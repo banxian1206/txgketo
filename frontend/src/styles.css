@@ -1,0 +1,141 @@
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  background: #f5f6f8;
+}
+
+/* 项目列表：整行可点击的视觉反馈 */
+.project-row-hover > td {
+  background: #eaf3ff !important;
+}
+.project-row-hover .row-title {
+  color: #1f6feb;
+  text-decoration: underline;
+}
+
+/* ============ 项目详情页 ============ */
+
+/* 顶部吸顶锚点条：不占左右空间，点一下跳到对应区块，滚到哪高亮哪 */
+.anchor-bar {
+  position: sticky;
+  top: 0;
+  z-index: 9;
+  display: flex;
+  gap: 6px;
+  margin-bottom: 12px;
+  padding: 8px 0;
+  overflow-x: auto;
+  background: #f5f6f8;
+  border-bottom: 1px solid #eee;
+  scrollbar-width: none;
+}
+.anchor-bar::-webkit-scrollbar {
+  display: none;
+}
+.anchor-bar a {
+  flex: none;
+  padding: 4px 14px;
+  border-radius: 14px;
+  font-size: 13px;
+  color: #595959;
+  white-space: nowrap;
+}
+.anchor-bar a:hover {
+  background: #eaf3ff;
+  color: #1f6feb;
+}
+.anchor-bar a.active {
+  background: #1f6feb;
+  color: #fff;
+}
+
+/* 跳转时给吸顶条留出位置，标题不被盖住 */
+[id^='sec-'] {
+  scroll-margin-top: 64px;
+}
+
+/* 就地编辑字段 */
+.ef-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 2px 20px;
+}
+.ef {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+  padding: 4px 8px;
+  border-radius: 6px;
+}
+.ef:hover {
+  background: #f5f8ff;
+}
+.ef-label {
+  flex: none;
+  width: 92px;
+  color: #8c8c8c;
+  font-size: 13px;
+}
+.ef-value {
+  flex: 1;
+  min-width: 0;
+  font-size: 14px;
+}
+.ef-readonly {
+  cursor: text;
+  display: inline-block;
+  min-width: 40px;
+}
+.ef-pen {
+  flex: none;
+  opacity: 0;
+  cursor: pointer;
+  color: #1f6feb;
+  font-size: 13px;
+  transition: opacity 0.15s;
+}
+.ef:hover .ef-pen {
+  opacity: 1;
+}
+
+/* 长表单：底部常驻操作条 */
+.form-actions {
+  position: sticky;
+  bottom: 0;
+  z-index: 10;
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 8px;
+  padding: 12px 0;
+  background: #fff;
+  border-top: 1px solid #f0f0f0;
+}
+
+/* 标准库左侧品类导航 */
+.lib-class {
+  display: block;
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 13px;
+  color: #595959;
+}
+.lib-class:hover { background: #f0f5ff; color: #1f6feb; }
+.lib-class.active { background: #e6f0ff; color: #1f6feb; font-weight: 600; }
+
+/* 设计工作面：还没创建的总装图（虚根） */
+.virtual-root-row > td {
+  background: #fafafa;
+  color: #999;
+}

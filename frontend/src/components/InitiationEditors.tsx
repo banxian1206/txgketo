@@ -1,0 +1,720 @@
+import {
+  App,
+  Button,
+  DatePicker,
+  Empty,
+  Form,
+  Input,
+  InputNumber,
+  Modal,
+  Popconfirm,
+  Select,
+  Space,
+  Table,
+  Tag,
+  Typography,
+} from 'antd'
+import dayjs from 'dayjs'
+import { useCallback, useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+
+import {
+  addEquipment,
+  errMsg,
+  listEquipment,
+  listMembers,
+  listMilestones,
+  listPurchaseRequests,
+  removeEquipment,
+  removeMilestone,
+  removePurchaseRequest,
+  saveMember,
+  updateEquipment,
+  updateMilestone,
+  addPurchaseRequest,
+  updatePurchaseRequest,
+  listStdItems,
+  type EquipmentItem,
+  type StdItem,
+  type MilestoneItem,
+  type ProjectMember,
+  type PurchaseRequestItem,
+} from '../api/client'
+
+const PROJECT_ROLES = [
+  '项目经理',
+  '技术负责人',
+  '机械负责人',
+  '电气负责人',
+  '程序负责人',
+  '工艺负责人',
+  '采购负责人',
+  '生产负责人',
+  '装配负责人',
+  '测试负责人',
+  '现场负责人',
+  '售后负责人',
+]
+
+const EQUIPMENT_KINDS = ['单机', '工位', '线体']
+const MILESTONE_STATUS = ['未开始', '进行中', '已完成', '延期']
+
+const STATUS_COLOR: Record<string, string> = {
+  未开始: 'default',
+  进行中: 'processing',
+  已完成: 'success',
+  延期: 'error',
+  待采购: 'default',
+  已下单: 'blue',
+  在途: 'gold',
+  已到货: 'success',
+  已取消: 'default',
+}
+
+interface Props {
+  projectNo: string
+  users: { id: number; name: string }[]
+  /** 变更后通知外面刷新（比如立项前的完成度检查） */
+  onChanged?: () => void
+}
+
+/** ① 项目团队：11 个项目角色，每个角色选一个人（换人留痕） */
+export function TeamEditor({ projectNo, users, onChanged }: Props) {
+  const { message } = App.useApp()
+  const [rows, setRows] = useState<ProjectMember[]>([])
+  const [saving, setSaving] = useState<string | null>(null)
+
+  const load = useCallback(async () => {
+    try {
+      setRows(await listMembers(projectNo))
+    } catch (e) {
+      message.error(errMsg(e))
+    }
+  }, [projectNo, message])
+
+  useEffect(() => {
+    void load()
+  }, [load])
+
+  const pick = async (role: string, userId?: number) => {
+    setSaving(role)
+    try {
+      if (userId) {
+        await saveMember(projectNo, userId, role)
+        await load()
+        onChanged?.()
+      }
+    } catch (e) {
+      message.error(errMsg(e))
+    } finally {
+      setSaving(null)
+    }
+  }
+
+  return (
+    <Table
+      rowKey="project_role"
+      size="small"
+      pagination={false}
+      dataSource={PROJECT_ROLES.map((r) => {
+        const found = rows.find((x) => x.project_role === r)
+        return {
+          ...(found ?? { id: 0, user_id: 0, project_role: r, remark: null }),
+          project_role: r,
+        }
+      })}
+      columns={[
+        { title: '项目角色', dataIndex: 'project_role', width: 140 },
+        {
+          title: '人',
+          dataIndex: 'user_id',
+          render: (v: number, r: ProjectMember & { project_role: string }) => (
+            <Select
+              size="small"
+              style={{ width: 180 }}
+              allowClear
+              showSearch
+              optionFilterProp="label"
+              placeholder="未任命"
+              value={v || undefined}
+              loading={saving === r.project_role}
+              options={users.map((u) => ({ value: u.id, label: u.name }))}
+              onChange={(nv) => void pick(r.project_role, nv as number | undefined)}
+            />
+          ),
+        },
+        {
+          title: '说明',
+          dataIndex: 'remark',
+          render: () => (
+            <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+              同一个人可以在不同项目担任不同角色
+            </Typography.Text>
+          ),
+        },
+      ]}
+    />
+  )
+}
+
+/** ② 设备清单：设备号由系统自动发（01A，同型第二台 01B） */
+export function EquipmentEditor({ projectNo, onChanged }: Omit<Props, 'users'>) {
+  const { message } = App.useApp()
+  const navigate = useNavigate()
+  const [rows, setRows] = useState<EquipmentItem[]>([])
+  const [open, setOpen] = useState(false)
+  const [sameAs, setSameAs] = useState<string | undefined>()
+  const [saving, setSaving] = useState(false)
+  const [form] = Form.useForm()
+
+  const load = useCallback(async () => {
+    try {
+      setRows(await listEquipment(projectNo))
+    } catch (e) {
+      message.error(errMsg(e))
+    }
+  }, [projectNo, message])
+
+  useEffect(() => {
+    void load()
+  }, [load])
+
+  const openAdd = (same?: string) => {
+    form.resetFields()
+    setSameAs(same)
+    setOpen(true)
+  }
+
+  const submit = async () => {
+    const v = await form.validateFields()
+    setSaving(true)
+    try {
+      const created = await addEquipment(projectNo, { ...v, same_as: sameAs })
+      message.success(`已新增设备 ${created.equip_no}（${created.equip_name}）`)
+      setOpen(false)
+      await load()
+      onChanged?.()
+    } catch (e) {
+      message.error(errMsg(e))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const editField = async (row: EquipmentItem, field: string, value: string) => {
+    try {
+      await updateEquipment(projectNo, row.id, { [field]: value })
+      await load()
+    } catch (e) {
+      message.error(errMsg(e))
+    }
+  }
+
+  return (
+    <>
+      <Space style={{ marginBottom: 12 }}>
+        <Button type="primary" size="small" onClick={() => openAdd()}>
+          + 新增设备
+        </Button>
+        <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+          设备号由系统自动发（01A、02A…；同型第二台自动 01B）
+        </Typography.Text>
+      </Space>
+      <Table<EquipmentItem>
+        rowKey="id"
+        size="small"
+        pagination={false}
+        dataSource={rows}
+        locale={{ emptyText: <Empty description="还没有设备" /> }}
+        columns={[
+          {
+            title: '设备号',
+            dataIndex: 'equip_no',
+            width: 90,
+            render: (v: string) => <Typography.Text strong>{v}</Typography.Text>,
+          },
+          {
+            title: '设备名称',
+            dataIndex: 'equip_name',
+            render: (v: string, r) => (
+              <Space size={6}>
+                <Typography.Text editable={{ onChange: (nv) => void editField(r, 'equip_name', nv) }}>
+                  {v}
+                </Typography.Text>
+                <a onClick={() => navigate(`/projects/${projectNo}/design/${r.equip_no}`)}>设计</a>
+              </Space>
+            ),
+          },
+          {
+            title: '类型',
+            dataIndex: 'kind',
+            width: 110,
+            render: (v: string, r) => (
+              <Select
+                size="small"
+                style={{ width: 90 }}
+                allowClear
+                value={v ?? undefined}
+                options={EQUIPMENT_KINDS.map((k) => ({ value: k, label: k }))}
+                onChange={(nv) => void editField(r, 'kind', (nv as string) ?? '')}
+              />
+            ),
+          },
+          {
+            title: '型号',
+            dataIndex: 'model',
+            render: (v: string | null, r) => (
+              <Typography.Text
+                editable={{ onChange: (nv) => void editField(r, 'model', nv) }}
+                type={v ? undefined : 'secondary'}
+              >
+                {v ?? '点这里填'}
+              </Typography.Text>
+            ),
+          },
+          {
+            title: 'BOM',
+            dataIndex: 'bom_complete',
+            width: 100,
+            render: (v: boolean) =>
+              v ? <Tag color="green">完整</Tag> : <Tag>待设计</Tag>,
+          },
+          {
+            title: '操作',
+            key: 'action',
+            width: 170,
+            render: (_: unknown, r: EquipmentItem) => (
+              <Space size="middle">
+                <a onClick={() => openAdd(r.equip_no)} title="再要一台一样的">
+                  同型再来一台
+                </a>
+                <Popconfirm
+                  title={`删除设备 ${r.equip_no}？`}
+                  onConfirm={() =>
+                    void removeEquipment(projectNo, r.id)
+                      .then(load)
+                      .then(() => onChanged?.())
+                      .catch((e) => message.error(errMsg(e)))
+                  }
+                >
+                  <a>删除</a>
+                </Popconfirm>
+              </Space>
+            ),
+          },
+        ]}
+      />
+
+      <Modal
+        title={sameAs ? `同型再来一台（参照 ${sameAs}）` : '新增设备'}
+        open={open}
+        width={520}
+        onCancel={() => setOpen(false)}
+        onOk={() => void submit()}
+        confirmLoading={saving}
+        okText="确定"
+        destroyOnClose
+      >
+        <Form form={form} layout="vertical" preserve={false}>
+          <Form.Item
+            name="equip_name"
+            label="设备名称"
+            rules={[{ required: true, message: '请填设备名称（如 升降机 / 点胶机 / 皮带线）' }]}
+          >
+            <Input placeholder="如：升降机" />
+          </Form.Item>
+          <Form.Item name="kind" label="类型">
+            <Select
+              allowClear
+              options={EQUIPMENT_KINDS.map((k) => ({ value: k, label: k }))}
+            />
+          </Form.Item>
+          <Form.Item name="model" label="型号">
+            <Input placeholder="如：TX-NS-LFT-01" />
+          </Form.Item>
+        </Form>
+      </Modal>
+    </>
+  )
+}
+
+/** ③ 节点计划：每个节点的时间段（立项时定下来） */
+export function MilestoneEditor({ projectNo, users, onChanged }: Props) {
+  const { message } = App.useApp()
+  const [rows, setRows] = useState<MilestoneItem[]>([])
+
+  const load = useCallback(async () => {
+    try {
+      setRows(await listMilestones(projectNo))
+    } catch (e) {
+      message.error(errMsg(e))
+    }
+  }, [projectNo, message])
+
+  useEffect(() => {
+    void load()
+  }, [load])
+
+  const patch = async (id: number, body: Record<string, unknown>) => {
+    try {
+      await updateMilestone(projectNo, id, body)
+      await load()
+      onChanged?.()
+    } catch (e) {
+      message.error(errMsg(e))
+    }
+  }
+
+  return (
+    <Table<MilestoneItem>
+      rowKey="id"
+      size="small"
+      pagination={false}
+      dataSource={rows}
+      locale={{ emptyText: <Empty description="还没有节点计划" /> }}
+      columns={[
+        { title: '#', dataIndex: 'seq', width: 46 },
+        { title: '节点', dataIndex: 'name', width: 150 },
+        {
+          title: '计划开始',
+          dataIndex: 'plan_start',
+          width: 140,
+          render: (v: string | null, r) => (
+            <DatePicker
+              size="small"
+              style={{ width: 120 }}
+              value={v ? dayjs(v) : null}
+              onChange={(d) => void patch(r.id, { plan_start: d ? d.format('YYYY-MM-DD') : null })}
+            />
+          ),
+        },
+        {
+          title: '计划结束',
+          dataIndex: 'plan_end',
+          width: 140,
+          render: (v: string | null, r) => (
+            <DatePicker
+              size="small"
+              style={{ width: 120 }}
+              value={v ? dayjs(v) : null}
+              onChange={(d) => void patch(r.id, { plan_end: d ? d.format('YYYY-MM-DD') : null })}
+            />
+          ),
+        },
+        {
+          title: '负责人',
+          dataIndex: 'owner_id',
+          width: 140,
+          render: (v: number | null, r) => (
+            <Select
+              size="small"
+              style={{ width: 120 }}
+              allowClear
+              showSearch
+              optionFilterProp="label"
+              value={v ?? undefined}
+              options={users.map((u) => ({ value: u.id, label: u.name }))}
+              onChange={(nv) => void patch(r.id, { owner_id: nv ?? null })}
+            />
+          ),
+        },
+        {
+          title: '状态',
+          dataIndex: 'status',
+          width: 110,
+          render: (v: string, r) => (
+            <Select
+              size="small"
+              style={{ width: 100 }}
+              value={v}
+              options={MILESTONE_STATUS.map((s) => ({
+                value: s,
+                label: <Tag color={STATUS_COLOR[s]}>{s}</Tag>,
+              }))}
+              onChange={(nv) => void patch(r.id, { status: nv })}
+            />
+          ),
+        },
+        {
+          title: '',
+          key: 'action',
+          width: 50,
+          render: (_: unknown, r: MilestoneItem) => (
+            <Popconfirm
+              title={`删除节点「${r.name}」？`}
+              onConfirm={() =>
+                void removeMilestone(projectNo, r.id)
+                  .then(load)
+                  .then(() => onChanged?.())
+                  .catch((e) => message.error(errMsg(e)))
+              }
+            >
+              <a>删除</a>
+            </Popconfirm>
+          ),
+        },
+      ]}
+    />
+  )
+}
+
+/** ④ 长周期采购：立项即下单（不走仓库优先与合并采购） */
+export function LongLeadEditor({ projectNo, onChanged }: Omit<Props, 'users'>) {
+  const { message } = App.useApp()
+  const [rows, setRows] = useState<PurchaseRequestItem[]>([])
+  const [open, setOpen] = useState(false)
+  const [editing, setEditing] = useState<PurchaseRequestItem | null>(null)
+  const [saving, setSaving] = useState(false)
+  const [form] = Form.useForm()
+
+  const load = useCallback(async () => {
+    try {
+      setRows(await listPurchaseRequests(projectNo))
+    } catch (e) {
+      message.error(errMsg(e))
+    }
+  }, [projectNo, message])
+
+  useEffect(() => {
+    void load()
+  }, [load])
+
+  const openForm = (row?: PurchaseRequestItem) => {
+    setEditing(row ?? null)
+    form.resetFields()
+    if (row) {
+      form.setFieldsValue({
+        item_no: row.item_no,
+        qty: row.qty,
+        unit: row.unit,
+        lead_days: row.lead_days,
+        supplier_name: row.supplier_name,
+        need_date: row.need_date ? dayjs(row.need_date) : undefined,
+        ordered_at: row.ordered_at ? dayjs(row.ordered_at) : undefined,
+        remark: row.remark,
+      })
+    } else {
+      form.setFieldsValue({ ordered_at: dayjs() })
+    }
+    setOpen(true)
+  }
+
+  const submit = async () => {
+    const v = await form.validateFields()
+    const body = {
+      ...v,
+      need_date: v.need_date ? v.need_date.format('YYYY-MM-DD') : null,
+      ordered_at: v.ordered_at ? v.ordered_at.format('YYYY-MM-DD') : null,
+    }
+    setSaving(true)
+    try {
+      if (editing) await updatePurchaseRequest(projectNo, editing.id, body)
+      else await addPurchaseRequest(projectNo, body)
+      message.success('已保存')
+      setOpen(false)
+      await load()
+      onChanged?.()
+    } catch (e) {
+      message.error(errMsg(e))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <>
+      <Space style={{ marginBottom: 12 }}>
+        <Button type="primary" size="small" onClick={() => openForm()}>
+          + 登记长周期件
+        </Button>
+        <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+          这类件不备货、周期长（如 ABB 机器人 2 个月）—— 立项就下单，不走合并采购
+        </Typography.Text>
+      </Space>
+      <Table<PurchaseRequestItem>
+        rowKey="id"
+        size="small"
+        pagination={false}
+        dataSource={rows}
+        locale={{ emptyText: <Empty description="还没有长周期采购件" /> }}
+        columns={[
+          {
+            title: '物料（标准库）',
+            dataIndex: 'item_name',
+            render: (v: string, r: PurchaseRequestItem) => (
+              <Space direction="vertical" size={0}>
+                <span>{v}</span>
+                <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                  {r.item_no}
+                  {r.spec_text ? ` · ${r.spec_text}` : ''}
+                </Typography.Text>
+              </Space>
+            ),
+          },
+          {
+            title: '数量',
+            dataIndex: 'qty',
+            width: 90,
+            render: (v: number | null, r) => (v ? `${v} ${r.unit ?? ''}` : '—'),
+          },
+          {
+            title: '周期',
+            dataIndex: 'lead_days',
+            width: 80,
+            render: (v: number | null) => (v ? `${v} 天` : '—'),
+          },
+          { title: '供应商', dataIndex: 'supplier_name', width: 110 },
+          { title: '下单', dataIndex: 'ordered_at', width: 110 },
+          {
+            title: '预计到货',
+            dataIndex: 'expected_date',
+            width: 110,
+            render: (v: string | null, r) => (
+              <Space size={4}>
+                <span>{v ?? '—'}</span>
+                {v && r.need_date && v > r.need_date && <Tag color="red">晚于需求</Tag>}
+              </Space>
+            ),
+          },
+          { title: '需要到货', dataIndex: 'need_date', width: 110 },
+          {
+            title: '状态',
+            dataIndex: 'status',
+            width: 100,
+            render: (v: string) => <Tag color={STATUS_COLOR[v]}>{v}</Tag>,
+          },
+          {
+            title: '',
+            key: 'action',
+            width: 90,
+            render: (_: unknown, r: PurchaseRequestItem) => (
+              <Space size="middle">
+                <a onClick={() => openForm(r)}>编辑</a>
+                <Popconfirm
+                  title="删除？"
+                  onConfirm={() =>
+                    void removePurchaseRequest(projectNo, r.id)
+                      .then(load)
+                      .then(() => onChanged?.())
+                      .catch((e) => message.error(errMsg(e)))
+                  }
+                >
+                  <a>删除</a>
+                </Popconfirm>
+              </Space>
+            ),
+          },
+        ]}
+      />
+
+      <Modal
+        title={editing ? `编辑 · ${editing.item_name}` : '登记长周期件'}
+        open={open}
+        width={640}
+        onCancel={() => setOpen(false)}
+        onOk={() => void submit()}
+        confirmLoading={saving}
+        okText="保存"
+        destroyOnClose
+      >
+        <Form form={form} layout="vertical" preserve={false}>
+          <Form.Item
+            name="item_no"
+            label="标准库物料"
+            rules={[{ required: true, message: '请从标准库里选一个物料' }]}
+            extra={
+              <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                库里没有？
+                <a onClick={() => window.open('/library', '_blank')}> 去标准库新建 </a>
+                （标准库是全公司共用的，建一次以后都能选）
+              </Typography.Text>
+            }
+          >
+            <StdItemSelect placeholder="输入编码 / 品名 / 规格 / 品牌搜索" />
+          </Form.Item>
+          <Space style={{ display: 'flex' }} size="middle">
+            <Form.Item name="qty" label="数量" style={{ minWidth: 120 }}>
+              <InputNumber style={{ width: '100%' }} min={0} />
+            </Form.Item>
+            <Form.Item name="unit" label="单位" style={{ minWidth: 90 }}>
+              <Input placeholder="台 / 套" />
+            </Form.Item>
+            <Form.Item
+              name="lead_days"
+              label="采购周期（天）"
+              tooltip="预计到货 = 下单日期 + 采购周期"
+              style={{ minWidth: 140 }}
+            >
+              <InputNumber style={{ width: '100%' }} min={0} addonAfter="天" />
+            </Form.Item>
+          </Space>
+          <Space style={{ display: 'flex' }} size="middle">
+            <Form.Item name="supplier_name" label="供应商" style={{ minWidth: 200 }}>
+              <Input placeholder="如：ABB" />
+            </Form.Item>
+            <Form.Item name="ordered_at" label="下单日期" style={{ minWidth: 170 }}>
+              <DatePicker style={{ width: '100%' }} />
+            </Form.Item>
+            <Form.Item name="need_date" label="需要到货" style={{ minWidth: 170 }}>
+              <DatePicker style={{ width: '100%' }} />
+            </Form.Item>
+          </Space>
+          <Form.Item name="remark" label="备注">
+            <Input.TextArea rows={2} />
+          </Form.Item>
+        </Form>
+      </Modal>
+    </>
+  )
+}
+
+/** 标准库物料选择器：搜索编码 / 品名 / 规格 / 品牌 */
+function StdItemSelect({
+  value,
+  onChange,
+  placeholder,
+}: {
+  value?: string
+  onChange?: (v?: string) => void
+  placeholder?: string
+}) {
+  const [rows, setRows] = useState<StdItem[]>([])
+  const [loading, setLoading] = useState(false)
+  const [q, setQ] = useState('')
+
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setLoading(true)
+      listStdItems({ q: q || undefined, limit: 50 })
+        .then(setRows)
+        .catch(() => setRows([]))
+        .finally(() => setLoading(false))
+    }, 250)
+    return () => clearTimeout(t)
+  }, [q])
+
+  // 已选中的物料如果不在当前搜索结果里，补一条进去（否则只显示编码）
+  const options = rows.map((i) => ({
+    value: i.item_no,
+    label: `${i.item_no} ${i.display_name}`,
+  }))
+  if (value && !rows.some((i) => i.item_no === value)) {
+    options.unshift({ value, label: value })
+  }
+
+  return (
+    <Select
+      showSearch
+      allowClear
+      value={value}
+      placeholder={placeholder}
+      loading={loading}
+      optionFilterProp="label"
+      filterOption={false}
+      onSearch={setQ}
+      onChange={(v) => onChange?.(v as string | undefined)}
+      options={options}
+      style={{ width: '100%' }}
+    />
+  )
+}

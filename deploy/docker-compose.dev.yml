@@ -1,0 +1,28 @@
+# ⚠️ 顶层 name 必须写死！
+# 本机多个项目都用 deploy/ 目录放 compose，Docker 默认以目录名作项目名 → 会撞车
+# （曾导致 txgketo 与 txeto 共用同一个 pg volume 的事故）
+name: txgketo
+
+services:
+  pg:
+    image: postgres:17-alpine
+    container_name: txgketo-pg
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: txgk
+      POSTGRES_PASSWORD: txgk
+      POSTGRES_DB: txgk
+      TZ: Asia/Shanghai
+    ports:
+      - "35432:5432"
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+      - ./initdb:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U txgk -d txgk"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  pg_data:
