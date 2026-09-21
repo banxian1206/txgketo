@@ -27,10 +27,12 @@ import Assembly from './pages/Assembly'
 import Shipping from './pages/Shipping'
 import Site from './pages/Site'
 import AcceptancePage from './pages/Acceptance'
+import Service from './pages/Service'
 import ProductionM from './pages/m/ProductionM'
 import AssemblyM from './pages/m/AssemblyM'
 import ShippingM from './pages/m/ShippingM'
 import SiteM from './pages/m/SiteM'
+import ServiceM from './pages/m/ServiceM'
 import Workbench from './pages/Workbench'
 import DeptWorkbench from './pages/workbench/DeptWorkbench'
 import EngWorkbench from './pages/workbench/EngWorkbench'
@@ -62,6 +64,7 @@ export default function App() {
         <Route path="assembly" element={<AssemblyM />} />
         <Route path="shipping" element={<ShippingM />} />
         <Route path="site" element={<SiteM />} />
+        <Route path="service" element={<ServiceM />} />
         <Route path="me" element={<MeM />} />
       </Route>
       <Route
@@ -96,6 +99,7 @@ export default function App() {
         <Route path="shipping" element={<Shipping />} />
         <Route path="site" element={<Site />} />
         <Route path="acceptance" element={<AcceptancePage />} />
+        <Route path="service" element={<Service />} />
         <Route path="projects/:projectNo/design/:equipNo" element={<EquipmentDesign />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />

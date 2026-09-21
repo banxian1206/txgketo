@@ -6,6 +6,7 @@ from app.models.assembly import AssemblyRecord, KittingSnapshot
 from app.models.shipment import PackingItem, Shipment, ShipmentLine, SiteReceipt
 from app.models.site import SiteCommission, SiteDaily, SiteIncoming, SiteIssue, SiteSurvey
 from app.models.acceptance import Acceptance, AcceptanceDocument
+from app.models.service import ServiceOrder, SparePart, SparePartMove
 from app.models.review import DesignRelease, ReviewAction, ReviewTicket, ReviewTicketItem
 from app.models.program import EquipmentProgram, EquipmentProgramVersion
 from app.models.production import (
@@ -101,6 +102,9 @@ __all__ = [
     "SiteIncoming",
     "SiteIssue",
     "SiteSurvey",
+    "ServiceOrder",
+    "SparePart",
+    "SparePartMove",
     "ProdAcceptance",
     "ProdOrder",
     "ProdTask",

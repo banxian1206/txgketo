@@ -22,6 +22,7 @@ from app.api.routes import (
     programs,
     project,
     reviews,
+    service,
     shipping,
     site,
     suppliers,
@@ -72,6 +73,7 @@ for r in (
     mobile,
     notifications,
     workbench,
+    service,
     suppliers,
     warehouse,
 ):

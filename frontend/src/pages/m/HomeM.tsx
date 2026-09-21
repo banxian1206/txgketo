@@ -31,6 +31,7 @@ export default function HomeM() {
     { label: '现场问题', value: c?.site_open_issues ?? 0, to: '/m/site' },
     { label: '待派调试', value: c?.site_to_dispatch ?? 0, to: '/m/site' },
     { label: '待客户验收', value: c?.acceptance_pending ?? 0, to: '/m/site' },
+    { label: '售后工单', value: c?.service_open ?? 0, to: '/m/service' },
     { label: '我的任务', value: c?.my_tasks ?? 0, to: '/my-tasks' },
     { label: '待我审', value: c?.to_review ?? 0, to: '/reviews' },
     { label: '待我裁决', value: c?.to_decide ?? 0, to: '/changes' },

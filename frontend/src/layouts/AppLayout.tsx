@@ -125,6 +125,7 @@ export default function AppLayout() {
                           { key: '/shipping', label: <Link to="/shipping">发运（发货指令）</Link> },
                           { key: '/site', label: <Link to="/site">现场安装</Link> },
                           { key: '/acceptance', label: <Link to="/acceptance">验收与质保</Link> },
+                          { key: '/service', label: <Link to="/service">售后</Link> },
                         ]
                       : []),
                     { key: '/suppliers', label: <Link to="/suppliers">供应商</Link> },

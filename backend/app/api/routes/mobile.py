@@ -25,6 +25,7 @@ from app.models.platform import POSITION_DIRECTOR, POSITION_LEAD, User
 from app.models.production import PROD_DISPATCHED, PROD_DONE, PROD_RUNNING, PROD_WAIT, ProdOrder
 from app.models.project import Equipment, Project
 from app.models.review import TICKET_PENDING_DIRECTOR, TICKET_PENDING_LEAD, ReviewTicket
+from app.models.service import ServiceOrder
 from app.models.shipment import Shipment
 from app.models.site import SiteCommission, SiteIssue
 from app.models.task import Task
@@ -117,6 +118,10 @@ def mobile_home(session: Session = Depends(get_session), current: User = Depends
     acceptance_pending = _count(
         session, select(func.count()).select_from(Acceptance).where(Acceptance.status == "待验收")
     )
+    service_open = _count(
+        session,
+        select(func.count()).select_from(ServiceOrder).where(ServiceOrder.status != "已关闭"),
+    )
 
     if current.position == POSITION_DIRECTOR:
         to_review = _count(
@@ -169,6 +174,7 @@ def mobile_home(session: Session = Depends(get_session), current: User = Depends
             "site_open_issues": site_open_issues,
             "site_to_dispatch": site_to_dispatch,
             "acceptance_pending": acceptance_pending,
+            "service_open": service_open,
         },
     }
 
