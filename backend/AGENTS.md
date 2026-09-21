@@ -92,8 +92,8 @@ deploy/          docker-compose.dev.yml
 ## 8. 当前进度（交接记录）
 
 > 更新于：**06 卷 F 步（账号权限收尾）**落地：接口级权限强校验（`require_permission`，采购下单类→`purchase:edit`、验收/入库/领料→`warehouse:edit`）、金额分档（`purchase:price` 采购价 / `project:amount` 项目金额，无权限返回 null）、**离职/停用一键转交**（任务/待审/项目角色/图·程序·BOM 归属）。
-> 已完成：S0 商机 → S1 立项 → S2 工程设计 → S3 采购 → S4 仓库 → S5 制造 → S6 装配与齐套率 → S7 发运 → S8 现场安装 → S9 现场调试 → **S10 客户验收与质保**。
-> 下一步：质保与售后（S11：服务工单 SV + 备件）；超期扫描自动提醒；Excel 历史采购导入。
+> **全部完成：S0 商机 → S1 立项 → S2 工程设计 → S3 采购 → S4 仓库 → S5 制造 → S6 装配与齐套率 → S7 发运 → S8 现场安装 → S9 现场调试 → S10 客户验收与质保 → S11 质保与售后。**
+> 后续可做：超期扫描自动提醒（已有 60 天质保到期看板）；经营驾驶舱/成本毛利（三期）；Excel 历史采购导入；离线队列 + Capacitor 打包。
 
 ### 8.1 采购状态线（客户口径，别再改回去了）
 
@@ -159,6 +159,7 @@ deploy/          docker-compose.dev.yml
 | **手机端补齐（S5–S7）** | ✅ | 底部入口**按角色/权限显示**（`MobileLayout.tsx`：首页/仓库/领料/制造/装配/发运/我的）；新增 `/m/assembly`（齐套率 + 开始装配/装配完成/厂内调试，拍照）、`/m/shipping`（勾选设备下指令 + 装箱/装车/发运/到货/现场验收，拍照）；`/m/home` 待办加上制造/装配/发运计数；现场到货验收允许 `ship:edit` 或 `site:edit`；演示账号新增 `delivery1`/`site1`/`service1`/`assy1`/`qc1`（密码 `txgk@123`） |
 | **S8 现场安装** | ✅ | 迁移 `j4f6b8d03e59`（`site_survey`/`site_daily`/`site_issue`/`site_commission`/`site_incoming`）；`services/site.py`（勘测→定入场时间、每日汇报勾选+拍照/录像、现场问题→变更、申请调试→通知装配/项目、直发件现场清点）；`routes/site.py`（写 `site:edit` 或 `project:edit`，读登录）；**直发到货改为「现场待验收」（原来直接置“现场已验收”）**，现场清点后反推采购需求状态；`pages/m/SiteM.tsx`（现场主终端）、`pages/Site.tsx`（PC 现场台）；`/m/home` 加现场问题/待派调试计数 |
 | **S9 现场调试 / S10 客户验收与质保** | ✅ | 迁移 `k5a7c9e14f60`（`acceptance`/`acceptance_document`）；现场调试：`site_commission` 加「调试完成」+ 每日汇报 stage（单机调试/联调）；验收：`services/acceptance.py`（调试完成→申请验收→传资料包→客户签字确认→**自动进入质保期**：`warranty_start=验收日`、`warranty_end=+质保月数`、项目阶段→质保）+ 60 天到期提醒（含质保金）；`routes/acceptance.py`（申请/资料包上传·下载·签收/客户确认/验收台）；`pages/Acceptance.tsx`（PC）+ SiteM「客户验收」页签；发运 → 项目自动进入「交付中」阶段 |
+| **S11 质保与售后** | ✅ | 迁移 `l6b8d0f25a71`（`service_order`/`spare_part`/`spare_part_move`；编号 `SV{YY}{NNN}` 沿用既有规则）；`routes/service.py`（报修自动判定**在保/过保** → 派工 → 到场 → 处理完成（工时/照片）→ 客户签字关单；备件建账 + 收发（领出扣库存、可关联工单、低库存标红））；`pages/Service.tsx`（PC 售后台）+ `pages/m/ServiceM.tsx`（手机端，service:edit）；`/m/home` 加售后工单待办；质保到期提醒在验收台（60 天 + 质保金） |
 | 供应商主数据 + 报价 + 能供品类 | ✅ | `models/purchasing.py`、`routes/suppliers.py` |
 | 推荐供应商（多路证据打分） | ✅ | `GET /purchase/recommend/{item_no}` |
 | 价格参考（上次成交/历史区间/各家报价） | ✅ | `GET /purchase/price-reference/{item_no}` |
@@ -293,6 +294,15 @@ GET  /api/v1/acceptance/documents/{doc_id}           下载资料（带鉴权）
 POST /api/v1/acceptance/documents/{doc_id}/sign      标记已签
 POST /api/v1/acceptance/{id}/confirm                 客户确认 {result: 通过/不通过, signed_by, accepted_at} → 自动质保
 GET  /api/v1/acceptance/workbench                    验收台 + 质保到期提醒（60 天）
+
+售后（S11）—— 写：service:edit；读：登录即可
+POST /api/v1/service/orders                          报修（自动判定在保/过保）
+GET  /api/v1/service/orders | /workbench             工单列表 / 售后台
+POST /api/v1/service/orders/{id}/dispatch|arrive|fix|sign   派工 / 到场 / 处理完成 / 客户签字关单
+GET  /api/v1/service/parts | POST /parts             备件列表 / 建账
+POST /api/v1/service/parts/move                     备件收发（领出/退回/补货，可关联工单）
+GET  /api/v1/service/parts/moves                    收发记录
+POST/GET /api/v1/service/photos                     售后拍照上传 / 取回
 POST /api/v1/projects/{p}/payment-terms/{seq}/receive  登记回款（多次累加；payment:edit）
    权限强校验：采购下单类→purchase:edit；验收/入库/领料→warehouse:edit；金额→purchase:price / project:amount（无权限返回 null）
 POST/PATCH /api/v1/orgs（/{id}）                   组织维护：部门/组 增改停用（停用不删）
