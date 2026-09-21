@@ -169,6 +169,11 @@ export default function Manufacturing() {
         })
         message.success('已下发（原材料 + 图纸，已拍照）')
       } else if (action.kind === 'accept' && action.order) {
+        if (v.result !== '合格' && !(v.reason || '').trim()) {
+          message.warning('不合格/返工必须写明原因')
+          setSaving(false)
+          return
+        }
         await acceptProdOrder(action.order.id, { result: v.result, reason: v.reason, photos })
         message.success(v.result === '合格' ? '验收合格 → 可转运' : '已标记返工')
       } else if (action.kind === 'transfer' && action.order) {

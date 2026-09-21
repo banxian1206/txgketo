@@ -79,7 +79,7 @@ class SurveyIn(BaseModel):
     power: str | None = None
     air: str | None = None
     network: str | None = None
-    enter_date: date | None = None
+    enter_date: date
     photos: list = Field(default_factory=list)
     remark: str | None = None
 
@@ -124,7 +124,7 @@ class DailyIn(BaseModel):
     stage: str = "安装"
     done_items: list = Field(default_factory=list)
     people: int | None = None
-    photos: list = Field(default_factory=list)
+    photos: list = Field(default_factory=list, description="每日汇报必须拍照留痕")
     videos: list = Field(default_factory=list)
     problem: str | None = None
     remark: str | None = None
@@ -139,6 +139,8 @@ def add_daily(
 ):
     if body.stage not in SITE_STAGES:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "阶段只能是 安装 / 单机调试 / 联调")
+    if not body.photos:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "每日汇报必须拍照留痕")
     row = site_svc.add_daily(session, project_no=body.project_no, actor_id=current.id, body=body.model_dump())
     audit.log(
         session, user=current, action="site_daily", object_type="project", object_ref=body.project_no,
@@ -241,7 +243,7 @@ def link_change(
 
 class CommissionIn(BaseModel):
     project_no: str
-    dispatch_to: str | None = None
+    dispatch_to: str = Field(..., description="派谁去（调试工程师）——必须派人到现场")
     plan_date: date | None = None
     remark: str | None = None
 

@@ -262,7 +262,11 @@ export default function Warehouse() {
 
   const issueAction = async (id: number, action: 'pick' | 'hand-over') => {
     const body: Record<string, unknown> = {}
-    if (action === 'hand-over') body.issued_to = window.prompt('领料人（车间）') ?? undefined
+    if (action === 'hand-over') {
+      const who = window.prompt('领料人（车间）——必填：谁领走的')
+      if (!who || !who.trim()) return
+      body.issued_to = who.trim()
+    }
     try {
       await api.post(`/warehouse/issues/${id}/${action}`, body)
       message.success(action === 'pick' ? '备料完成' : '已领走（库存已扣）')
@@ -716,8 +720,8 @@ export default function Warehouse() {
           {storeTarget?.equip_no ? ` · ${storeTarget.equip_no}` : ''}
         </Typography.Paragraph>
         <Form form={storeForm} layout="vertical">
-          <Form.Item name="location" label="入库库位">
-            <Input placeholder="如 深圳仓 A-03-12（不填先用「待定」库位）" />
+          <Form.Item name="location" label="入库库位" rules={[{ required: true, message: '入库必须定库位' }]}>
+            <Input placeholder="如 深圳仓 A-01-01" />
           </Form.Item>
           <Form.Item name="note" label="备注" style={{ marginBottom: 0 }}>
             <Input placeholder="可不填" />

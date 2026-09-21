@@ -494,6 +494,8 @@ def hand_over_issue(
     current: User = Depends(require_permission("warehouse:edit")),
 ):
     """车间领走：扣库存、解锁占用、写出库流水。"""
+    if not (body.issued_to or "").strip():
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "必须填领料人（谁领走的）")
     issue = session.get(MaterialIssue, issue_id)
     if issue is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "领料单不存在")

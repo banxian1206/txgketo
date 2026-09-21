@@ -321,6 +321,8 @@ def receipt(
         raise HTTPException(status.HTTP_404_NOT_FOUND, "发运批次不存在")
     if body.result not in RECEIPT_RESULTS:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "验收结论只能是 齐 / 缺件 / 破损")
+    if body.result != "齐" and not body.shortage_detail:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "缺件/破损必须写明明细（缺什么、多少、原因）")
     try:
         shp.site_receipt(
             session, sh, actor_id=current.id, result=body.result,

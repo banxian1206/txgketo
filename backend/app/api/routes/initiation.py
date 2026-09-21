@@ -927,6 +927,8 @@ def order(
         raise HTTPException(status.HTTP_400_BAD_REQUEST, f"收货地点只能是：{'/'.join(DELIVER_TO)}")
     if body.deliver_to == "直发客户现场" and not body.deliver_address:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "直发客户现场必须填送货地址")
+    if not body.supplier_id and not body.supplier_name:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "下单必须写供应商（从供应商主数据选或填名称）")
     row.deliver_to = body.deliver_to
     row.deliver_address = body.deliver_address
     row.status = "在途"  # 下完单就是在途（等货）
@@ -1063,6 +1065,8 @@ def inspect_purchase_request(
         raise HTTPException(status.HTTP_404_NOT_FOUND, "采购需求不存在")
     if body.result not in ("合格", "不合格"):
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "验收结果只能是 合格 / 不合格")
+    if body.result == "不合格" and not (body.note or "").strip():
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "验收不合格必须写明原因")
     if row.status in ("已取消", "已退货"):
         raise HTTPException(status.HTTP_400_BAD_REQUEST, f"这一行已经结束了（{row.status}），不能再验收")
     if row.status not in ("在途", "部分到货", "待入库", "不合格", "已下单"):
@@ -1182,7 +1186,7 @@ def inspect_purchase_request(
 
 
 class StoreIn(BaseModel):
-    location: str | None = Field(default=None, description="入库库位（如 深圳仓 A-03-12）")
+    location: str = Field(..., description="入库库位（如 深圳仓 A-01-01）—— 入库必须定库位")
     note: str | None = None
 
 

@@ -293,6 +293,8 @@ def accept(
         raise HTTPException(status.HTTP_404_NOT_FOUND, "排产单不存在")
     if body.result not in ("合格", "不合格", "返工"):
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "验收结论只能是 合格 / 不合格 / 返工")
+    if body.result != "合格" and not (body.reason or "").strip():
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "不合格/返工必须写明原因")
     if not body.photos:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "验收要拍照（证明做完了、合格）")
     try:

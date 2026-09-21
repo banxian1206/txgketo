@@ -101,6 +101,8 @@ def confirm(
     remark: str | None = None,
 ) -> Acceptance:
     """客户确认验收。通过 → 自动进入质保期 + 项目阶段推进到「质保」。"""
+    if result == "通过" and not (signed_by or "").strip():
+        raise AcceptanceError("验收通过必须记录客户签字人")
     project = session.get(Project, acc.project_no)
     when = accepted_at or date.today()
     acc.accepted_at = _now()

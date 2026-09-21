@@ -79,7 +79,7 @@ def part_dict(p: SparePart) -> dict:
 class CreateIn(BaseModel):
     project_no: str
     equip_no: str | None = None
-    fault: str | None = None
+    fault: str = Field(..., description="故障描述（报修必须写清楚）")
     remark: str | None = None
 
 

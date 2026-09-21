@@ -285,7 +285,7 @@ export default function Service() {
             <>
               <Form.Item name="project_no" label="项目号" rules={[{ required: true }]}><Input placeholder="如 TX26001" /></Form.Item>
               <Form.Item name="equip_no" label="设备号（可选）"><Input placeholder="如 01A" /></Form.Item>
-              <Form.Item name="fault" label="故障描述"><Input.TextArea rows={2} /></Form.Item>
+              <Form.Item name="fault" label="故障描述" rules={[{ required: true, message: '必填：出了什么问题' }]}><Input.TextArea rows={2} /></Form.Item>
             </>
           )}
           {modal?.kind === 'dispatch' && (

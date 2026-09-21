@@ -246,7 +246,7 @@ export default function AcceptancePage() {
               <Radio.Button value="不通过">不通过</Radio.Button>
             </Radio.Group>
           </Form.Item>
-          <Form.Item name="signed_by" label="客户签字人"><Input placeholder="如 客户 张工" /></Form.Item>
+          <Form.Item name="signed_by" label="客户签字人" rules={[{ required: true, message: '验收通过必须记录客户签字人' }]}><Input placeholder="如 客户 张工" /></Form.Item>
           <Form.Item name="accepted_at" label="验收日期"><DatePicker style={{ width: '100%' }} defaultValue={dayjs()} /></Form.Item>
           <Form.Item name="remark" label="备注"><Input.TextArea rows={2} /></Form.Item>
           <Typography.Text type="secondary" style={{ fontSize: 12 }}>

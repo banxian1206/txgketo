@@ -313,7 +313,9 @@ export default function SiteM() {
           {modal?.kind === 'survey' && (
             <>
               <Form.Item name="contact" label="甲方现场负责人 / 电话"><Input /></Form.Item>
-              <Form.Item name="enter_date" label="约定入场时间"><DatePicker style={{ width: '100%' }} /></Form.Item>
+              <Form.Item name="enter_date" label="约定入场时间" rules={[{ required: true, message: '勘测核心结论：约定入场时间' }]}>
+                <DatePicker style={{ width: '100%' }} />
+              </Form.Item>
               <Form.Item name="floor_load" label="地面承重"><Input placeholder="如 3t/m²" /></Form.Item>
               <Form.Item name="passage" label="通道 / 吊装口"><Input /></Form.Item>
               <Form.Item name="power" label="电"><Input placeholder="如 380V 100A" /></Form.Item>
@@ -374,7 +376,9 @@ export default function SiteM() {
               <Typography.Paragraph type="secondary" style={{ fontSize: 12 }}>
                 一个动作：必须派人到现场（设备太多，远程调不了）。会同时通知装配/调试组和项目团队。
               </Typography.Paragraph>
-              <Form.Item name="dispatch_to" label="派谁去（调试工程师）"><Input placeholder="如 王工" /></Form.Item>
+              <Form.Item name="dispatch_to" label="派谁去（调试工程师）" rules={[{ required: true, message: '必须写明派谁去' }]}>
+                <Input placeholder="如 王工" />
+              </Form.Item>
               <Form.Item name="plan_date" label="计划到场日期"><DatePicker style={{ width: '100%' }} /></Form.Item>
               <Form.Item name="remark" label="备注"><Input /></Form.Item>
             </>

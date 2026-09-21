@@ -99,7 +99,9 @@ export default function ShippingM() {
         await loadShipment(modal.ship.id, { ...v, photos })
       } else if (modal.kind === 'receipt' && modal.ship) {
         if (!photos.length) { message.warning('到货验收要拍照'); setSaving(false); return }
-        await receiptShipment(modal.ship.id, { result: v.result, shortage_detail: (v.shortage ?? []).filter((s: { item?: string }) => s.item), photos, remark: v.remark })
+        const shortage = (v.shortage ?? []).filter((s: { item?: string }) => s.item)
+        if (v.result !== '齐' && shortage.length === 0) { message.warning('缺件/破损必须写明缺了什么'); setSaving(false); return }
+        await receiptShipment(modal.ship.id, { result: v.result, shortage_detail: shortage, photos, remark: v.remark })
       }
       message.success('已提交')
       setModal(null)

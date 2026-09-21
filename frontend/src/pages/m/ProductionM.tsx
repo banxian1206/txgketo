@@ -81,8 +81,14 @@ export default function ProductionM() {
     try {
       if (action.kind === 'dispatch' && action.order)
         await dispatchProdOrder(action.order.id, { step_name: v.step_name, material_item_no: v.material_item_no || undefined, issued_to: v.issued_to || undefined, photos })
-      else if (action.kind === 'accept' && action.order)
+      else if (action.kind === 'accept' && action.order) {
+        if (v.result !== '合格' && !(v.reason || '').trim()) {
+          message.warning('不合格/返工必须写明原因')
+          setSaving(false)
+          return
+        }
         await acceptProdOrder(action.order.id, { result: v.result, reason: v.reason, photos })
+      }
       else if (action.kind === 'transfer' && action.order)
         await transferProdOrder(action.order.id, { transfer_to: v.transfer_to, photos })
       else if (action.kind === 'os-send' && action.os)

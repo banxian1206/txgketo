@@ -633,7 +633,7 @@ export function LongLeadEditor({ projectNo, onChanged }: Omit<Props, 'users'>) {
             <StdItemSelect placeholder="输入编码 / 品名 / 规格 / 品牌搜索" />
           </Form.Item>
           <Space style={{ display: 'flex' }} size="middle">
-            <Form.Item name="qty" label="数量" style={{ minWidth: 120 }}>
+            <Form.Item name="qty" label="数量" style={{ minWidth: 120 }} rules={[{ required: true, message: '填数量' }]}>
               <InputNumber style={{ width: '100%' }} min={0} />
             </Form.Item>
             <Form.Item name="unit" label="单位" style={{ minWidth: 90 }}>
@@ -644,6 +644,7 @@ export function LongLeadEditor({ projectNo, onChanged }: Omit<Props, 'users'>) {
               label="采购周期（天）"
               tooltip="预计到货 = 下单日期 + 采购周期"
               style={{ minWidth: 140 }}
+              rules={[{ required: true, message: '填周期' }]}
             >
               <InputNumber style={{ width: '100%' }} min={0} addonAfter="天" />
             </Form.Item>
@@ -652,10 +653,10 @@ export function LongLeadEditor({ projectNo, onChanged }: Omit<Props, 'users'>) {
             <Form.Item name="supplier_name" label="供应商" style={{ minWidth: 200 }}>
               <Input placeholder="如：ABB" />
             </Form.Item>
-            <Form.Item name="ordered_at" label="下单日期" style={{ minWidth: 170 }}>
+            <Form.Item name="ordered_at" label="下单日期" style={{ minWidth: 170 }} rules={[{ required: true, message: '填下单日' }]}>
               <DatePicker style={{ width: '100%' }} />
             </Form.Item>
-            <Form.Item name="need_date" label="需要到货" style={{ minWidth: 170 }}>
+            <Form.Item name="need_date" label="需要到货" style={{ minWidth: 170 }} rules={[{ required: true, message: '填需要到货日' }]}>
               <DatePicker style={{ width: '100%' }} />
             </Form.Item>
           </Space>
