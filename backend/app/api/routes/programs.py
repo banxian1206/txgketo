@@ -26,9 +26,11 @@ from sqlalchemy.orm import Session
 from app.api.deps import client_ip, get_current_user
 from app.core.config import settings
 from app.core.db import get_session
+from app.models.change import CR_DISPATCHED, TARGET_PROGRAM
 from app.models.platform import User
 from app.models.program import EquipmentProgram, EquipmentProgramVersion
-from app.services import audit
+from app.models.task import Task
+from app.services import audit, change_flow
 from app.services.review_flow import current_program_version_row
 
 router = APIRouter(tags=["程序版本"])
@@ -101,7 +103,31 @@ def list_programs(
         .order_by(EquipmentProgram.id)
     ).all()
     names = _names(session)
-    return [_program_dict(p, current_program_version_row(session, p.id), names) for p in rows]
+    active = change_flow.active_map(session, project_no, equip_no)
+    cr_task_ids = {c.change_task_id for c in active.values() if c.change_task_id}
+    cr_tasks = (
+        {t.id: t for t in session.scalars(select(Task).where(Task.id.in_(cr_task_ids))).all()}
+        if cr_task_ids
+        else {}
+    )
+    out = []
+    for p in rows:
+        d = _program_dict(p, current_program_version_row(session, p.id), names)
+        cr = active.get((TARGET_PROGRAM, str(p.id)))
+        d["change_request"] = (
+            {
+                "id": cr.id,
+                "cr_no": cr.cr_no,
+                "status": cr.status,
+                "change_task_owner_id": (
+                    cr_tasks[cr.change_task_id].owner_id if cr.change_task_id in cr_tasks else None
+                ),
+            }
+            if cr
+            else None
+        )
+        out.append(d)
+    return out
 
 
 @router.post("/projects/{project_no}/equipment/{equip_no}/programs", status_code=status.HTTP_201_CREATED)
@@ -218,10 +244,23 @@ def new_program_version(
     session: Session = Depends(get_session),
     current: User = Depends(get_current_user),
 ):
-    """改版：V1 → V2，回到草稿走评审单（P6 起改版要先提改版申请）。"""
+    """改版：V1 → V2，回到草稿走评审单（05 卷 §7：必须先提改版申请、总监批准并下发）。"""
     row = _get_program(session, program_id)
     if row.status not in ("已发布", "已作废"):
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "只有已发布的程序需要改版")
+    cr = change_flow.approved_for(session, TARGET_PROGRAM, str(program_id))
+    if cr is None:
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            "冻结程序改版必须先提「改版申请」并等总监批准、下发任务",
+        )
+    if cr.status != CR_DISPATCHED:
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST, f"改版申请 {cr.cr_no} 已批准，等总监下发改版任务后再出新版"
+        )
+    task = session.get(Task, cr.change_task_id) if cr.change_task_id else None
+    if not current.is_superuser and (task is None or task.owner_id != current.id):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "只有这条改版任务的负责人能出新版")
     n = int(row.current_version.lstrip("V") or "1") + 1
     prev = current_program_version_row(session, program_id)
     if prev is not None:

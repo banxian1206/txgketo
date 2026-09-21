@@ -40,6 +40,7 @@ export default function AppLayout() {
             { key: '/', label: <Link to="/">首页</Link> },
             { key: '/my-tasks', label: <Link to="/my-tasks">我的任务</Link> },
             { key: '/reviews', label: <Link to="/reviews">设计评审</Link> },
+            { key: '/changes', label: <Link to="/changes">改版</Link> },
             { key: '/projects', label: <Link to="/projects">商机 / 项目</Link> },
             { key: '/warehouse', label: <Link to="/warehouse">仓库</Link> },
             { key: '/purchase', label: <Link to="/purchase">采购工作台</Link> },

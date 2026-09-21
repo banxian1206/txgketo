@@ -131,7 +131,11 @@ def equipment_demand(session: Session, project_no: str, equip_no: str) -> list[D
         return []
     tree_nos = {d.drawing_no for d in drawings}
     cum = _cumulative_qty(drawings)
-    bom_rows = session.scalars(select(BomItem).where(BomItem.project_no == project_no)).all()
+    bom_rows = session.scalars(
+        select(BomItem).where(
+            BomItem.project_no == project_no, BomItem.superseded_by_id.is_(None)
+        )
+    ).all()
     items = {i.item_no: i for i in session.scalars(select(Item)).all()}
 
     need: dict[tuple[str, str], float] = {}

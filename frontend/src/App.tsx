@@ -2,6 +2,7 @@ import { Card, Typography } from 'antd'
 import { Navigate, Route, Routes } from 'react-router-dom'
 
 import AppLayout from './layouts/AppLayout'
+import Changes from './pages/Changes'
 import Login from './pages/Login'
 import NumberRules from './pages/NumberRules'
 import ProjectCreate from './pages/ProjectCreate'
@@ -59,6 +60,7 @@ export default function App() {
         <Route path="library" element={<Library />} />
         <Route path="my-tasks" element={<MyTasks />} />
         <Route path="reviews" element={<Reviews />} />
+        <Route path="changes" element={<Changes />} />
         <Route path="purchase" element={<PurchaseWorkbench />} />
         <Route path="suppliers" element={<Suppliers />} />
         <Route path="warehouse" element={<Warehouse />} />

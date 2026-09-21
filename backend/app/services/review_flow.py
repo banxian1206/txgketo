@@ -49,7 +49,7 @@ from app.models.review import (
     ReviewTicketItem,
 )
 from app.models.task import Task
-from app.services import audit, bom_demand
+from app.services import audit, bom_demand, change_flow
 from app.services.numbering import next_number, year_scope_key
 from app.services.reviewers import chain_levels, director, team_lead_for
 
@@ -618,6 +618,8 @@ def _publish_round(
     created = bom_demand.create_release_demands(session, release)
     summary["purchase_requests"] = [r.id for r in created]
     release.summary = summary
+    # 改版任务发布 → 改版申请完成（05 卷 §7⑥）
+    change_flow.complete_for_release(session, ticket.task_id, release, now)
     _maybe_complete_task(session, ticket.task_id)
     return release
 

@@ -27,6 +27,7 @@ import type { Dayjs } from 'dayjs'
 
 import ReviewDetailModal from '../components/ReviewDetailModal'
 import SubmitReviewModal from '../components/SubmitReviewModal'
+import ChangeRequestModal from '../components/ChangeRequestModal'
 
 import {
   addBom,
@@ -42,12 +43,14 @@ import {
   listProgramVersions,
   listStdItems,
   listVersions,
+  me,
   newDrawingVersion,
   newProgramVersion,
   removeBom,
   uploadDrawingDraft,
   uploadProgramDraft,
   type BomLine,
+  type ChangeBrief,
   type DesignRoot,
   type DesignTree,
   type GeneratePurchaseResult,
@@ -55,6 +58,7 @@ import {
   type ProgramItem,
   type ProgramVersionRow,
   type StdItem,
+  type User,
   type VersionRow,
 } from '../api/client'
 
@@ -80,6 +84,21 @@ const REVIEW_STATUS_COLOR: Record<string, string> = {
   已通过: 'success',
 }
 
+const CHANGE_STATUS_COLOR: Record<string, string> = {
+  待裁决: 'processing',
+  已批准: 'blue',
+  已否决: 'error',
+  已下发: 'gold',
+  已完成: 'success',
+  已归档: 'default',
+}
+
+const BOM_STATUS_COLOR: Record<string, string> = {
+  草稿: 'default',
+  审核中: 'processing',
+  已冻结: 'success',
+}
+
 interface TreeNode {
   drawing_no: string
   level: number
@@ -91,6 +110,7 @@ interface TreeNode {
   current_version: string
   status: string
   is_part: boolean
+  change_request?: { id: number; cr_no: string; status: string; change_task_owner_id?: number | null } | null
 }
 
 interface Props {
@@ -143,19 +163,28 @@ export default function EquipmentDesign({ projectNo: p0, equipNo: e0, embedded }
   const [progForm] = Form.useForm()
   const [progUploadForm] = Form.useForm()
   const progReasonRef = { current: '' }
+  // 改版（ECN）
+  const [profile, setProfile] = useState<User | null>(null)
+  const [changeTarget, setChangeTarget] = useState<{
+    type: 'DRAWING' | 'PROGRAM' | 'BOM_ITEM'
+    ref: string
+    title: string
+  } | null>(null)
 
   const load = useCallback(async () => {
     if (!projectNo || !equipNo) return
     setLoading(true)
     try {
-      const [d, mt, pg] = await Promise.all([
+      const [d, mt, pg, who] = await Promise.all([
         getDesignTree(projectNo, equipNo),
         getMyDesignTasks(projectNo, equipNo),
         listPrograms(projectNo, equipNo),
+        me(),
       ])
       setData(d)
       setMyTasks(mt)
       setPrograms(pg)
+      setProfile(who)
       setSelected((prev) => (prev ? d.tree.find((t) => t.drawing_no === prev.drawing_no) ?? null : null))
     } catch (e) {
       message.error(errMsg(e))
@@ -234,6 +263,31 @@ export default function EquipmentDesign({ projectNo: p0, equipNo: e0, embedded }
     } catch (e) {
       message.error(errMsg(e))
     }
+  }
+
+  const CHANGE_ACTION_AVAILABLE = (cr?: ChangeBrief | null) =>
+    !!cr && cr.status === '已下发'
+
+  const doNewDrawingVersion = (no: string) => {
+    reasonRef.current = ''
+    Modal.confirm({
+      title: `改版出新版 ${no}`,
+      content: (
+        <Input
+          placeholder="改版说明（如：安装孔左移 5mm）"
+          onChange={(e) => {
+            reasonRef.current = e.target.value
+          }}
+        />
+      ),
+      onOk: () =>
+        newDrawingVersion(no, reasonRef.current)
+          .then(() => {
+            message.success('已生成新版本草稿 —— 去「我的提交」勾选提交评审')
+            return load()
+          })
+          .catch((e) => message.error(errMsg(e))),
+    })
   }
 
   const doCreateProgram = async () => {
@@ -651,32 +705,30 @@ export default function EquipmentDesign({ projectNo: p0, equipNo: e0, embedded }
                       上传图纸
                     </a>
                   )}
-                  {r.status === '已发布' && (
+                  {r.status === '已发布' && !r.change_request && (
                     <a
                       onClick={() =>
-                        Modal.confirm({
-                          title: `改版 ${r.drawing_no}`,
-                          content: (
-                            <Input
-                              placeholder="改版原因（如：现场反馈尺寸偏小）"
-                              onChange={(e) => {
-                                reasonRef.current = e.target.value
-                              }}
-                            />
-                          ),
-                          onOk: () =>
-                            newDrawingVersion(r.drawing_no, reasonRef.current)
-                              .then(() => {
-                                message.success('已生成新版本草稿，图号不变')
-                                return load()
-                              })
-                              .catch((e) => message.error(errMsg(e))),
+                        setChangeTarget({
+                          type: 'DRAWING',
+                          ref: r.drawing_no,
+                          title: `${r.drawing_no} ${r.title}（${r.current_version}）`,
                         })
                       }
                     >
-                      改版
+                      提改版申请
                     </a>
                   )}
+                  {r.status === '已发布' && r.change_request && (
+                    <Tooltip title={`改版申请 ${r.change_request.cr_no}：${r.change_request.status}`}>
+                      <Tag color={CHANGE_STATUS_COLOR[r.change_request.status] ?? 'default'}>
+                        {r.change_request.status}
+                      </Tag>
+                    </Tooltip>
+                  )}
+                  {CHANGE_ACTION_AVAILABLE(r.change_request) &&
+                    r.change_request?.change_task_owner_id === profile?.id && (
+                      <a onClick={() => doNewDrawingVersion(r.drawing_no)}>改版出新版</a>
+                    )}
                   {r.level > 0 && r.status !== '已发布' && (
                     <Popconfirm
                       title={`删除 ${r.drawing_no}？`}
@@ -728,19 +780,49 @@ export default function EquipmentDesign({ projectNo: p0, equipNo: e0, embedded }
                   render: (v: number, r: BomLine) => `${v} ${r.unit ?? ''}`,
                 },
                 {
-                  title: '',
-                  key: 'del',
-                  width: 50,
-                  render: (_: unknown, r: BomLine) => (
-                    <Popconfirm
-                      title="删除？"
-                      onConfirm={() =>
-                        void removeBom(r.id).then(load).catch((e) => message.error(errMsg(e)))
-                      }
-                    >
-                      <a>删</a>
-                    </Popconfirm>
-                  ),
+                  title: '状态',
+                  dataIndex: 'status',
+                  width: 80,
+                  render: (v: string) => <Tag color={BOM_STATUS_COLOR[v] ?? 'default'}>{v ?? '草稿'}</Tag>,
+                },
+                {
+                  title: '操作',
+                  key: 'bomaction',
+                  width: 140,
+                  render: (_: unknown, r: BomLine) =>
+                    r.status === '已冻结' ? (
+                      <Space size={4}>
+                        {!r.change_request && (
+                          <a
+                            onClick={() =>
+                              setChangeTarget({
+                                type: 'BOM_ITEM',
+                                ref: String(r.id),
+                                title: `${r.parent_ref} ← ${r.display_name} × ${r.qty}`,
+                              })
+                            }
+                          >
+                            提改版申请
+                          </a>
+                        )}
+                        {r.change_request && (
+                          <Tooltip title={`改版申请 ${r.change_request.cr_no}：${r.change_request.status}`}>
+                            <Tag color={CHANGE_STATUS_COLOR[r.change_request.status] ?? 'default'}>
+                              {r.change_request.status}
+                            </Tag>
+                          </Tooltip>
+                        )}
+                      </Space>
+                    ) : (
+                      <Popconfirm
+                        title="删除？"
+                        onConfirm={() =>
+                          void removeBom(r.id).then(load).catch((e) => message.error(errMsg(e)))
+                        }
+                      >
+                        <a>删</a>
+                      </Popconfirm>
+                    ),
                 },
               ]}
             />
@@ -772,19 +854,49 @@ export default function EquipmentDesign({ projectNo: p0, equipNo: e0, embedded }
                   render: (v: number, r: BomLine) => `${v} ${r.unit ?? ''}`,
                 },
                 {
-                  title: '',
-                  key: 'del',
-                  width: 50,
-                  render: (_: unknown, r: BomLine) => (
-                    <Popconfirm
-                      title="删除？"
-                      onConfirm={() =>
-                        void removeBom(r.id).then(load).catch((e) => message.error(errMsg(e)))
-                      }
-                    >
-                      <a>删</a>
-                    </Popconfirm>
-                  ),
+                  title: '状态',
+                  dataIndex: 'status',
+                  width: 80,
+                  render: (v: string) => <Tag color={BOM_STATUS_COLOR[v] ?? 'default'}>{v ?? '草稿'}</Tag>,
+                },
+                {
+                  title: '操作',
+                  key: 'bomaction',
+                  width: 140,
+                  render: (_: unknown, r: BomLine) =>
+                    r.status === '已冻结' ? (
+                      <Space size={4}>
+                        {!r.change_request && (
+                          <a
+                            onClick={() =>
+                              setChangeTarget({
+                                type: 'BOM_ITEM',
+                                ref: String(r.id),
+                                title: `${r.parent_ref} ← ${r.display_name} × ${r.qty}`,
+                              })
+                            }
+                          >
+                            提改版申请
+                          </a>
+                        )}
+                        {r.change_request && (
+                          <Tooltip title={`改版申请 ${r.change_request.cr_no}：${r.change_request.status}`}>
+                            <Tag color={CHANGE_STATUS_COLOR[r.change_request.status] ?? 'default'}>
+                              {r.change_request.status}
+                            </Tag>
+                          </Tooltip>
+                        )}
+                      </Space>
+                    ) : (
+                      <Popconfirm
+                        title="删除？"
+                        onConfirm={() =>
+                          void removeBom(r.id).then(load).catch((e) => message.error(errMsg(e)))
+                        }
+                      >
+                        <a>删</a>
+                      </Popconfirm>
+                    ),
                 },
               ]}
             />
@@ -853,7 +965,30 @@ export default function EquipmentDesign({ projectNo: p0, equipNo: e0, embedded }
                     </a>
                   )}
                   <a onClick={() => void openProgramVersions(p)}>版本</a>
-                  {p.status === '已发布' && <a onClick={() => doNewProgramVersion(p)}>改版</a>}
+                  {p.status === '已发布' && !p.change_request && (
+                    <a
+                      onClick={() =>
+                        setChangeTarget({
+                          type: 'PROGRAM',
+                          ref: String(p.id),
+                          title: `程序 ${p.name}（${p.current_version}）`,
+                        })
+                      }
+                    >
+                      提改版申请
+                    </a>
+                  )}
+                  {p.status === '已发布' && p.change_request && (
+                    <Tooltip title={`改版申请 ${p.change_request.cr_no}：${p.change_request.status}`}>
+                      <Tag color={CHANGE_STATUS_COLOR[p.change_request.status] ?? 'default'}>
+                        {p.change_request.status}
+                      </Tag>
+                    </Tooltip>
+                  )}
+                  {CHANGE_ACTION_AVAILABLE(p.change_request) &&
+                    p.change_request?.change_task_owner_id === profile?.id && (
+                      <a onClick={() => doNewProgramVersion(p)}>改版出新版</a>
+                    )}
                   {p.status === '草稿' && (
                     <Popconfirm title={`删除程序 ${p.name}？`} onConfirm={() => void removeProgram(p)}>
                       <a>删除</a>
@@ -1256,6 +1391,16 @@ export default function EquipmentDesign({ projectNo: p0, equipNo: e0, embedded }
           ]}
         />
       </Modal>
+
+      {/* 提改版申请 */}
+      <ChangeRequestModal
+        open={!!changeTarget}
+        targetType={changeTarget?.type ?? null}
+        targetRef={changeTarget?.ref ?? null}
+        targetTitle={changeTarget?.title}
+        onClose={() => setChangeTarget(null)}
+        onCreated={() => void load()}
+      />
 
       {/* 提交评审 / 审核记录 */}
       <SubmitReviewModal

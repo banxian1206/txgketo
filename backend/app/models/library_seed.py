@@ -304,6 +304,15 @@ REVIEW_TICKET_RULE: dict = {
     "remark": "一个任务一张单，多轮提交共用",
 }
 
+# 改版申请编号规则（05 卷 §7/§8.1）
+CHANGE_REQUEST_RULE: dict = {
+    "object_type": "CHANGE_REQUEST",
+    "name": "改版申请",
+    "template": "CR{YY}{seq:03}",
+    "scope": "global_year",
+    "remark": "冻结版本变更的唯一入口，全局按年取号",
+}
+
 # 设计发布（冻结）批次编号规则（05 卷 §8.1）
 DESIGN_RELEASE_RULE: dict = {
     "object_type": "DESIGN_RELEASE",

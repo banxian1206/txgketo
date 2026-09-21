@@ -7,6 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.routes import (
     auth,
+    changes,
     engineering,
     health,
     initiation,
@@ -44,6 +45,7 @@ for r in (
     engineering,
     reviews,
     programs,
+    changes,
     suppliers,
     warehouse,
 ):

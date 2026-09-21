@@ -17,6 +17,7 @@ from app.core.security import hash_password  # noqa: E402
 from app.models.library import StdCategory, StdClass  # noqa: E402
 from app.models.library_seed import (  # noqa: E402
     CATEGORIES,
+    CHANGE_REQUEST_RULE,
     CLASSES,
     DESIGN_RELEASE_RULE,
     ISSUE_RULE,
@@ -175,6 +176,7 @@ def main() -> None:
             PO_RULE,
             REVIEW_TICKET_RULE,
             DESIGN_RELEASE_RULE,
+            CHANGE_REQUEST_RULE,
         ]:
             row = session.scalar(select(NumberRule).where(NumberRule.object_type == rule["object_type"]))
             if row is None:

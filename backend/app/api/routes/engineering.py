@@ -22,6 +22,7 @@ from sqlalchemy.orm import Session
 from app.api.deps import client_ip, get_current_user
 from app.core.config import settings
 from app.core.db import get_session
+from app.models.change import CR_DISPATCHED, TARGET_BOM_ITEM, TARGET_DRAWING
 from app.models.engineering import (
     BOM_DESIGN,
     BOM_MATERIAL,
@@ -32,7 +33,8 @@ from app.models.engineering import (
 from app.models.library import SOURCE_STANDARD, Item
 from app.models.platform import User
 from app.models.project import Equipment, Project
-from app.services import audit
+from app.models.task import Task
+from app.services import audit, change_flow
 from app.services.numbering import (
     EMPTY,
     compose_mech_drawing_no,
@@ -123,8 +125,46 @@ def get_design_tree(
     # 按图号排序即是树的顺序（层次码天然有序）
     tree = [_drawing_dict(d, names) for d in sorted(drawings, key=lambda x: x.drawing_no)]
 
+    # 在办的改版申请（05 卷 §7）：挂到具体图纸上，前端据此显示「已批准可改版 / 改版中」
+    active = change_flow.active_map(session, project_no, equip_no)
+    cr_task_ids = {c.change_task_id for c in active.values() if c.change_task_id}
+    cr_tasks = (
+        {t.id: t for t in session.scalars(select(Task).where(Task.id.in_(cr_task_ids))).all()}
+        if cr_task_ids
+        else {}
+    )
+    for d in tree:
+        cr = active.get((TARGET_DRAWING, d["drawing_no"]))
+        d["change_request"] = (
+            {
+                "id": cr.id,
+                "cr_no": cr.cr_no,
+                "status": cr.status,
+                "change_task_owner_id": (
+                    cr_tasks[cr.change_task_id].owner_id if cr.change_task_id in cr_tasks else None
+                ),
+            }
+            if cr
+            else None
+        )
+
     std_bom = [_bom_dict(b, items.get(b.child_item_no)) for b in bom_rows if b.bom_source == BOM_DESIGN]
     mat_bom = [_bom_dict(b, items.get(b.child_item_no)) for b in bom_rows if b.bom_source == BOM_MATERIAL]
+    # BOM 行的在办改版申请（05 卷 §7）：冻结行才能提改版
+    for b in std_bom + mat_bom:
+        cr = active.get((TARGET_BOM_ITEM, str(b["id"])))
+        b["change_request"] = (
+            {
+                "id": cr.id,
+                "cr_no": cr.cr_no,
+                "status": cr.status,
+                "change_task_owner_id": (
+                    cr_tasks[cr.change_task_id].owner_id if cr.change_task_id in cr_tasks else None
+                ),
+            }
+            if cr
+            else None
+        )
 
     # ---- 完整度检查 ----
     in_tree = {d["drawing_no"] for d in tree}
@@ -516,12 +556,28 @@ def new_version(
     session: Session = Depends(get_session),
     current: User = Depends(get_current_user),
 ):
-    """改版：已发布的图号不变，版本 V1 → V2，回到草稿走审核发布流程。"""
+    """改版：已发布的图号不变，版本 V1 → V2，回到草稿走审核发布流程。
+
+    05 卷 §7：冻结版本改版必须先提改版申请 → 总监批准 → 下发任务 → 才能出新版。
+    """
     row = session.get(Drawing, drawing_no)
     if row is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "图纸不存在")
     if row.status not in ("已发布", "已作废"):
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "只有已发布的图纸需要改版")
+    cr = change_flow.approved_for(session, TARGET_DRAWING, drawing_no)
+    if cr is None:
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            "冻结图纸改版必须先提「改版申请」并等总监批准、下发任务",
+        )
+    if cr.status != CR_DISPATCHED:
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST, f"改版申请 {cr.cr_no} 已批准，等总监下发改版任务后再出新版"
+        )
+    task = session.get(Task, cr.change_task_id) if cr.change_task_id else None
+    if not current.is_superuser and (task is None or task.owner_id != current.id):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "只有这条改版任务的负责人能出新版")
     n = int(row.current_version.lstrip("V") or "1") + 1
     prev = session.scalar(
         select(DrawingVersion).where(
