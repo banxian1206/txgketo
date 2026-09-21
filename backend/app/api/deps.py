@@ -81,6 +81,7 @@ MONEY_KEYS = {
     "min_price",
     "max_price",
     "last_price",
+    "received_amount",
     "performance_deposit",
     "warranty_amount",
 }
