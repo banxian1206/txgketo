@@ -161,6 +161,7 @@ deploy/          docker-compose.dev.yml
 | **S9 现场调试 / S10 客户验收与质保** | ✅ | 迁移 `k5a7c9e14f60`（`acceptance`/`acceptance_document`）；现场调试：`site_commission` 加「调试完成」+ 每日汇报 stage（单机调试/联调）；验收：`services/acceptance.py`（调试完成→申请验收→传资料包→客户签字确认→**自动进入质保期**：`warranty_start=验收日`、`warranty_end=+质保月数`、项目阶段→质保）+ 60 天到期提醒（含质保金）；`routes/acceptance.py`（申请/资料包上传·下载·签收/客户确认/验收台）；`pages/Acceptance.tsx`（PC）+ SiteM「客户验收」页签；发运 → 项目自动进入「交付中」阶段 |
 | **S11 质保与售后** | ✅ | 迁移 `l6b8d0f25a71`（`service_order`/`spare_part`/`spare_part_move`；编号 `SV{YY}{NNN}` 沿用既有规则）；`routes/service.py`（报修自动判定**在保/过保** → 派工 → 到场 → 处理完成（工时/照片）→ 客户签字关单；备件建账 + 收发（领出扣库存、可关联工单、低库存标红））；`pages/Service.tsx`（PC 售后台）+ `pages/m/ServiceM.tsx`（手机端，service:edit）；`/m/home` 加售后工单待办；质保到期提醒在验收台（60 天 + 质保金） |
 | **全链路演示数据** | ✅ | `scripts/seed_demo_project.py`：用演示账号走**真实 API** 把 S0 商机 → 成交 → 立项 → 设计（评审/发布/进池）→ 采购（合并下单/验收/入库/直发）→ 领料 → 排产（合格转运/在制/返工）→ 外协 → 装配调试 → 发运（装箱/装车/到货/现场验收）→ 现场（勘测/日报/问题/申请调试）→ 客户验收（资料包/签字/**自动质保**）→ 售后工单/备件 → 回款，全部串起来；每次运行新建一个项目（不动已有数据）；跑法：`.venv/bin/python -m scripts.seed_demo_project` |
+| **分段重测（S0→S1）** | ✅ | `scripts/seed_s0_s1.py`：**清空业务数据**（保留账号/组织/角色/标准库类目，序列归零）→ 重建 8 条常用标准库物料 → 走 S0 商机/成交 + S1 立项（团队/设备/节点/长周期件/派任务）；跑法：`DATABASE_URL=... .venv/bin/python -m scripts.seed_s0_s1`；⚠ admin 密码是 `admin12345`，其余演示账号 `txgk@123` |
 | 供应商主数据 + 报价 + 能供品类 | ✅ | `models/purchasing.py`、`routes/suppliers.py` |
 | 推荐供应商（多路证据打分） | ✅ | `GET /purchase/recommend/{item_no}` |
 | 价格参考（上次成交/历史区间/各家报价） | ✅ | `GET /purchase/price-reference/{item_no}` |
