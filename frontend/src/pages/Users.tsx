@@ -111,7 +111,7 @@ function subtreeIds(rows: OrgRow[], rootId: number): Set<number> {
   return out
 }
 
-/** 用户与权限（06 卷）：组织维护 + 用户管理（管理员 / 部门负责人管本部门）+ 角色说明 */
+/** 用户与权限（06 卷）：组织维护 + 用户管理（管理员 / 总监管本部门）+ 角色说明 */
 export default function Users() {
   const { message } = App.useApp()
   const [scope, setScope] = useState<MyScope | null>(null)
@@ -175,7 +175,7 @@ export default function Users() {
     void loadUsers()
   }, [loadUsers])
 
-  // 部门负责人只看自己部门这棵树
+  // 总监只看自己部门这棵树
   const visibleOrgs = useMemo(() => {
     if (!scope || scope.is_admin || !scope.department) return orgs
     const ids = subtreeIds(orgs, scope.department.id)
@@ -201,11 +201,11 @@ export default function Users() {
     [roles, scope],
   )
   const assignablePositions = useMemo(
-    () => (scope?.is_admin ? POSITIONS : POSITIONS.filter((p) => p !== '部门负责人')),
+    () => (scope?.is_admin ? POSITIONS : POSITIONS.filter((p) => p !== '总监')),
     [scope],
   )
 
-  // 部门负责人：用户列表里只展示本部门的人（后端也会拦越权操作）
+  // 总监：用户列表里只展示本部门的人（后端也会拦越权操作）
   const shownUsers = useMemo(() => {
     if (!scope || scope.is_admin || !scope.department) return users
     const ids = subtreeIds(orgs, scope.department.id)
@@ -217,7 +217,7 @@ export default function Users() {
     userForm.resetFields()
     userForm.setFieldsValue({
       org_id: scope?.department?.id,
-      position: '成员',
+      position: '组员',
       role_codes: [],
     })
     setUserOpen(true)
@@ -354,7 +354,7 @@ export default function Users() {
       width: 100,
       render: (v: string | null) =>
         v ? (
-          <Tag color={v === '部门负责人' ? 'red' : v === '组长' ? 'blue' : 'default'}>{v}</Tag>
+          <Tag color={v === '总监' ? 'red' : v === '经理' ? 'blue' : 'default'}>{v}</Tag>
         ) : (
           '—'
         ),
@@ -465,7 +465,7 @@ export default function Users() {
                 />
                 {!scope?.is_admin && scope?.department && (
                   <Typography.Paragraph type="secondary" style={{ fontSize: 12, marginTop: 8 }}>
-                    你是「{scope.department.name}」的部门负责人：只能维护本部门的人，且只能勾本部门角色。
+                    你是「{scope.department.name}」的总监：只能维护本部门的人，且只能勾本部门角色。
                   </Typography.Paragraph>
                 )}
               </>
@@ -656,7 +656,7 @@ export default function Users() {
             <Input placeholder="如：技术 / 业务 / 供应链 / 制造" />
           </Form.Item>
           <Typography.Paragraph type="secondary" style={{ fontSize: 12 }}>
-            上级留空 = 顶级部门（仅管理员）；部门负责人只能在自己部门下建组。
+            上级留空 = 顶级部门（仅管理员）；总监只能在自己部门下建组。
           </Typography.Paragraph>
         </Form>
       </Modal>

@@ -36,7 +36,7 @@ const TASK_STATUS_COLOR: Record<string, string> = {
 
 const PROFS = ['机械', '电气', '程序', '工艺']
 
-/** 工程部工作台（06 卷 §3）：成员 / 组长 / 部门负责人 三视角 */
+/** 工程部工作台（06 卷 §3）：组员 / 经理 / 总监 三视角 */
 export default function EngWorkbench() {
   const { message } = App.useApp()
   const nav = useNavigate()
@@ -80,8 +80,8 @@ export default function EngWorkbench() {
   }, [load])
 
   const position = me?.user.position ?? ''
-  const isLead = position === '组长' || position === '部门负责人'
-  const isDirector = position === '部门负责人' || me?.user.roles.includes('ADMIN')
+  const isLead = position === '经理' || position === '总监'
+  const isDirector = position === '总监' || me?.user.roles.includes('ADMIN')
 
   const taskColumns: ColumnsType<TaskItem> = [
     { title: '任务号', dataIndex: 'task_no', width: 100 },

@@ -199,7 +199,7 @@ def create_request(
         summary=f"改版申请 {row.cr_no}：{info['title']}（{info['version']}）—— {row.reason}",
         ip=ip,
     )
-    # ★ 站内消息：提醒**申请人所在部门**的部门负责人裁决（06 卷 §9）
+    # ★ 站内消息：提醒**申请人所在部门**的总监裁决（06 卷 §9）
     boss = director_for(session, user)
     if boss is not None:
         notify.notify(
@@ -236,7 +236,7 @@ def decide(
     solution: str,
     ip: str | None = None,
 ) -> None:
-    """工程总监裁决（05 卷 §7②）：批准 / 否决（否决必须给替代方案）。"""
+    """总监裁决（05 卷 §7②）：批准 / 否决（否决必须给替代方案）。"""
     if cr.status != CR_PENDING:
         raise ChangeFlowError(f"这张申请当前是「{cr.status}」，不在待裁决")
     if user.position != POSITION_DIRECTOR and not user.is_superuser:

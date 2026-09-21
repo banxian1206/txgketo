@@ -1,9 +1,9 @@
-"""评审单流转：提交 → 组长 → 总监 → 发布（= 冻结）（05 卷 §3、§4）。
+"""评审单流转：提交 → 经理 → 总监 → 发布（= 冻结）（05 卷 §3、§4）。
 
 规则速查（全部来自 05 卷对齐结论）：
 · 审核单按**人的任务**一张，多轮提交共用；每轮提交/审核全部留档
 · 只能提交自己任务的内容；提交后内容锁定（图纸/ BOM 行 → 审核中）
-· 两级必须都过；组长本人提交跳过一级（总监直审）；总监不能自审
+· 两级必须都过；经理本人提交跳过一级（总监直审）；总监不能自审
 · 二级通过的那一轮整体发布（=冻结），写 design_release；退回/撤回则解锁回草稿
 """
 
@@ -54,7 +54,7 @@ from app.services import audit, notify, bom_demand, change_flow
 from app.services.numbering import next_number, year_scope_key
 from app.services.reviewers import chain_levels, director, director_for, team_lead_for
 
-LEVEL_LABEL = {1: "组长", 2: "总监"}
+LEVEL_LABEL = {1: "经理", 2: "总监"}
 KIND_BY_PROFESSION = {"机械": "机械", "电气": "电气"}
 TAG_TYPES = ("自制件", "外协件", "定制件")
 
@@ -92,7 +92,7 @@ def current_program_version_row(session: Session, program_id: int) -> EquipmentP
 def candidates(session: Session, task: Task) -> dict:
     """这条任务下、还在草稿态的可提交内容（05 卷 §3.1 勾选清单）。
 
-    ★ 归属判断在任务层（提交时校验 task.owner_id）—— 组长拆给组员的子任务，
+    ★ 归属判断在任务层（提交时校验 task.owner_id）—— 经理拆给组员的子任务，
       组员可以提交该设备该专业下任何草稿内容，不卡单条内容是谁建的。
     """
     out: dict = {
@@ -347,18 +347,18 @@ def submit_round(
             )
         )
 
-    # 审核链（06 卷 §2/#2）：组长空缺自动跳级；部门负责人必须有，否则不让提交
+    # 审核链（06 卷 §2/#2）：经理空缺自动跳级；总监必须有，否则不让提交
     need_lead, _ = chain_levels(user.position)
     lead = team_lead_for(session, task.profession) if need_lead else None
     boss = director_for(session, user)
     if boss is None:
-        raise ReviewFlowError("本部门还没配「部门负责人」—— 先到「用户与权限」把审核人配好再提交")
+        raise ReviewFlowError("本部门还没配「总监」—— 先到「用户与权限」把审核人配好再提交")
 
     if need_lead and lead is not None:
         ticket.status = TICKET_PENDING_LEAD
         reviewer = lead
     elif need_lead and lead is None:
-        # 组长空缺 → 自动跳级到部门负责人（06 卷 §2）
+        # 经理空缺 → 自动跳级到总监（06 卷 §2）
         ticket.status = TICKET_PENDING_DIRECTOR
         reviewer = boss
         session.add(
@@ -368,12 +368,12 @@ def submit_round(
                 level=1,
                 reviewer_id=user.id,
                 action=ACTION_SKIP,
-                note="组长空缺，自动跳级到部门负责人（06 卷 §2）",
+                note="经理空缺，自动跳级到总监（06 卷 §2）",
                 acted_at=now,
             )
         )
     else:
-        # 组长本人提交 → 跳过一级（05 卷 §0.1#13）
+        # 经理本人提交 → 跳过一级（05 卷 §0.1#13）
         ticket.status = TICKET_PENDING_DIRECTOR
         reviewer = boss
         session.add(
@@ -383,7 +383,7 @@ def submit_round(
                 level=1,
                 reviewer_id=user.id,
                 action=ACTION_SKIP,
-                note="组长本人提交，跳过一级（05 卷 §0.1#13）",
+                note="经理本人提交，跳过一级（05 卷 §0.1#13）",
                 acted_at=now,
             )
         )
@@ -430,7 +430,7 @@ def review_ticket(
     note: str,
     ip: str | None = None,
 ) -> DesignRelease | None:
-    """组长/总监审核。二级通过时发布本轮（= 冻结），返回 design_release。"""
+    """经理/总监审核。二级通过时发布本轮（= 冻结），返回 design_release。"""
     if ticket.status not in TICKET_PENDING:
         raise ReviewFlowError(f"这张单当前是「{ticket.status}」，不在审核中")
     if action not in (ACTION_PASS, ACTION_REJECT):
@@ -442,16 +442,16 @@ def review_ticket(
     if level == 1:
         lead = team_lead_for(session, ticket.profession)
         if lead is None:
-            raise ReviewFlowError("组长空缺（提交时应已自动跳级）；请让部门负责人审核")
+            raise ReviewFlowError("经理空缺（提交时应已自动跳级）；请让总监审核")
         if lead.id != user.id:
-            raise ReviewFlowError("只有本专业组长能审这一级")
+            raise ReviewFlowError("只有本专业经理能审这一级")
     else:
         submitter = session.get(User, ticket.submitter_id) if ticket.submitter_id else None
         boss = director_for(session, submitter) if submitter else director(session)
         if boss is None:
-            raise ReviewFlowError("本部门还没配部门负责人——先到「用户与权限」配审核人")
+            raise ReviewFlowError("本部门还没配总监——先到「用户与权限」配审核人")
         if boss.id != user.id:
-            raise ReviewFlowError("只有本部门的部门负责人能审这一级")
+            raise ReviewFlowError("只有本部门的总监能审这一级")
 
     now = datetime.now(UTC)
     round_no = ticket.current_round
@@ -498,7 +498,7 @@ def review_ticket(
                 session,
                 [boss.id],
                 type_=notify.TYPE_REVIEW,
-                title=f"组长已通过，等你终审：{ticket.ticket_no}",
+                title=f"经理已通过，等你终审：{ticket.ticket_no}",
                 link="/reviews",
                 biz_type="review_ticket",
                 biz_id=ticket.id,
@@ -769,7 +769,7 @@ def _publish_round(
 def _maybe_complete_task(session: Session, task_id: int) -> None:
     """任务联动（05 卷 §3.3#6）：任务下所有内容都已冻结 → 任务自动已完成。
 
-    有子任务的父任务不自动完成（等组长手动兜底）——避免把组员的活算空。
+    有子任务的父任务不自动完成（等经理手动兜底）——避免把组员的活算空。
     """
     task = session.get(Task, task_id)
     if task is None or task.task_type != "设计" or task.equip_no is None:

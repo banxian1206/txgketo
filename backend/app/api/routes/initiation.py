@@ -803,7 +803,7 @@ def initiate_project(
     if not tasks:
         raise HTTPException(
             status.HTTP_400_BAD_REQUEST,
-            "还不能立项：任务还没生成 —— 立项后设计要分到机械/电气/程序设计师手上，采购要分到采购员手上",
+            "还不能立项：任务还没生成 —— 立项后设计要分到机械/电气/程序经理手上，采购要分到采购员手上",
         )
     unassigned = [t.task_no for t in tasks if not t.owner_id]
     if unassigned:

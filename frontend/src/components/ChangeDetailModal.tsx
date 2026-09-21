@@ -86,7 +86,7 @@ export default function ChangeDetailModal({ crId, open, onClose, onChanged }: Pr
     if (open) void load()
   }, [open, load])
 
-  const isDirector = ['部门负责人', '工程总监'].includes(profile?.position ?? '')
+  const isDirector = ['总监', '部门负责人', '工程总监'].includes(profile?.position ?? '')
   const isTaskOwner = !!cr && cr.change_task_owner_id === profile?.id
   const canDecide = cr?.status === '待裁决' && isDirector
   const canDispatch = cr?.status === '已批准' && isDirector
@@ -121,7 +121,7 @@ export default function ChangeDetailModal({ crId, open, onClose, onChanged }: Pr
       u.is_active &&
       cr != null &&
       (u.profession === cr.profession ||
-        ['组长', '设计组长'].includes(u.position ?? '') ||
+        ['经理', '组长', '设计组长', '主管'].includes(u.position ?? '') ||
         u.is_superuser),
   )
 

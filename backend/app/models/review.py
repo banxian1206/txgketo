@@ -2,8 +2,8 @@
 
 ★ 审核单 = 任务级单据：**一个任务一张单**，反复使用。
   同一张单上可以多轮提交（第 1/2/3…次），每一次提交、每一次审核**全部留档**。
-  审核链：设计师 → 本专业组长（一级）→ 工程部总监（二级）；
-  组长本人提交跳过一级（总监直审）；总监不能自审（05 卷 §0.1#13）。
+  审核链：组员 → 本部门经理（一级）→ 总监（二级）；
+  经理本人提交跳过一级（总监直审）；总监不能自审（05 卷 §0.1#13）。
 
 发布 = 冻结：二级通过的那一轮，这一轮勾选的内容整体冻结，写一条 `design_release`。
 """
@@ -40,7 +40,7 @@ REVIEW_ITEM_LABELS = {
 }
 
 # ---- 评审单状态 ----
-TICKET_PENDING_LEAD = "待组长审"
+TICKET_PENDING_LEAD = "待经理审"
 TICKET_PENDING_DIRECTOR = "待总监审"
 TICKET_REJECTED = "已退回"
 TICKET_WITHDRAWN = "已撤回"
@@ -57,7 +57,7 @@ TICKET_PENDING = (TICKET_PENDING_LEAD, TICKET_PENDING_DIRECTOR)
 # ---- 审核动作 ----
 ACTION_PASS = "通过"
 ACTION_REJECT = "退回"
-ACTION_SKIP = "跳过"  # 组长自提：系统自动留痕
+ACTION_SKIP = "跳过"  # 经理自提 / 经理空缺：系统自动留痕
 ACTION_WITHDRAW = "撤回"
 REVIEW_ACTIONS = (ACTION_PASS, ACTION_REJECT, ACTION_SKIP, ACTION_WITHDRAW)
 
@@ -104,7 +104,7 @@ class ReviewAction(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     ticket_id: Mapped[int] = mapped_column(ForeignKey("review_ticket.id", ondelete="CASCADE"))
     round_no: Mapped[int] = mapped_column(Integer)
-    level: Mapped[int] = mapped_column(Integer, default=1, server_default="1")  # 1=组长 / 2=总监 / 0=撤回
+    level: Mapped[int] = mapped_column(Integer, default=1, server_default="1")  # 1=经理 / 2=总监 / 0=撤回
     reviewer_id: Mapped[int | None] = mapped_column(ForeignKey("app_user.id"))
     action: Mapped[str] = mapped_column(String(8))
     note: Mapped[str | None] = mapped_column(Text)

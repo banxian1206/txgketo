@@ -22,8 +22,8 @@ export default function AppLayout() {
       return {}
     }
   })()
-  // 用户与权限：系统管理员 + 部门负责人（06 卷 §4）
-  const canManageUsers = me.is_superuser === true || me.position === '部门负责人'
+  // 用户与权限：系统管理员 + 总监（06 卷 §4）
+  const canManageUsers = me.is_superuser === true || me.position === '总监'
   const [workbenches, setWorkbenches] = useState<WorkbenchItem[]>([
     { key: 'mine', name: '我的工作台', route: '/workbench', visible: true },
   ])

@@ -42,7 +42,7 @@ const CONFIG: Record<string, Cfg> = {
   },
   eng: {
     title: '工程部工作台',
-    note: '成员 / 组长 / 部门负责人 三视角：待我处理、我负责的、部门看板（详细看板在 D 步补齐）。',
+    note: '组员 / 经理 / 总监 三视角：待我处理、我负责的、部门看板。',
     todos: [
       { label: '我的任务', key: 'my_tasks', to: '/my-tasks' },
       { label: '待我审核', key: 'to_review', to: '/reviews' },
@@ -132,7 +132,7 @@ export default function DeptWorkbench({ kind }: { kind: 'sales' | 'pm' | 'eng' |
           ))}
         </Space>
         <Typography.Paragraph type="secondary" style={{ fontSize: 12, marginTop: 8, marginBottom: 0 }}>
-          范围按岗位自动过滤（成员=本人 / 组长=本组 / 部门负责人=本部门）。详细看板随 06 卷 §11 D/E 步补齐。
+          范围按岗位自动过滤（组员=本人 / 经理=本组 / 总监=本部门）。
         </Typography.Paragraph>
       </Card>
     </>

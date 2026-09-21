@@ -6,7 +6,7 @@ import ReviewDetailModal from '../components/ReviewDetailModal'
 import { errMsg, listReviewTickets, me, type ReviewTicketBrief, type User } from '../api/client'
 
 const STATUS_COLOR: Record<string, string> = {
-  待组长审: 'processing',
+  待经理审: 'processing',
   待总监审: 'gold',
   已退回: 'error',
   已撤回: 'default',
@@ -46,8 +46,8 @@ export default function Reviews() {
   }
 
   const isReviewer =
-    ['组长', '设计组长'].includes(profile?.position ?? '') ||
-    ['部门负责人', '工程总监'].includes(profile?.position ?? '')
+    ['经理', '组长', '设计组长', '主管'].includes(profile?.position ?? '') ||
+    ['总监', '部门负责人', '工程总监'].includes(profile?.position ?? '')
 
   const columns: ColumnsType<ReviewTicketBrief> = [
     {
@@ -135,7 +135,7 @@ export default function Reviews() {
         pagination={{ pageSize: 20, showSizeChanger: false }}
       />
       <Typography.Paragraph type="secondary" style={{ fontSize: 12, marginTop: 12 }}>
-        审核链：成员提交 → 本专业组长（一级）→ 部门负责人（二级）→ 发布（= 冻结）。
+        审核链：组员提交 → 本部门经理（一级）→ 总监（二级）→ 发布（= 冻结）。
         发布后这一轮内容成为冻结版本，采购按发布批次触发（05 卷 §3、§5）。
       </Typography.Paragraph>
       <ReviewDetailModal

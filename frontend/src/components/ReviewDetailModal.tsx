@@ -12,7 +12,7 @@ import {
 } from '../api/client'
 
 const STATUS_COLOR: Record<string, string> = {
-  待组长审: 'processing',
+  待经理审: 'processing',
   待总监审: 'gold',
   已退回: 'error',
   已撤回: 'default',
@@ -51,14 +51,14 @@ export default function ReviewDetailModal({ ticketId, open, onClose, onChanged }
   }, [open, load])
 
   const canReview1 =
-    detail?.status === '待组长审' &&
-    ['组长', '设计组长'].includes(profile?.position ?? '') &&
+    detail?.status === '待经理审' &&
+    ['经理', '组长', '设计组长', '主管'].includes(profile?.position ?? '') &&
     profile?.profession === detail.profession
   const canReview2 =
-    detail?.status === '待总监审' && ['部门负责人', '工程总监'].includes(profile?.position ?? '')
+    detail?.status === '待总监审' && ['总监', '部门负责人', '工程总监'].includes(profile?.position ?? '')
   const canWithdraw =
     !!detail &&
-    (detail.status === '待组长审' || detail.status === '待总监审') &&
+    (detail.status === '待经理审' || detail.status === '待总监审') &&
     detail.submitter_id === profile?.id
 
   const act = async (action: '通过' | '退回') => {
@@ -186,7 +186,7 @@ export default function ReviewDetailModal({ ticketId, open, onClose, onChanged }
                       color: a.action === '退回' ? 'red' : a.action === '撤回' ? 'gray' : a.action === '跳过' ? 'gray' : 'green',
                       children: (
                         <span>
-                          {a.level === 1 ? '组长' : a.level === 2 ? '总监' : '提交人'}
+                          {a.level === 1 ? '经理' : a.level === 2 ? '总监' : '提交人'}
                           {a.action}
                           {a.reviewer_name ? ` · ${a.reviewer_name}` : ''}
                           {a.note ? `：${a.note}` : ''}

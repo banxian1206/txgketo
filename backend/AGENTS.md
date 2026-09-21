@@ -144,10 +144,10 @@ deploy/          docker-compose.dev.yml
 | **发布→采购触发 + 手工申请（05 卷 P5）** | ✅ | `services/bom_demand.py`（`release_demand`/`plan_release_purchase`/`create_release_demands`，BUY_TYPES 加外协/定制）；发布时自动进池（`review_flow._publish_round`）；`POST /purchase/manual-request`；`purchase_request` 加 attribution/requester_id/source_release_id，project_no 可空；采购池显示来源/批次/归属/申请人；`components/ManualPurchaseModal.tsx` |
 | **改版申请 ECN（05 卷 P6）** | ✅ | `models/change.py` + `services/change_flow.py`（申请/裁决/下发/修订/影响面/完成）+ `routes/changes.py`；图纸/程序/BOM 行的 new-version 被门禁拦住（必须先批准并下发）；BOM 替代行 `superseded_by_id`（旧行排除出需求）；`pages/Changes.tsx`、`components/ChangeRequestModal.tsx`/`ChangeDetailModal.tsx` |
 | **移动端 / 工作台（05 卷 P7）** | ✅ | `GET /drawings/{no}/file`、`/programs/{id}/file`（电子图纸/程序下载）；`goods_receipt.photos` + `POST/GET /goods-receipts/{id}/photos`；`routes/mobile.py`（`/m/home`、`/m/materials/{id}`）；`layouts/MobileLayout.tsx` + `pages/m/*`（仓库验收动线：看图→拍照→合格/不合格→入库；领料）；`utils/image.ts` 前端压缩；PWA manifest |
-| **用户·角色·组织（06 卷 A 步）** | ✅ | 岗位三级 + `title`（迁移 `d0f4a6c83b25`）；组织增改停用 `POST/PATCH /orgs`；`GET /my-scope`；用户管理按部门范围（部门负责人只能管本部门/只能勾本部门角色）；审核链 `director_for`（按部门找负责人）+ 自动跳级；`pages/Users.tsx`（用户 / 组织架构 / 角色说明 三页签） |
+| **用户·角色·组织（06 卷 A 步）** | ✅ | 岗位三级 + `title`（迁移 `d0f4a6c83b25`）；组织增改停用 `POST/PATCH /orgs`；`GET /my-scope`；用户管理按部门范围（总监只能管本部门/只能勾本部门角色）；审核链 `director_for`（按部门找总监）+ 自动跳级；`pages/Users.tsx`（用户 / 组织架构 / 角色说明 三页签） |
 | **工作台框架（06 卷 B 步）** | ✅ | `GET /workbench/me`（可见工作台 + 待办数字 + 我的项目）；侧栏三分组 + 按角色显示工作台；登录默认进「我的工作台」；`pages/Workbench.tsx` + `pages/workbench/DeptWorkbench.tsx`（部门台统一外壳）；`routes/workbench.py` |
-| **站内消息 + 红点（06 卷 C 步）** | ✅ | `models/notify.py` + `services/notify.py` + `routes/notifications.py`；触发钩子：任务派工/转派/拆分、评审提交/通过/退回/发布、改版申请/裁决/下发/完成、验收合格→仓库·不合格→采购·直发现场→项目经理、**入库完成→采购+项目经理**、发布进采购池；**发布扇出**（项目团队全员 + 下游工艺 + 采购）；`components/NotificationsDrawer.tsx` + 顶栏铃铛红点（PC/移动端 60s 轮询）+ **我的工作台消息区**；**组长空缺自动跳级**、改版裁决通知只发本部门负责人、移动端消息链接映射 |
-| **工程部工作台（06 卷 D 步）** | ✅ | `GET /workbench/eng/board`（设备×四专业进度、待终审、待裁决改版、卡住/超期）；`pages/workbench/EngWorkbench.tsx`（成员/组长/部门负责人三视角按岗位自动切；我的任务·评审单·改版 / 我组待审·组员进度 / 部门看板） |
+| **站内消息 + 红点（06 卷 C 步）** | ✅ | `models/notify.py` + `services/notify.py` + `routes/notifications.py`；触发钩子：任务派工/转派/拆分、评审提交/通过/退回/发布、改版申请/裁决/下发/完成、验收合格→仓库·不合格→采购·直发现场→项目经理、**入库完成→采购+项目经理**、发布进采购池；**发布扇出**（项目团队全员 + 下游工艺 + 采购）；`components/NotificationsDrawer.tsx` + 顶栏铃铛红点（PC/移动端 60s 轮询）+ **我的工作台消息区**；**经理空缺自动跳级**、改版裁决通知只发申请人所在部门的总监、移动端消息链接映射 |
+| **工程部工作台（06 卷 D 步）** | ✅ | `GET /workbench/eng/board`（设备×四专业进度、待终审、待裁决改版、卡住/超期）；`pages/workbench/EngWorkbench.tsx`（组员/经理/总监三视角按岗位自动切；我的任务·评审单·改版 / 我组待审·组员进度 / 部门看板） |
 | **工作台收尾（06 卷 E 步）** | ✅ | 采购工作台待办头（待下单/在途/验收不合格/退换）+ 仓库待办头（待验收/待入库/待领料）；`GET /workbench/sales/board` + `SalesWorkbench.tsx`（商机/待立项/回款）；`GET /workbench/pm/board` + `PmWorkbench.tsx`（项目全链进度/风险）；车间台仍留位 |
 | 供应商主数据 + 报价 + 能供品类 | ✅ | `models/purchasing.py`、`routes/suppliers.py` |
 | 推荐供应商（多路证据打分） | ✅ | `GET /purchase/recommend/{item_no}` |
@@ -158,8 +158,8 @@ deploy/          docker-compose.dev.yml
 | **仓库两个动作：验收 / 入库（分批）** | ✅ | `POST /projects/{no}/purchase-requests/{id}/inspect`、`POST /goods-receipts/{id}/store`；`pages/Warehouse.tsx`、`warehouse/workbench`（`incoming` 待验收 / `pending_storage` 待入库） |
 | 采购流程（下单/发货登记已废弃） | ✅ | `routes/initiation.py`（单条下单自动发号，含 `deliver_to/deliver_address`） |
 | 仓库三件事（验收/入库/领料单） | ✅ | `models/warehouse.py`、`routes/warehouse.py` |
-| **组织与岗位（05 卷 P1）** | ✅ | `models/platform.py`（`PROFESSIONS`/`POSITIONS`）· `services/reviewers.py`（组长→总监审核链）· `scripts/seed.py`（工程部→机械/电气/程序/工艺组；旧设计部/工艺部停用）· 用户与岗位页 `pages/Users.tsx` |
-| **任务体系改造（05 卷 P2）** | ✅ | `task.depends_on_id/parent_task_id`；立项派给设计组长、工艺挂机械（机械首次发布才解锁）；`POST /tasks/{id}/split` 组长拆分派工；`GET /my-tasks?scope=team` 我组；`pages/MyTasks.tsx` |
+| **组织与岗位（05 卷 P1）** | ✅ | `models/platform.py`（`PROFESSIONS`/`POSITIONS`）· `services/reviewers.py`（经理→总监审核链）· `scripts/seed.py`（工程部→机械/电气/程序/工艺组；旧设计部/工艺部停用）· 用户与岗位页 `pages/Users.tsx` |
+| **任务体系改造（05 卷 P2）** | ✅ | `task.depends_on_id/parent_task_id`；立项派给经理、工艺挂机械（机械首次发布才解锁）；`POST /tasks/{id}/split` 经理拆分派工；`GET /my-tasks?scope=team` 我组；`pages/MyTasks.tsx` |
 | 前端页面 | ✅ | 商机列表/详情/新建、我的任务、立项、设计工作面、采购工作台（采购池/采购单/验收不合格/退换记录/入库记录五页签）、供应商、标准库、仓库 |
 
 ### 8.3 ★ 未完成（下次会话要做的）
@@ -191,12 +191,12 @@ POST /api/v1/projects/{no}/purchase-requests/{id}/inspect   仓库验收（分�
 POST /api/v1/goods-receipts/{id}/store           入库（分批；记库位+库存+流水）
 GET  /api/v1/goods-receipts?status=待入库        到货单（待入库/已入库/现场已验收/不合格/已换货/已退货）
 GET  /api/v1/warehouse/workbench                  仓库待办（incoming 待验收 / pending_storage 待入库 / 领料）
-GET  /api/v1/my-tasks?scope=mine|team             我的任务 / 我组任务（组长台；blocked 字段标「等待前置」）
-POST /api/v1/tasks/{id}/split                     组长拆分派工：一条任务拆给多个组员（子任务继承前置依赖）
+GET  /api/v1/my-tasks?scope=mine|team             我的任务 / 我组任务（经理台；blocked 字段标「等待前置」）
+POST /api/v1/tasks/{id}/split                     经理拆分派工：一条任务拆给多个组员（子任务继承前置依赖）
 GET  /api/v1/tasks/{id}/review-candidates         可提交评审的草稿内容（图纸/设计BOM/材料BOM/自制外协判定）
 POST /api/v1/tasks/{id}/submit-review             勾选提交评审（任务级一张单、多轮留档）
 GET  /api/v1/tasks/{id}/review-ticket             任务的评审单（多轮明细 + 审核记录 + 发布批次）
-GET  /api/v1/review-tickets?scope=todo|mine|all   评审列表（组长/总监待办）
+GET  /api/v1/review-tickets?scope=todo|mine|all   评审列表（经理/总监待办）
 POST /api/v1/review-tickets/{id}/review           两级审核（通过/退回，退回必填说明）
 POST /api/v1/review-tickets/{id}/withdraw         提交人撤回（解锁回草稿）
 GET  /api/v1/projects/{p}/equipment/{e}/my-design-tasks  设计面「我的提交」卡片
@@ -218,7 +218,7 @@ POST /api/v1/goods-receipts/{id}/photos           验收拍照（手机端，多
 GET  /api/v1/goods-receipts/{id}/photos/{idx}     看验收照片
 GET  /api/v1/m/home                               手机端首页待办（按角色）
 GET  /api/v1/m/materials/{request_id}             手机端一条货详情（物料+供应商+图纸+到货单/照片）
-GET  /api/v1/my-scope                             我能管什么（是否管理员/部门负责人、可勾角色、可选岗位）
+GET  /api/v1/my-scope                             我能管什么（是否管理员/总监、可勾角色、可选岗位）
 POST/PATCH /api/v1/orgs（/{id}）                   组织维护：部门/组 增改停用（停用不删）
 GET  /api/v1/users?org_id&role_code&is_active&q   用户列表（筛选；管理权限在后端校验）
 GET  /api/v1/workbench/me                          我的工作台：可见工作台 + 待办数字 + 我的项目

@@ -183,11 +183,11 @@ def generate_tasks(
         for prof in professions:
             if (eq.equip_no, "设计", prof) in key:
                 continue
-            # 立项直接派给各专业设计组长（05 卷 §0.1#14），组长再拆给组员
+            # 立项直接派给各专业经理（05 卷 §0.1#14），经理再拆给组员
             lead = team_lead_for(session, prof)
             owner = lead.id if lead else None
             if owner is None:
-                unassigned.append(f"{eq.equip_no} {prof}设计（工程部没配「{prof}」设计组长）")
+                unassigned.append(f"{eq.equip_no} {prof}设计（工程部没配「{prof}」经理）")
             dep_id = None
             if prof == "工艺":
                 mech = design_by_key.get((eq.equip_no, "机械"))
@@ -316,12 +316,12 @@ def list_project_tasks(
 @router.get("/my-tasks")
 def my_tasks(
     status_filter: str | None = Query(default=None, alias="status"),
-    scope: str = Query(default="mine", description="mine=我的任务 / team=我组任务（组长台）"),
+    scope: str = Query(default="mine", description="mine=我的任务 / team=我组任务（经理台）"),
     limit: int = 100,
     session: Session = Depends(get_session),
     current: User = Depends(get_current_user),
 ):
-    """我该干什么：指派给我的任务；组长可切「我组」（05 卷 §2.2 默认筛选）。"""
+    """我该干什么：指派给我的任务；经理可切「我组」（05 卷 §2.2 默认筛选）。"""
     if scope == "team":
         if current.position == POSITION_DIRECTOR:
             stmt = select(Task).where(Task.task_type == "设计")
@@ -391,7 +391,7 @@ def update_task(
         if reason:
             raise HTTPException(status.HTTP_400_BAD_REQUEST, f"{reason}，还不能开工")
 
-    # 转派：任务负责人（组长）或工程总监/超管才能改（05 卷 §0.1#14）
+    # 转派：任务负责人（经理）或总监/超管才能改（05 卷 §0.1#14）
     old_owner_id = row.owner_id
     if body.owner_id is not None and body.owner_id != row.owner_id:
         allowed = (
@@ -401,7 +401,7 @@ def update_task(
             or current.position == POSITION_DIRECTOR
         )
         if not allowed:
-            raise HTTPException(status.HTTP_403_FORBIDDEN, "只有任务负责人（组长）或工程总监才能转派")
+            raise HTTPException(status.HTTP_403_FORBIDDEN, "只有任务负责人（经理）或总监才能转派")
 
     labels = {"status": "状态", "owner_id": "负责人", "plan_start": "计划开始", "plan_end": "计划结束", "remark": "备注"}
     changes = []
@@ -461,9 +461,9 @@ def split_task(
     session: Session = Depends(get_session),
     current: User = Depends(get_current_user),
 ):
-    """组长把任务拆给组员（05 卷 §0.1#14）：生成子任务，父任务仍是组长的活。
+    """经理把任务拆给组员（05 卷 §0.1#14）：生成子任务，父任务仍是经理的活。
 
-    子任务继承前置依赖（工艺等机械首次发布），组长在「我组」里盯进度。
+    子任务继承前置依赖（工艺等机械首次发布），经理在「我组」里盯进度。
     """
     row = session.get(Task, task_id)
     if row is None:
@@ -475,7 +475,7 @@ def split_task(
         or current.position == POSITION_DIRECTOR
     )
     if not allowed:
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "只有这条任务的组长能拆给组员")
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "只有这条任务的经理能拆给组员")
     if row.parent_task_id is not None:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "子任务不能再拆")
 
@@ -522,7 +522,7 @@ def split_task(
         action="split",
         object_type="task",
         object_ref=f"{row.project_no}/{row.task_no}",
-        summary=f"组长拆分任务 {row.task_no} → {len(created)} 条子任务",
+        summary=f"经理拆分任务 {row.task_no} → {len(created)} 条子任务",
         detail={"children": [c.task_no for c in created]},
         ip=client_ip(request),
     )

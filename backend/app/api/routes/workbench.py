@@ -77,7 +77,7 @@ def _visible(session: Session, user: User) -> set[str]:
 def eng_board(session: Session = Depends(get_session), current: User = Depends(get_current_user)):
     """工程部看板（06 卷 §3）：设备设计进度 + 待终审 + 改版裁决 + 卡住/超期。
 
-    设计属于工程部，这里给全量；页面上再按岗位（成员/组长/部门负责人）分三视角。
+    设计属于工程部，这里给全量；页面上再按岗位（组员/经理/总监）分三视角。
     """
     profs = ("机械", "电气", "程序", "工艺")
     today = datetime.now(UTC).date()

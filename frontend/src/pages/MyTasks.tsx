@@ -48,7 +48,7 @@ const TYPE_COLOR: Record<string, string> = {
   现场: 'magenta',
 }
 
-/** 我的任务（工作台）：我的任务 / 我组任务（组长，05 卷 §2.2） */
+/** 我的任务（工作台）：我的任务 / 我组任务（经理，05 卷 §2.2） */
 export default function MyTasks() {
   const { message } = App.useApp()
   const nav = useNavigate()
@@ -63,8 +63,9 @@ export default function MyTasks() {
   const [selected, setSelected] = useState<number[]>([])
   const [splitting, setSplitting] = useState(false)
 
-  const isLead = ['组长', '设计组长'].includes(profile?.position ?? '') ||
-    ['部门负责人', '工程总监'].includes(profile?.position ?? '')
+  const isLead =
+    ['经理', '组长', '设计组长', '主管'].includes(profile?.position ?? '') ||
+    ['总监', '部门负责人', '工程总监'].includes(profile?.position ?? '')
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -115,7 +116,7 @@ export default function MyTasks() {
       const users = await listUsers()
       setMembers(
         users.filter(
-          (u) => u.is_active && u.profession === task.profession && (u.position === '成员' || u.position === '设计师'),
+          (u) => u.is_active && u.profession === task.profession && (u.position === '组员' || u.position === '成员'),
         ),
       )
     } catch (e) {
@@ -317,7 +318,7 @@ export default function MyTasks() {
         columns={columns}
       />
       <Typography.Paragraph type="secondary" style={{ fontSize: 12, marginTop: 12 }}>
-        任务在「立项」时生成：每台设备 × 专业 → 设计任务，直接派给各专业组长，组长再拆给组员；
+        任务在「立项」时生成：每台设备 × 专业 → 设计任务，直接派给各专业经理，经理再拆给组员；
         工艺挂在机械之后，机械首次发布即可开工（05 卷 §0.1）。
       </Typography.Paragraph>
 

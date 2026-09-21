@@ -19,7 +19,7 @@ interface Props {
 
 const SECTION_STYLE: React.CSSProperties = { marginBottom: 14 }
 
-/** 提交评审：勾选草稿内容 → 一张任务级评审单（组长 → 总监，发布=冻结） */
+/** 提交评审：勾选草稿内容 → 一张任务级评审单（经理 → 总监，发布=冻结） */
 export default function SubmitReviewModal({ task, open, onClose, onDone }: Props) {
   const { message } = App.useApp()
   const [cand, setCand] = useState<ReviewCandidate | null>(null)
@@ -86,7 +86,7 @@ export default function SubmitReviewModal({ task, open, onClose, onDone }: Props
     setSaving(true)
     try {
       await submitReview(task.task_id, selections, note)
-      message.success('已提交评审：组长 → 总监，两级通过后发布冻结')
+      message.success('已提交评审：经理 → 总监，两级通过后发布冻结')
       onClose()
       onDone()
     } catch (e) {
@@ -122,7 +122,7 @@ export default function SubmitReviewModal({ task, open, onClose, onDone }: Props
         showIcon
         style={{ marginBottom: 12 }}
         message="发布 = 冻结"
-        description="两级审核（组长 → 总监）都通过后，这一轮勾选的内容成为冻结版本；退回或撤回会解锁回草稿。"
+        description="两级审核（经理 → 总监）都通过后，这一轮勾选的内容成为冻结版本；退回或撤回会解锁回草稿。"
       />
       {isEmpty && <Empty description="没有可提交的草稿内容 —— 先把图/BOM 建好" />}
 

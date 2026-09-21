@@ -1,7 +1,7 @@
 """平台基础接口：组织（可维护）/ 用户 / 角色（06 卷）。
 
 三个层（06 卷 §1）：系统角色（功能/可见性）· 部门岗位（范围/审核链）· 项目角色（项目内指派）。
-本模块管：组织树增改停用、用户管理（管理员 + 部门负责人管本部门）、角色只读列表、我的权限范围。
+本模块管：组织树增改停用、用户管理（管理员 + 总监管本部门）、角色只读列表、我的权限范围。
 """
 
 from __future__ import annotations
@@ -69,7 +69,7 @@ def _subtree_ids(session: Session, root_id: int) -> set[int]:
 
 
 def _scope(session: Session, current: User) -> dict:
-    """当前用户能管什么：管理员=全部；部门负责人=本部门；其他人=不能管。"""
+    """当前用户能管什么：管理员=全部；总监=本部门；其他人=不能管。"""
     if current.is_superuser:
         return {"admin": True, "department": None, "role_codes": None, "can_manage": True}
     if current.position == POSITION_DIRECTOR and current.org_id:
@@ -90,7 +90,7 @@ def _scope(session: Session, current: User) -> dict:
 def _require_manage(session: Session, current: User) -> dict:
     scope = _scope(session, current)
     if not scope["can_manage"]:
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "只有系统管理员或部门负责人能维护用户")
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "只有系统管理员或总监能维护用户")
     return scope
 
 
@@ -204,7 +204,7 @@ def create_org(
     session: Session = Depends(get_session),
     current: User = Depends(get_current_user),
 ):
-    """新增部门 / 组（06 卷 §2）：管理员建部门，部门负责人只能在自己部门下建组。"""
+    """新增部门 / 组（06 卷 §2）：管理员建部门，总监只能在自己部门下建组。"""
     scope = _require_manage(session, current)
     parent = session.get(Org, body.parent_id) if body.parent_id else None
     if body.parent_id and parent is None:
@@ -213,7 +213,7 @@ def create_org(
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "名称不能为空")
     if not scope["admin"]:
         if parent is None:
-            raise HTTPException(status.HTTP_403_FORBIDDEN, "部门负责人不能新建顶级部门")
+            raise HTTPException(status.HTTP_403_FORBIDDEN, "总监不能新建顶级部门")
         if parent.id not in _subtree_ids(session, scope["department"].id):
             raise HTTPException(status.HTTP_403_FORBIDDEN, "只能在自己部门下新增组")
     if body.code:
@@ -362,7 +362,7 @@ class UserCreateIn(BaseModel):
     phone: str | None = None
     org_id: int | None = None
     profession: str | None = None  # 机械/电气/程序/工艺（工程部）
-    position: str | None = None  # 成员 / 组长 / 部门负责人
+    position: str | None = None  # 组员 / 经理 / 总监
     title: str | None = None  # 称谓（可选填，如“设计师”）
     role_codes: list[str] = []
 
@@ -398,7 +398,7 @@ def _enforce_scope(
     role_codes: list[str] | None,
     position: str | None,
 ) -> None:
-    """部门负责人：只能管本部门的人、只能勾本部门角色、只能定成员/组长。"""
+    """总监：只能管本部门的人、只能勾本部门角色、只能定组员/经理。"""
     if scope["admin"]:
         return
     dept: Org = scope["department"]
@@ -406,7 +406,7 @@ def _enforce_scope(
     if org_id is None or org_id not in allowed_orgs:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "只能把人员放在自己部门下")
     if position == POSITION_DIRECTOR:
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "部门负责人不能任命其他部门负责人")
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "总监不能任命其他总监")
     if role_codes:
         bad = [c for c in role_codes if c not in scope["role_codes"]]
         if bad:
@@ -464,7 +464,7 @@ def update_user(
     session: Session = Depends(get_session),
     current: User = Depends(get_current_user),
 ):
-    """改部门 / 岗位 / 角色 / 停用 / 重置密码；审核人（组长、部门负责人）就是在这里配出来的。"""
+    """改部门 / 岗位 / 角色 / 停用 / 重置密码；审核人（经理、总监）就是在这里配出来的。"""
     scope = _require_manage(session, current)
     user = session.get(User, user_id)
     if user is None:

@@ -93,7 +93,7 @@ ROLES: list[tuple[str, str, list[str]]] = [
     ("CRAFT", "工艺", ["project:view", "design:edit", "std:view", "std:edit"]),
     ("PM", "项目经理", ["project:view", "project:edit", "project:close", "contract:view", "design:edit", "purchase:view", "mfg:view", "ship:edit", "site:edit", "acceptance:edit"]),
     ("PURCHASE", "采购", ["project:view", "purchase:view", "purchase:edit", "std:view", "warehouse:view"]),
-    ("PURCHASE_LEAD", "采购主管", ["project:view", "purchase:view", "purchase:edit", "std:view", "std:edit", "warehouse:view", "cost:view"]),
+    ("PURCHASE_LEAD", "采购经理", ["project:view", "purchase:view", "purchase:edit", "std:view", "std:edit", "warehouse:view", "cost:view"]),
     ("WAREHOUSE", "仓库", ["project:view", "warehouse:view", "warehouse:edit", "purchase:view", "std:view"]),
     ("MFG", "制造执行", ["project:view", "mfg:view", "mfg:edit", "warehouse:edit"]),
     ("ASSY", "装配", ["project:view", "mfg:view", "mfg:edit"]),

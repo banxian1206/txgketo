@@ -72,7 +72,7 @@ export interface RoleRow {
 
 /** 工程部专业 / 岗位（06 卷 §3，与后端 PROFESSIONS / POSITIONS 对齐） */
 export const PROFESSIONS = ['机械', '电气', '程序', '工艺']
-export const POSITIONS = ['成员', '组长', '部门负责人']
+export const POSITIONS = ['组员', '经理', '总监']
 
 export interface ContactIn {
   name: string

@@ -77,7 +77,7 @@ const STATE_COLOR: Record<string, string> = {
 }
 
 const REVIEW_STATUS_COLOR: Record<string, string> = {
-  待组长审: 'processing',
+  待经理审: 'processing',
   待总监审: 'gold',
   已退回: 'error',
   已撤回: 'default',
@@ -543,7 +543,7 @@ export default function EquipmentDesign({ projectNo: p0, equipNo: e0, embedded }
             ]}
           />
           <Typography.Paragraph type="secondary" style={{ fontSize: 12, marginTop: 8, marginBottom: 0 }}>
-            勾选草稿内容 → 组长 → 总监 → 发布（= 冻结）。退回/撤回后内容回到草稿，可在同一张单上重新提交。
+            勾选草稿内容 → 经理 → 总监 → 发布（= 冻结）。退回/撤回后内容回到草稿，可在同一张单上重新提交。
           </Typography.Paragraph>
         </Card>
       )}
