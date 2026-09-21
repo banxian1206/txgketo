@@ -29,6 +29,8 @@ class ObjectType(StrEnum):
     DRAWING_ELEC_MACHINE = "DRAWING_ELEC_MACHINE"  # 电气图纸（单机）
     DRAWING_ELEC_LINE = "DRAWING_ELEC_LINE"  # 电气图纸（线体）
     SERVICE_ORDER = "SERVICE_ORDER"  # 售后工单
+    PROD_ORDER = "PROD_ORDER"  # 排产订单（车间自制件）
+    OUTSOURCE = "OUTSOURCE"  # 外协任务单
 
 
 # 默认规则（seed 时写入数据库；改规则只改数据，不改代码）
@@ -74,6 +76,20 @@ DEFAULT_RULES: list[dict] = [
         "template": "SV{YY}{seq:03}",
         "scope": "global_year",
         "remark": "",
+    },
+    {
+        "object_type": ObjectType.PROD_ORDER,
+        "name": "排产订单",
+        "template": "PR{YY}{seq:03}",
+        "scope": "global_year",
+        "remark": "车间自制件排产；图号即物料号",
+    },
+    {
+        "object_type": ObjectType.OUTSOURCE,
+        "name": "外协任务单",
+        "template": "WX{YY}{seq:03}",
+        "scope": "global_year",
+        "remark": "自制件发出去加工",
     },
 ]
 

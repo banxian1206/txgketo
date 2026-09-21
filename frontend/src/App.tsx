@@ -22,6 +22,8 @@ import Reviews from './pages/Reviews'
 import Suppliers from './pages/Suppliers'
 import Users from './pages/Users'
 import Warehouse from './pages/Warehouse'
+import Manufacturing from './pages/Manufacturing'
+import ProductionM from './pages/m/ProductionM'
 import Workbench from './pages/Workbench'
 import DeptWorkbench from './pages/workbench/DeptWorkbench'
 import EngWorkbench from './pages/workbench/EngWorkbench'
@@ -49,6 +51,7 @@ export default function App() {
         <Route path="warehouse" element={<WarehouseM />} />
         <Route path="accept/:requestId" element={<AcceptM />} />
         <Route path="issues" element={<IssuesM />} />
+        <Route path="production" element={<ProductionM />} />
         <Route path="me" element={<MeM />} />
       </Route>
       <Route
@@ -78,6 +81,7 @@ export default function App() {
         <Route path="purchase" element={<PurchaseWorkbench />} />
         <Route path="suppliers" element={<Suppliers />} />
         <Route path="warehouse" element={<Warehouse />} />
+        <Route path="manufacturing" element={<Manufacturing />} />
         <Route path="projects/:projectNo/design/:equipNo" element={<EquipmentDesign />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />

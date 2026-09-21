@@ -17,6 +17,7 @@ from app.core.db import get_session
 from app.models.change import CR_ACTIVE, CR_PENDING, ChangeRequest
 from app.models.initiation import GoodsReceipt, Milestone, ProjectMember, PurchaseRequest
 from app.models.platform import POSITION_DIRECTOR, POSITION_LEAD, Org, User
+from app.models.production import PROD_DISPATCHED, PROD_DONE, PROD_RUNNING, PROD_WAIT, ProdOrder
 from app.models.project import Equipment, PaymentTerm, Project
 from app.models.review import (
     TICKET_PENDING_DIRECTOR,
@@ -27,6 +28,7 @@ from app.models.review import (
 )
 from app.models.task import Task
 from app.models.warehouse import MaterialIssue
+from app.services import manufacturing as mfg
 from app.services import notify
 
 router = APIRouter(prefix="/workbench", tags=["工作台"])
@@ -370,6 +372,12 @@ def pm_board(session: Session = Depends(get_session), current: User = Depends(ge
     }
 
 
+@router.get("/shop")
+def shop_board(session: Session = Depends(get_session), _: User = Depends(get_current_user)):
+    """车间台（S5 制造）：只管两头 —— 下发（拍照）→ 验收（拍照）→ 转运（拍照）。"""
+    return mfg.workbench_view(session)
+
+
 @router.get("/me")
 def workbench_me(session: Session = Depends(get_session), current: User = Depends(get_current_user)):
     codes = {r.code for r in current.roles}
@@ -449,6 +457,21 @@ def workbench_me(session: Session = Depends(get_session), current: User = Depend
         session,
         select(func.count()).select_from(PurchaseRequest).where(PurchaseRequest.status == "待采购"),
     ) if is_purchase else 0
+    is_shop = current.is_superuser or bool(codes & {"MFG", "ASSY", "QC"})
+    shop_wait = _count(
+        session,
+        select(func.count()).select_from(ProdOrder).where(ProdOrder.status == PROD_WAIT),
+    ) if is_shop else 0
+    shop_accept = _count(
+        session,
+        select(func.count())
+        .select_from(ProdOrder)
+        .where(ProdOrder.status.in_((PROD_DISPATCHED, PROD_RUNNING))),
+    ) if is_shop else 0
+    shop_transfer = _count(
+        session,
+        select(func.count()).select_from(ProdOrder).where(ProdOrder.status == PROD_DONE),
+    ) if is_shop else 0
     my_leads = _count(
         session,
         select(func.count())
@@ -508,6 +531,9 @@ def workbench_me(session: Session = Depends(get_session), current: User = Depend
             "to_store": to_store,
             "issues": issues,
             "to_purchase": to_purchase,
+            "shop_wait": shop_wait,
+            "shop_accept": shop_accept,
+            "shop_transfer": shop_transfer,
             "my_leads": my_leads,
             "my_projects": len(project_nos),
             "unread": notify.unread_count(session, current.id),

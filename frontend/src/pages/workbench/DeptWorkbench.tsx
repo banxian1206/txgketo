@@ -59,9 +59,15 @@ const CONFIG: Record<string, Cfg> = {
   },
   shop: {
     title: '车间工作台',
-    note: '制造 / 装配 / 发运（S5–S7）还没做，这里先留位；车间由联络小组统一录入，一线人员不登录。',
-    todos: [{ label: '待领料', key: 'issues', to: '/m/issues' }],
+    note: '制造（S5）：下发（原材料 + 图纸，拍照）→ 到职验收（拍照）→ 转运装配区（拍照）。只管两头，不做工序级报工。',
+    todos: [
+      { label: '待下发排产单', key: 'shop_wait', to: '/manufacturing' },
+      { label: '在制 / 待验收', key: 'shop_accept', to: '/manufacturing' },
+      { label: '待转运装配区', key: 'shop_transfer', to: '/manufacturing' },
+      { label: '待领料', key: 'issues', to: '/m/issues' },
+    ],
     quick: [
+      { label: '制造（车间）', to: '/manufacturing' },
       { label: '领料（手机端）', to: '/m/issues' },
       { label: '仓库工作台', to: '/warehouse' },
     ],

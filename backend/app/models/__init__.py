@@ -4,6 +4,12 @@ from app.models.base import Base
 from app.models.engineering import BomItem, Drawing, DrawingVersion
 from app.models.review import DesignRelease, ReviewAction, ReviewTicket, ReviewTicketItem
 from app.models.program import EquipmentProgram, EquipmentProgramVersion
+from app.models.production import (
+    OutsourceTask,
+    ProdAcceptance,
+    ProdOrder,
+    ProdTask,
+)
 from app.models.change import ChangeRequest
 from app.models.notify import Notification
 from app.models.warehouse import (
@@ -77,6 +83,10 @@ __all__ = [
     "ReviewTicketItem",
     "NumberRule",
     "NumberSeq",
+    "OutsourceTask",
+    "ProdAcceptance",
+    "ProdOrder",
+    "ProdTask",
     "Org",
     "PaymentTerm",
     "Permission",

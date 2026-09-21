@@ -9,6 +9,7 @@ const TABS = [
   { key: '/m', label: '首页', icon: '🏠' },
   { key: '/m/warehouse', label: '仓库', icon: '📦' },
   { key: '/m/issues', label: '领料', icon: '🧰' },
+  { key: '/m/production', label: '制造', icon: '🏭' },
   { key: '/m/me', label: '我的', icon: '👤' },
 ]
 
