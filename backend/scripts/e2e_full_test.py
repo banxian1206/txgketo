@@ -66,6 +66,8 @@ def main() -> None:
         return [x["token"] for x in req("post", f"/api/v1/{area}/photos", who, (201,),
                                         params={"project_no": pno, "ref": ref}, files=files)]
 
+    users = {u["username"]: u["id"] for u in req("get", "/api/v1/users", "admin")}
+
     # ================= 基础数据：标准库物料（接口建，重复容错） =================
     stage("准备：标准库物料（admin 通过接口建档）")
     ITEMS = [
@@ -98,6 +100,7 @@ def main() -> None:
     pj = req("get", f"/api/v1/projects/{p}", "sales1")
     flag("S0", pj["stage"] == "线索", f"新商机阶段应为「线索」，实际 {pj['stage']}")
     flag("S0", pj["project_no"].startswith("TX"), "项目号格式 TX{YY}{NNN}")
+    flag("S0", pj.get("sales_id") == users["sales1"], "建商机应自动把创建人记为销售负责人（商务全程可见）")
     print(f"  商机号 {p}（{pj['stage']}）")
     STAGES.append(("S0 商机", f"{p} 建档，阶段=线索"))
 
@@ -429,6 +432,30 @@ def main() -> None:
     r = c.post("/api/v1/service/orders", headers=login("pm1"), json={"project_no": p})
     flag("权限", r.status_code == 403, f"pm1（无 service:edit）报修应 403，实际 {r.status_code}")
     print("  3 项越权全部被拦（403）")
+
+    # ================= 部门可见性抽查（每个部门都能看到这个订单的痕迹） =================
+    stage("部门可见性抽查（各部门工作台/列表都能看到 TX 项目）")
+    sales = req("get", "/api/v1/workbench/sales/board", "sales1")
+    flag("可见-商务", any(r["project_no"] == p for r in sales["projects"]),
+         "商务部台应全程展示该订单（含质保阶段）+ 待回款")
+    flag("可见-商务", len(sales["payments"]) >= 1, "商务部台应看到待回款节点（验收款尾款/质保金）")
+    pm = req("get", "/api/v1/workbench/pm/board", "pm1")
+    flag("可见-项目经理", p in str(pm), "项目经理台应看到该订单")
+    eng = req("get", "/api/v1/workbench/eng/board", "mech_manager")
+    flag("可见-工程", p in str(eng), "工程部台应看到该订单的设计进度")
+    iss = req("get", "/api/v1/warehouse/issues", "wh1")
+    flag("可见-仓库", any(i["project_no"] == p for i in iss), "仓库领料列表应看到该订单")
+    mfg = req("get", "/api/v1/manufacturing/orders", "shop1", params={"project_no": p})
+    flag("可见-制造", len(mfg) >= 2, "制造列表应看到该订单的排产单")
+    recs = req("get", "/api/v1/assembly/records", "assy1", params={"project_no": p})
+    flag("可见-装配", len(recs) >= 1, "装配记录应看到该订单")
+    ships = req("get", "/api/v1/shipping/list", "delivery1", params={"project_no": p})
+    flag("可见-发运", any(x["project_no"] == p for x in ships), "发运列表应看到该订单")
+    coms = req("get", "/api/v1/site/commission", "site1", params={"project_no": p})
+    flag("可见-现场", len(coms) >= 1, "现场调试记录应看到该订单")
+    sos = req("get", "/api/v1/service/orders", "service1", params={"project_no": p})
+    flag("可见-售后", any(x["project_no"] == p for x in sos), "售后工单应看到该订单")
+    print("  商务/项目经理/工程/仓库/制造/装配/发运/现场/售后 全部可见 ✓")
 
     # ================= 报告 =================
     print("\n" + "=" * 64)

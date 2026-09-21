@@ -54,6 +54,7 @@ class ProjectCreateIn(BaseModel):
     # 必填
     customer_name: str = Field(..., description="客户名称")
     project_name: str = Field(..., description="项目名称")
+    sales_id: int | None = Field(default=None, description="销售/商务负责人；不填默认为创建人")
     contacts: list[ContactIn] = Field(default_factory=list, description="客户方联系人（可多个）")
     received_docs: list[str] = Field(default_factory=list, description="接收到的资料（清单勾选）")
     project_desc: str | None = Field(default=None, description="项目描述")
