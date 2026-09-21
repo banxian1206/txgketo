@@ -92,8 +92,8 @@ deploy/          docker-compose.dev.yml
 ## 8. 当前进度（交接记录）
 
 > 更新于：**06 卷 F 步（账号权限收尾）**落地：接口级权限强校验（`require_permission`，采购下单类→`purchase:edit`、验收/入库/领料→`warehouse:edit`）、金额分档（`purchase:price` 采购价 / `project:amount` 项目金额，无权限返回 null）、**离职/停用一键转交**（任务/待审/项目角色/图·程序·BOM 归属）。
-> 已完成：S0 商机 → S1 立项 → S2 工程设计 → S3 采购 → S4 仓库 → S5 制造 → S6 装配与齐套率 → **S7 发运**。
-> 下一步：现场安装/调试/客户验收/质保售后（S8–S11）；超期扫描自动提醒；Excel 历史采购导入。
+> 已完成：S0 商机 → S1 立项 → S2 工程设计 → S3 采购 → S4 仓库 → S5 制造 → S6 装配与齐套率 → S7 发运 → **S8 现场安装**。
+> 下一步：现场调试（每日汇报 + 单机/联调）、客户验收与资料包、质保与售后（S9–S11）；超期扫描自动提醒；Excel 历史采购导入。
 
 ### 8.1 采购状态线（客户口径，别再改回去了）
 
@@ -157,6 +157,7 @@ deploy/          docker-compose.dev.yml
 | **S6 装配与齐套率** | ✅ | 迁移 `h2c4e6a81d35`（`kitting_snapshot` / `assembly_record`）；`services/kitting.py`（自制件看排产是否已转运、外协看是否合格、采购/库存看是否到货入库 → **齐套率只展示**）；`routes/assembly.py`（齐套率/概览/装配开始·完成/厂内调试/装配台）；`pages/Assembly.tsx`（项目 → 各设备齐套率进度条 + 明细 + 装配记录/调试）；**项目详情新增「齐套率」卡**；车间台计数装配中/待调试；**不设 100% 门槛，随时可开装** |
 | **S7 发运（发货指令）** | ✅ | 迁移 `i3e5a7c92d48`（`shipment`/`shipment_line`/`packing_list`/`site_receipt`；编号 `FH{YY}{NNN}`）；`services/shipping.py`（待发设备=装配完成且不在未完成批次；**PM 勾选设备 → 指令 → 装箱（拆解与否不拆流程）→ 装车（拍照）→ 发运 → 到货 → 现场验收对账**）；`routes/shipping.py`（含 `ship:edit` 写、拍照上传/取回）；`pages/Shipping.tsx`（待发设备勾选 + 批次表 + 装箱/装车/发运/到货/验收弹窗 + 详情抽屉）；`services/photos.py` 抽象出共用拍照上传 |
 | **手机端补齐（S5–S7）** | ✅ | 底部入口**按角色/权限显示**（`MobileLayout.tsx`：首页/仓库/领料/制造/装配/发运/我的）；新增 `/m/assembly`（齐套率 + 开始装配/装配完成/厂内调试，拍照）、`/m/shipping`（勾选设备下指令 + 装箱/装车/发运/到货/现场验收，拍照）；`/m/home` 待办加上制造/装配/发运计数；现场到货验收允许 `ship:edit` 或 `site:edit`；演示账号新增 `delivery1`/`site1`/`service1`/`assy1`/`qc1`（密码 `txgk@123`） |
+| **S8 现场安装** | ✅ | 迁移 `j4f6b8d03e59`（`site_survey`/`site_daily`/`site_issue`/`site_commission`/`site_incoming`）；`services/site.py`（勘测→定入场时间、每日汇报勾选+拍照/录像、现场问题→变更、申请调试→通知装配/项目、直发件现场清点）；`routes/site.py`（写 `site:edit` 或 `project:edit`，读登录）；**直发到货改为「现场待验收」（原来直接置“现场已验收”）**，现场清点后反推采购需求状态；`pages/m/SiteM.tsx`（现场主终端）、`pages/Site.tsx`（PC 现场台）；`/m/home` 加现场问题/待派调试计数 |
 | 供应商主数据 + 报价 + 能供品类 | ✅ | `models/purchasing.py`、`routes/suppliers.py` |
 | 推荐供应商（多路证据打分） | ✅ | `GET /purchase/recommend/{item_no}` |
 | 价格参考（上次成交/历史区间/各家报价） | ✅ | `GET /purchase/price-reference/{item_no}` |
@@ -266,7 +267,21 @@ POST/GET /api/v1/shipping/photos                     发运拍照上传 / 取回
 
 移动端（03 卷）—— 底部入口按角色显示；页面均走「清单 + 勾选 + 拍照」
 GET  /api/v1/m/home                                 手机首页待办（含 to_dispatch/to_accept/to_transfer/assembling/to_debug/shipments_open/shipments_receive）
-页面：/m（首页）· /m/warehouse（验收·入库）· /m/issues（领料）· /m/production（制造）· /m/assembly（装配·齐套率）· /m/shipping（发运）· /m/me
+页面：/m（首页）· /m/warehouse（验收·入库）· /m/issues（领料）· /m/production（制造）· /m/assembly（装配·齐套率）· /m/shipping（发运）· /m/site（现场）· /m/me
+
+现场（S8）—— 写：site:edit 或 project:edit；读：登录即可
+POST /api/v1/site/survey                              现场勘测（承重/通道/电/气/网 + 约定入场时间）
+GET  /api/v1/site/survey?project_no=
+POST /api/v1/site/daily                               每日汇报 {stage: 安装/单机调试/联调, done_items[], photos, videos, problem}
+GET  /api/v1/site/daily?project_no=
+POST /api/v1/site/issues | GET                    现场问题（→ 变更）
+POST /api/v1/site/issues/{id}/link-change            {change_id} 或 {close:true}
+POST /api/v1/site/commission                        申请调试 {dispatch_to, plan_date}
+POST /api/v1/site/commission/{id}/arrive|start      已到现场 / 开始调试
+GET  /api/v1/site/incoming?project_no=              待现场清点的直发件
+POST /api/v1/site/incoming/{receipt_id}/accept      现场清点 {result: 齐/缺件/破损, shortage_detail[], photos}
+GET  /api/v1/site/workbench                         现场台汇总
+POST/GET /api/v1/site/photos                        现场拍照/录像上传 / 取回
 POST /api/v1/projects/{p}/payment-terms/{seq}/receive  登记回款（多次累加；payment:edit）
    权限强校验：采购下单类→purchase:edit；验收/入库/领料→warehouse:edit；金额→purchase:price / project:amount（无权限返回 null）
 POST/PATCH /api/v1/orgs（/{id}）                   组织维护：部门/组 增改停用（停用不删）
