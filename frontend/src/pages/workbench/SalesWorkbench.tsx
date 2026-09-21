@@ -59,7 +59,7 @@ export default function SalesWorkbench() {
 
       <Row gutter={[12, 12]} style={{ marginBottom: 12 }}>
         {[
-          { label: '我的商机（线索）', value: s?.my_leads ?? 0, color: '#1f6feb' },
+          { label: '商机（线索）', value: s?.my_leads ?? 0, color: '#1f6feb' },
           { label: '待立项', value: s?.to_initiate ?? 0, color: '#fa8c16' },
           { label: '执行中 / 交付中', value: s?.executing ?? 0, color: '#13c2c2' },
           { label: '跟进超期', value: s?.overdue_followup ?? 0, color: '#f5222d' },

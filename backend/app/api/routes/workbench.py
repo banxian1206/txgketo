@@ -226,9 +226,12 @@ def eng_board(session: Session = Depends(get_session), current: User = Depends(g
 def sales_board(session: Session = Depends(get_session), current: User = Depends(get_current_user)):
     """商务部工作台（06 卷 §3）：我的商机 / 待成交 / 待立项 / 回款。"""
     today = datetime.now(UTC).date()
-    projects = session.scalars(
-        select(Project).where(Project.sales_id == current.id).order_by(Project.project_no.desc())
-    ).all()
+    # ★ 部门台口径：总监/管理员看全部门账本；销售看自己归属的订单（商务全程可见）
+    is_dept_lead = current.is_superuser or current.position == POSITION_DIRECTOR
+    stmt = select(Project).order_by(Project.project_no.desc())
+    if not is_dept_lead:
+        stmt = stmt.where(Project.sales_id == current.id)
+    projects = session.scalars(stmt).all()
     nos = [p.project_no for p in projects]
     terms = (
         session.scalars(select(PaymentTerm).where(PaymentTerm.project_no.in_(nos))).all() if nos else []
@@ -284,11 +287,14 @@ def sales_board(session: Session = Depends(get_session), current: User = Depends
 def pm_board(session: Session = Depends(get_session), current: User = Depends(get_current_user)):
     """项目经理台（06 卷 §3）：我项目的全链进度 + 风险 + 待办。"""
     today = datetime.now(UTC).date()
-    pm_nos = set(session.scalars(select(Project.project_no).where(Project.pm_id == current.id)).all())
-    member_nos = set(
-        session.scalars(select(ProjectMember.project_no).where(ProjectMember.user_id == current.id)).all()
-    )
-    nos = sorted(pm_nos | member_nos)
+    if current.is_superuser or current.position == POSITION_DIRECTOR:
+        nos = sorted(session.scalars(select(Project.project_no)).all())
+    else:
+        pm_nos = set(session.scalars(select(Project.project_no).where(Project.pm_id == current.id)).all())
+        member_nos = set(
+            session.scalars(select(ProjectMember.project_no).where(ProjectMember.user_id == current.id)).all()
+        )
+        nos = sorted(pm_nos | member_nos)
     projects = session.scalars(select(Project).where(Project.project_no.in_(nos))).all() if nos else []
 
     equipments: dict[str, list[str]] = {}
