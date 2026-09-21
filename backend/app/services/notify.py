@@ -16,6 +16,7 @@ from app.models.platform import POSITION_DIRECTOR, Role, User, user_role
 TYPE_TASK = "task"
 TYPE_REVIEW = "review"
 TYPE_CHANGE = "change"
+TYPE_RELEASE = "release"  # 设计发布（= 冻结）：通知链条上要接着干活的人
 TYPE_WAREHOUSE = "warehouse"
 TYPE_PURCHASE = "purchase"
 

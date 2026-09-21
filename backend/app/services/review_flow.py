@@ -25,6 +25,7 @@ from app.models.engineering import (
     DrawingVersion,
 )
 from app.models.library import Item
+from app.models.initiation import ProjectMember
 from app.models.platform import User
 from app.models.program import EquipmentProgram, EquipmentProgramVersion
 from app.models.review import (
@@ -599,6 +600,65 @@ def _unlock_round(session: Session, ticket: ReviewTicket, round_no: int) -> None
                 p.status = "草稿"
 
 
+def _notify_release(session: Session, release: DesignRelease, actor_id: int | None) -> None:
+    """发布（= 冻结）→ 通知链条上要接着干活的人（06 卷 §9）。
+
+    · 项目团队全员（项目经理/各专业负责人/采购负责人…）
+    · 下游专业：机械/电气/程序 发布 → 工艺的任务负责人可以开工
+    · 采购：由 bom_demand.create_release_demands 在真产生需求时单独提醒
+    """
+    recipients: set[int] = {
+        uid
+        for uid in session.scalars(
+            select(ProjectMember.user_id).where(ProjectMember.project_no == release.project_no)
+        ).all()
+        if uid
+    }
+    downstream = ""
+    if release.profession == "机械":
+        # 工艺挂在机械之后：机械发布 → 工艺可以开工（05 卷 §0）
+        owners = [
+            oid
+            for oid in session.scalars(
+                select(Task.owner_id).where(
+                    Task.project_no == release.project_no,
+                    Task.equip_no == release.equip_no,
+                    Task.profession == "工艺",
+                    Task.task_type == "设计",
+                    Task.owner_id.is_not(None),
+                )
+            ).all()
+            if oid
+        ]
+        if owners:
+            recipients.update(owners)
+        else:
+            lead = team_lead_for(session, "工艺")
+            if lead is not None:
+                recipients.add(lead.id)
+        downstream = "；工艺可以开工了"
+
+    # 提交人已经收到「评审通过并发布」，不再重复发
+    ticket = session.get(ReviewTicket, release.ticket_id)
+    if ticket is not None and ticket.submitter_id:
+        recipients.discard(ticket.submitter_id)
+    notify.notify(
+        session,
+        recipients,
+        type_=notify.TYPE_RELEASE,
+        title=f"{release.profession}设计已发布（{release.equip_no or ''}）：{release.release_no}",
+        body=f"内容已冻结，后面按这一版干活{downstream}",
+        link=(
+            f"/projects/{release.project_no}/design/{release.equip_no}"
+            if release.equip_no
+            else "/projects"
+        ),
+        biz_type="design_release",
+        biz_id=release.id,
+        actor_id=actor_id,
+    )
+
+
 def _publish_round(
     session: Session,
     ticket: ReviewTicket,
@@ -694,6 +754,8 @@ def _publish_round(
                 )
 
     release.summary = summary
+    # ★ 站内消息：发布 = 里程碑 → 通知链条上要接着干活的人（06 卷 §9）
+    _notify_release(session, release, actor_id=director_user.id)
     # ★ 发布 = 采购触发（05 卷 §5）：这一批冻结的内容净需求自动进采购池
     created = bom_demand.create_release_demands(session, release)
     summary["purchase_requests"] = [r.id for r in created]

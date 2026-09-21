@@ -17,6 +17,7 @@ const TYPE_COLOR: Record<string, string> = {
   task: 'blue',
   review: 'gold',
   change: 'purple',
+  release: 'green',
   warehouse: 'cyan',
   purchase: 'orange',
 }
