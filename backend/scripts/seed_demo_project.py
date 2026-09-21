@@ -81,6 +81,7 @@ def main() -> None:
             "post", "/api/v1/projects", who="sales1", ok=(201,),
             label="S0 新建商机",
             json={
+                "sales_id": users["sales1"],
                 "customer_name": "创维rgb电子",
                 "project_name": "65寸电视后壳自动锁附线",
                 "contacts": [{"name": "刘工", "title": "设备科", "phone": "13800000000", "role_tag": "技术对接人"}],

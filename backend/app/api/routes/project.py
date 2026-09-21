@@ -109,7 +109,7 @@ def create_project(
         performance_deposit_return_date=body.performance_deposit_return_date,
         performance_deposit_returned=body.performance_deposit_returned,
         risk_note=body.risk_note,
-        sales_id=body.sales_id or current.id,  # ★ 商机归属：默认创建人（商务全程可见该订单）
+        sales_id=body.sales_id,  # ★ 商机归属（创建时必选销售负责人，商务全程可见该订单）
         stage="线索",
         created_by=current.id,
     )

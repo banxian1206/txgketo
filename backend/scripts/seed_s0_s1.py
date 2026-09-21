@@ -77,7 +77,9 @@ def main() -> None:
             assert r.status_code == 201, r.text
         print(f"📦 标准库物料重建 {len(ITEMS)} 条")
 
-        p = call("post", "/api/v1/projects", "sales1", "① 新建商机", ok=(201,), json={
+        users = {u["username"]: u["id"] for u in c.get("/api/v1/users", headers=login("admin")).json()}
+        p = call("post", "/api/v1/projects", "sales1", "① 新建商机（选销售负责人=sales1）", ok=(201,), json={
+            "sales_id": users["sales1"],
             "customer_name": "创维rgb电子", "project_name": "65寸电视后壳自动锁附线",
             "contacts": [{"name": "刘工", "title": "设备科", "phone": "13800000000", "role_tag": "技术对接人"}],
             "deadline": d(14), "delivery_days": 120, "deal_mode": "直签", "source": "老客户复购",

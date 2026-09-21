@@ -92,6 +92,7 @@ def main() -> None:
     # ================= S0 商机 =================
     stage("S0 商机登记（sales1）")
     p = req("post", "/api/v1/projects", "sales1", (201,), json={
+        "sales_id": users["sales1"],
         "customer_name": "创维rgb电子", "project_name": "65寸电视后壳自动锁附线",
         "contacts": [{"name": "刘工", "title": "设备科", "phone": "13800000000", "role_tag": "技术对接人"}],
         "deadline": d(14), "delivery_days": 120, "deal_mode": "直签", "source": "老客户复购",
@@ -102,7 +103,10 @@ def main() -> None:
     flag("S0", pj["project_no"].startswith("TX"), "项目号格式 TX{YY}{NNN}")
     flag("S0", pj.get("sales_id") == users["sales1"], "建商机应自动把创建人记为销售负责人（商务全程可见）")
     print(f"  商机号 {p}（{pj['stage']}）")
-    STAGES.append(("S0 商机", f"{p} 建档，阶段=线索"))
+    r = c.post("/api/v1/projects", headers=login("sales1"),
+               json={"customer_name": "X", "project_name": "Y"})
+    flag("S0", r.status_code == 422, f"不选销售负责人应被拦截（422），实际 {r.status_code}")
+    STAGES.append(("S0 商机", f"{p} 建档（必选销售负责人），阶段=线索"))
 
     # ================= S0-2 成交登记 =================
     stage("S0-2 成交登记（sales1）")

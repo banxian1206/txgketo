@@ -54,7 +54,7 @@ class ProjectCreateIn(BaseModel):
     # 必填
     customer_name: str = Field(..., description="客户名称")
     project_name: str = Field(..., description="项目名称")
-    sales_id: int | None = Field(default=None, description="销售/商务负责人；不填默认为创建人")
+    sales_id: int = Field(..., description="销售/商务负责人（必选：这个商机归谁跟）")
     contacts: list[ContactIn] = Field(default_factory=list, description="客户方联系人（可多个）")
     received_docs: list[str] = Field(default_factory=list, description="接收到的资料（清单勾选）")
     project_desc: str | None = Field(default=None, description="项目描述")
@@ -74,7 +74,6 @@ class ProjectCreateIn(BaseModel):
     competitor: str | None = None
     related_project_no: str | None = None
     risk_note: str | None = None
-    sales_id: int | None = None
     # 履约保证金（我们交出去的，选填）
     performance_deposit: float | None = None
     performance_deposit_return_date: date | None = None

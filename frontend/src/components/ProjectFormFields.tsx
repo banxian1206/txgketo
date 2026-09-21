@@ -356,12 +356,15 @@ export default function ProjectFormFields({
       <Group title="⑥ 商务跟进" hint="内部用">
         <Row gutter={16}>
           <Col span={6}>
-            <Form.Item name="sales_id" label="销售负责人">
+            <Form.Item
+              name="sales_id"
+              label="销售负责人"
+              rules={[{ required: true, message: '必选：这个商机归谁跟' }]}
+            >
               <Select
-                allowClear
                 showSearch
                 optionFilterProp="label"
-                placeholder="谁在跟"
+                placeholder="选销售/商务负责人"
                 options={users.map((u) => ({ value: u.id, label: u.name }))}
               />
             </Form.Item>
