@@ -45,7 +45,9 @@ export default function Reviews() {
     setOpen(true)
   }
 
-  const isReviewer = profile?.position === '设计组长' || profile?.position === '工程总监'
+  const isReviewer =
+    ['组长', '设计组长'].includes(profile?.position ?? '') ||
+    ['部门负责人', '工程总监'].includes(profile?.position ?? '')
 
   const columns: ColumnsType<ReviewTicketBrief> = [
     {
@@ -133,7 +135,7 @@ export default function Reviews() {
         pagination={{ pageSize: 20, showSizeChanger: false }}
       />
       <Typography.Paragraph type="secondary" style={{ fontSize: 12, marginTop: 12 }}>
-        审核链：设计师提交 → 本专业组长（一级）→ 工程部总监（二级）→ 发布（= 冻结）。
+        审核链：成员提交 → 本专业组长（一级）→ 部门负责人（二级）→ 发布（= 冻结）。
         发布后这一轮内容成为冻结版本，采购按发布批次触发（05 卷 §3、§5）。
       </Typography.Paragraph>
       <ReviewDetailModal

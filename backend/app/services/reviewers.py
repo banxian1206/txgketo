@@ -12,7 +12,7 @@ from __future__ import annotations
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models.platform import POSITION_DIRECTOR, POSITION_LEAD, User
+from app.models.platform import LEGACY_POSITIONS, POSITION_DIRECTOR, POSITION_LEAD, Org, User
 
 
 class ReviewerError(ValueError):
@@ -20,11 +20,12 @@ class ReviewerError(ValueError):
 
 
 def chain_levels(submitter_position: str | None) -> tuple[bool, bool]:
-    """按提交人岗位判断要走几级：返回（是否要一级组长审, 是否要二级总监审）。"""
-    if submitter_position == POSITION_DIRECTOR:
-        raise ReviewerError("工程总监不能自己提交自审")
-    if submitter_position == POSITION_LEAD:
-        return False, True  # 组长本人提交：跳过一级，总监直审（单上留痕）
+    """按提交人岗位判断要走几级：返回（是否要一级组长审, 是否要二级部门负责人审）。"""
+    position = LEGACY_POSITIONS.get(submitter_position or "", submitter_position)
+    if position == POSITION_DIRECTOR:
+        raise ReviewerError("部门负责人不提交（他负责审批）；请用部门成员的帐号提交")
+    if position == POSITION_LEAD:
+        return False, True  # 组长本人提交：跳过一级，部门负责人直审
     return True, True
 
 
@@ -40,10 +41,48 @@ def team_lead_for(session: Session, profession: str | None) -> User | None:
 
 
 def director(session: Session) -> User | None:
-    """工程部总监。"""
+    """部门负责人（兜底：全局第一个，用于没有组织信息的老数据）。"""
     return session.scalar(
         select(User).where(User.position == POSITION_DIRECTOR, User.is_active.is_(True))
     )
+
+
+def _department_root(session: Session, org_id: int | None) -> Org | None:
+    org = session.get(Org, org_id) if org_id else None
+    seen: set[int] = set()
+    while org is not None and org.parent_id and org.parent_id not in seen:
+        seen.add(org.id)
+        parent = session.get(Org, org.parent_id)
+        if parent is None:
+            break
+        org = parent
+    return org
+
+
+def _subtree_ids(session: Session, root_id: int) -> set[int]:
+    ids = {root_id}
+    frontier = [root_id]
+    while frontier:
+        rows = session.scalars(select(Org).where(Org.parent_id.in_(frontier))).all()
+        frontier = [r.id for r in rows if r.id not in ids]
+        ids.update(frontier)
+    return ids
+
+
+def director_for(session: Session, user: User) -> User | None:
+    """提交人所在部门的部门负责人（06 卷 §3）；部门没配就全局兜底。"""
+    dept = _department_root(session, user.org_id)
+    if dept is not None:
+        boss = session.scalar(
+            select(User).where(
+                User.position == POSITION_DIRECTOR,
+                User.is_active.is_(True),
+                User.org_id.in_(_subtree_ids(session, dept.id)),
+            ).order_by(User.id)
+        )
+        if boss is not None:
+            return boss
+    return director(session)
 
 
 def resolve_chain(session: Session, submitter: User) -> tuple[User | None, User]:
@@ -58,9 +97,9 @@ def resolve_chain(session: Session, submitter: User) -> tuple[User | None, User]
         lead = team_lead_for(session, submitter.profession)
         if lead is None:
             raise ReviewerError(
-                f"没找到「{submitter.profession or '未定专业'}」的设计组长，先配置审核人"
+                f"没找到「{submitter.profession or '未定专业'}」的组长，先配置审核人"
             )
-    boss = director(session)
+    boss = director_for(session, submitter)
     if boss is None:
-        raise ReviewerError("没找到工程总监，先配置审核人")
+        raise ReviewerError("没找到部门负责人，先配置审核人")
     return lead, boss

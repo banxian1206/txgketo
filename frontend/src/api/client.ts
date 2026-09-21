@@ -33,6 +33,7 @@ export interface User {
   is_superuser: boolean
   profession?: string | null
   position?: string | null
+  title?: string | null
   org_id?: number | null
 }
 
@@ -49,6 +50,18 @@ export interface OrgRow {
   name: string
   parent_id?: number | null
   kind?: string | null
+  is_active?: boolean
+  user_count?: number
+}
+
+/** 我的权限范围（06 卷 §4）：能不能管用户/组织、能勾哪些角色 */
+export interface MyScope {
+  is_admin: boolean
+  can_manage_users: boolean
+  can_manage_org: boolean
+  department: { id: number; code: string; name: string } | null
+  assignable_role_codes: string[] | null
+  positions: string[]
 }
 
 export interface RoleRow {
@@ -57,9 +70,9 @@ export interface RoleRow {
   name: string
 }
 
-/** 工程部专业 / 岗位（05 卷 §2.1，与后端 PROFESSIONS / POSITIONS 对齐） */
+/** 工程部专业 / 岗位（06 卷 §3，与后端 PROFESSIONS / POSITIONS 对齐） */
 export const PROFESSIONS = ['机械', '电气', '程序', '工艺']
-export const POSITIONS = ['设计师', '设计组长', '工程总监']
+export const POSITIONS = ['成员', '组长', '部门负责人']
 
 export interface ContactIn {
   name: string
@@ -268,8 +281,35 @@ export async function listNumberRules() {
   return data
 }
 
-export async function listUsers() {
-  const { data } = await api.get<UserRow[]>('/users')
+export async function listUsers(params?: {
+  org_id?: number
+  role_code?: string
+  is_active?: boolean
+  q?: string
+}) {
+  const { data } = await api.get<UserRow[]>('/users', { params })
+  return data
+}
+
+export async function getMyScope() {
+  const { data } = await api.get<MyScope>('/my-scope')
+  return data
+}
+
+export async function createOrg(body: {
+  name: string
+  parent_id?: number | null
+  kind?: string | null
+}) {
+  const { data } = await api.post<OrgRow>('/orgs', body)
+  return data
+}
+
+export async function updateOrg(
+  id: number,
+  body: { name?: string; parent_id?: number | null; kind?: string | null; is_active?: boolean },
+) {
+  const { data } = await api.patch<OrgRow>(`/orgs/${id}`, body)
   return data
 }
 
@@ -281,6 +321,7 @@ export async function createUser(body: {
   org_id?: number | null
   profession?: string | null
   position?: string | null
+  title?: string | null
   role_codes: string[]
 }) {
   const { data } = await api.post<UserRow>('/users', body)
@@ -295,6 +336,7 @@ export async function updateUser(
     org_id?: number | null
     profession?: string | null
     position?: string | null
+    title?: string | null
     role_codes?: string[]
     is_active?: boolean
     password?: string

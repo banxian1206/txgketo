@@ -9,13 +9,18 @@ export default function AppLayout() {
   const nav = useNavigate()
   const loc = useLocation()
   const name = localStorage.getItem('txgk_name') ?? '用户'
-  const isAdmin = (() => {
+  const me = (() => {
     try {
-      return JSON.parse(localStorage.getItem('txgk_user') ?? '{}').is_superuser === true
+      return JSON.parse(localStorage.getItem('txgk_user') ?? '{}') as {
+        is_superuser?: boolean
+        position?: string
+      }
     } catch {
-      return false
+      return {}
     }
   })()
+  // 用户与权限：系统管理员 + 部门负责人（06 卷 §4）
+  const canManageUsers = me.is_superuser === true || me.position === '部门负责人'
 
   return (
     <Layout style={{ minHeight: '100%' }}>
@@ -47,7 +52,7 @@ export default function AppLayout() {
             { key: '/suppliers', label: <Link to="/suppliers">供应商</Link> },
             { key: '/library', label: <Link to="/library">标准库</Link> },
             { key: '/numbering', label: <Link to="/numbering">编号规则</Link> },
-            ...(isAdmin ? [{ key: '/users', label: <Link to="/users">用户与岗位</Link> }] : []),
+            ...(canManageUsers ? [{ key: '/users', label: <Link to="/users">用户与权限</Link> }] : []),
           ]}
         />
       </Sider>

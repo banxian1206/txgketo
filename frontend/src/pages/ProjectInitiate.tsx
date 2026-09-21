@@ -110,7 +110,7 @@ export default function ProjectInitiate() {
       message.success(`生成 ${r.created} 条任务`)
       if (r.unassigned.length) {
         message.warning(
-          `有 ${r.unassigned.length} 条没指派到人 —— 先到「用户与岗位」里把各专业设计组长配好，再点一次生成`,
+          `有 ${r.unassigned.length} 条没指派到人 —— 先到「用户与权限」里把各专业组长配好，再点一次生成`,
         )
       }
       await load()
@@ -153,7 +153,7 @@ export default function ProjectInitiate() {
       ok: tasks.length > 0 && unassigned.length === 0,
       text:
         tasks.length === 0
-          ? '任务还没分派（设计派给各专业设计组长，采购派给采购员）'
+          ? '任务还没分派（设计派给各专业组长，采购派给采购员）'
           : unassigned.length
             ? `${unassigned.length} 条任务没指派负责人`
             : `任务已分派（${tasks.length} 条到人）`,
@@ -294,7 +294,7 @@ export default function ProjectInitiate() {
         style={{ marginBottom: 16 }}
       >
         <Typography.Paragraph type="secondary" style={{ fontSize: 12 }}>
-          每台设备 × 勾选的专业 → 一条设计任务，直接派给对应专业的设计组长（工程部岗位），组长再拆给组员；
+          每台设备 × 勾选的专业 → 一条设计任务，直接派给对应专业的组长（工程部岗位），组长再拆给组员；
           工艺挂在机械之后（机械首次发布即可开工）。每个长周期件 → 一条采购任务。生成后各人在「我的任务」里看到自己的活。
         </Typography.Paragraph>
         <Table<TaskItem>

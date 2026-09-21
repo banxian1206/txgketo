@@ -51,7 +51,7 @@ from app.models.review import (
 from app.models.task import Task
 from app.services import audit, bom_demand, change_flow
 from app.services.numbering import next_number, year_scope_key
-from app.services.reviewers import chain_levels, director, team_lead_for
+from app.services.reviewers import chain_levels, director, director_for, team_lead_for
 
 LEVEL_LABEL = {1: "组长", 2: "总监"}
 KIND_BY_PROFESSION = {"机械": "机械", "电气": "电气"}
@@ -407,9 +407,10 @@ def review_ticket(
         if lead is None or lead.id != user.id:
             raise ReviewFlowError("只有本专业组长能审这一级")
     else:
-        boss = director(session)
+        submitter = session.get(User, ticket.submitter_id) if ticket.submitter_id else None
+        boss = director_for(session, submitter) if submitter else director(session)
         if boss is None or boss.id != user.id:
-            raise ReviewFlowError("只有工程部总监能审这一级")
+            raise ReviewFlowError("只有本部门的部门负责人能审这一级")
 
     now = datetime.now(UTC)
     round_no = ticket.current_round

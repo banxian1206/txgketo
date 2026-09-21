@@ -51,8 +51,11 @@ export default function ReviewDetailModal({ ticketId, open, onClose, onChanged }
   }, [open, load])
 
   const canReview1 =
-    detail?.status === '待组长审' && profile?.position === '设计组长' && profile.profession === detail.profession
-  const canReview2 = detail?.status === '待总监审' && profile?.position === '工程总监'
+    detail?.status === '待组长审' &&
+    ['组长', '设计组长'].includes(profile?.position ?? '') &&
+    profile?.profession === detail.profession
+  const canReview2 =
+    detail?.status === '待总监审' && ['部门负责人', '工程总监'].includes(profile?.position ?? '')
   const canWithdraw =
     !!detail &&
     (detail.status === '待组长审' || detail.status === '待总监审') &&

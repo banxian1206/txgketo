@@ -21,6 +21,7 @@ class UserOut(BaseModel):
     org_id: int | None = None
     profession: str | None = None
     position: str | None = None
+    title: str | None = None
     is_active: bool = True
     is_superuser: bool = False
 

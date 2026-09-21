@@ -112,7 +112,7 @@ export default function Changes() {
         pagination={{ pageSize: 20, showSizeChanger: false }}
       />
       <Typography.Paragraph type="secondary" style={{ fontSize: 12, marginTop: 12 }}>
-        冻结后要动，必须提改版申请：工程总监裁决（否决必须给替代方案）→ 下发改版任务 →
+        冻结后要动，必须提改版申请：部门负责人裁决（否决必须给替代方案）→ 下发改版任务 →
         设计师改完重走两级审核 → 新版本发布、旧版留档。影响面（已生成采购需求/已领料）只提示，人工处理。
       </Typography.Paragraph>
       <ChangeDetailModal crId={crId} open={open} onClose={() => setOpen(false)} onChanged={() => void load()} />

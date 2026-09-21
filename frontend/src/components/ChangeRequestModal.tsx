@@ -40,7 +40,7 @@ export default function ChangeRequestModal({
         reason: v.reason,
         proposal: v.proposal ?? null,
       })
-      message.success(`已提改版申请 ${cr.cr_no} —— 等工程总监裁决`)
+      message.success(`已提改版申请 ${cr.cr_no} —— 等部门负责人裁决`)
       onClose()
       onCreated?.(cr)
     } catch (e) {

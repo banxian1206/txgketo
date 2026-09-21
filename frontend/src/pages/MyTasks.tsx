@@ -63,7 +63,8 @@ export default function MyTasks() {
   const [selected, setSelected] = useState<number[]>([])
   const [splitting, setSplitting] = useState(false)
 
-  const isLead = profile?.position === '设计组长' || profile?.position === '工程总监'
+  const isLead = ['组长', '设计组长'].includes(profile?.position ?? '') ||
+    ['部门负责人', '工程总监'].includes(profile?.position ?? '')
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -114,7 +115,7 @@ export default function MyTasks() {
       const users = await listUsers()
       setMembers(
         users.filter(
-          (u) => u.is_active && u.profession === task.profession && u.position === '设计师',
+          (u) => u.is_active && u.profession === task.profession && (u.position === '成员' || u.position === '设计师'),
         ),
       )
     } catch (e) {
@@ -316,7 +317,7 @@ export default function MyTasks() {
         columns={columns}
       />
       <Typography.Paragraph type="secondary" style={{ fontSize: 12, marginTop: 12 }}>
-        任务在「立项」时生成：每台设备 × 专业 → 设计任务，直接派给各专业设计组长，组长再拆给组员；
+        任务在「立项」时生成：每台设备 × 专业 → 设计任务，直接派给各专业组长，组长再拆给组员；
         工艺挂在机械之后，机械首次发布即可开工（05 卷 §0.1）。
       </Typography.Paragraph>
 
@@ -336,7 +337,7 @@ export default function MyTasks() {
           mode="multiple"
           style={{ width: '100%' }}
           placeholder={
-            members.length ? '选择组员' : '本专业还没有设计师 —— 先到「用户与岗位」配人'
+            members.length ? '选择组员' : '本专业还没有组员 —— 先到「用户与权限」配人'
           }
           value={selected}
           onChange={setSelected}
