@@ -91,8 +91,8 @@ deploy/          docker-compose.dev.yml
 
 ## 8. 当前进度（交接记录）
 
-> 更新于：**06 卷 C 步（站内消息 + 红点）**落地：`notification` 表 + 触发钩子（任务派工/转派、评审提交/通过/退回/发布、改版申请/裁决/下发/完成、验收待入库/不合格、发布进采购池）+ 顶栏铃铛未读红点（PC/移动端，60s 轮询）。
-> 下一步：**06 卷 D 步（工程部工作台三视角）** → E 采购/仓库待办头。
+> 更新于：**06 卷 D 步（工程部工作台三视角）**落地：`/workbench/eng/board`（设备设计进度 + 待终审 + 待裁决改版 + 卡住/超期）+ `pages/workbench/EngWorkbench.tsx`（成员 / 组长 / 部门负责人 三视角按岗位自动切）。
+> 下一步：**06 卷 E 步（采购/仓库工作台加待办头；商务部/项目经理台同构复制）**。
 
 ### 8.1 采购状态线（客户口径，别再改回去了）
 
@@ -147,6 +147,7 @@ deploy/          docker-compose.dev.yml
 | **用户·角色·组织（06 卷 A 步）** | ✅ | 岗位三级 + `title`（迁移 `d0f4a6c83b25`）；组织增改停用 `POST/PATCH /orgs`；`GET /my-scope`；用户管理按部门范围（部门负责人只能管本部门/只能勾本部门角色）；审核链 `director_for`（按部门找负责人）+ 自动跳级；`pages/Users.tsx`（用户 / 组织架构 / 角色说明 三页签） |
 | **工作台框架（06 卷 B 步）** | ✅ | `GET /workbench/me`（可见工作台 + 待办数字 + 我的项目）；侧栏三分组 + 按角色显示工作台；登录默认进「我的工作台」；`pages/Workbench.tsx` + `pages/workbench/DeptWorkbench.tsx`（部门台统一外壳）；`routes/workbench.py` |
 | **站内消息 + 红点（06 卷 C 步）** | ✅ | `models/notify.py` + `services/notify.py` + `routes/notifications.py`；触发钩子：任务派工/转派/拆分、评审提交/通过/退回/发布、改版申请/裁决/下发/完成、验收合格→仓库·不合格→采购·直发现场→项目经理、**入库完成→采购+项目经理**、发布进采购池；**发布扇出**（项目团队全员 + 下游工艺 + 采购）；`components/NotificationsDrawer.tsx` + 顶栏铃铛红点（PC/移动端 60s 轮询）+ **我的工作台消息区**；**组长空缺自动跳级**、改版裁决通知只发本部门负责人、移动端消息链接映射 |
+| **工程部工作台（06 卷 D 步）** | ✅ | `GET /workbench/eng/board`（设备×四专业进度、待终审、待裁决改版、卡住/超期）；`pages/workbench/EngWorkbench.tsx`（成员/组长/部门负责人三视角按岗位自动切；我的任务·评审单·改版 / 我组待审·组员进度 / 部门看板） |
 | 供应商主数据 + 报价 + 能供品类 | ✅ | `models/purchasing.py`、`routes/suppliers.py` |
 | 推荐供应商（多路证据打分） | ✅ | `GET /purchase/recommend/{item_no}` |
 | 价格参考（上次成交/历史区间/各家报价） | ✅ | `GET /purchase/price-reference/{item_no}` |
@@ -168,7 +169,7 @@ deploy/          docker-compose.dev.yml
 | 2 | 制造 / 装配 / 发运 / 现场 / 验收 / 售后 | 流程上还没做（见 `../00 方案` §3 S5–S11） |
 | 3 | 领料单数量算法对齐 | `warehouse/generate-issue` 还是旧算法（材料只乘直接父件、标准件不乘）；建议改成 `bom_demand` 那套按树累计 |
 | 4 | 移动端离线队列 + Capacitor 打包 | 03 卷：现场弱网「拍完先存本地、有网再传」；需要时再打包 APK/ipa（同一份代码） |
-| 5 | **06 卷 D–E**（工程部工作台三视角 → 采购/仓库待办头） | 06 卷 §11 落地顺序 |
+| 5 | **06 卷 E**（采购/仓库工作台待办头；商务部/项目经理台同构复制） | 06 卷 §11 落地顺序 |
 | 6 | **接口级权限强校验 + 离职一键转交** | 06 卷 §10：本期不做，已记录，下期做（`require_permission` 接关键动作；任务/待审/项目角色转交） |
 | 7 | **超期扫描（任务/交期到期提醒）** | 本期只展示“超期”，**自动扫描下期**。注：**没有“到货登记”这个动作**（新流程已废弃，AGENTS §8.1：采购侧不登记到货/发货，状态由仓库验收/入库推着变）——所以不存在“到货提醒”，仓库是主动看「待验收」清单收货；验收/入库的通知已接 |
 
@@ -221,6 +222,7 @@ GET  /api/v1/my-scope                             我能管什么（是否管理
 POST/PATCH /api/v1/orgs（/{id}）                   组织维护：部门/组 增改停用（停用不删）
 GET  /api/v1/users?org_id&role_code&is_active&q   用户列表（筛选；管理权限在后端校验）
 GET  /api/v1/workbench/me                          我的工作台：可见工作台 + 待办数字 + 我的项目
+GET  /api/v1/workbench/eng/board                  工程部看板：设备×四专业进度 + 待终审 + 待裁决 + 超期
 GET  /api/v1/notifications                         站内消息列表（?unread=true 只看未读）
 GET  /api/v1/notifications/unread-count            未读数（红点）
 POST /api/v1/notifications/{id}/read · /read-all   已读 / 全部已读

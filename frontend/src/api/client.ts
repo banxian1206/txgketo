@@ -338,6 +338,73 @@ export async function workbenchMe() {
   return data
 }
 
+// ------------------- 工程部看板（06 卷 §3）-------------------
+
+export interface EngCell {
+  state: string
+  task_no?: string | null
+  owner?: string | null
+  release_no?: string | null
+  ticket_status?: string | null
+  overdue: boolean
+  plan_end?: string | null
+}
+
+export interface EngEquipment {
+  project_no: string
+  project_name?: string | null
+  equip_no: string
+  equip_name: string
+  professions: Record<string, EngCell>
+  released_count: number
+  blocked: string[]
+}
+
+export interface EngBoard {
+  summary: {
+    equipments: number
+    all_released: number
+    blocked: number
+    pending_reviews: number
+    pending_changes: number
+    overdue_tasks: number
+    released: number
+  }
+  equipments: EngEquipment[]
+  pending_reviews: {
+    id: number
+    ticket_no: string
+    project_no: string
+    equip_no?: string | null
+    profession?: string | null
+    submitter?: string | null
+    round: number
+  }[]
+  pending_changes: {
+    id: number
+    cr_no: string
+    target_type: string
+    target_ref: string
+    project_no: string
+    equip_no?: string | null
+    reason: string
+  }[]
+  overdue_tasks: {
+    id: number
+    task_no: string
+    title: string
+    profession?: string | null
+    owner?: string | null
+    plan_end?: string | null
+    status: string
+  }[]
+}
+
+export async function engBoard() {
+  const { data } = await api.get<EngBoard>('/workbench/eng/board')
+  return data
+}
+
 // ------------------- 站内消息（06 卷 §9）-------------------
 
 export interface NotificationRow {

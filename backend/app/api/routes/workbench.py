@@ -6,6 +6,8 @@
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
+
 from fastapi import APIRouter, Depends
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
@@ -15,8 +17,14 @@ from app.core.db import get_session
 from app.models.change import CR_ACTIVE, CR_PENDING, ChangeRequest
 from app.models.initiation import GoodsReceipt, ProjectMember, PurchaseRequest
 from app.models.platform import POSITION_DIRECTOR, POSITION_LEAD, Org, User
-from app.models.project import Project
-from app.models.review import TICKET_PENDING_DIRECTOR, TICKET_PENDING_LEAD, ReviewTicket
+from app.models.project import Equipment, Project
+from app.models.review import (
+    TICKET_PENDING_DIRECTOR,
+    TICKET_PENDING_LEAD,
+    TICKET_REJECTED,
+    DesignRelease,
+    ReviewTicket,
+)
 from app.models.task import Task
 from app.models.warehouse import MaterialIssue
 from app.services import notify
@@ -63,6 +71,152 @@ def _visible(session: Session, user: User) -> set[str]:
         if w["roles"] and codes & set(w["roles"]):
             out.add(w["key"])
     return out
+
+
+@router.get("/eng/board")
+def eng_board(session: Session = Depends(get_session), current: User = Depends(get_current_user)):
+    """工程部看板（06 卷 §3）：设备设计进度 + 待终审 + 改版裁决 + 卡住/超期。
+
+    设计属于工程部，这里给全量；页面上再按岗位（成员/组长/部门负责人）分三视角。
+    """
+    profs = ("机械", "电气", "程序", "工艺")
+    today = datetime.now(UTC).date()
+
+    equipments = session.scalars(select(Equipment)).all()
+    tasks = session.scalars(select(Task).where(Task.task_type == "设计")).all()
+    tickets = session.scalars(select(ReviewTicket)).all()
+    releases = session.scalars(select(DesignRelease).order_by(DesignRelease.id)).all()
+    projects = {p.project_no: p.project_name for p in session.scalars(select(Project)).all()}
+    names = {u.id: u.name for u in session.scalars(select(User)).all()}
+
+    task_map = {
+        (t.project_no, t.equip_no, t.profession): t for t in tasks if t.parent_task_id is None
+    }
+    ticket_by_task = {t.task_id: t for t in tickets}
+    rel_map: dict[tuple, DesignRelease] = {}
+    for r in releases:
+        rel_map[(r.project_no, r.equip_no, r.profession)] = r  # 后来的覆盖（已按 id 排序）
+
+    items: list[dict] = []
+    blocked_equip = 0
+    all_released = 0
+    for eq in equipments:
+        cells: dict[str, dict] = {}
+        blocked_parts: list[str] = []
+        for prof in profs:
+            task = task_map.get((eq.project_no, eq.equip_no, prof))
+            rel = rel_map.get((eq.project_no, eq.equip_no, prof))
+            ticket = ticket_by_task.get(task.id) if task else None
+            if rel is not None:
+                state = "已发布"
+            elif ticket is not None and ticket.status in (
+                TICKET_PENDING_LEAD,
+                TICKET_PENDING_DIRECTOR,
+            ):
+                state = "审核中"
+            elif ticket is not None and ticket.status == TICKET_REJECTED:
+                state = "已退回"
+                blocked_parts.append(f"{prof}（评审被退回）")
+            elif task is not None:
+                state = "进行中" if task.status != "待开始" else "待开始"
+            else:
+                state = "未派"
+            overdue = bool(
+                task is not None
+                and task.plan_end is not None
+                and task.plan_end < today
+                and task.status not in ("已完成", "已取消")
+            )
+            if overdue:
+                blocked_parts.append(f"{prof}（超期 {task.plan_end}）")
+            cells[prof] = {
+                "state": state,
+                "task_no": task.task_no if task else None,
+                "owner": names.get(task.owner_id) if task and task.owner_id else None,
+                "release_no": rel.release_no if rel else None,
+                "ticket_status": ticket.status if ticket else None,
+                "overdue": overdue,
+                "plan_end": task.plan_end if task else None,
+            }
+        done = sum(1 for p in profs if cells[p]["state"] == "已发布")
+        if done == len(profs):
+            all_released += 1
+        if blocked_parts:
+            blocked_equip += 1
+        items.append(
+            {
+                "project_no": eq.project_no,
+                "project_name": projects.get(eq.project_no),
+                "equip_no": eq.equip_no,
+                "equip_name": eq.equip_name,
+                "professions": cells,
+                "released_count": done,
+                "blocked": blocked_parts,
+            }
+        )
+
+    pending_reviews = session.scalars(
+        select(ReviewTicket).where(ReviewTicket.status == TICKET_PENDING_DIRECTOR)
+    ).all()
+    pending_changes = session.scalars(
+        select(ChangeRequest).where(ChangeRequest.status == CR_PENDING)
+    ).all()
+    overdue_tasks = [
+        t
+        for t in tasks
+        if t.plan_end is not None
+        and t.plan_end < today
+        and t.status not in ("已完成", "已取消")
+    ]
+
+    return {
+        "summary": {
+            "equipments": len(equipments),
+            "all_released": all_released,
+            "blocked": blocked_equip,
+            "pending_reviews": len(pending_reviews),
+            "pending_changes": len(pending_changes),
+            "overdue_tasks": len(overdue_tasks),
+            "released": sum(1 for r in releases if r.profession in profs),
+        },
+        "equipments": items,
+        "pending_reviews": [
+            {
+                "id": t.id,
+                "ticket_no": t.ticket_no,
+                "project_no": t.project_no,
+                "equip_no": t.equip_no,
+                "profession": t.profession,
+                "submitter": names.get(t.submitter_id) if t.submitter_id else None,
+                "round": t.current_round,
+            }
+            for t in pending_reviews
+        ],
+        "pending_changes": [
+            {
+                "id": c.id,
+                "cr_no": c.cr_no,
+                "target_type": c.target_type,
+                "target_ref": c.target_ref,
+                "project_no": c.project_no,
+                "equip_no": c.equip_no,
+                "reason": c.reason,
+            }
+            for c in pending_changes
+        ],
+        "overdue_tasks": [
+            {
+                "id": t.id,
+                "task_no": t.task_no,
+                "title": t.title,
+                "profession": t.profession,
+                "owner": names.get(t.owner_id) if t.owner_id else None,
+                "plan_end": t.plan_end,
+                "status": t.status,
+            }
+            for t in overdue_tasks
+        ],
+    }
 
 
 @router.get("/me")
