@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
-from app.api.deps import client_ip, get_current_user, has_permission, scrub_money
+from app.api.deps import client_ip, get_current_user, has_permission, require_permission, scrub_money
 from app.core.db import get_session
 from app.models.initiation import PurchaseRequest
 from app.models.library import SOURCE_STANDARD, Item, StdCategory, StdClass
@@ -313,7 +313,9 @@ def add_quote(
 
 @router.get("/purchase/price-reference/{item_no}")
 def price_reference(
-    item_no: str, session: Session = Depends(get_session), current: User = Depends(get_current_user)
+    item_no: str,
+    session: Session = Depends(get_session),
+    current: User = Depends(require_permission("purchase:price")),
 ):
     item = session.get(Item, item_no)
     if item is None:

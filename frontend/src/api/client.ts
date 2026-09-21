@@ -2035,6 +2035,62 @@ export async function priceReference(itemNo: string) {
   return data
 }
 
+// ============================== 物料搜索 / 库位 / 其他入库 =============================
+
+export interface ItemLite {
+  item_no: string
+  display_name: string
+  spec_text?: string | null
+  brand?: string | null
+  unit?: string | null
+  std_class_name?: string | null
+}
+
+/** 物料搜索（标准件库，按编码/品名/规格/品牌/型号模糊） */
+export async function searchItems(q: string, limit = 30) {
+  const { data } = await api.get<ItemLite[]>('/items', { params: { q, limit } })
+  return data
+}
+
+export interface LocationRow {
+  id: number
+  warehouse: string
+  code: string
+  name?: string | null
+  item_count: number
+  is_active: boolean
+  remark?: string | null
+}
+
+export async function listLocations() {
+  const { data } = await api.get<LocationRow[]>('/warehouse/locations')
+  return data
+}
+
+export async function createLocation(body: {
+  warehouse: string
+  code: string
+  name?: string
+  remark?: string
+}) {
+  const { data } = await api.post<LocationRow>('/warehouse/locations', body)
+  return data
+}
+
+/** 其他入库（没走采购流程：退料回库、盘盈等） */
+export async function manualInbound(body: {
+  item_no: string
+  qty: number
+  location_id: number
+  project_no?: string
+  equip_no?: string
+  ref_no?: string
+  remark?: string
+}) {
+  const { data } = await api.post('/warehouse/inbound', body)
+  return data
+}
+
 // ============================== 供货范围 / 推荐供应商 =============================
 
 export interface CatalogRow {

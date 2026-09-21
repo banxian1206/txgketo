@@ -19,10 +19,10 @@ import {
   Typography,
 } from 'antd'
 import dayjs from 'dayjs'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
-import { api, errMsg, generateEquipmentIssue, hasPerm, inspectPurchase, listEquipment, listProjects, storeReceipt, type GoodsReceiptRow } from '../api/client'
+import { api, createLocation, errMsg, generateEquipmentIssue, hasPerm, inspectPurchase, listEquipment, listLocations, listProjects, manualInbound, searchItems, storeReceipt, type GoodsReceiptRow, type ItemLite, type LocationRow } from '../api/client'
 
 const ISSUE_COLOR: Record<string, string> = { 待备料: 'gold', 已备料: 'processing', 已领走: 'success' }
 
@@ -85,6 +85,15 @@ export default function Warehouse() {
   const [genProjects, setGenProjects] = useState<{ project_no: string; project_name: string }[]>([])
   const [genEquips, setGenEquips] = useState<{ equip_no: string; equip_name: string }[]>([])
   const [genLoading, setGenLoading] = useState(false)
+  // 其他入库（退料回库 / 盘盈）
+  const [inboundOpen, setInboundOpen] = useState(false)
+  const [itemOptions, setItemOptions] = useState<ItemLite[]>([])
+  const [inboundForm] = Form.useForm()
+  // 库位管理
+  const [locs, setLocs] = useState<LocationRow[]>([])
+  const [locOpen, setLocOpen] = useState(false)
+  const [locForm] = Form.useForm()
+  const itemSearchTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [tab, setTab] = useState('todo')
   const [stock, setStock] = useState<StockRow[]>([])
   const [issueCount, setIssueCount] = useState(0)
@@ -119,7 +128,56 @@ export default function Warehouse() {
     listProjects()
       .then((rows) => setGenProjects(rows.map((p) => ({ project_no: p.project_no, project_name: p.project_name }))))
       .catch(() => undefined)
+    listLocations().then(setLocs).catch(() => undefined)
   }, [])
+
+  const searchItemOptions = (q: string) => {
+    if (itemSearchTimer.current) clearTimeout(itemSearchTimer.current)
+    itemSearchTimer.current = setTimeout(() => {
+      searchItems(q)
+        .then(setItemOptions)
+        .catch(() => undefined)
+    }, 250)
+  }
+
+  const doInbound = async () => {
+    const v = await inboundForm.validateFields()
+    setSaving(true)
+    try {
+      await manualInbound({
+        item_no: v.item_no,
+        qty: v.qty,
+        location_id: v.location_id,
+        project_no: v.project_no || undefined,
+        equip_no: v.equip_no || undefined,
+        ref_no: v.ref_no || undefined,
+        remark: v.remark || undefined,
+      })
+      message.success('已入库（其他入库）')
+      setInboundOpen(false)
+      await load()
+    } catch (e) {
+      message.error(errMsg(e))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const doCreateLocation = async () => {
+    const v = await locForm.validateFields()
+    setSaving(true)
+    try {
+      await createLocation(v)
+      message.success('库位已建')
+      setLocOpen(false)
+      locForm.resetFields()
+      setLocs(await listLocations())
+    } catch (e) {
+      message.error(errMsg(e))
+    } finally {
+      setSaving(false)
+    }
+  }
 
   const onGenProject = async (no?: string) => {
     setGenProject(no)
@@ -436,6 +494,11 @@ export default function Warehouse() {
                 <Typography.Paragraph type="secondary" style={{ fontSize: 12 }}>
                   入库动作完成后才有库存；车间来领料按这个出库。
                 </Typography.Paragraph>
+                <Space style={{ marginBottom: 12 }}>
+                  <Button disabled={!canStore} onClick={() => setInboundOpen(true)}>
+                    其他入库（退料回库 / 盘盈）
+                  </Button>
+                </Space>
                 <Table<StockRow>
                   rowKey="id" size="small" dataSource={stock} pagination={{ pageSize: 20, showSizeChanger: false }}
                   locale={{ emptyText: <Empty description="还没有库存" /> }}
@@ -470,8 +533,119 @@ export default function Warehouse() {
               />
             ),
           },
+          {
+            key: 'locations',
+            label: `库位 (${locs.length})`,
+            children: (
+              <>
+                <Space style={{ marginBottom: 12 }}>
+                  <Button type="primary" disabled={!canStore} onClick={() => setLocOpen(true)}>
+                    新建库位
+                  </Button>
+                  <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                    入库时选库位；这里可以集中看/补建库位。
+                  </Typography.Text>
+                </Space>
+                <Table<LocationRow>
+                  rowKey="id" size="small" dataSource={locs} pagination={{ pageSize: 20, showSizeChanger: false }}
+                  locale={{ emptyText: <Empty description="还没有库位" /> }}
+                  columns={[
+                    { title: '仓库', dataIndex: 'warehouse', width: 130 },
+                    { title: '库位编码', dataIndex: 'code', width: 160 },
+                    { title: '名称', dataIndex: 'name', render: (v: string | null) => v ?? '—' },
+                    { title: '在库物料数', dataIndex: 'item_count', width: 110, align: 'right' },
+                    {
+                      title: '状态', dataIndex: 'is_active', width: 90,
+                      render: (v: boolean) => (v ? <Tag color="green">启用</Tag> : <Tag>停用</Tag>),
+                    },
+                    { title: '备注', dataIndex: 'remark', render: (v: string | null) => v ?? '—' },
+                  ]}
+                />
+              </>
+            ),
+          },
         ]}
       />
+
+      {/* 其他入库 */}
+      <Modal
+        title="其他入库（退料回库 / 盘盈）"
+        open={inboundOpen}
+        onCancel={() => setInboundOpen(false)}
+        onOk={() => void doInbound()}
+        confirmLoading={saving}
+        okText="入库"
+        destroyOnClose
+      >
+        <Typography.Paragraph type="secondary" style={{ fontSize: 12, marginTop: 0 }}>
+          没走采购流程的东西：退料回库、盘盈、其他来源。正常采购到货请用「待办 → 验收 → 入库」。
+        </Typography.Paragraph>
+        <Form form={inboundForm} layout="vertical" preserve={false}>
+          <Form.Item name="item_no" label="物料" rules={[{ required: true, message: '选物料' }]}>
+            <Select
+              showSearch
+              filterOption={false}
+              placeholder="输编码 / 品名 / 规格搜物料"
+              onSearch={searchItemOptions}
+              options={itemOptions.map((i) => ({
+                value: i.item_no,
+                label: `${i.item_no} ${i.display_name}${i.spec_text ? ` · ${i.spec_text}` : ''}`,
+              }))}
+            />
+          </Form.Item>
+          <Space style={{ display: 'flex' }} size="middle" align="start">
+            <Form.Item name="qty" label="数量" rules={[{ required: true, message: '填数量' }]}>
+              <InputNumber min={0.001} style={{ width: 140 }} />
+            </Form.Item>
+            <Form.Item name="location_id" label="入库库位" rules={[{ required: true, message: '选库位' }]} style={{ minWidth: 240 }}>
+              <Select
+                placeholder="选库位"
+                options={locs.filter((l) => l.is_active).map((l) => ({ value: l.id, label: `${l.warehouse} ${l.code}${l.name ? ` ${l.name}` : ''}` }))}
+              />
+            </Form.Item>
+          </Space>
+          <Space style={{ display: 'flex' }} size="middle" align="start">
+            <Form.Item name="project_no" label="项目号（可选）">
+              <Input placeholder="如 TX26001" style={{ width: 180 }} />
+            </Form.Item>
+            <Form.Item name="equip_no" label="设备号（可选）">
+              <Input placeholder="如 01A" style={{ width: 140 }} />
+            </Form.Item>
+          </Space>
+          <Form.Item name="ref_no" label="单据 / 参考号（可选）">
+            <Input placeholder="如退料单号" />
+          </Form.Item>
+          <Form.Item name="remark" label="说明">
+            <Input placeholder="如：车间多领退回" />
+          </Form.Item>
+        </Form>
+      </Modal>
+
+      {/* 新建库位 */}
+      <Modal
+        title="新建库位"
+        open={locOpen}
+        onCancel={() => setLocOpen(false)}
+        onOk={() => void doCreateLocation()}
+        confirmLoading={saving}
+        okText="创建"
+        destroyOnClose
+      >
+        <Form form={locForm} layout="vertical" preserve={false}>
+          <Form.Item name="warehouse" label="仓库" rules={[{ required: true, message: '填仓库名' }]}>
+            <Input placeholder="如 主仓 / 车间仓" />
+          </Form.Item>
+          <Form.Item name="code" label="库位编码" rules={[{ required: true, message: '填库位编码' }]}>
+            <Input placeholder="如 A-01-02" />
+          </Form.Item>
+          <Form.Item name="name" label="名称（可选）">
+            <Input placeholder="如 电气件区" />
+          </Form.Item>
+          <Form.Item name="remark" label="备注">
+            <Input />
+          </Form.Item>
+        </Form>
+      </Modal>
 
       {/* 验收（合格 / 不合格） */}
       <Modal

@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom'
 
 import ManualPurchaseModal from '../components/ManualPurchaseModal'
 import MergeOrderModal from '../components/MergeOrderModal'
+import PriceReferencePanel from '../components/PriceReferencePanel'
 import PurchaseOrderDrawer from '../components/PurchaseOrderDrawer'
 import ReceiptNegotiateModal from '../components/ReceiptNegotiateModal'
 import {
@@ -856,6 +857,15 @@ export default function PurchaseWorkbench() {
               </>
             ),
           },
+          ...(hasPerm('purchase:price')
+            ? [
+                {
+                  key: 'reference',
+                  label: '价格参考',
+                  children: <PriceReferencePanel />,
+                },
+              ]
+            : []),
         ]}
       />
 
