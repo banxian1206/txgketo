@@ -3,10 +3,18 @@
 from __future__ import annotations
 
 import time
-from datetime import UTC, datetime
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile, status
+from fastapi import (
+    APIRouter,
+    Depends,
+    File,
+    Form,
+    HTTPException,
+    Request,
+    UploadFile,
+    status,
+)
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -17,7 +25,6 @@ from app.core.db import get_session
 from app.models.engineering import (
     BOM_DESIGN,
     BOM_MATERIAL,
-    DRAWING_STATUS,
     BomItem,
     Drawing,
     DrawingVersion,
@@ -28,11 +35,9 @@ from app.models.project import Equipment, Project
 from app.services import audit
 from app.services.numbering import (
     EMPTY,
-    ObjectType,
     compose_mech_drawing_no,
     drawing_level,
     next_level_code,
-    parent_drawing_no,
     parse_drawing_no,
 )
 
@@ -87,6 +92,10 @@ def _bom_dict(b: BomItem, item: Item | None) -> dict:
         "spec_text": item.spec_text if item else None,
         "brand": item.brand if item else None,
         "remark": b.remark,
+        # 冻结线（05 卷 §8.2）：草稿 / 审核中 / 已冻结
+        "status": b.status,
+        "owner_id": b.owner_id,
+        "frozen_release_id": b.frozen_release_id,
     }
 
 
@@ -357,6 +366,11 @@ def update_drawing(
     row = session.get(Drawing, drawing_no)
     if row is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "图纸不存在")
+    if row.status == "审核中":
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            "审核中的图纸不可修改 —— 先撤回或等退回（05 卷 §3.1）",
+        )
     if row.status == "已发布" and (body.title or body.qty or body.source_type):
         raise HTTPException(
             status.HTTP_400_BAD_REQUEST,
@@ -405,6 +419,8 @@ def delete_drawing(
     row = session.get(Drawing, drawing_no)
     if row is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "图纸不存在")
+    if row.status == "审核中":
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "审核中的图纸不能删 —— 先撤回或等审核结果")
     if row.status == "已发布":
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "已发布的图纸不能删除（会作废处理）")
     children = session.scalars(
@@ -429,7 +445,7 @@ def delete_drawing(
 
 
 # ============================================================================
-# 版本流转：草稿 → 提交审核 → 审核通过并发布；已发布 → 改版（V2）
+# 版本流转：草稿 →（评审单两级审核）→ 发布（= 冻结）；已发布 → 改版（V2）
 # ============================================================================
 
 
@@ -441,8 +457,8 @@ def _current_version_row(session: Session, drawing_no: str) -> DrawingVersion | 
     )
 
 
-@router.post("/drawings/{drawing_no}/submit")
-async def submit_drawing(
+@router.post("/drawings/{drawing_no}/draft")
+async def upload_drawing_draft(
     drawing_no: str,
     file: UploadFile | None = File(default=None),
     change_reason: str = Form(""),
@@ -450,12 +466,19 @@ async def submit_drawing(
     session: Session = Depends(get_session),
     current: User = Depends(get_current_user),
 ):
-    """提交审核（可同时上传图纸文件）。"""
+    """上传/更新草稿文件（05 卷 §3.1）。
+
+    这里**不改变审核状态**：草稿可以反复覆盖；
+    提交评审后在评审单里勾选这张图，两级审核通过才发布（= 冻结）。
+    """
     row = session.get(Drawing, drawing_no)
     if row is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "图纸不存在")
-    if row.status not in ("草稿",):
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, f"只有草稿能提交审核（当前：{row.status}）")
+    if row.status != "草稿":
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            f"只有草稿能上传（当前：{row.status}）—— 已发布的先「改版」，审核中的先撤回",
+        )
 
     ver = _current_version_row(session, drawing_no)
     if ver is None:
@@ -470,58 +493,15 @@ async def submit_drawing(
         ver.file_path = str(stored)
         ver.filename = safe
     ver.change_reason = change_reason or ver.change_reason
-    ver.submitted_by = current.id
-    ver.submitted_at = datetime.now(UTC)
-    row.status = "审核中"
     audit.log(
         session,
         user=current,
-        action="submit",
+        action="draft",
         object_type="drawing",
         object_ref=drawing_no,
-        summary=f"提交审核 {drawing_no}（{ver.version}）"
+        summary=f"上传草稿 {drawing_no}（{ver.version}）"
         + (f"，附件《{ver.filename}》" if ver.filename else "")
         + (f"，说明：{change_reason}" if change_reason else ""),
-        ip=client_ip(request) if request else None,
-    )
-    session.commit()
-    return _drawing_dict(row, _names(session))
-
-
-@router.post("/drawings/{drawing_no}/publish")
-def publish_drawing(
-    drawing_no: str,
-    review_note: str = Form(""),
-    request: Request = None,  # type: ignore[assignment]
-    session: Session = Depends(get_session),
-    current: User = Depends(get_current_user),
-):
-    """审核通过并发布（发布后该版本成为「当前有效版本」，只读）。"""
-    row = session.get(Drawing, drawing_no)
-    if row is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "图纸不存在")
-    if row.status != "审核中":
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, f"只有审核中的图纸能发布（当前：{row.status}）")
-    ver = _current_version_row(session, drawing_no)
-    if ver is None:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "没有待发布的版本记录")
-    if ver.submitted_by == current.id:
-        # 允许，但要提示（执行与批准分离是原则，30 人公司先不硬拦）
-        pass
-    ver.reviewed_by = current.id
-    ver.reviewed_at = datetime.now(UTC)
-    ver.published_by = current.id
-    ver.published_at = datetime.now(UTC)
-    ver.review_note = review_note
-    row.status = "已发布"
-    audit.log(
-        session,
-        user=current,
-        action="publish",
-        object_type="drawing",
-        object_ref=drawing_no,
-        summary=f"审核发布 {drawing_no}（{ver.version}）"
-        + (f"，审核意见：{review_note}" if review_note else ""),
         ip=client_ip(request) if request else None,
     )
     session.commit()
@@ -652,6 +632,7 @@ def _add_bom(session: Session, project_no: str, body: BomIn, source: str, curren
         unit=item.unit,
         pos_no=body.pos_no,
         remark=body.remark,
+        owner_id=current.id,
     )
     session.add(row)
     session.flush()
@@ -711,6 +692,11 @@ def remove_bom(
     row = session.get(BomItem, bom_id)
     if row is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "BOM 行不存在")
+    if row.status != "草稿":
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            f"这条 BOM 行当前是「{row.status}」，不能直接删（冻结内容只能走改版流程）",
+        )
     item = session.get(Item, row.child_item_no)
     session.delete(row)
     audit.log(
@@ -801,7 +787,7 @@ def my_design_equipment(
     session: Session = Depends(get_session), current: User = Depends(get_current_user)
 ):
     """我负责设计的设备（从设计任务推导），点了直接进设计工作面。"""
-    from app.models.task import Task  # noqa: PLC0415
+    from app.models.task import Task
 
     rows = session.scalars(
         select(Task).where(

@@ -91,8 +91,8 @@ deploy/          docker-compose.dev.yml
 
 ## 8. 当前进度（交接记录）
 
-> 更新于：**05 卷 P2 任务改造**落地（工艺挂机械 + 前置依赖阻塞、立项直接派给各专业设计组长、组长拆分/转派组员、我的任务/我组筛选、用户与岗位管理页）。
-> 下一步：**05 卷 P3 评审单**（提交 → 组长 → 总监两级审核 → 发布冻结）。BOM → 净需求 → 采购池（常规件通道）已通。
+> 更新于：**05 卷 P3 评审单**落地（提交 → 组长 → 总监 → 发布冻结；多轮留档/撤回/退回重提；「设计评审」工作台）。
+> 下一步：**05 卷 P4 PLC 程序版本**（表 + 上传 + 复用评审单）、**P5 发布→采购触发**（按发布批次 + 手工申请）。BOM → 净需求 → 采购池（常规件通道）已通，但只认已冻结行。
 
 ### 8.1 采购状态线（客户口径，别再改回去了）
 
@@ -116,7 +116,7 @@ deploy/          docker-compose.dev.yml
   到货单的 `retries` / 采购单详情的「流转记录」都能看到它后来下成了哪张单
   采购侧不登记到货/发货，状态被仓库推着变
 - **零件归属**：`purchase_request.part_no`（图号）——合并单里能看出「这 10 个方通分别给哪个零件的」
-- 常规件通道：设备设计面「生成采购需求（进池）」= BOM 展开 − 库存 − 在跑需求（幂等，重复点不会重复进池）
+- 常规件通道：设备设计面「生成采购需求（进池）」= **已冻结（发布过）的** BOM 展开 − 库存 − 在跑需求（幂等，重复点不会重复进池）；草稿/审核中的行不算数（05 卷 §4）
 - 长周期件立项即下单：状态「在途」+ 自动发号（旧「已下单」中间态已归一，迁移 `e9c06543ffaa`）
 - 合并单 = 一张单（一个 `po_no`）+ 多行需求，**每行带项目/设备归属**；
   采购单详情（`GET /purchase/orders/{key}`）就是仓库对单、以后发货对单的地方
@@ -136,7 +136,8 @@ deploy/          docker-compose.dev.yml
 | 立项（团队/设备清单/节点计划/长周期件/生成任务） | ✅ | `routes/initiation.py`、`routes/tasks.py` |
 | 任务体系（我的任务、立项自动分派） | ✅ | `models/task.py` |
 | 标准库三层（类别→品类→型号，规格模板，防重复建码） | ✅ | `models/library.py`、`routes/library.py` |
-| 工程设计（图纸树/版本审核发布/设计BOM/材料BOM） | ✅ | `models/engineering.py`、`routes/engineering.py` |
+| 工程设计（图纸树/版本/设计BOM/材料BOM） | ✅ | `models/engineering.py`、`routes/engineering.py` |
+| **设计评审（05 卷 P3）** | ✅ | `models/review.py`（评审单/明细/审核记录/发布）+ `services/review_flow.py`（两级审核、发布=冻结、撤回/退回、任务联动）+ `routes/reviews.py`、`pages/Reviews.tsx`、`components/SubmitReviewModal.tsx`/`ReviewDetailModal.tsx`；图纸改「上传草稿 + 提交评审」，不再单级发布 |
 | 供应商主数据 + 报价 + 能供品类 | ✅ | `models/purchasing.py`、`routes/suppliers.py` |
 | 推荐供应商（多路证据打分） | ✅ | `GET /purchase/recommend/{item_no}` |
 | 价格参考（上次成交/历史区间/各家报价） | ✅ | `GET /purchase/price-reference/{item_no}` |
@@ -157,7 +158,7 @@ deploy/          docker-compose.dev.yml
 | 1 | Excel 历史采购导入 | 客户已确认后期要做（物料/供应商/单价/数量/日期 → 写价格库） |
 | 2 | 制造 / 装配 / 发运 / 现场 / 验收 / 售后 | 流程上还没做（见 `../00 方案` §3 S5–S11） |
 | 3 | 领料单数量算法对齐 | `warehouse/generate-issue` 还是旧算法（材料只乘直接父件、标准件不乘）；建议改成 `bom_demand` 那套按树累计 |
-| 4 | 工程设计流转（05 卷 P3–P7） | P3 评审单两级审核冻结 → P4 程序版本 → P5 采购触发/手工申请 → P6 改版 → P7 工作台；口径见 `../05 工程设计流转·审核·冻结·改版.md` |
+| 4 | 工程设计流转（05 卷 P4–P7） | P4 程序版本 → P5 采购触发/手工申请 → P6 改版 → P7 工作台；口径见 `../05 工程设计流转·审核·冻结·改版.md` |
 
 > 本轮顺手修复：`update_purchase_request` 漏导入 `REQUEST_STATUS`，改采购需求状态会 500。
 
@@ -179,6 +180,14 @@ GET  /api/v1/goods-receipts?status=待入库        到货单（待入库/已入
 GET  /api/v1/warehouse/workbench                  仓库待办（incoming 待验收 / pending_storage 待入库 / 领料）
 GET  /api/v1/my-tasks?scope=mine|team             我的任务 / 我组任务（组长台；blocked 字段标「等待前置」）
 POST /api/v1/tasks/{id}/split                     组长拆分派工：一条任务拆给多个组员（子任务继承前置依赖）
+GET  /api/v1/tasks/{id}/review-candidates         可提交评审的草稿内容（图纸/设计BOM/材料BOM/自制外协判定）
+POST /api/v1/tasks/{id}/submit-review             勾选提交评审（任务级一张单、多轮留档）
+GET  /api/v1/tasks/{id}/review-ticket             任务的评审单（多轮明细 + 审核记录 + 发布批次）
+GET  /api/v1/review-tickets?scope=todo|mine|all   评审列表（组长/总监待办）
+POST /api/v1/review-tickets/{id}/review           两级审核（通过/退回，退回必填说明）
+POST /api/v1/review-tickets/{id}/withdraw         提交人撤回（解锁回草稿）
+GET  /api/v1/projects/{p}/equipment/{e}/my-design-tasks  设计面「我的提交」卡片
+POST /api/v1/drawings/{no}/draft                  上传/更新草稿文件（审核走评审单，不再单级发布）
 GET/POST/PATCH /api/v1/users                      用户与岗位：专业/岗位（审核人）、组织、角色、停用、重置密码
 POST /api/v1/warehouse/projects/{no}/equipment/{equip}/generate-issue  按 BOM 生成领料单
 GET  /api/v1/purchase/recommend/{item_no}         推荐供应商（打分+理由）

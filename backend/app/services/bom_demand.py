@@ -17,7 +17,7 @@ from dataclasses import dataclass
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models.engineering import BomItem, Drawing
+from app.models.engineering import BOM_ROW_FROZEN, BomItem, Drawing
 from app.models.initiation import PurchaseRequest
 from app.models.library import Item
 from app.models.warehouse import StockItem
@@ -80,6 +80,9 @@ def equipment_demand(session: Session, project_no: str, equip_no: str) -> list[D
     need: dict[tuple[str, str], float] = {}
     for b in bom_rows:
         if b.parent_ref not in tree_nos:
+            continue
+        # ★ 只有发布冻结过的 BOM 行才进采购（05 卷 §4/§5）；草稿/审核中的不算数
+        if b.status != BOM_ROW_FROZEN:
             continue
         item = items.get(b.child_item_no)
         if item is None or item.source_type not in BUY_TYPES:

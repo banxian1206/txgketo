@@ -25,6 +25,9 @@ import { useNavigate, useParams } from 'react-router-dom'
 
 import type { Dayjs } from 'dayjs'
 
+import ReviewDetailModal from '../components/ReviewDetailModal'
+import SubmitReviewModal from '../components/SubmitReviewModal'
+
 import {
   addBom,
   addDrawing,
@@ -32,16 +35,17 @@ import {
   errMsg,
   generateEquipmentPurchase,
   getDesignTree,
+  getMyDesignTasks,
   listStdItems,
   listVersions,
   newDrawingVersion,
-  publishDrawing,
   removeBom,
-  submitDrawing,
+  uploadDrawingDraft,
   type BomLine,
   type DesignRoot,
   type DesignTree,
   type GeneratePurchaseResult,
+  type MyDesignTask,
   type StdItem,
   type VersionRow,
 } from '../api/client'
@@ -58,6 +62,14 @@ const STATE_COLOR: Record<string, string> = {
   设计中: 'processing',
   设计BOM已提交: 'gold',
   BOM完整: 'success',
+}
+
+const REVIEW_STATUS_COLOR: Record<string, string> = {
+  待组长审: 'processing',
+  待总监审: 'gold',
+  已退回: 'error',
+  已撤回: 'default',
+  已通过: 'success',
 }
 
 interface TreeNode {
@@ -96,6 +108,12 @@ export default function EquipmentDesign({ projectNo: p0, equipNo: e0, embedded }
   const [matOpen, setMatOpen] = useState(false)
   const [verOpen, setVerOpen] = useState(false)
   const [submitOpen, setSubmitOpen] = useState(false)
+  // 我的提交（评审单）
+  const [myTasks, setMyTasks] = useState<MyDesignTask[]>([])
+  const [reviewTask, setReviewTask] = useState<MyDesignTask | null>(null)
+  const [reviewOpen, setReviewOpen] = useState(false)
+  const [detailTicketId, setDetailTicketId] = useState<number | null>(null)
+  const [detailOpen, setDetailOpen] = useState(false)
   const [versions, setVersions] = useState<VersionRow[]>([])
   const [items, setItems] = useState<StdItem[]>([])
   const [addForm] = Form.useForm()
@@ -111,8 +129,12 @@ export default function EquipmentDesign({ projectNo: p0, equipNo: e0, embedded }
     if (!projectNo || !equipNo) return
     setLoading(true)
     try {
-      const d = await getDesignTree(projectNo, equipNo)
+      const [d, mt] = await Promise.all([
+        getDesignTree(projectNo, equipNo),
+        getMyDesignTasks(projectNo, equipNo),
+      ])
       setData(d)
+      setMyTasks(mt)
       setSelected((prev) => (prev ? d.tree.find((t) => t.drawing_no === prev.drawing_no) ?? null : null))
     } catch (e) {
       message.error(errMsg(e))
@@ -291,7 +313,7 @@ export default function EquipmentDesign({ projectNo: p0, equipNo: e0, embedded }
           showIcon
           style={{ marginBottom: 16 }}
           message={`有 ${data?.issues.unpublished.length} 张图还没发布`}
-          description="设计 BOM 要等图纸走完「提交审核 → 审核发布」才算数（车间只认已发布的当前有效版本）"
+          description="设计 BOM 要等图纸走完「提交评审 → 两级审核 → 发布冻结」才算数（车间只认已发布的当前有效版本）"
         />
       )}
       {(data?.issues.parts_without_material.length ?? 0) > 0 && (
@@ -304,6 +326,77 @@ export default function EquipmentDesign({ projectNo: p0, equipNo: e0, embedded }
             .slice(0, 3)
             .join('、')}…  设计 BOM + 材料 BOM 合起来才是设备的完整 BOM`}
         />
+      )}
+
+      {/* 我的提交（评审单）：一个任务一张单，多轮共用 */}
+      {myTasks.length > 0 && (
+        <Card size="small" title="我的提交（评审单）" style={{ marginBottom: 16 }}>
+          <Table<MyDesignTask>
+            rowKey="task_id"
+            size="small"
+            pagination={false}
+            dataSource={myTasks}
+            columns={[
+              {
+                title: '任务号',
+                dataIndex: 'task_no',
+                width: 100,
+                render: (v: string) => <Typography.Text strong>{v}</Typography.Text>,
+              },
+              { title: '任务', dataIndex: 'title' },
+              {
+                title: '评审状态',
+                key: 'status',
+                width: 140,
+                render: (_: unknown, r: MyDesignTask) =>
+                  r.ticket ? (
+                    <Tag color={REVIEW_STATUS_COLOR[r.ticket.status] ?? 'default'}>{r.ticket.status}</Tag>
+                  ) : (
+                    <Tag>未提交</Tag>
+                  ),
+              },
+              {
+                title: '轮次',
+                key: 'round',
+                width: 80,
+                render: (_: unknown, r: MyDesignTask) =>
+                  r.ticket ? `第 ${r.ticket.current_round} 轮` : '—',
+              },
+              {
+                title: '操作',
+                key: 'action',
+                width: 200,
+                render: (_: unknown, r: MyDesignTask) => (
+                  <Space size="middle">
+                    {(!r.ticket || !r.ticket.status.includes('待')) && (
+                      <a
+                        onClick={() => {
+                          setReviewTask(r)
+                          setReviewOpen(true)
+                        }}
+                      >
+                        提交评审
+                      </a>
+                    )}
+                    {r.ticket && (
+                      <a
+                        onClick={() => {
+                          setDetailTicketId(r.ticket!.id)
+                          setDetailOpen(true)
+                        }}
+                      >
+                        审核记录
+                      </a>
+                    )}
+                  </Space>
+                ),
+              },
+            ]}
+          />
+          <Typography.Paragraph type="secondary" style={{ fontSize: 12, marginTop: 8, marginBottom: 0 }}>
+            勾选草稿内容 → 组长 → 总监 → 发布（= 冻结）。退回/撤回后内容回到草稿，可在同一张单上重新提交。
+          </Typography.Paragraph>
+        </Card>
       )}
 
       {/* 图纸树 */}
@@ -460,24 +553,8 @@ export default function EquipmentDesign({ projectNo: p0, equipNo: e0, embedded }
                         setSubmitOpen(true)
                       }}
                     >
-                      提交审核
+                      上传图纸
                     </a>
-                  )}
-                  {r.status === '审核中' && (
-                    <Popconfirm
-                      title="审核通过并发布？"
-                      description="发布后该版本成为当前有效版本，只读"
-                      onConfirm={() =>
-                        void publishDrawing(r.drawing_no)
-                          .then(() => {
-                            message.success('已发布')
-                            return load()
-                          })
-                          .catch((e) => message.error(errMsg(e)))
-                      }
-                    >
-                      <a>审核发布</a>
-                    </Popconfirm>
                   )}
                   {r.status === '已发布' && (
                     <a
@@ -680,8 +757,8 @@ export default function EquipmentDesign({ projectNo: p0, equipNo: e0, embedded }
         ) : (
           <>
             <Typography.Paragraph type="secondary" style={{ fontSize: 12, marginTop: 0 }}>
-              按这台设备的完整 BOM 展开（标准件 + 原材料），扣掉仓库可用库存和这台设备已经在跑的需求，
-              剩下的按「物料 + 零件」生成待采购需求，进采购池等合并下单。
+              只展开已冻结（评审发布过）的标准件/原材料 BOM 行；扣掉仓库可用库存和这台设备已经在跑的需求，
+              剩下的按「物料 + 零件」进采购池等合并下单。
             </Typography.Paragraph>
             <Form form={purchaseForm} layout="vertical">
               <Form.Item
@@ -787,9 +864,9 @@ export default function EquipmentDesign({ projectNo: p0, equipNo: e0, embedded }
         </Form>
       </Modal>
 
-      {/* 提交审核 */}
+      {/* 上传图纸草稿（审核走评审单） */}
       <Modal
-        title={`提交审核 · ${selected?.drawing_no ?? ''}`}
+        title={`上传图纸草稿 · ${selected?.drawing_no ?? ''}`}
         open={submitOpen}
         width={560}
         onCancel={() => setSubmitOpen(false)}
@@ -798,8 +875,8 @@ export default function EquipmentDesign({ projectNo: p0, equipNo: e0, embedded }
           const file = submitForm.getFieldValue('file')?.[0]?.originFileObj as File | undefined
           setSaving(true)
           try {
-            await submitDrawing(selected!.drawing_no, v.change_reason, file)
-            message.success('已提交审核')
+            await uploadDrawingDraft(selected!.drawing_no, v.change_reason, file)
+            message.success('草图已上传 —— 到「我的提交」里勾选提交评审')
             setSubmitOpen(false)
             await load()
           } catch (e) {
@@ -809,7 +886,7 @@ export default function EquipmentDesign({ projectNo: p0, equipNo: e0, embedded }
           }
         }}
         confirmLoading={saving}
-        okText="提交"
+        okText="上传"
         destroyOnClose
       >
         <Form form={submitForm} layout="vertical" preserve={false}>
@@ -918,6 +995,19 @@ export default function EquipmentDesign({ projectNo: p0, equipNo: e0, embedded }
           ]}
         />
       </Modal>
+      {/* 提交评审 / 审核记录 */}
+      <SubmitReviewModal
+        task={reviewTask}
+        open={reviewOpen}
+        onClose={() => setReviewOpen(false)}
+        onDone={() => void load()}
+      />
+      <ReviewDetailModal
+        ticketId={detailTicketId}
+        open={detailOpen}
+        onClose={() => setDetailOpen(false)}
+        onChanged={() => void load()}
+      />
     </>
   )
 }

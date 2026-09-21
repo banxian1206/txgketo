@@ -85,6 +85,13 @@ class DrawingVersion(Base, TimestampMixin):
     is_current: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
 
 
+# BOM 行状态（05 卷 §8.2）：草稿 → 提交后审核中 → 发布后已冻结
+BOM_ROW_DRAFT = "草稿"
+BOM_ROW_REVIEWING = "审核中"
+BOM_ROW_FROZEN = "已冻结"
+BOM_ROW_STATUS = (BOM_ROW_DRAFT, BOM_ROW_REVIEWING, BOM_ROW_FROZEN)
+
+
 class BomItem(Base, TimestampMixin):
     """BOM 行：只用于**没有图号**的项（标准件 / 原材料）。
 
@@ -102,6 +109,14 @@ class BomItem(Base, TimestampMixin):
     unit: Mapped[str | None] = mapped_column(String(16))
     pos_no: Mapped[str | None] = mapped_column(String(32))
     remark: Mapped[str | None] = mapped_column(String(255))
+    # ---- 冻结线（05 卷 §4、§8.2）----
+    status: Mapped[str] = mapped_column(String(8), default=BOM_ROW_DRAFT, server_default=BOM_ROW_DRAFT)
+    # 被哪次发布冻结（指向 design_release.id）
+    frozen_release_id: Mapped[int | None] = mapped_column(ForeignKey("design_release.id"))
+    # 谁挂的（提交归属；老数据可能为空）
+    owner_id: Mapped[int | None] = mapped_column(ForeignKey("app_user.id"))
+    # 改版流程用：被哪条新行替代（P6）
+    superseded_by_id: Mapped[int | None] = mapped_column(ForeignKey("bom_item.id"))
 
 
 # ---------------------------------------------------------------------------
@@ -128,6 +143,10 @@ __all__ = [
     "BOM_STATE_DESIGNING",
     "BOM_STATE_DESIGN_DONE",
     "BOM_STATE_EMPTY",
+    "BOM_ROW_DRAFT",
+    "BOM_ROW_FROZEN",
+    "BOM_ROW_REVIEWING",
+    "BOM_ROW_STATUS",
     "BomItem",
     "DRAWING_KINDS",
     "DRAWING_STATUS",

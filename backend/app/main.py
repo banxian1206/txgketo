@@ -14,6 +14,7 @@ from app.api.routes import (
     numbering,
     platform,
     project,
+    reviews,
     suppliers,
     tasks,
     warehouse,
@@ -40,6 +41,7 @@ for r in (
     library,
     tasks,
     engineering,
+    reviews,
     suppliers,
     warehouse,
 ):

@@ -295,6 +295,24 @@ RECEIPT_RULE: dict = {
     "remark": "",
 }
 
+# 评审单编号规则（05 卷 §8.1）：一个任务一张单，多轮提交共用
+REVIEW_TICKET_RULE: dict = {
+    "object_type": "REVIEW_TICKET",
+    "name": "评审单",
+    "template": "RV{YY}{seq:03}",
+    "scope": "project",
+    "remark": "一个任务一张单，多轮提交共用",
+}
+
+# 设计发布（冻结）批次编号规则（05 卷 §8.1）
+DESIGN_RELEASE_RULE: dict = {
+    "object_type": "DESIGN_RELEASE",
+    "name": "设计发布",
+    "template": "RL{YY}{seq:03}",
+    "scope": "project",
+    "remark": "一次审核通过 = 一个冻结批次",
+}
+
 # 标准库物料的编号规则（01 卷 §5：{类别码}-{品类码}-{流水4位}）
 STD_ITEM_RULE: dict = {
     "object_type": "STD_ITEM",

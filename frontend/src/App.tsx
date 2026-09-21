@@ -12,6 +12,7 @@ import EquipmentDesign from './pages/EquipmentDesign'
 import MyTasks from './pages/MyTasks'
 import Projects from './pages/Projects'
 import PurchaseWorkbench from './pages/PurchaseWorkbench'
+import Reviews from './pages/Reviews'
 import Suppliers from './pages/Suppliers'
 import Users from './pages/Users'
 import Warehouse from './pages/Warehouse'
@@ -57,6 +58,7 @@ export default function App() {
         <Route path="users" element={<Users />} />
         <Route path="library" element={<Library />} />
         <Route path="my-tasks" element={<MyTasks />} />
+        <Route path="reviews" element={<Reviews />} />
         <Route path="purchase" element={<PurchaseWorkbench />} />
         <Route path="suppliers" element={<Suppliers />} />
         <Route path="warehouse" element={<Warehouse />} />

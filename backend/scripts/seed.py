@@ -18,9 +18,11 @@ from app.models.library import StdCategory, StdClass  # noqa: E402
 from app.models.library_seed import (  # noqa: E402
     CATEGORIES,
     CLASSES,
+    DESIGN_RELEASE_RULE,
     ISSUE_RULE,
     PO_RULE,
     RECEIPT_RULE,
+    REVIEW_TICKET_RULE,
     SUPPLIER_RULE,
     STD_ITEM_RULE,
     TASK_RULE,
@@ -163,7 +165,17 @@ def main() -> None:
         session.flush()
 
         # 编号规则
-        for rule in [*DEFAULT_RULES, STD_ITEM_RULE, TASK_RULE, RECEIPT_RULE, SUPPLIER_RULE, ISSUE_RULE, PO_RULE]:
+        for rule in [
+            *DEFAULT_RULES,
+            STD_ITEM_RULE,
+            TASK_RULE,
+            RECEIPT_RULE,
+            SUPPLIER_RULE,
+            ISSUE_RULE,
+            PO_RULE,
+            REVIEW_TICKET_RULE,
+            DESIGN_RELEASE_RULE,
+        ]:
             row = session.scalar(select(NumberRule).where(NumberRule.object_type == rule["object_type"]))
             if row is None:
                 session.add(NumberRule(**rule))
