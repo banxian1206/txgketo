@@ -40,7 +40,7 @@ from app.models.program import EquipmentProgram
 from app.models.review import DesignRelease
 from app.models.task import Task
 from app.models.warehouse import MaterialIssue, MaterialIssueLine
-from app.services import audit
+from app.services import audit, notify
 from app.services.numbering import next_number, year_scope_key
 
 
@@ -198,6 +198,17 @@ def create_request(
         summary=f"改版申请 {row.cr_no}：{info['title']}（{info['version']}）—— {row.reason}",
         ip=ip,
     )
+    # ★ 站内消息：提醒部门负责人裁决（06 卷 §9）
+    notify.notify_directors(
+        session,
+        type_=notify.TYPE_CHANGE,
+        title=f"有改版申请等你裁决：{row.cr_no}",
+        body=f"{info['title']} —— {row.reason}",
+        link="/changes",
+        biz_type="change_request",
+        biz_id=row.id,
+        actor_id=user.id,
+    )
     return row
 
 
@@ -229,6 +240,18 @@ def decide(
     cr.decided_by = user.id
     cr.decided_at = now
     cr.decision_note = (note or "").strip() or None
+    if cr.applicant_id:
+        notify.notify(
+            session,
+            [cr.applicant_id],
+            type_=notify.TYPE_CHANGE,
+            title=f"改版申请 {cr.cr_no} {decision}",
+            body=(note or cr.solution) or None,
+            link="/changes",
+            biz_type="change_request",
+            biz_id=cr.id,
+            actor_id=user.id,
+        )
     audit.log(
         session,
         user=user,
@@ -283,6 +306,17 @@ def dispatch(
     session.flush()
     cr.change_task_id = task.id
     cr.status = CR_DISPATCHED
+    notify.notify(
+        session,
+        [assignee.id],
+        type_=notify.TYPE_CHANGE,
+        title=f"改版任务派给你：{cr.cr_no}（{task.title}）",
+        body=f"问题：{cr.reason}",
+        link="/my-tasks",
+        biz_type="change_request",
+        biz_id=cr.id,
+        actor_id=user.id,
+    )
     audit.log(
         session,
         user=user,
@@ -306,6 +340,17 @@ def complete_for_release(session: Session, task_id: int, release: DesignRelease,
         cr.status = CR_DONE
         cr.new_release_id = release.id
         cr.archived_at = now
+        if cr.applicant_id:
+            notify.notify(
+                session,
+                [cr.applicant_id],
+                type_=notify.TYPE_CHANGE,
+                title=f"改版已完成并发布：{cr.cr_no}（{release.release_no}）",
+                link="/changes",
+                biz_type="change_request",
+                biz_id=cr.id,
+                actor_id=None,
+            )
     return list(rows)
 
 

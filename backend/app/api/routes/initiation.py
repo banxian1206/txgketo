@@ -38,7 +38,7 @@ from app.models.library import Item
 from app.models.platform import User
 from app.models.project import Equipment, Project
 from app.models.review import DesignRelease
-from app.services import audit, bom_demand, project_stage
+from app.services import audit, bom_demand, notify, project_stage
 from app.services.numbering import (
     make_equip_no,
     next_letter,
@@ -1100,6 +1100,31 @@ def inspect_purchase_request(
         + (f"，说明：{body.note}" if body.note else ""),
         ip=client_ip(request),
     )
+    # ★ 站内消息（06 卷 §9）：合格提醒仓库入库；不合格提醒采购协商
+    if receipt_status == "待入库":
+        notify.notify_role(
+            session,
+            "WAREHOUSE",
+            type_=notify.TYPE_WAREHOUSE,
+            title=f"有货待入库：{row.item_no} × {body.qty:g}",
+            body=f"{receipt_no}（{project_no}）",
+            link="/warehouse",
+            biz_type="goods_receipt",
+            biz_id=gr.id,
+            actor_id=current.id,
+        )
+    elif body.result == "不合格":
+        notify.notify_role(
+            session,
+            "PURCHASE",
+            type_=notify.TYPE_PURCHASE,
+            title=f"验收不合格：{receipt_no}（{row.item_no} × {body.qty:g}）",
+            body=body.note,
+            link="/purchase",
+            biz_type="goods_receipt",
+            biz_id=gr.id,
+            actor_id=current.id,
+        )
     session.commit()
     return {
         "receipt_id": gr.id,

@@ -24,6 +24,7 @@ from app.models.project import Equipment, Project
 from app.models.review import TICKET_PENDING_DIRECTOR, TICKET_PENDING_LEAD, ReviewTicket
 from app.models.task import Task
 from app.models.warehouse import MaterialIssue
+from app.services.notify import unread_count
 
 router = APIRouter(prefix="/m", tags=["移动端"])
 
@@ -76,6 +77,7 @@ def mobile_home(session: Session = Depends(get_session), current: User = Depends
         .select_from(Task)
         .where(Task.owner_id == current.id, Task.status.not_in(("已完成", "已取消"))),
     )
+    unread = unread_count(session, current.id)
 
     if current.position == POSITION_DIRECTOR:
         to_review = _count(
@@ -110,6 +112,7 @@ def mobile_home(session: Session = Depends(get_session), current: User = Depends
             "profession": current.profession,
             "position": current.position,
         },
+        "unread": unread,
         "counts": {
             "to_inspect": to_inspect,
             "to_store": to_store,

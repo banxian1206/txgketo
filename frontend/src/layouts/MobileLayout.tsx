@@ -1,7 +1,9 @@
-import { Typography } from 'antd'
+import { Badge, Typography } from 'antd'
+import { useCallback, useEffect, useState } from 'react'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 
-import { TOKEN_KEY } from '../api/client'
+import NotificationsDrawer from '../components/NotificationsDrawer'
+import { TOKEN_KEY, unreadNotificationCount } from '../api/client'
 
 const TABS = [
   { key: '/m', label: '首页', icon: '🏠' },
@@ -15,6 +17,21 @@ export default function MobileLayout() {
   const loc = useLocation()
   const nav = useNavigate()
   const name = localStorage.getItem('txgk_name') ?? '用户'
+  const [unread, setUnread] = useState(0)
+  const [notifOpen, setNotifOpen] = useState(false)
+
+  const refreshUnread = useCallback(() => {
+    unreadNotificationCount()
+      .then(setUnread)
+      .catch(() => undefined)
+  }, [])
+
+  useEffect(() => {
+    refreshUnread()
+    const t = setInterval(refreshUnread, 60_000)
+    return () => clearInterval(t)
+  }, [refreshUnread])
+
   const active =
     TABS.filter((t) => t.key !== '/m').find((t) => loc.pathname.startsWith(t.key))?.key ?? '/m'
 
@@ -34,6 +51,11 @@ export default function MobileLayout() {
         }}
       >
         <Typography.Text style={{ color: '#fff', fontWeight: 600 }}>同兴高科 · 移动端</Typography.Text>
+        <a style={{ color: '#fff' }} onClick={() => setNotifOpen(true)}>
+          <Badge count={unread} size="small">
+            <span style={{ fontSize: 16 }}>🔔</span>
+          </Badge>
+        </a>
         <a
           style={{ color: '#fff', fontSize: 13 }}
           onClick={() => {
@@ -50,6 +72,12 @@ export default function MobileLayout() {
       <div style={{ padding: 12 }}>
         <Outlet />
       </div>
+
+      <NotificationsDrawer
+        open={notifOpen}
+        onClose={() => setNotifOpen(false)}
+        onReadChange={setUnread}
+      />
 
       <div
         style={{

@@ -5,6 +5,7 @@ from app.models.engineering import BomItem, Drawing, DrawingVersion
 from app.models.review import DesignRelease, ReviewAction, ReviewTicket, ReviewTicketItem
 from app.models.program import EquipmentProgram, EquipmentProgramVersion
 from app.models.change import ChangeRequest
+from app.models.notify import Notification
 from app.models.warehouse import (
     MaterialIssue,
     MaterialIssueLine,
@@ -67,6 +68,7 @@ __all__ = [
     "ProjectMember",
     "PurchaseRequest",
     "ChangeRequest",
+    "Notification",
     "DesignRelease",
     "EquipmentProgram",
     "EquipmentProgramVersion",

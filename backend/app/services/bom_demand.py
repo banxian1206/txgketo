@@ -26,6 +26,7 @@ from app.models.initiation import (
 from app.models.library import Item
 from app.models.review import DesignRelease
 from app.models.warehouse import StockItem
+from app.services import notify
 
 # 还在跑（没结束）的需求算已覆盖，避免重复进池
 OPEN_STATUS = ("待采购", "在途", "已下单", "待入库", "部分到货", "不合格")
@@ -266,4 +267,15 @@ def create_release_demands(session: Session, release: DesignRelease) -> list[Pur
         session.add(row)
         session.flush()
         created.append(row)
+    if created:
+        # ★ 站内消息：发布冻结 → 提醒采购（06 卷 §9；一个批次提醒一次）
+        notify.notify_role(
+            session,
+            "PURCHASE",
+            type_=notify.TYPE_PURCHASE,
+            title=f"{release.release_no} 发布冻结，新增采购需求",
+            link="/purchase",
+            biz_type="design_release",
+            biz_id=release.id,
+        )
     return created

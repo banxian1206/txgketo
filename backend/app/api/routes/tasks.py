@@ -17,7 +17,7 @@ from app.models.library import Item
 from app.models.platform import POSITION_DIRECTOR, POSITION_LEAD, User
 from app.models.project import Equipment, Project
 from app.models.task import PROFESSIONS, TASK_STATUS, Task
-from app.services import audit
+from app.services import audit, notify
 from app.services.numbering import next_number, year_scope_key
 from app.services.reviewers import team_lead_for
 
@@ -214,6 +214,18 @@ def generate_tasks(
             session.flush()
             design_by_key[(eq.equip_no, prof)] = row
             created.append(row)
+            if owner is not None:
+                notify.notify(
+                    session,
+                    [owner],
+                    type_=notify.TYPE_TASK,
+                    title=f"任务派给你：{row.title}",
+                    body=row.content,
+                    link="/my-tasks",
+                    biz_type="task",
+                    biz_id=row.id,
+                    actor_id=current.id,
+                )
 
     if body.with_purchase:
         requests = session.scalars(
@@ -250,6 +262,17 @@ def generate_tasks(
             )
             session.add(row)
             created.append(row)
+            if row.owner_id is not None:
+                notify.notify(
+                    session,
+                    [row.owner_id],
+                    type_=notify.TYPE_TASK,
+                    title=f"采购任务派给你：{row.title}",
+                    link="/my-tasks",
+                    biz_type="task",
+                    biz_id=row.id,
+                    actor_id=current.id,
+                )
 
     session.flush()
     if created:
@@ -369,6 +392,7 @@ def update_task(
             raise HTTPException(status.HTTP_400_BAD_REQUEST, f"{reason}，还不能开工")
 
     # 转派：任务负责人（组长）或工程总监/超管才能改（05 卷 §0.1#14）
+    old_owner_id = row.owner_id
     if body.owner_id is not None and body.owner_id != row.owner_id:
         allowed = (
             current.is_superuser
@@ -403,6 +427,18 @@ def update_task(
             detail={"changes": changes},
             ip=client_ip(request),
         )
+        # ★ 站内消息：转派给谁就提醒谁（06 卷 §9）
+        if old_owner_id is not None and row.owner_id != old_owner_id:
+            notify.notify(
+                session,
+                [row.owner_id],
+                type_=notify.TYPE_TASK,
+                title=f"任务转派给你：{row.task_no} {row.title}",
+                link="/my-tasks",
+                biz_type="task",
+                biz_id=row.id,
+                actor_id=current.id,
+            )
     session.commit()
     blocked = _blocked_reason(session, row, session.get(Task, row.depends_on_id)) if row.depends_on_id else None
     return _task_dict(row, _names(session), blocked)
@@ -470,6 +506,16 @@ def split_task(
         session.add(child)
         session.flush()
         created.append(child)
+        notify.notify(
+            session,
+            [child.owner_id],
+            type_=notify.TYPE_TASK,
+            title=f"任务派给你：{child.title}",
+            link="/my-tasks",
+            biz_type="task",
+            biz_id=child.id,
+            actor_id=current.id,
+        )
     audit.log(
         session,
         user=current,

@@ -1,8 +1,10 @@
-import { Avatar, Layout, Menu, Space, Typography } from 'antd'
-import { useEffect, useState } from 'react'
+import { Avatar, Badge, Button, Layout, Menu, Space, Typography } from 'antd'
+import { BellOutlined } from '@ant-design/icons'
+import { useCallback, useEffect, useState } from 'react'
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom'
 
-import { TOKEN_KEY, workbenchMe, type WorkbenchItem } from '../api/client'
+import NotificationsDrawer from '../components/NotificationsDrawer'
+import { TOKEN_KEY, unreadNotificationCount, workbenchMe, type WorkbenchItem } from '../api/client'
 
 const { Header, Sider, Content } = Layout
 
@@ -25,6 +27,21 @@ export default function AppLayout() {
   const [workbenches, setWorkbenches] = useState<WorkbenchItem[]>([
     { key: 'mine', name: '我的工作台', route: '/workbench', visible: true },
   ])
+  // 站内消息红点（06 卷 §9）：60s 轮询未读数
+  const [unread, setUnread] = useState(0)
+  const [notifOpen, setNotifOpen] = useState(false)
+
+  const refreshUnread = useCallback(() => {
+    unreadNotificationCount()
+      .then(setUnread)
+      .catch(() => undefined)
+  }, [])
+
+  useEffect(() => {
+    refreshUnread()
+    const t = setInterval(refreshUnread, 60_000)
+    return () => clearInterval(t)
+  }, [refreshUnread])
 
   useEffect(() => {
     workbenchMe()
@@ -103,6 +120,9 @@ export default function AppLayout() {
               {name.slice(0, 1)}
             </Avatar>
             <Typography.Text>{name}</Typography.Text>
+            <Badge count={unread} size="small">
+              <Button size="small" icon={<BellOutlined />} onClick={() => setNotifOpen(true)} />
+            </Badge>
             <Link to="/m" style={{ fontSize: 13 }}>
               手机端
             </Link>
@@ -122,6 +142,11 @@ export default function AppLayout() {
           <Outlet />
         </Content>
       </Layout>
+      <NotificationsDrawer
+        open={notifOpen}
+        onClose={() => setNotifOpen(false)}
+        onReadChange={setUnread}
+      />
     </Layout>
   )
 }

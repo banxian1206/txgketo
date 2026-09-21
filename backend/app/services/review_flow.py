@@ -49,7 +49,7 @@ from app.models.review import (
     ReviewTicketItem,
 )
 from app.models.task import Task
-from app.services import audit, bom_demand, change_flow
+from app.services import audit, notify, bom_demand, change_flow
 from app.services.numbering import next_number, year_scope_key
 from app.services.reviewers import chain_levels, director, director_for, team_lead_for
 
@@ -366,6 +366,21 @@ def submit_round(
     ticket.current_round = round_no
     ticket.submitter_id = user.id
 
+    # ★ 站内消息：提醒下一级审核人（06 卷 §9）
+    reviewer = team_lead_for(session, task.profession) if need_lead else director_for(session, user)
+    if reviewer is not None:
+        notify.notify(
+            session,
+            [reviewer.id],
+            type_=notify.TYPE_REVIEW,
+            title=f"有评审单等你审核：{ticket.ticket_no}（{ticket.equip_no or ''} {ticket.profession or ''}）",
+            body=note or None,
+            link="/reviews",
+            biz_type="review_ticket",
+            biz_id=ticket.id,
+            actor_id=user.id,
+        )
+
     audit.log(
         session,
         user=user,
@@ -435,6 +450,45 @@ def review_ticket(
     else:
         release = _publish_round(session, ticket, user, round_no, note, now)
         ticket.status = TICKET_APPROVED
+
+    # ★ 站内消息：通过→提醒下一级/提交人；退回→提醒提交人（06 卷 §9）
+    submitter = session.get(User, ticket.submitter_id) if ticket.submitter_id else None
+    if action == ACTION_REJECT and submitter is not None:
+        notify.notify(
+            session,
+            [submitter.id],
+            type_=notify.TYPE_REVIEW,
+            title=f"评审被退回：{ticket.ticket_no}（第 {round_no} 轮）",
+            body=note or None,
+            link="/reviews",
+            biz_type="review_ticket",
+            biz_id=ticket.id,
+            actor_id=user.id,
+        )
+    elif level == 1:
+        boss = director_for(session, submitter) if submitter else None
+        if boss is not None:
+            notify.notify(
+                session,
+                [boss.id],
+                type_=notify.TYPE_REVIEW,
+                title=f"组长已通过，等你终审：{ticket.ticket_no}",
+                link="/reviews",
+                biz_type="review_ticket",
+                biz_id=ticket.id,
+                actor_id=user.id,
+            )
+    elif release is not None and submitter is not None:
+        notify.notify(
+            session,
+            [submitter.id],
+            type_=notify.TYPE_REVIEW,
+            title=f"评审通过并发布：{release.release_no}（内容已冻结）",
+            link="/reviews",
+            biz_type="review_ticket",
+            biz_id=ticket.id,
+            actor_id=user.id,
+        )
 
     audit.log(
         session,
