@@ -91,8 +91,8 @@ deploy/          docker-compose.dev.yml
 
 ## 8. 当前进度（交接记录）
 
-> 更新于：**05 卷 P1 组织与岗位**落地（`app_user.profession/position`、工程部→四个专业组、审核链查找、软件→程序更名）。
-> 下一步：**05 卷 P2 任务改造**（工艺专业 + 前置依赖 + 立项派给组长、组长拆分/转派组员）。上次会话的 BOM → 净需求 → 采购池（常规件通道）已通。
+> 更新于：**05 卷 P2 任务改造**落地（工艺挂机械 + 前置依赖阻塞、立项直接派给各专业设计组长、组长拆分/转派组员、我的任务/我组筛选、用户与岗位管理页）。
+> 下一步：**05 卷 P3 评审单**（提交 → 组长 → 总监两级审核 → 发布冻结）。BOM → 净需求 → 采购池（常规件通道）已通。
 
 ### 8.1 采购状态线（客户口径，别再改回去了）
 
@@ -146,7 +146,8 @@ deploy/          docker-compose.dev.yml
 | **仓库两个动作：验收 / 入库（分批）** | ✅ | `POST /projects/{no}/purchase-requests/{id}/inspect`、`POST /goods-receipts/{id}/store`；`pages/Warehouse.tsx`、`warehouse/workbench`（`incoming` 待验收 / `pending_storage` 待入库） |
 | 采购流程（下单/发货登记已废弃） | ✅ | `routes/initiation.py`（单条下单自动发号，含 `deliver_to/deliver_address`） |
 | 仓库三件事（验收/入库/领料单） | ✅ | `models/warehouse.py`、`routes/warehouse.py` |
-| **组织与岗位（05 卷 P1）** | ✅ | `models/platform.py`（`PROFESSIONS`/`POSITIONS`）· `services/reviewers.py`（组长→总监审核链）· `scripts/seed.py`（工程部→机械/电气/程序/工艺组；旧设计部/工艺部停用）· `PATCH /users/{id}` 配专业/岗位 |
+| **组织与岗位（05 卷 P1）** | ✅ | `models/platform.py`（`PROFESSIONS`/`POSITIONS`）· `services/reviewers.py`（组长→总监审核链）· `scripts/seed.py`（工程部→机械/电气/程序/工艺组；旧设计部/工艺部停用）· 用户与岗位页 `pages/Users.tsx` |
+| **任务体系改造（05 卷 P2）** | ✅ | `task.depends_on_id/parent_task_id`；立项派给设计组长、工艺挂机械（机械首次发布才解锁）；`POST /tasks/{id}/split` 组长拆分派工；`GET /my-tasks?scope=team` 我组；`pages/MyTasks.tsx` |
 | 前端页面 | ✅ | 商机列表/详情/新建、我的任务、立项、设计工作面、采购工作台（采购池/采购单/验收不合格/退换记录/入库记录五页签）、供应商、标准库、仓库 |
 
 ### 8.3 ★ 未完成（下次会话要做的）
@@ -156,7 +157,7 @@ deploy/          docker-compose.dev.yml
 | 1 | Excel 历史采购导入 | 客户已确认后期要做（物料/供应商/单价/数量/日期 → 写价格库） |
 | 2 | 制造 / 装配 / 发运 / 现场 / 验收 / 售后 | 流程上还没做（见 `../00 方案` §3 S5–S11） |
 | 3 | 领料单数量算法对齐 | `warehouse/generate-issue` 还是旧算法（材料只乘直接父件、标准件不乘）；建议改成 `bom_demand` 那套按树累计 |
-| 4 | 工程设计流转（05 卷 P2–P7） | P2 任务（工艺+依赖+组长分派）→ P3 评审单两级审核冻结 → P4 程序版本 → P5 采购触发/手工申请 → P6 改版 → P7 工作台；口径见 `../05 工程设计流转·审核·冻结·改版.md` |
+| 4 | 工程设计流转（05 卷 P3–P7） | P3 评审单两级审核冻结 → P4 程序版本 → P5 采购触发/手工申请 → P6 改版 → P7 工作台；口径见 `../05 工程设计流转·审核·冻结·改版.md` |
 
 > 本轮顺手修复：`update_purchase_request` 漏导入 `REQUEST_STATUS`，改采购需求状态会 500。
 
@@ -176,7 +177,9 @@ POST /api/v1/projects/{no}/purchase-requests/{id}/inspect   仓库验收（分�
 POST /api/v1/goods-receipts/{id}/store           入库（分批；记库位+库存+流水）
 GET  /api/v1/goods-receipts?status=待入库        到货单（待入库/已入库/现场已验收/不合格/已换货/已退货）
 GET  /api/v1/warehouse/workbench                  仓库待办（incoming 待验收 / pending_storage 待入库 / 领料）
-PATCH /api/v1/users/{id}                          用户配置：专业/岗位（审核人）、组织、角色、停用、重置密码
+GET  /api/v1/my-tasks?scope=mine|team             我的任务 / 我组任务（组长台；blocked 字段标「等待前置」）
+POST /api/v1/tasks/{id}/split                     组长拆分派工：一条任务拆给多个组员（子任务继承前置依赖）
+GET/POST/PATCH /api/v1/users                      用户与岗位：专业/岗位（审核人）、组织、角色、停用、重置密码
 POST /api/v1/warehouse/projects/{no}/equipment/{equip}/generate-issue  按 BOM 生成领料单
 GET  /api/v1/purchase/recommend/{item_no}         推荐供应商（打分+理由）
 GET  /api/v1/purchase/price-reference/{item_no}   价格参考

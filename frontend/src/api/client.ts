@@ -31,7 +31,35 @@ export interface User {
   username: string
   name: string
   is_superuser: boolean
+  profession?: string | null
+  position?: string | null
+  org_id?: number | null
 }
+
+/** 用户管理页的行（比 User 多管理字段） */
+export interface UserRow extends User {
+  phone?: string | null
+  is_active: boolean
+  roles?: string[]
+}
+
+export interface OrgRow {
+  id: number
+  code: string
+  name: string
+  parent_id?: number | null
+  kind?: string | null
+}
+
+export interface RoleRow {
+  id: number
+  code: string
+  name: string
+}
+
+/** 工程部专业 / 岗位（05 卷 §2.1，与后端 PROFESSIONS / POSITIONS 对齐） */
+export const PROFESSIONS = ['机械', '电气', '程序', '工艺']
+export const POSITIONS = ['设计师', '设计组长', '工程总监']
 
 export interface ContactIn {
   name: string
@@ -241,7 +269,48 @@ export async function listNumberRules() {
 }
 
 export async function listUsers() {
-  const { data } = await api.get<{ id: number; name: string }[]>('/users')
+  const { data } = await api.get<UserRow[]>('/users')
+  return data
+}
+
+export async function createUser(body: {
+  username: string
+  password: string
+  name: string
+  phone?: string | null
+  org_id?: number | null
+  profession?: string | null
+  position?: string | null
+  role_codes: string[]
+}) {
+  const { data } = await api.post<UserRow>('/users', body)
+  return data
+}
+
+export async function updateUser(
+  id: number,
+  body: {
+    name?: string
+    phone?: string | null
+    org_id?: number | null
+    profession?: string | null
+    position?: string | null
+    role_codes?: string[]
+    is_active?: boolean
+    password?: string
+  },
+) {
+  const { data } = await api.patch<UserRow>(`/users/${id}`, body)
+  return data
+}
+
+export async function listOrgs() {
+  const { data } = await api.get<OrgRow[]>('/orgs')
+  return data
+}
+
+export async function listRoles() {
+  const { data } = await api.get<RoleRow[]>('/roles')
   return data
 }
 
@@ -601,6 +670,10 @@ export interface TaskItem {
   content?: string | null
   owner_id?: number | null
   owner_name?: string | null
+  depends_on_id?: number | null
+  parent_task_id?: number | null
+  blocked?: boolean
+  blocked_reason?: string | null
   plan_start?: string | null
   plan_end?: string | null
   status: string
@@ -627,8 +700,15 @@ export async function listProjectTasks(no: string) {
   return data
 }
 
-export async function listMyTasks(status?: string) {
-  const { data } = await api.get<TaskItem[]>('/my-tasks', { params: status ? { status } : {} })
+export async function listMyTasks(status?: string, scope: 'mine' | 'team' = 'mine') {
+  const params: Record<string, string> = { scope }
+  if (status) params.status = status
+  const { data } = await api.get<TaskItem[]>('/my-tasks', { params })
+  return data
+}
+
+export async function splitTask(taskId: number, items: { owner_id: number; title?: string }[]) {
+  const { data } = await api.post<TaskItem[]>(`/tasks/${taskId}/split`, { items })
   return data
 }
 

@@ -51,6 +51,10 @@ class Task(Base, TimestampMixin):
     content: Mapped[str | None] = mapped_column(Text)
 
     owner_id: Mapped[int | None] = mapped_column(ForeignKey("app_user.id"))
+    # 前置任务（05 卷 §8.2）：工艺挂在机械之后（机械首次发布即可开工，§0.1#17）
+    depends_on_id: Mapped[int | None] = mapped_column(ForeignKey("task.id"))
+    # 组长拆分给组员的子任务（05 卷 §0.1#14）：父任务的 owner 是组长
+    parent_task_id: Mapped[int | None] = mapped_column(ForeignKey("task.id"))
     plan_start: Mapped[date | None] = mapped_column(Date)
     plan_end: Mapped[date | None] = mapped_column(Date)
 

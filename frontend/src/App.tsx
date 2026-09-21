@@ -13,6 +13,7 @@ import MyTasks from './pages/MyTasks'
 import Projects from './pages/Projects'
 import PurchaseWorkbench from './pages/PurchaseWorkbench'
 import Suppliers from './pages/Suppliers'
+import Users from './pages/Users'
 import Warehouse from './pages/Warehouse'
 import { TOKEN_KEY } from './api/client'
 
@@ -53,6 +54,7 @@ export default function App() {
         <Route path="projects/:projectNo" element={<ProjectDetailPage />} />
         <Route path="projects/:projectNo/initiate" element={<ProjectInitiate />} />
         <Route path="numbering" element={<NumberRules />} />
+        <Route path="users" element={<Users />} />
         <Route path="library" element={<Library />} />
         <Route path="my-tasks" element={<MyTasks />} />
         <Route path="purchase" element={<PurchaseWorkbench />} />

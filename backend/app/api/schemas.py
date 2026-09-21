@@ -25,6 +25,12 @@ class UserOut(BaseModel):
     is_superuser: bool = False
 
 
+class UserAdminOut(UserOut):
+    """用户管理页用：带角色编码。"""
+
+    roles: list[str] = []
+
+
 class LoginOut(BaseModel):
     access_token: str
     token_type: str = "bearer"

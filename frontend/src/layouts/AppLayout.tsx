@@ -9,6 +9,13 @@ export default function AppLayout() {
   const nav = useNavigate()
   const loc = useLocation()
   const name = localStorage.getItem('txgk_name') ?? '用户'
+  const isAdmin = (() => {
+    try {
+      return JSON.parse(localStorage.getItem('txgk_user') ?? '{}').is_superuser === true
+    } catch {
+      return false
+    }
+  })()
 
   return (
     <Layout style={{ minHeight: '100%' }}>
@@ -38,6 +45,7 @@ export default function AppLayout() {
             { key: '/suppliers', label: <Link to="/suppliers">供应商</Link> },
             { key: '/library', label: <Link to="/library">标准库</Link> },
             { key: '/numbering', label: <Link to="/numbering">编号规则</Link> },
+            ...(isAdmin ? [{ key: '/users', label: <Link to="/users">用户与岗位</Link> }] : []),
           ]}
         />
       </Sider>
@@ -61,6 +69,7 @@ export default function AppLayout() {
               onClick={() => {
                 localStorage.removeItem(TOKEN_KEY)
                 localStorage.removeItem('txgk_name')
+                localStorage.removeItem('txgk_user')
                 nav('/login')
               }}
             >

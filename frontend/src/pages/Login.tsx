@@ -34,6 +34,7 @@ export default function Login() {
               const data = await login(v.username, v.password)
               localStorage.setItem(TOKEN_KEY, data.access_token)
               localStorage.setItem('txgk_name', data.user.name)
+              localStorage.setItem('txgk_user', JSON.stringify(data.user))
               nav('/projects')
             } catch (e) {
               message.error(errMsg(e))

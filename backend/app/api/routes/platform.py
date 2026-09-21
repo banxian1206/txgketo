@@ -6,7 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.api.deps import client_ip, get_current_user
-from app.api.schemas import UserOut
+from app.api.schemas import UserAdminOut, UserOut
 from app.core.db import get_session
 from app.core.security import hash_password
 from app.models.platform import PROFESSIONS, POSITIONS, AuditLog, Org, Role, User
@@ -80,10 +80,13 @@ def list_roles(session: Session = Depends(get_session), _: User = Depends(get_cu
     return [RoleOut(id=r.id, code=r.code, name=r.name) for r in rows]
 
 
-@router.get("/users", response_model=list[UserOut])
+@router.get("/users", response_model=list[UserAdminOut])
 def list_users(session: Session = Depends(get_session), _: User = Depends(get_current_user)):
     rows = session.scalars(select(User).order_by(User.id)).all()
-    return [UserOut.model_validate(r) for r in rows]
+    return [
+        UserAdminOut(**UserOut.model_validate(r).model_dump(), roles=[x.code for x in r.roles])
+        for r in rows
+    ]
 
 
 @router.get("/audit-logs")
