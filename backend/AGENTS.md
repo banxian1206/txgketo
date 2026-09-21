@@ -92,8 +92,8 @@ deploy/          docker-compose.dev.yml
 ## 8. 当前进度（交接记录）
 
 > 更新于：**06 卷 F 步（账号权限收尾）**落地：接口级权限强校验（`require_permission`，采购下单类→`purchase:edit`、验收/入库/领料→`warehouse:edit`）、金额分档（`purchase:price` 采购价 / `project:amount` 项目金额，无权限返回 null）、**离职/停用一键转交**（任务/待审/项目角色/图·程序·BOM 归属）。
-> 下一步：装配与厂内调试（S6，齐套率驱动）、发运/现场/验收/售后（S7–S11）；超期扫描自动提醒；Excel 历史采购导入；领料数量算法对齐；离线队列 + Capacitor。
-> 已完成：S0 商机 → S1 立项 → S2 工程设计 → S3 采购 → S4 仓库 → **S5 制造**。
+> 已完成：S0 商机 → S1 立项 → S2 工程设计 → S3 采购 → S4 仓库 → S5 制造 → **S6 装配与齐套率**。
+> 下一步：发运/现场/验收/售后（S7–S11）；超期扫描自动提醒；Excel 历史采购导入。
 
 ### 8.1 采购状态线（客户口径，别再改回去了）
 
@@ -154,6 +154,7 @@ deploy/          docker-compose.dev.yml
 | **权限强校验 + 金额分档 + 离职转交（06 卷 F 步）** | ✅ | `deps.require_permission`/`has_permission`/`scrub_money`；采购下单类→`purchase:edit`、验收/入库/领料→`warehouse:edit`；金额：`purchase:price`（采购单/报价/价格参考）、`project:amount`（项目金额/列表）无权限返回 null；`POST /users/{id}/handover` 一键转交；前端 `hasPerm()` 按钮显隐 + Users 页「转交」弹窗 |
 | **入口补齐（领料 / 回款 / 日志 / 其他入库·库位 / 价格参考）** | ✅ | ① 仓库待办页「生成领料单（按设备）」（`generateEquipmentIssue`）；② `POST /projects/{p}/payment-terms/{seq}/receive` 登记回款（多次累加、超额拦截）+ 项目详情付款节点「登记回款」（`payment:edit`）；③「用户与权限」加「操作日志」页签（`GET /audit-logs`）；④ 库存页「其他入库」（`POST /warehouse/inbound`，退料回库/盘盈）；⑤ 仓库新增「库位」页签 + 新建库位（`GET/POST /warehouse/locations`）；⑥ 采购工作台「价格参考」页签（物料搜索 + 历史价 + 推荐供应商，需 `purchase:price`，后端同步收紧） |
 | **S5 制造（★只管两头）** | ✅ | 迁移 `g1b3d5f70c29`（`prod_order`/`prod_task`/`prod_acceptance`/`outsource_task`；编号 `PR{YY}{NNN}` 排产单 / `WX{YY}{NNN}` 外协单）；`services/manufacturing.py`（按设备**已发布图纸**展开：自制件→排产单、外协件→外协任务，幂等）；`routes/manufacturing.py`（生成/列表/工作台/下发/开工/验收/转运/外协发出·回厂·验收 + 拍照 `POST /manufacturing/photos` ✓鉴权取回）；`pages/Manufacturing.tsx`（PC）、`pages/m/ProductionM.tsx`（手机批量）、车间台 `GET /workbench/shop`；通知 MFG 角色 + 不合格通知项目团队/设计；**不做工序级报工/工时** |
+| **S6 装配与齐套率** | ✅ | 迁移 `h2c4e6a81d35`（`kitting_snapshot` / `assembly_record`）；`services/kitting.py`（自制件看排产是否已转运、外协看是否合格、采购/库存看是否到货入库 → **齐套率只展示**）；`routes/assembly.py`（齐套率/概览/装配开始·完成/厂内调试/装配台）；`pages/Assembly.tsx`（项目 → 各设备齐套率进度条 + 明细 + 装配记录/调试）；**项目详情新增「齐套率」卡**；车间台计数装配中/待调试；**不设 100% 门槛，随时可开装** |
 | 供应商主数据 + 报价 + 能供品类 | ✅ | `models/purchasing.py`、`routes/suppliers.py` |
 | 推荐供应商（多路证据打分） | ✅ | `GET /purchase/recommend/{item_no}` |
 | 价格参考（上次成交/历史区间/各家报价） | ✅ | `GET /purchase/price-reference/{item_no}` |
@@ -240,6 +241,15 @@ POST /api/v1/manufacturing/outsource/{id}/send|return|accept   外协发出 / �
 POST /api/v1/manufacturing/photos                  制造拍照上传（multipart files）→ token
 GET  /api/v1/manufacturing/photos?token=...        取制造照片（带鉴权）
 GET  /api/v1/workbench/shop                        车间台（同 /manufacturing/workbench）
+
+装配与齐套（S6）—— 权限：mfg:view / mfg:edit；**齐套率只展示，不设门槛**
+GET  /api/v1/assembly/kitting?project_no=&equip_no=  一台设备齐套率 + 明细（到了多少 / 还差什么）
+GET  /api/v1/assembly/kitting/overview?project_no=   项目下每台设备齐套率
+POST /api/v1/assembly/records                       开始装配（整机/组件预装，快照当时齐套率）
+POST /api/v1/assembly/records/{id}/finish           装配完成
+POST /api/v1/assembly/records/{id}/debug            厂内调试记录 {result, note, photos}
+GET  /api/v1/assembly/records                       装配记录列表
+GET  /api/v1/assembly/workbench                     装配台（计数 + 概览 + 记录）
 POST /api/v1/projects/{p}/payment-terms/{seq}/receive  登记回款（多次累加；payment:edit）
    权限强校验：采购下单类→purchase:edit；验收/入库/领料→warehouse:edit；金额→purchase:price / project:amount（无权限返回 null）
 POST/PATCH /api/v1/orgs（/{id}）                   组织维护：部门/组 增改停用（停用不删）
