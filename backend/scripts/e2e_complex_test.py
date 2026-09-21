@@ -235,11 +235,10 @@ def main() -> None:
     pool = req("get", "/api/v1/purchase/pool", "buyer1")
     prs_pool = [{**r, "item_no": g["item_no"]} for g in pool for r in g["requests"] if r["project_no"] == p]
     print(f"  01A 图纸 6 张 + 程序 1 个发布；02A/03A 各 1 张发布；采购池 {len(prs_pool)} 条")
-    # 预期 7 条：轴承(01A)+轴承(02A)+气缸+电机+方通+板材+防护罩(外协)
-    # ★ 支撑梁被工艺改判「定制件」——发布逻辑只自动外协件进池，定制件不进（疑似缺口，计入问题）
-    flag("S2", d_beam["drawing_no"] not in {x["item_no"] for x in prs_pool},
-         "疑似缺口：工艺改判「定制件」的零件不会自动进采购池（只有外协件会）")
-    flag("S2", len(prs_pool) == 7, f"采购池应 7 条，实际 {len(prs_pool)}：{sorted(x['item_no'] for x in prs_pool)}")
+    # 预期 8 条：轴承(01A)+轴承(02A)+气缸+电机+方通+板材+防护罩(外协)+支撑梁(定制)
+    flag("S2", d_beam["drawing_no"] in {x["item_no"] for x in prs_pool},
+         "工艺改判「定制件」的支撑梁应自动进采购池（与外协件同等待遇）")
+    flag("S2", len(prs_pool) == 8, f"采购池应 8 条，实际 {len(prs_pool)}：{sorted(x['item_no'] for x in prs_pool)}")
     STAGES.append(("S2 设计", "01A 五图(3级树/定制件/外协件)+程序发布；02A/03A 各1图；池累计 6 条"))
 
     # ================= S3 采购（2 家供应商 3 张单；分批到货；不合格→换货→重验） =================
@@ -256,17 +255,7 @@ def main() -> None:
     req("post", "/api/v1/purchase/merge-order", "buyer1", (200, 201),
         json={"supplier_id": sup1["id"], "ordered_at": d(0), "expected_date": d(18),
               "deliver_to": "公司仓库", "lines": [{"request_id": rid} for rid in wh_lines]})
-    # ★ 工艺改判定制件的支撑梁不自动进池 → 用「手工采购申请」补买（真实兜底路径）
-    req("post", "/api/v1/purchase/manual-request", "buyer1", (201,),
-        json={"attribution": "项目", "project_no": p, "equip_no": A,
-              "item_no": d_beam["drawing_no"], "qty": 1, "need_date": d(20),
-              "note": "工艺改判定制件，池里没进，手工补买"})
-    pool3 = req("get", "/api/v1/purchase/pool", "buyer1")
-    beam_req = next(r for g in pool3 for r in g["requests"]
-                    if r["project_no"] == p and g["item_no"] == d_beam["drawing_no"])
-    req("post", "/api/v1/purchase/merge-order", "buyer1", (200, 201),
-        json={"supplier_id": sup1["id"], "ordered_at": d(0), "expected_date": d(12),
-              "deliver_to": "公司仓库", "lines": [{"request_id": beam_req["id"]}]})
+
     req("post", "/api/v1/purchase/merge-order", "buyer1", (200, 201),
         json={"supplier_id": sup2["id"], "ordered_at": d(0), "deliver_to": "直发客户现场",
               "deliver_address": "佛山顺德 美的全球创新中心",
@@ -307,6 +296,7 @@ def main() -> None:
     flag("S3", neg.status_code == 200, f"换货协商应成功，实际 {neg.status_code}: {neg.text[:120]}")
     inspect((ft["item_no"], "01A"), 2)  # 补发到货
     inspect((bc["item_no"], A), 2)
+    inspect((dj["item_no"], A), 2)   # 电机也要验收入库（漏验会导致领料单正确标缺）
     inspect((d_beam["drawing_no"], A), 1)
     inspect((zct["item_no"], "02A"), 8)
     inspect((d_cover["drawing_no"], A), 1)  # 外协直发 → 现场待验收
@@ -509,15 +499,15 @@ def main() -> None:
     nos = [r["project_no"] for r in sales["projects"]]
     flag("可见", p in nos, "商务部台应见新订单")
     flag("可见", len(nos) >= 1, "商务部台应能看到订单")
-    flag("可见-项目经理", p in str(req("get", "/api/v1/workbench/pm/board", "pm1")))
-    flag("可见-工程", p in str(req("get", "/api/v1/workbench/eng/board", "mech_manager")))
-    flag("可见-仓库", any(i["project_no"] == p for i in req("get", "/api/v1/warehouse/issues", "wh1")))
-    flag("可见-制造", any(o["project_no"] == p for o in req("get", "/api/v1/manufacturing/orders", "shop1")))
-    flag("可见-装配", any(r["project_no"] == p for r in req("get", "/api/v1/assembly/records", "assy1")))
-    flag("可见-发运", any(s["project_no"] == p for s in req("get", "/api/v1/shipping/list", "delivery1")))
-    flag("可见-现场", any(x["project_no"] == p for x in req("get", "/api/v1/site/commission", "site1")))
-    flag("可见-售后", any(x["project_no"] == p for x in req("get", "/api/v1/service/orders", "service1")))
-    print("  商务（两单并存）/项目经理/工程/仓库/制造/装配/发运/现场/售后 全部可见 ✓")
+    flag("可见-项目经理", p in str(req("get", "/api/v1/workbench/pm/board", "pm1")), "项目经理台应见订单")
+    flag("可见-工程", p in str(req("get", "/api/v1/workbench/eng/board", "mech_manager")), "工程部台应见订单")
+    flag("可见-仓库", any(i["project_no"] == p for i in req("get", "/api/v1/warehouse/issues", "wh1")), "仓库领料列表应见订单")
+    flag("可见-制造", any(o["project_no"] == p for o in req("get", "/api/v1/manufacturing/orders", "shop1")), "制造列表应见订单")
+    flag("可见-装配", any(r["project_no"] == p for r in req("get", "/api/v1/assembly/records", "assy1")), "装配记录应见订单")
+    flag("可见-发运", any(s["project_no"] == p for s in req("get", "/api/v1/shipping/list", "delivery1")), "发运列表应见订单")
+    flag("可见-现场", any(x["project_no"] == p for x in req("get", "/api/v1/site/commission", "site1")), "现场调试应见订单")
+    flag("可见-售后", any(x["project_no"] == p for x in req("get", "/api/v1/service/orders", "service1")), "售后工单应见订单")
+    print("  商务/项目经理/工程/仓库/制造/装配/发运/现场/售后 全部可见 ✓")
 
     # ================= 报告 =================
     print("\n" + "=" * 64)
@@ -532,7 +522,7 @@ def main() -> None:
             print(f"  {i}. [{stg}] {m}")
     else:
         print("未发现问题")
-    print(f"\n新订单号：{p}（与 TX26001 并存，均可按角色走查）")
+    print(f"\n新订单号：{p}")
 
 
 if __name__ == "__main__":

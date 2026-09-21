@@ -153,6 +153,18 @@ def equipment_demand(session: Session, project_no: str, equip_no: str) -> list[D
         key = (b.child_item_no, b.parent_ref)
         need[key] = need.get(key, 0.0) + float(b.qty or 0) * mult
 
+    # 有图号的「定制件 / 外协件」（图号即物料号）：已发布就计入净需求（总装图除外）
+    for d in drawings:
+        if d.parent_drawing_no is None:
+            continue  # 总装图是装配对象，不是采购件
+        if d.status != "已发布" or d.source_type not in ("定制件", "外协件"):
+            continue
+        item = items.get(d.drawing_no)
+        if item is None or item.source_type not in BUY_TYPES:
+            continue
+        key = (d.drawing_no, d.drawing_no)
+        need[key] = need.get(key, 0.0) + float(d.qty or 0) * cum.get(d.drawing_no, 1.0)
+
     lines = [
         DemandLine(item_no=item_no, part_no=part_no, qty=round(qty, 3), unit=items[item_no].unit)
         for (item_no, part_no), qty in need.items()
@@ -204,9 +216,9 @@ def release_demand(session: Session, release: DesignRelease) -> list[DemandLine]
             continue
         add(d.drawing_no, d.drawing_no, cum.get(d.drawing_no, 1.0))
 
-    # ③ 工艺发布：判定为「外协件」的零件
+    # ③ 工艺发布：判定为「外协件 / 定制件」的零件（都要外购，自动进池）
     for entry in summary.get("source_tags", []):
-        if entry.get("new") != "外协件":
+        if entry.get("new") not in ("外协件", "定制件"):
             continue
         d = session.get(Drawing, entry.get("drawing_no"))
         if d is None or items.get(d.drawing_no) is None:
