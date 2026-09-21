@@ -13,17 +13,18 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models.assembly import AssemblyRecord
+from app.models.library import Item
 from app.models.project import Equipment, Project
 from app.services import project_stage
 from app.models.shipment import (
     SHIP_ARRIVED,
     SHIP_INSTRUCTED,
     SHIP_LOADED,
-    SHIP_PACKING,
+    SHIP_SHIPPING,
     SHIP_SIGNED,
     SHIP_TRANSIT,
-    PackingItem,
     Shipment,
+    ShipmentItem,
     ShipmentLine,
     SiteReceipt,
 )
@@ -31,7 +32,7 @@ from app.services import notify
 from app.services import kitting as kt
 from app.services.numbering import ObjectType, next_number, year_scope_key
 
-SHIP_OPEN = (SHIP_INSTRUCTED, SHIP_PACKING, SHIP_LOADED, SHIP_TRANSIT, SHIP_ARRIVED)
+SHIP_OPEN = (SHIP_INSTRUCTED, SHIP_SHIPPING, SHIP_LOADED, SHIP_TRANSIT, SHIP_ARRIVED)
 READY_ASSY = ("已装配", "调试中", "调试完成")
 
 
@@ -140,39 +141,162 @@ def create_shipment(
     return sh
 
 
-def add_packing(
+def generate_items(
+    session: Session,
+    sh: Shipment,
+) -> list[dict]:
+    """按本次发运设备的**已发布结构**生成发运清单候选（组件→子组件→零件 + 标准件/原材料）。
+
+    数量 = 结构连乘。生成的是"应发清单"，逐项勾「已发」+ 拍照。
+    """
+    from app.models.engineering import BOM_MATERIAL, BomItem, Drawing
+    from app.services.bom_demand import _cumulative_qty
+
+    equip_nos = [
+        l.equip_no
+        for l in session.scalars(select(ShipmentLine).where(ShipmentLine.shipment_id == sh.id)).all()
+    ]
+    out: list[dict] = []
+    for eq in equip_nos:
+        drawings = session.scalars(
+            select(Drawing).where(Drawing.project_no == sh.project_no, Drawing.equip_no == eq)
+        ).all()
+        published = [d for d in drawings if d.status == "已发布"]
+        tree = {d.drawing_no: d for d in drawings}
+        cum = _cumulative_qty(drawings)
+        bom_rows = session.scalars(
+            select(BomItem).where(
+                BomItem.project_no == sh.project_no,
+                BomItem.parent_ref.in_({d.drawing_no for d in published}),
+                BomItem.status == "已冻结",
+            )
+        ).all()
+        # 组件/零件（图纸树）
+        for d in published:
+            children = any(x.parent_drawing_no == d.drawing_no for x in published)
+            out.append({
+                "equip_no": eq,
+                "ref": d.drawing_no,
+                "parent_ref": d.parent_drawing_no,
+                "name": d.title,
+                "kind": "组件" if children else "零件",
+                "source": "结构",
+                "qty": float(d.qty or 1),
+                "unit": d.unit,
+                "level": sum(1 for lv in (d.l1, d.l2, d.l3, d.l4) if lv != "00"),
+            })
+        # 标准件 / 原材料（挂父件下）
+        for b in bom_rows:
+            it = session.get(Item, b.child_item_no)
+            out.append({
+                "equip_no": eq,
+                "ref": b.child_item_no,
+                "parent_ref": b.parent_ref,
+                "name": it.display_name if it else b.child_item_no,
+                "kind": "原材料" if b.bom_source == BOM_MATERIAL else "标准件",
+                "source": "结构",
+                "qty": float(b.qty or 0) * float(cum.get(b.parent_ref, 1) or 1),
+                "unit": None,
+                "level": 9,
+            })
+    return out
+
+
+def sync_items(
     session: Session,
     sh: Shipment,
     items: list[dict],
     *,
     actor_id: int | None = None,
-) -> list[PackingItem]:
-    if sh.status not in (SHIP_INSTRUCTED, SHIP_PACKING):
-        raise ShippingError(f"当前状态「{sh.status}」，不能再改装箱清单")
+) -> list[ShipmentItem]:
+    """把候选清单保存为发运清单行（保留已勾选/已拍照的行，只补新的）。"""
+    if sh.status not in (SHIP_INSTRUCTED, SHIP_SHIPPING):
+        raise ShippingError(f"当前状态「{sh.status}」，不能生成发运清单")
     if not items:
-        raise ShippingError("装箱清单不能为空")
-    rows: list[PackingItem] = []
+        raise ShippingError("清单不能为空")
+    existing = {
+        (r.equip_no, r.ref): r
+        for r in session.scalars(select(ShipmentItem).where(ShipmentItem.shipment_id == sh.id)).all()
+    }
+    rows: list[ShipmentItem] = []
     for it in items:
-        if not it.get("part_item_no"):
-            continue
-        row = PackingItem(
-            shipment_id=sh.id,
-            equip_no=it.get("equip_no"),
-            part_item_no=it["part_item_no"],
-            part_name=it.get("part_name"),
-            qty=it.get("qty") or 1,
-            package_no=it.get("package_no"),
-            weight=it.get("weight"),
-            size=it.get("size"),
-            disassembled=bool(it.get("disassembled")),
-            photos=it.get("photos") or [],
-            remark=it.get("remark"),
-        )
-        session.add(row)
-        rows.append(row)
-    sh.status = SHIP_PACKING
+        key = (it.get("equip_no"), it["ref"])
+        row = existing.get(key)
+        if row is None:
+            row = ShipmentItem(
+                shipment_id=sh.id, equip_no=it.get("equip_no"), ref=it["ref"],
+                parent_ref=it.get("parent_ref"), name=it.get("name"), kind=it.get("kind", "零件"),
+                qty=it.get("qty") or 1, unit=it.get("unit"), source=it.get("source", "结构"),
+            )
+            session.add(row)
+            rows.append(row)
     session.flush()
+    if sh.status == SHIP_INSTRUCTED:
+        sh.status = SHIP_SHIPPING
     return rows
+
+
+def mark_shipped(
+    session: Session,
+    sh: Shipment,
+    *,
+    actor_id: int,
+    item_ids: list[int],
+    photos: list | None = None,
+) -> int:
+    """勾选「已发」：大组件勾上 = 子树全部标记已发；可拍照。"""
+    if sh.status not in (SHIP_INSTRUCTED, SHIP_SHIPPING):
+        raise ShippingError(f"当前状态「{sh.status}」，不能再勾选发货")
+    items = session.scalars(select(ShipmentItem).where(ShipmentItem.shipment_id == sh.id)).all()
+    by_id = {i.id: i for i in items}
+    # 勾组件 → 子树全部勾上
+    children_map: dict[str | None, list[ShipmentItem]] = {}
+    for i in items:
+        children_map.setdefault(i.parent_ref, []).append(i)
+    to_mark: list[ShipmentItem] = []
+    stack = [by_id[i] for i in item_ids if i in by_id]
+    while stack:
+        cur = stack.pop()
+        if cur.shipped:
+            continue
+        cur.shipped = True
+        cur.shipped_at = _now()
+        cur.shipped_by = actor_id
+        if photos:
+            cur.photos = list(cur.photos or []) + list(photos)
+        to_mark.append(cur)
+        stack.extend(children_map.get(cur.ref, []))
+    n = len(to_mark)
+    if any(i.status in (SHIP_INSTRUCTED,) for i in [sh]):
+        sh.status = SHIP_SHIPPING
+    return n
+
+
+def add_manual_item(
+    session: Session,
+    sh: Shipment,
+    *,
+    actor_id: int,
+    equip_no: str | None,
+    name: str,
+    qty: float,
+    remark: str | None = None,
+) -> ShipmentItem:
+    """结构外补充项：说明书 / 备件 / 工具等。"""
+    if sh.status not in (SHIP_INSTRUCTED, SHIP_SHIPPING):
+        raise ShippingError(f"当前状态「{sh.status}」，不能再补清单")
+    row = ShipmentItem(
+        shipment_id=sh.id,
+        equip_no=equip_no or (sh.lines[0].equip_no if sh.lines else None),
+        ref=f"补-{name}"[:48],
+        name=name,
+        kind="补充",
+        qty=qty or 1,
+        source="补充",
+    )
+    session.add(row)
+    session.flush()
+    return row
 
 
 def load(
@@ -185,7 +309,7 @@ def load(
     photos: list | None,
     remark: str | None = None,
 ) -> Shipment:
-    if sh.status not in (SHIP_INSTRUCTED, SHIP_PACKING, SHIP_LOADED):
+    if sh.status not in (SHIP_INSTRUCTED, SHIP_SHIPPING, SHIP_LOADED):
         raise ShippingError(f"当前状态「{sh.status}」，不能装车")
     if not photos:
         raise ShippingError("装车要拍照")
@@ -207,7 +331,7 @@ def depart(
     photos: list | None = None,
     remark: str | None = None,
 ) -> Shipment:
-    if sh.status not in (SHIP_LOADED, SHIP_PACKING):
+    if sh.status not in (SHIP_LOADED, SHIP_SHIPPING):
         raise ShippingError(f"当前状态「{sh.status}」，不能发运（先装车）")
     sh.status = SHIP_TRANSIT
     sh.depart_at = _now()
@@ -241,41 +365,81 @@ def site_receipt(
     sh: Shipment,
     *,
     actor_id: int,
-    result: str,
-    shortage_detail: list | None,
+    checks: list[dict],
     photos: list | None,
     remark: str | None = None,
 ) -> SiteReceipt:
-    if sh.status not in (SHIP_ARRIVED, SHIP_TRANSIT):
-        raise ShippingError(f"当前状态「{sh.status}」，不能做现场到货验收")
+    """现场清点：按发运清单逐行勾「到 / 缺 / 损」，全部清点完才能提交。
+
+    结论自动判定：全部「到」= 齐；有「缺」= 缺件；有「损」= 破损。
+    """
+    if sh.status not in (SHIP_TRANSIT, SHIP_ARRIVED):
+        raise ShippingError(f"当前状态「{sh.status}」，不能做现场清点")
     if not photos:
-        raise ShippingError("到货验收要拍照")
-    row = SiteReceipt(
+        raise ShippingError("现场清点要拍照")
+    items = session.scalars(
+        select(ShipmentItem).where(ShipmentItem.shipment_id == sh.id)
+    ).all()
+    if not items:
+        raise ShippingError("这批没有发运清单（先回系统生成/勾选发运项）")
+    unchecked = [i for i in items if i.id not in {c.get("item_id") for c in checks}]
+    if unchecked:
+        raise ShippingError(f"还有 {len(unchecked)} 项没清点：{unchecked[0].ref} 等")
+    shortage: list[dict] = []
+    damaged: list[dict] = []
+    by_id = {i.id: i for i in items}
+    for ck in checks:
+        row = by_id.get(ck.get("item_id"))
+        if row is None:
+            continue
+        result = ck.get("result")
+        if result not in ("到", "缺", "损"):
+            raise ShippingError("清点结果只能是 到 / 缺 / 损")
+        row.check_result = result
+        row.check_qty = float(ck.get("received_qty")) if ck.get("received_qty") is not None else None
+        row.check_note = ck.get("reason")
+        row.check_by = actor_id
+        row.check_at = _now()
+        if result in ("缺", "损"):
+            shortage.append({
+                "item_id": row.id, "equip_no": row.equip_no, "item": row.ref,
+                "name": row.name, "qty": float(row.qty or 0),
+                "received_qty": ck.get("received_qty"), "result": result,
+                "reason": ck.get("reason") or "",
+            })
+            if result == "缺":
+                damaged.append({"item": row.ref, "result": "缺"})
+    result_overall = "齐"
+    if any(s["result"] == "缺" for s in shortage):
+        result_overall = "缺件"
+    elif any(s["result"] == "损" for s in shortage):
+        result_overall = "破损"
+    row_sr = SiteReceipt(
         shipment_id=sh.id,
         project_no=sh.project_no,
         received_by=actor_id,
         received_at=_now(),
-        result=result,
-        shortage_detail=shortage_detail or [],
+        result=result_overall,
+        shortage_detail=shortage or [],
         photos=list(photos or []),
         remark=remark,
     )
-    session.add(row)
+    session.add(row_sr)
     sh.status = SHIP_SIGNED
     sh.signed_at = _now()
-    if result != "齐":
+    if result_overall != "齐":
         notify.notify(
             session,
             project_team_ids(session, sh.project_no),
             type_="ship",
-            title=f"现场到货{result}：{sh.project_no}（{sh.shipment_no}）",
-            body=f"验收结论：{result}。备注：{remark or '—'}",
+            title=f"现场清点{result_overall}：{sh.project_no}（{sh.shipment_no}）",
+            body=f"缺/损 {len(shortage)} 项；备注：{remark or '—'}",
             link="/shipping",
             biz_type="shipment",
             biz_id=sh.id,
             actor_id=actor_id,
         )
-    return row
+    return row_sr
 
 
 def shipment_dict(session: Session, sh: Shipment) -> dict:
@@ -283,7 +447,7 @@ def shipment_dict(session: Session, sh: Shipment) -> dict:
         select(ShipmentLine).where(ShipmentLine.shipment_id == sh.id).order_by(ShipmentLine.id)
     ).all()
     packing = session.scalars(
-        select(PackingItem).where(PackingItem.shipment_id == sh.id).order_by(PackingItem.id)
+        select(ShipmentItem).where(ShipmentItem.shipment_id == sh.id).order_by(ShipmentItem.id)
     ).all()
     receipts = session.scalars(
         select(SiteReceipt).where(SiteReceipt.shipment_id == sh.id).order_by(SiteReceipt.id)
@@ -307,18 +471,24 @@ def shipment_dict(session: Session, sh: Shipment) -> dict:
             {"id": l.id, "equip_no": l.equip_no, "equip_name": l.equip_name, "qty": float(l.qty or 0), "remark": l.remark}
             for l in lines
         ],
-        "packing": [
+        "items": [
             {
                 "id": p.id,
                 "equip_no": p.equip_no,
-                "part_item_no": p.part_item_no,
-                "part_name": p.part_name,
+                "ref": p.ref,
+                "parent_ref": p.parent_ref,
+                "name": p.name,
+                "kind": p.kind,
+                "source": p.source,
                 "qty": float(p.qty or 0),
-                "package_no": p.package_no,
-                "weight": float(p.weight) if p.weight is not None else None,
-                "size": p.size,
-                "disassembled": p.disassembled,
+                "unit": p.unit,
+                "shipped": p.shipped,
+                "shipped_at": p.shipped_at,
                 "photos": p.photos or [],
+                "place_photos": p.place_photos or [],
+                "check_result": p.check_result,
+                "check_qty": float(p.check_qty) if p.check_qty is not None else None,
+                "check_note": p.check_note,
                 "remark": p.remark,
             }
             for p in packing

@@ -2511,17 +2511,23 @@ export interface ToShipRow {
   in_open_shipment: boolean
 }
 
-export interface PackingItemRow {
+export interface ShipmentItemRow {
   id: number
-  equip_no?: string | null
-  part_item_no: string
-  part_name?: string | null
+  equip_no: string
+  ref: string
+  parent_ref?: string | null
+  name?: string | null
+  kind: string
+  source: string
   qty: number
-  package_no?: string | null
-  weight?: number | null
-  size?: string | null
-  disassembled: boolean
+  unit?: string | null
+  shipped: boolean
+  shipped_at?: string | null
   photos: string[]
+  place_photos: string[]
+  check_result?: string | null
+  check_qty?: number | null
+  check_note?: string | null
   remark?: string | null
 }
 
@@ -2536,7 +2542,7 @@ export interface ShipmentLineRow {
 export interface SiteReceiptRow {
   id: number
   result: string
-  shortage_detail: { equip_no?: string; item?: string; qty?: number; reason?: string }[]
+  shortage_detail: { item_id?: number; equip_no?: string; item?: string; name?: string; qty?: number; received_qty?: number; result?: string; reason?: string }[]
   photos: string[]
   received_at?: string | null
   remark?: string | null
@@ -2558,7 +2564,7 @@ export interface ShipmentRow {
   photos: string[]
   remark?: string | null
   lines: ShipmentLineRow[]
-  packing: PackingItemRow[]
+  items: ShipmentItemRow[]
   receipts: SiteReceiptRow[]
 }
 
@@ -2590,22 +2596,26 @@ export async function shippingWorkbench(projectNo?: string) {
   return data
 }
 
-export async function packShipment(
-  id: number,
-  items: {
-    equip_no?: string
-    part_item_no: string
-    part_name?: string
-    qty: number
-    package_no?: string
-    weight?: number
-    size?: string
-    disassembled?: boolean
-    photos?: string[]
-    remark?: string
-  }[],
+export async function generateShipItems(shipId: number) {
+  const { data } = await api.post<ShipmentRow>(`/shipping/${shipId}/items/generate`)
+  return data
+}
+
+export async function addManualShipItem(
+  shipId: number,
+  body: { equip_no?: string; name: string; qty: number; remark?: string },
 ) {
-  const { data } = await api.post<ShipmentRow>(`/shipping/${id}/pack`, { items })
+  const { data } = await api.post<{ id: number }>(`/shipping/${shipId}/items/manual`, body)
+  return data
+}
+
+export async function markShipItems(itemIds: number[], photos: string[] = []) {
+  const { data } = await api.post<{ marked: number }>(`/shipping/items/ship`, { item_ids: itemIds, photos })
+  return data
+}
+
+export async function setItemPlacePhotos(itemId: number, photos: string[]) {
+  const { data } = await api.post(`/shipping/items/${itemId}/place`, { place_photos: photos })
   return data
 }
 
@@ -2633,8 +2643,7 @@ export async function arriveShipment(id: number) {
 export async function receiptShipment(
   id: number,
   body: {
-    result: string
-    shortage_detail?: { equip_no?: string; item?: string; qty?: number; reason?: string }[]
+    checks: { item_id: number; result: string; received_qty?: number; reason?: string }[]
     photos: string[]
     remark?: string
   },

@@ -16,7 +16,7 @@ from sqlalchemy.orm import Session
 from app.api.deps import client_ip, get_current_user, has_permission, require_permission
 from app.core.db import get_session
 from app.models.platform import User
-from app.models.shipment import RECEIPT_RESULTS, Shipment
+from app.models.shipment import Shipment, ShipmentItem
 from app.services import audit
 from app.services import shipping as shp
 from app.services.shipping import SHIP_OPEN
@@ -29,6 +29,15 @@ router = APIRouter(prefix="/shipping", tags=["发运"])
 # --------------------------------------------------------------------------
 
 
+def _can_receive(current: User = Depends(get_current_user)) -> User:
+    """现场到货验收：交付发运（ship:edit）或现场（site:edit）都能做。"""
+    if not (has_permission(current, "ship:edit") or has_permission(current, "site:edit")):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "没有权限：ship:edit / site:edit")
+    return current
+
+
+
+
 @router.post("/photos", status_code=status.HTTP_201_CREATED)
 async def upload_photos(
     request: Request,
@@ -36,8 +45,9 @@ async def upload_photos(
     ref: str | None = Query(default=None),
     files: list[UploadFile] = File(...),
     session: Session = Depends(get_session),
-    current: User = Depends(require_permission("ship:edit")),
+    current: User = Depends(_can_receive),
 ):
+    """发货/清点拍照：交付（ship:edit）或现场（site:edit）都可上传。"""
     from app.services.photos import save_photos
 
     out = await save_photos(files, project_no=project_no, area="shipping", ref=ref)
@@ -166,45 +176,131 @@ def get_shipment(
 # --------------------------------------------------------------------------
 
 
-class PackingItemIn(BaseModel):
+class ItemSaveIn(BaseModel):
     equip_no: str | None = None
-    part_item_no: str
-    part_name: str | None = None
+    ref: str
+    parent_ref: str | None = None
+    name: str | None = None
+    kind: str = "零件"
+    source: str = "结构"
     qty: float = 1
-    package_no: str | None = None
-    weight: float | None = None
-    size: str | None = None
-    disassembled: bool = False
-    photos: list = Field(default_factory=list)
-    remark: str | None = None
+    unit: str | None = None
 
 
-class PackIn(BaseModel):
-    items: list[PackingItemIn]
-
-
-@router.post("/{ship_id}/pack")
-def pack(
+@router.get("/{ship_id}/items")
+def list_items(
     ship_id: int,
-    body: PackIn,
+    session: Session = Depends(get_session),
+    _: User = Depends(get_current_user),
+):
+    sh = session.get(Shipment, ship_id)
+    if sh is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "发运批次不存在")
+    return shp.shipment_dict(session, sh).get("items", [])
+
+
+@router.post("/{ship_id}/items/generate", status_code=status.HTTP_201_CREATED)
+def generate_items(
+    ship_id: int,
     request: Request,
     session: Session = Depends(get_session),
     current: User = Depends(require_permission("ship:edit")),
 ):
-    """登记装箱清单（打包含拆解，不拆成两个流程）。"""
+    """按设备结构生成本批发运清单（组件→零件→标准件/原材料）。"""
     sh = session.get(Shipment, ship_id)
     if sh is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "发运批次不存在")
     try:
-        rows = shp.add_packing(session, sh, [i.model_dump() for i in body.items], actor_id=current.id)
+        rows = shp.sync_items(session, sh, shp.generate_items(session, sh), actor_id=current.id)
     except shp.ShippingError as e:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, str(e)) from e
     audit.log(
-        session, user=current, action="ship_pack", object_type="shipment", object_ref=sh.shipment_no,
-        summary=f"装箱 {sh.shipment_no}：{len(rows)} 箱/件", ip=client_ip(request),
+        session, user=current, action="ship_items_generate", object_type="shipment",
+        object_ref=sh.shipment_no, summary=f"按结构生成发运清单 {sh.shipment_no}：{len(rows)} 行",
+        ip=client_ip(request),
     )
     session.commit()
     return shp.shipment_dict(session, sh)
+
+
+class ManualItemIn(BaseModel):
+    equip_no: str | None = None
+    name: str
+    qty: float = 1
+    remark: str | None = None
+
+
+@router.post("/{ship_id}/items/manual", status_code=status.HTTP_201_CREATED)
+def add_manual_item(
+    ship_id: int,
+    body: ManualItemIn,
+    request: Request,
+    session: Session = Depends(get_session),
+    current: User = Depends(require_permission("ship:edit")),
+):
+    """结构外补充项：说明书 / 备件 / 随机工具等。"""
+    sh = session.get(Shipment, ship_id)
+    if sh is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "发运批次不存在")
+    try:
+        row = shp.add_manual_item(session, sh, actor_id=current.id,
+                                  equip_no=body.equip_no, name=body.name,
+                                  qty=body.qty, remark=body.remark)
+    except shp.ShippingError as e:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, str(e)) from e
+    audit.log(session, user=current, action="ship_item_manual", object_type="shipment",
+              object_ref=sh.shipment_no, summary=f"补充发运项：{body.name} ×{body.qty}",
+              ip=client_ip(request))
+    session.commit()
+    return {"id": row.id}
+
+
+class ShipItemsIn(BaseModel):
+    item_ids: list[int]
+    photos: list = Field(default_factory=list)
+
+
+@router.post("/items/ship")
+def mark_items_shipped(
+    body: ShipItemsIn,
+    request: Request,
+    session: Session = Depends(get_session),
+    current: User = Depends(require_permission("ship:edit")),
+):
+    """勾选「已发」：可勾组件（子树全勾）；可拍照。"""
+    n = 0
+    items = session.scalars(select(ShipmentItem).where(ShipmentItem.id.in_(body.item_ids))).all()
+    sh_ids = {i.shipment_id for i in items}
+    for sid in sh_ids:
+        sh = session.get(Shipment, sid)
+        n += shp.mark_shipped(session, sh, actor_id=current.id, item_ids=body.item_ids, photos=body.photos)
+    audit.log(session, user=current, action="ship_mark", object_type="shipment",
+              summary=f"标记已发 {n} 项", ip=client_ip(request))
+    session.commit()
+    return {"marked": n}
+
+
+class PlacePhotoIn(BaseModel):
+    place_photos: list = Field(default_factory=list)
+
+
+@router.post("/items/{item_id}/place")
+def set_place_photos(
+    item_id: int,
+    body: PlacePhotoIn,
+    request: Request,
+    session: Session = Depends(get_session),
+    current: User = Depends(require_permission("ship:edit")),
+):
+    """记录摆放位置照片（可后补）。"""
+    it = session.get(ShipmentItem, item_id)
+    if it is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "发运项不存在")
+    it.place_photos = list(it.place_photos or []) + list(body.place_photos)
+    audit.log(session, user=current, action="ship_place", object_type="shipment_item",
+              object_ref=str(item_id), summary="登记摆放位置照片", ip=client_ip(request))
+    session.commit()
+    return {"ok": True}
 
 
 class LoadIn(BaseModel):
@@ -293,18 +389,17 @@ def arrive(
     return shp.shipment_dict(session, sh)
 
 
+class ReceiptCheckIn(BaseModel):
+    item_id: int
+    result: str = Field(..., description="到 / 缺 / 损")
+    received_qty: float | None = None
+    reason: str | None = None
+
+
 class ReceiptIn(BaseModel):
-    result: str = Field(..., description="齐 / 缺件 / 破损")
-    shortage_detail: list = Field(default_factory=list)
+    checks: list[ReceiptCheckIn]
     photos: list = Field(default_factory=list)
     remark: str | None = None
-
-
-def _can_receive(current: User = Depends(get_current_user)) -> User:
-    """现场到货验收：交付发运（ship:edit）或现场（site:edit）都能做。"""
-    if not (has_permission(current, "ship:edit") or has_permission(current, "site:edit")):
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "没有权限：ship:edit / site:edit")
-    return current
 
 
 @router.post("/{ship_id}/receipt")
@@ -315,24 +410,27 @@ def receipt(
     session: Session = Depends(get_session),
     current: User = Depends(_can_receive),
 ):
-    """现场到货验收（与发货指令 / 装箱清单对账）。"""
+    """现场清点：按发运清单逐项勾「到 / 缺 / 损」，结论系统自动判定（齐/缺件/破损）。"""
     sh = session.get(Shipment, ship_id)
     if sh is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "发运批次不存在")
-    if body.result not in RECEIPT_RESULTS:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "验收结论只能是 齐 / 缺件 / 破损")
-    if body.result != "齐" and not body.shortage_detail:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "缺件/破损必须写明明细（缺什么、多少、原因）")
+    item_count = len(shp.shipment_dict(session, sh)["items"])
+    if item_count and len(body.checks) != item_count:
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            f"发运清单共 {item_count} 项，必须逐项清点（当前 {len(body.checks)} 项）",
+        )
     try:
         shp.site_receipt(
-            session, sh, actor_id=current.id, result=body.result,
-            shortage_detail=body.shortage_detail, photos=body.photos, remark=body.remark,
+            session, sh, actor_id=current.id,
+            checks=[c.model_dump() for c in body.checks],
+            photos=body.photos, remark=body.remark,
         )
     except shp.ShippingError as e:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, str(e)) from e
     audit.log(
         session, user=current, action="site_receipt", object_type="shipment", object_ref=sh.shipment_no,
-        summary=f"现场到货验收 {sh.shipment_no}：{body.result}", ip=client_ip(request),
+        summary=f"现场清点 {sh.shipment_no}：{len(body.checks)} 项清点完成", ip=client_ip(request),
     )
     session.commit()
     return shp.shipment_dict(session, sh)

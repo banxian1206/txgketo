@@ -375,39 +375,60 @@ def main() -> None:
     STAGES.append(("S6 装配", f"01A 齐套 {round(rate_a*100)}% → 整机装配/调试合格；02A 组件预装开工"))
 
     # ================= S7 发运（两批 + 重复拦截 + 缺件签收） =================
-    stage("S7 发运（pm1 指令 / delivery1 执行 / site1 验收）：第一批 01A，第二批 02A 缺件")
+    stage("S7 发运（pm1 指令 / delivery1 执行 / site1 清点）：第一批 01A 齐；第二批 02A 缺件")
     sh1 = req("post", "/api/v1/shipping/instructions", "pm1", (201,),
               json={"project_no": p, "equip_nos": [A], "remark": "第一批：先发主机"})
     r = c.post("/api/v1/shipping/instructions", headers=login("pm1"),
                json={"project_no": p, "equip_nos": [A]})
     flag("S7", r.status_code == 400, "01A 已在未完成批次，重复下单应被拦")
+    # 按结构生成发运清单
+    req("post", f"/api/v1/shipping/{sh1['id']}/items/generate", "pm1", (201,))
+    sh1 = next(x for x in req("get", "/api/v1/shipping/list", "pm1", params={"project_no": p}) if x["id"] == sh1["id"])
+    flag("S7", len(sh1["items"]) >= 3, f"01A 发运清单应按结构生成 ≥3 项（含组件），实际 {len(sh1['items'])}")
+    # 逐项勾「已发」（模拟散件发出，部分带拍照）
+    all_ids = [i["id"] for i in sh1["items"]]
     sph = photos("pm1", "shipping", p, sh1["shipment_no"])
-    req("post", f"/api/v1/shipping/{sh1['id']}/pack", "delivery1",
-        json={"items": [{"equip_no": A, "part_item_no": frame_no, "part_name": "机架", "qty": 1,
-                         "package_no": "A-P1", "weight": 320, "size": "2400x1200x900", "disassembled": True}]})
+    req("post", "/api/v1/shipping/items/ship", "delivery1", json={"item_ids": all_ids, "photos": sph[:1]})
+    sh1 = next(x for x in req("get", "/api/v1/shipping/list", "pm1", params={"project_no": p}) if x["id"] == sh1["id"])
+    flag("S7", all(i["shipped"] for i in sh1["items"]), "勾选后所有项应标记已发")
+    # 装车（拍照）→ 发运 → 到货
     req("post", f"/api/v1/shipping/{sh1['id']}/load", "delivery1",
         json={"plate_no": "粤B88888", "driver": "张师傅", "photos": sph[:1]})
     req("post", f"/api/v1/shipping/{sh1['id']}/depart", "delivery1", json={})
+    pj = req("get", f"/api/v1/projects/{p}", "pm1")
+    flag("S7", pj["stage"] == "交付中", f"发运后项目阶段应「交付中」，实际 {pj['stage']}")
     req("post", f"/api/v1/shipping/{sh1['id']}/arrive", "delivery1")
+    # 现场清点：全部「到」
+    checks1 = [{"item_id": i["id"], "result": "到"} for i in sh1["items"]]
+    sph2 = photos("site1", "shipping", p, sh1["shipment_no"])
     sh1now = req("post", f"/api/v1/shipping/{sh1['id']}/receipt", "site1",
-                 json={"result": "齐", "photos": sph[:1]})
-    flag("S7", sh1now["status"] == "已签收", "第一批应齐且签收")
+                 json={"checks": checks1, "photos": sph2[:1]})
+    flag("S7", sh1now["status"] == "已签收" and sh1now["receipts"][-1]["result"] == "齐", "第一批应齐且签收")
 
+    # 第二批：02A —— 漏发一项，现场清点时必须逐项暴露
     sh2 = req("post", "/api/v1/shipping/instructions", "pm1", (201,),
               json={"project_no": p, "equip_nos": ["02A"], "remark": "第二批：线体分段"})
-    req("post", f"/api/v1/shipping/{sh2['id']}/pack", "delivery1",
-        json={"items": [{"equip_no": "02A", "part_item_no": d2_body["drawing_no"], "part_name": "输送段", "qty": 3,
-                         "package_no": "B-P1", "disassembled": True}]})
+    req("post", f"/api/v1/shipping/{sh2['id']}/items/generate", "pm1", (201,))
+    sh2 = next(x for x in req("get", "/api/v1/shipping/list", "pm1", params={"project_no": p}) if x["id"] == sh2["id"])
+    ship_ids = [i["id"] for i in sh2["items"]][:-1]  # 故意漏发最后一项
+    req("post", "/api/v1/shipping/items/ship", "delivery1", json={"item_ids": ship_ids})
     req("post", f"/api/v1/shipping/{sh2['id']}/load", "delivery1",
-        json={"plate_no": "粤B66666", "photos": sph[:1]})
+        json={"plate_no": "粤B66666", "photos": photos("pm1", "shipping", p, sh2["shipment_no"])})
     req("post", f"/api/v1/shipping/{sh2['id']}/depart", "delivery1", json={})
     req("post", f"/api/v1/shipping/{sh2['id']}/arrive", "delivery1")
+    # 现场清点：漏发的项勾「缺」，必须写原因；未清点的项会被系统拦截
+    r = c.post(f"/api/v1/shipping/{sh2['id']}/receipt", headers=login("site1"),
+               json={"checks": [{"item_id": i["id"], "result": "到"} for i in sh2["items"][:-1]],
+                     "photos": photos("site1", "shipping", p, sh2["shipment_no"])})
+    flag("S7", r.status_code == 400, f"漏项清点应被拦截（400），实际 {r.status_code}")
+    checks2 = [{"item_id": i["id"], "result": "到"} for i in sh2["items"][:-1]]
+    checks2.append({"item_id": sh2["items"][-1]["id"], "result": "缺", "received_qty": 0, "reason": "漏装，补发"})
+    sph3 = photos("site1", "shipping", p, sh2["shipment_no"])
     sh2now = req("post", f"/api/v1/shipping/{sh2['id']}/receipt", "site1",
-                 json={"result": "缺件", "shortage_detail": [{"equip_no": "02A", "item": "滚筒", "qty": 2, "reason": "运输丢失"}],
-                       "photos": sph[:1], "remark": "少 2 根滚筒，已通知补发"})
-    flag("S7", sh2now["status"] == "已签收" and sh2now["receipts"][-1]["result"] == "缺件", "第二批应缺件签收并留明细")
-    print(f"  {sh1['shipment_no']} 齐签收；{sh2['shipment_no']} 缺件签收（留明细）；分批发运 ✓")
-    STAGES.append(("S7 发运", "两批发运（01A 齐 / 02A 缺件留明细）；重复发货指令被拦；阶段→交付中"))
+                 json={"checks": checks2, "photos": sph3, "remark": "少 1 项，已通知补发"})
+    flag("S7", sh2now["status"] == "已签收" and sh2now["receipts"][-1]["result"] == "缺件", "缺件应签收并留明细")
+    print(f"  {sh1['shipment_no']} 齐签收（{len(checks1)} 项全到）；{sh2['shipment_no']} 缺件签收（漏项被系统拦住补勾）；分批发运 ✓")
+    STAGES.append(("S7 发运", "两批发运：清单按结构生成、逐项勾「已发」+拍照；漏项清点被系统拦；第二批缺件签收留明细；阶段→交付中"))
 
     # ================= S8 现场安装 + ECN 变更联动 =================
     stage("S8 现场安装（site1）：勘测/日报/问题→ECN/申请调试")

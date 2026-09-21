@@ -16,12 +16,12 @@ from app.models.base import Base, TimestampMixin
 
 # 发货指令 / 发运状态（02 卷 §8）
 SHIP_INSTRUCTED = "已指令"
-SHIP_PACKING = "打包中"
+SHIP_SHIPPING = "发货中"
 SHIP_LOADED = "已装车"
 SHIP_TRANSIT = "在途"
 SHIP_ARRIVED = "已到货"
 SHIP_SIGNED = "已签收"
-SHIP_STATUS = (SHIP_INSTRUCTED, SHIP_PACKING, SHIP_LOADED, SHIP_TRANSIT, SHIP_ARRIVED, SHIP_SIGNED)
+SHIP_STATUS = (SHIP_INSTRUCTED, SHIP_SHIPPING, SHIP_LOADED, SHIP_TRANSIT, SHIP_ARRIVED, SHIP_SIGNED)
 
 # 现场到货验收结论
 RECEIPT_OK = "齐"
@@ -65,22 +65,39 @@ class ShipmentLine(Base, TimestampMixin):
     remark: Mapped[str | None] = mapped_column(String(255))
 
 
-class PackingItem(Base, TimestampMixin):
-    """装箱清单：打包含拆解，不拆成两个流程。"""
+class ShipmentItem(Base, TimestampMixin):
+    """发运清单行：按设备结构生成（组件/零件/标准件/原材料），散件发运、逐项勾选。
 
-    __tablename__ = "packing_list"
+    ★ 没有装箱动作：散件发过去，逐项标「发了没发」+ 拍照；最后拍一张照片记录摆放位置。
+      勾大组件 = 整棵子树都发了。结构外的东西（说明书/备件/工具）手动补充（source=补充）。
+    """
+
+    __tablename__ = "shipment_item"
 
     id: Mapped[int] = mapped_column(primary_key=True)
     shipment_id: Mapped[int] = mapped_column(ForeignKey("shipment.id", ondelete="CASCADE"))
-    equip_no: Mapped[str | None] = mapped_column(String(16))
-    part_item_no: Mapped[str] = mapped_column(String(48))  # 零件/物料号
-    part_name: Mapped[str | None] = mapped_column(String(128))
+    equip_no: Mapped[str] = mapped_column(String(16))
+    # 树结构
+    ref: Mapped[str] = mapped_column(String(48))  # 图号 / 物料号
+    parent_ref: Mapped[str | None] = mapped_column(String(48))  # 父级图号（组件树）
+    name: Mapped[str | None] = mapped_column(String(128))
+    kind: Mapped[str] = mapped_column(String(16), default="零件", server_default="零件")
+    # 组件 / 零件 / 标准件 / 原材料 / 补充
     qty: Mapped[float] = mapped_column(Numeric(12, 2), default=1, server_default="1")
-    package_no: Mapped[str | None] = mapped_column(String(32))  # 箱号
-    weight: Mapped[float | None] = mapped_column(Numeric(12, 2))  # kg
-    size: Mapped[str | None] = mapped_column(String(48))  # 长×宽×高 mm
-    disassembled: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
-    photos: Mapped[list | None] = mapped_column(JSONB)
+    unit: Mapped[str | None] = mapped_column(String(16))
+    source: Mapped[str] = mapped_column(String(16), default="结构", server_default="结构")
+    # 发运勾选
+    shipped: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    shipped_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    shipped_by: Mapped[int | None] = mapped_column(ForeignKey("app_user.id"))
+    photos: Mapped[list | None] = mapped_column(JSONB)  # 发这个件的拍照
+    place_photos: Mapped[list | None] = mapped_column(JSONB)  # 摆放位置照片（可后补）
+    # 现场清点结果
+    check_result: Mapped[str | None] = mapped_column(String(8))  # 到 / 缺 / 损
+    check_qty: Mapped[float | None] = mapped_column(Numeric(12, 2))  # 实到数量
+    check_note: Mapped[str | None] = mapped_column(String(255))  # 缺/损原因
+    check_by: Mapped[int | None] = mapped_column(ForeignKey("app_user.id"))
+    check_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     remark: Mapped[str | None] = mapped_column(String(255))
 
 

@@ -277,19 +277,20 @@ def main() -> None:
         ships = c.get("/api/v1/shipping/list", headers=login("pm1"), params={"project_no": p}).json()
         sh = ships[0]
         sph = photos("pm1", "shipping", p, sh["shipment_no"])
-        call("post", f"/api/v1/shipping/{sh['id']}/pack", who="delivery1", ok=(200,),
-             label="装箱清单（含拆解）",
-             json={"items": [
-                 {"equip_no": "01A", "part_item_no": dr_frame["drawing_no"], "part_name": "机架", "qty": 1,
-                  "package_no": "P1", "weight": 320, "size": "2400x1200x900", "disassembled": True},
-                 {"equip_no": "01A", "part_item_no": it2["item_no"], "part_name": "标准件包", "qty": 4, "package_no": "P2"},
-             ]})
+        call("post", f"/api/v1/shipping/{sh['id']}/items/generate", who="pm1", ok=(201,),
+             label="按结构生成发运清单")
+        sh = next(x for x in c.get("/api/v1/shipping/list", headers=login("pm1"), params={"project_no": p}).json()
+                  if x["id"] == sh["id"])
+        all_ids = [i["id"] for i in sh["items"]]
+        call("post", "/api/v1/shipping/items/ship", who="delivery1", ok=(200,),
+             label=f"逐项勾「已发」（{len(all_ids)} 项，含拍照）", json={"item_ids": all_ids, "photos": sph[:1]})
         call("post", f"/api/v1/shipping/{sh['id']}/load", who="delivery1", ok=(200,),
              label="装车（拍照）", json={"vehicle": "17.5 米平板", "plate_no": "粤B88888", "driver": "张师傅 137...", "photos": sph[:1]})
         call("post", f"/api/v1/shipping/{sh['id']}/depart", who="delivery1", ok=(200,), label="发运（在途）", json={})
         call("post", f"/api/v1/shipping/{sh['id']}/arrive", who="delivery1", ok=(200,), label="登记到货")
+        checks = [{"item_id": i["id"], "result": "到"} for i in sh["items"]]
         call("post", f"/api/v1/shipping/{sh['id']}/receipt", who="site1", ok=(200,),
-             label="现场到货验收：齐（与装箱清单对账）", json={"result": "齐", "photos": sph[:1]})
+             label="现场按发运清单清点：齐", json={"checks": checks, "photos": sph[:1]})
 
         # ---------- S8 现场安装 ----------
         call("post", f"/api/v1/site/incoming/{direct_receipt_id}/accept", who="site1", ok=(200,),

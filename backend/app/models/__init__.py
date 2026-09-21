@@ -3,7 +3,7 @@
 from app.models.base import Base
 from app.models.engineering import BomItem, Drawing, DrawingVersion
 from app.models.assembly import AssemblyRecord, KittingSnapshot
-from app.models.shipment import PackingItem, Shipment, ShipmentLine, SiteReceipt
+from app.models.shipment import Shipment, ShipmentItem, ShipmentLine, SiteReceipt
 from app.models.site import SiteCommission, SiteDaily, SiteIncoming, SiteIssue, SiteSurvey
 from app.models.acceptance import Acceptance, AcceptanceDocument
 from app.models.service import ServiceOrder, SparePart, SparePartMove
@@ -93,7 +93,7 @@ __all__ = [
     "NumberRule",
     "NumberSeq",
     "OutsourceTask",
-    "PackingItem",
+    "ShipmentItem",
     "Shipment",
     "ShipmentLine",
     "SiteReceipt",
