@@ -25,6 +25,7 @@ from app.models.production import PROD_DISPATCHED, PROD_DONE, PROD_RUNNING, PROD
 from app.models.project import Equipment, Project
 from app.models.review import TICKET_PENDING_DIRECTOR, TICKET_PENDING_LEAD, ReviewTicket
 from app.models.shipment import Shipment
+from app.models.site import SiteCommission, SiteIssue
 from app.models.task import Task
 from app.models.warehouse import MaterialIssue
 from app.services.notify import unread_count
@@ -106,6 +107,12 @@ def mobile_home(session: Session = Depends(get_session), current: User = Depends
         session,
         select(func.count()).select_from(Shipment).where(Shipment.status.in_(("在途", "已到货"))),
     )
+    site_open_issues = _count(
+        session, select(func.count()).select_from(SiteIssue).where(SiteIssue.status == "待处理")
+    )
+    site_to_dispatch = _count(
+        session, select(func.count()).select_from(SiteCommission).where(SiteCommission.status == "已申请")
+    )
 
     if current.position == POSITION_DIRECTOR:
         to_review = _count(
@@ -155,6 +162,8 @@ def mobile_home(session: Session = Depends(get_session), current: User = Depends
             "to_debug": to_debug,
             "shipments_open": shipments_open,
             "shipments_receive": shipments_receive,
+            "site_open_issues": site_open_issues,
+            "site_to_dispatch": site_to_dispatch,
         },
     }
 

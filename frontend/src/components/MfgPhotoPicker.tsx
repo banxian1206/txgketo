@@ -14,6 +14,7 @@ export default function MfgPhotoPicker({
   onChange,
   max = 6,
   label = '拍照（必须）',
+  allowVideo = false,
   upload = uploadMfgPhotos,
   photoUrl = mfgPhotoUrl,
 }: {
@@ -23,6 +24,7 @@ export default function MfgPhotoPicker({
   onChange: (tokens: string[]) => void
   max?: number
   label?: string
+  allowVideo?: boolean
   upload?: (projectNo: string, ref: string, files: File[]) => Promise<{ token: string }[]>
   photoUrl?: (token: string) => string
 }) {
@@ -33,7 +35,10 @@ export default function MfgPhotoPicker({
     setBusy(true)
     try {
       const compressed: File[] = []
-      for (const f of files.slice(0, max - value.length)) compressed.push(await compressImage(f))
+      for (const f of files.slice(0, max - value.length)) {
+        // 视频不压缩（直接传），图片压缩后再传
+        compressed.push(f.type.startsWith('video/') ? f : await compressImage(f))
+      }
       const rows = await upload(projectNo, refNo || 'misc', compressed)
       onChange([...value, ...rows.map((r) => r.token)])
     } catch (e) {
@@ -46,7 +51,7 @@ export default function MfgPhotoPicker({
   return (
     <Space direction="vertical" size={4}>
       <Upload
-        accept="image/*"
+        accept={allowVideo ? "image/*,video/*" : "image/*"}
         capture="environment"
         multiple
         showUploadList={false}

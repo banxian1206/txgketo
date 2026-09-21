@@ -979,7 +979,7 @@ def _recalc_request_status(session: Session, row: PurchaseRequest) -> str:
     gs = _request_receipts(session, row.id)
     stored = sum(float(g.qty or 0) for g in gs if g.status == "已入库")
     site = sum(float(g.qty or 0) for g in gs if g.status == "现场已验收")
-    pending = sum(float(g.qty or 0) for g in gs if g.status == "待入库")
+    pending = sum(float(g.qty or 0) for g in gs if g.status in ("待入库", "现场待验收"))
     row.qty_received = stored + site + pending  # 有效到货（不合格/退回的不算）
     qty = float(row.qty or 0)
     if any(g.status == "不合格" for g in gs):
@@ -1057,7 +1057,7 @@ def inspect_purchase_request(
     if body.result == "不合格":
         receipt_status = "不合格"
     elif to == "直发客户现场":
-        receipt_status = "现场已验收"  # 直发的由现场验收（现场模块以后接）
+        receipt_status = "现场待验收"  # 直发的由现场清点验收（S8 现场域）
     else:
         receipt_status = "待入库"
     receipt_no = next_number(session, "RECEIPT", scope_key=year_scope_key())
@@ -1095,6 +1095,7 @@ def inspect_purchase_request(
         object_ref=receipt_no,
         summary=f"到货验收 {receipt_no}（{row.item_no} × {body.qty:g}）：{body.result}"
         + ("，待入库" if receipt_status == "待入库" else "")
+        + ("，现场待验收" if receipt_status == "现场待验收" else "")
         + ("，现场已验收" if receipt_status == "现场已验收" else "")
         + ("，等采购协商" if body.result == "不合格" else "")
         + (f"，说明：{body.note}" if body.note else ""),
@@ -1125,8 +1126,22 @@ def inspect_purchase_request(
             biz_id=gr.id,
             actor_id=current.id,
         )
+    elif receipt_status == "现场待验收":
+        # 直发客户现场：先登记到货，等现场清点验收（S8）
+        project = session.get(Project, project_no)
+        if project is not None and project.pm_id:
+            notify.notify(
+                session,
+                [project.pm_id],
+                type_=notify.TYPE_WAREHOUSE,
+                title=f"直发现场已到货待清点：{row.item_no} × {body.qty:g}",
+                body=f"{project_no} {row.equip_no or ''}（{receipt_no}）—— 请现场清点验收",
+                link="/site",
+                biz_type="goods_receipt",
+                biz_id=gr.id,
+                actor_id=current.id,
+            )
     elif receipt_status == "现场已验收":
-        # 直发客户现场：由现场验收，提醒项目经理
         project = session.get(Project, project_no)
         if project is not None and project.pm_id:
             notify.notify(

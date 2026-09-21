@@ -23,6 +23,12 @@ const ALL_TABS: { key: string; label: string; icon: string; show: () => boolean 
     icon: '🚚',
     show: () => hasPerm('ship:edit') || hasPerm('site:edit'),
   },
+  {
+    key: '/m/site',
+    label: '现场',
+    icon: '🏗️',
+    show: () => hasPerm('site:edit') || hasPerm('project:edit'),
+  },
   { key: '/m/me', label: '我的', icon: '👤', show: () => true },
 ]
 
