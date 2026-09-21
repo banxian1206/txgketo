@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_current_user
 from app.core.db import get_session
 from app.models.change import CR_ACTIVE, CR_PENDING, ChangeRequest
+from app.models.assembly import AssemblyRecord
 from app.models.initiation import GoodsReceipt, Milestone, ProjectMember, PurchaseRequest
 from app.models.platform import POSITION_DIRECTOR, POSITION_LEAD, Org, User
 from app.models.production import PROD_DISPATCHED, PROD_DONE, PROD_RUNNING, PROD_WAIT, ProdOrder
@@ -472,6 +473,14 @@ def workbench_me(session: Session = Depends(get_session), current: User = Depend
         session,
         select(func.count()).select_from(ProdOrder).where(ProdOrder.status == PROD_DONE),
     ) if is_shop else 0
+    shop_assembling = _count(
+        session,
+        select(func.count()).select_from(AssemblyRecord).where(AssemblyRecord.status == "装配中"),
+    ) if is_shop else 0
+    shop_debug = _count(
+        session,
+        select(func.count()).select_from(AssemblyRecord).where(AssemblyRecord.status == "已装配"),
+    ) if is_shop else 0
     my_leads = _count(
         session,
         select(func.count())
@@ -534,6 +543,8 @@ def workbench_me(session: Session = Depends(get_session), current: User = Depend
             "shop_wait": shop_wait,
             "shop_accept": shop_accept,
             "shop_transfer": shop_transfer,
+            "shop_assembling": shop_assembling,
+            "shop_debug": shop_debug,
             "my_leads": my_leads,
             "my_projects": len(project_nos),
             "unread": notify.unread_count(session, current.id),

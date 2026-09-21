@@ -11,6 +11,7 @@ import {
   Input,
   InputNumber,
   Modal,
+  Progress,
   Row,
   Select,
   Space,
@@ -56,7 +57,9 @@ import {
   type ProjectDetail as Detail,
   type ProjectUpdate,
   hasPerm,
+  kittingOverview,
   registerPayment,
+  type KittingOverviewRow,
 } from '../api/client'
 
 const ATT_CATEGORIES = ['客户资料', '方案', '报价', '合同', '技术协议', '其他']
@@ -109,6 +112,7 @@ export default function ProjectDetailPage() {
   const [uploading, setUploading] = useState(false)
   const [active, setActive] = useState('basic')
   const [design, setDesign] = useState<DesignOverviewRow[]>([])
+  const [kitting, setKitting] = useState<KittingOverviewRow[]>([])
 
   // 成交登记 / 关闭订单 / 联系人
   const [dealOpen, setDealOpen] = useState(false)
@@ -146,6 +150,11 @@ export default function ProjectDetailPage() {
       setDesign(await getDesignOverview(projectNo))
     } catch {
       setDesign([])
+    }
+    try {
+      setKitting(await kittingOverview(projectNo))
+    } catch {
+      setKitting([])
     }
   }, [projectNo, message])
 
@@ -927,6 +936,56 @@ export default function ProjectDetailPage() {
                 />
                 <Typography.Paragraph type="secondary" style={{ fontSize: 12, margin: '8px 0 0' }}>
                   设计师也可以从左侧「我的任务」进入自己的设计任务；这里给项目经理看总体进度。
+                </Typography.Paragraph>
+              </Card>
+
+              <Card
+                id="sec-kitting"
+                size="small"
+                title="齐套率（装配 · 只展示，不设门槛）"
+                style={{ marginBottom: 16 }}
+                extra={<a onClick={() => nav('/assembly')}>装配 / 厂内调试</a>}
+              >
+                <Table<KittingOverviewRow>
+                  rowKey="equip_no"
+                  size="small"
+                  pagination={false}
+                  dataSource={kitting}
+                  locale={{ emptyText: <Empty description="还没有设备" /> }}
+                  columns={[
+                    {
+                      title: '设备',
+                      key: 'eq',
+                      width: 180,
+                      render: (_: unknown, r: KittingOverviewRow) => (
+                        <Space size={6}>
+                          <Typography.Text strong>{r.equip_no}</Typography.Text>
+                          <span>{r.equip_name}</span>
+                        </Space>
+                      ),
+                    },
+                    {
+                      title: '齐套率',
+                      key: 'rate',
+                      width: 280,
+                      render: (_: unknown, r: KittingOverviewRow) => (
+                        <Progress
+                          size="small"
+                          percent={Math.round((r.kitting_rate ?? 0) * 100)}
+                          strokeColor={r.kitting_rate >= 1 ? '#52c41a' : r.kitting_rate >= 0.6 ? '#1677ff' : '#faad14'}
+                        />
+                      ),
+                    },
+                    {
+                      title: '到位',
+                      key: 'd',
+                      render: (_: unknown, r: KittingOverviewRow) =>
+                        `${r.arrived}/${r.total} 种 · 数量 ${r.arrived_qty}/${r.total_qty}`,
+                    },
+                  ]}
+                />
+                <Typography.Paragraph type="secondary" style={{ fontSize: 12, margin: '8px 0 0' }}>
+                  齐套率只做展示：装配随时能开工（56%、78% 都行），不设 100% 门槛。自制件已转运、外协件合格、采购件已到货/入库、库存够，就算到位。
                 </Typography.Paragraph>
               </Card>
 

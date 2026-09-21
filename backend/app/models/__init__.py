@@ -2,6 +2,7 @@
 
 from app.models.base import Base
 from app.models.engineering import BomItem, Drawing, DrawingVersion
+from app.models.assembly import AssemblyRecord, KittingSnapshot
 from app.models.review import DesignRelease, ReviewAction, ReviewTicket, ReviewTicketItem
 from app.models.program import EquipmentProgram, EquipmentProgramVersion
 from app.models.production import (
@@ -49,6 +50,7 @@ from app.models.project import (
 
 __all__ = [
     "Attachment",
+    "AssemblyRecord",
     "AuditLog",
     "Base",
     "Contact",
@@ -59,6 +61,7 @@ __all__ = [
     "Equipment",
     "GoodsReceipt",
     "Item",
+    "KittingSnapshot",
     "StdCategory",
     "StdClass",
     "Supplier",

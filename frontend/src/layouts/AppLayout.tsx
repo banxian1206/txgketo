@@ -119,7 +119,10 @@ export default function AppLayout() {
                     { key: '/reviews', label: <Link to="/reviews">设计评审</Link> },
                     { key: '/changes', label: <Link to="/changes">改版</Link> },
                     ...(hasPerm('mfg:view') || canManageUsers
-                      ? [{ key: '/manufacturing', label: <Link to="/manufacturing">制造（车间）</Link> }]
+                      ? [
+                          { key: '/manufacturing', label: <Link to="/manufacturing">制造（车间）</Link> },
+                          { key: '/assembly', label: <Link to="/assembly">装配 · 齐套率</Link> },
+                        ]
                       : []),
                     { key: '/suppliers', label: <Link to="/suppliers">供应商</Link> },
                   ],

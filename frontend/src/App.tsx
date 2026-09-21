@@ -23,6 +23,7 @@ import Suppliers from './pages/Suppliers'
 import Users from './pages/Users'
 import Warehouse from './pages/Warehouse'
 import Manufacturing from './pages/Manufacturing'
+import Assembly from './pages/Assembly'
 import ProductionM from './pages/m/ProductionM'
 import Workbench from './pages/Workbench'
 import DeptWorkbench from './pages/workbench/DeptWorkbench'
@@ -82,6 +83,7 @@ export default function App() {
         <Route path="suppliers" element={<Suppliers />} />
         <Route path="warehouse" element={<Warehouse />} />
         <Route path="manufacturing" element={<Manufacturing />} />
+        <Route path="assembly" element={<Assembly />} />
         <Route path="projects/:projectNo/design/:equipNo" element={<EquipmentDesign />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
