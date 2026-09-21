@@ -92,8 +92,8 @@ deploy/          docker-compose.dev.yml
 ## 8. 当前进度（交接记录）
 
 > 更新于：**06 卷 F 步（账号权限收尾）**落地：接口级权限强校验（`require_permission`，采购下单类→`purchase:edit`、验收/入库/领料→`warehouse:edit`）、金额分档（`purchase:price` 采购价 / `project:amount` 项目金额，无权限返回 null）、**离职/停用一键转交**（任务/待审/项目角色/图·程序·BOM 归属）。
-> 已完成：S0 商机 → S1 立项 → S2 工程设计 → S3 采购 → S4 仓库 → S5 制造 → **S6 装配与齐套率**。
-> 下一步：发运/现场/验收/售后（S7–S11）；超期扫描自动提醒；Excel 历史采购导入。
+> 已完成：S0 商机 → S1 立项 → S2 工程设计 → S3 采购 → S4 仓库 → S5 制造 → S6 装配与齐套率 → **S7 发运**。
+> 下一步：现场安装/调试/客户验收/质保售后（S8–S11）；超期扫描自动提醒；Excel 历史采购导入。
 
 ### 8.1 采购状态线（客户口径，别再改回去了）
 
@@ -155,6 +155,7 @@ deploy/          docker-compose.dev.yml
 | **入口补齐（领料 / 回款 / 日志 / 其他入库·库位 / 价格参考）** | ✅ | ① 仓库待办页「生成领料单（按设备）」（`generateEquipmentIssue`）；② `POST /projects/{p}/payment-terms/{seq}/receive` 登记回款（多次累加、超额拦截）+ 项目详情付款节点「登记回款」（`payment:edit`）；③「用户与权限」加「操作日志」页签（`GET /audit-logs`）；④ 库存页「其他入库」（`POST /warehouse/inbound`，退料回库/盘盈）；⑤ 仓库新增「库位」页签 + 新建库位（`GET/POST /warehouse/locations`）；⑥ 采购工作台「价格参考」页签（物料搜索 + 历史价 + 推荐供应商，需 `purchase:price`，后端同步收紧） |
 | **S5 制造（★只管两头）** | ✅ | 迁移 `g1b3d5f70c29`（`prod_order`/`prod_task`/`prod_acceptance`/`outsource_task`；编号 `PR{YY}{NNN}` 排产单 / `WX{YY}{NNN}` 外协单）；`services/manufacturing.py`（按设备**已发布图纸**展开：自制件→排产单、外协件→外协任务，幂等）；`routes/manufacturing.py`（生成/列表/工作台/下发/开工/验收/转运/外协发出·回厂·验收 + 拍照 `POST /manufacturing/photos` ✓鉴权取回）；`pages/Manufacturing.tsx`（PC）、`pages/m/ProductionM.tsx`（手机批量）、车间台 `GET /workbench/shop`；通知 MFG 角色 + 不合格通知项目团队/设计；**不做工序级报工/工时** |
 | **S6 装配与齐套率** | ✅ | 迁移 `h2c4e6a81d35`（`kitting_snapshot` / `assembly_record`）；`services/kitting.py`（自制件看排产是否已转运、外协看是否合格、采购/库存看是否到货入库 → **齐套率只展示**）；`routes/assembly.py`（齐套率/概览/装配开始·完成/厂内调试/装配台）；`pages/Assembly.tsx`（项目 → 各设备齐套率进度条 + 明细 + 装配记录/调试）；**项目详情新增「齐套率」卡**；车间台计数装配中/待调试；**不设 100% 门槛，随时可开装** |
+| **S7 发运（发货指令）** | ✅ | 迁移 `i3e5a7c92d48`（`shipment`/`shipment_line`/`packing_list`/`site_receipt`；编号 `FH{YY}{NNN}`）；`services/shipping.py`（待发设备=装配完成且不在未完成批次；**PM 勾选设备 → 指令 → 装箱（拆解与否不拆流程）→ 装车（拍照）→ 发运 → 到货 → 现场验收对账**）；`routes/shipping.py`（含 `ship:edit` 写、拍照上传/取回）；`pages/Shipping.tsx`（待发设备勾选 + 批次表 + 装箱/装车/发运/到货/验收弹窗 + 详情抽屉）；`services/photos.py` 抽象出共用拍照上传 |
 | 供应商主数据 + 报价 + 能供品类 | ✅ | `models/purchasing.py`、`routes/suppliers.py` |
 | 推荐供应商（多路证据打分） | ✅ | `GET /purchase/recommend/{item_no}` |
 | 价格参考（上次成交/历史区间/各家报价） | ✅ | `GET /purchase/price-reference/{item_no}` |
@@ -250,6 +251,17 @@ POST /api/v1/assembly/records/{id}/finish           装配完成
 POST /api/v1/assembly/records/{id}/debug            厂内调试记录 {result, note, photos}
 GET  /api/v1/assembly/records                       装配记录列表
 GET  /api/v1/assembly/workbench                     装配台（计数 + 概览 + 记录）
+
+发运（S7）—— 写：ship:edit（项目经理 / 交付发运）；读：登录即可
+GET  /api/v1/shipping/to-ship?project_no=            待发设备（装配完成且不在未完成批次）
+POST /api/v1/shipping/instructions                   下达发货指令 {project_no, equip_nos[]}
+GET  /api/v1/shipping/list | /workbench | /{id}      批次列表 / 发运台 / 详情
+POST /api/v1/shipping/{id}/pack                      装箱清单 {items[]}
+POST /api/v1/shipping/{id}/load                      装车 {vehicle, driver, plate_no, photos}
+POST /api/v1/shipping/{id}/depart                    发运（在途）
+POST /api/v1/shipping/{id}/arrive                    登记到货
+POST /api/v1/shipping/{id}/receipt                   现场到货验收 {result: 齐/缺件/破损, shortage_detail[], photos}
+POST/GET /api/v1/shipping/photos                     发运拍照上传 / 取回
 POST /api/v1/projects/{p}/payment-terms/{seq}/receive  登记回款（多次累加；payment:edit）
    权限强校验：采购下单类→purchase:edit；验收/入库/领料→warehouse:edit；金额→purchase:price / project:amount（无权限返回 null）
 POST/PATCH /api/v1/orgs（/{id}）                   组织维护：部门/组 增改停用（停用不删）
