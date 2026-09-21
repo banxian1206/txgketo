@@ -1155,22 +1155,22 @@ export default function ProjectDetailPage() {
         <Form form={dealForm} layout="vertical" preserve={false}>
           <Row gutter={12}>
             <Col span={6}>
-              <Form.Item name="period_start" label="合同签订日">
+              <Form.Item name="period_start" label="合同签订日" rules={[{ required: true, message: '必填' }]}>
                 <DatePicker style={{ width: '100%' }} />
               </Form.Item>
             </Col>
             <Col span={6}>
-              <Form.Item name="period_end" label="合同交期">
+              <Form.Item name="period_end" label="合同交期" rules={[{ required: true, message: '必填' }]}>
                 <DatePicker style={{ width: '100%' }} />
               </Form.Item>
             </Col>
             <Col span={6}>
-              <Form.Item name="amount" label="合同金额（元）">
+              <Form.Item name="amount" label="合同金额（元）" rules={[{ required: true, message: '必填' }]}>
                 <InputNumber style={{ width: '100%' }} min={0} step={100000} />
               </Form.Item>
             </Col>
             <Col span={6}>
-              <Form.Item name="warranty_months" label="质保期（月）">
+              <Form.Item name="warranty_months" label="质保期（月）" rules={[{ required: true, message: '必填' }]}>
                 <InputNumber style={{ width: '100%' }} min={0} addonAfter="月" />
               </Form.Item>
             </Col>
@@ -1211,13 +1211,28 @@ export default function ProjectDetailPage() {
           <Typography.Paragraph type="secondary" style={{ fontSize: 12, marginTop: -8 }}>
             质保金 = 节点名含「质保」的那一条（客户从货款里扣留、质保期满才付给我们），系统自动带出
           </Typography.Paragraph>
-          <Form.List name="payment_terms">
+          <Form.List
+            name="payment_terms"
+            rules={[
+              {
+                validator: async (_, value) => {
+                  if (!value || value.length === 0) throw new Error('至少登记 1 个付款节点')
+                  const first = value[0] ?? {}
+                  if (!first.node_name) throw new Error('第 1 个付款节点的节点名必填')
+                },
+              },
+            ]}
+          >
             {(fields, { add, remove }) => (
               <>
                 {fields.map((field) => (
                   <Row key={field.key} gutter={8} align="middle">
                     <Col span={6}>
-                      <Form.Item name={[field.name, 'node_name']}>
+                      <Form.Item
+                        name={[field.name, 'node_name']}
+                        style={{ marginBottom: 0 }}
+                        rules={field.name === 0 ? [{ required: true, message: '填节点名' }] : undefined}
+                      >
                         <Input placeholder="节点名，如 预付款" />
                       </Form.Item>
                     </Col>

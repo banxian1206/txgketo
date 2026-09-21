@@ -157,7 +157,11 @@ export default function ProjectFormFields({
             </Form.Item>
           </Col>
           <Col span={24}>
-            <Form.Item name="project_desc" label="项目描述">
+            <Form.Item
+              name="project_desc"
+              label="项目描述"
+              rules={[{ required: true, message: '必填：这个项目是干什么的' }]}
+            >
               <Input.TextArea rows={2} placeholder="客户要解决什么问题、大概要什么设备" />
             </Form.Item>
           </Col>
@@ -181,13 +185,29 @@ export default function ProjectFormFields({
             <Typography.Text type="secondary" style={{ fontSize: 12 }}>
               客户方联系人（可多个：技术对接人 / 采购 / 决策人）
             </Typography.Text>
-            <Form.List name="contacts">
+            <Form.List
+              name="contacts"
+              rules={[
+                {
+                  validator: async (_, value) => {
+                    if (!value || value.length === 0) throw new Error('至少要有一个客户方联系人')
+                    const first = value[0] ?? {}
+                    if (!first.name) throw new Error('第 1 位联系人的姓名必填')
+                    if (!first.phone) throw new Error('第 1 位联系人的电话必填')
+                  },
+                },
+              ]}
+            >
               {(fields, { add, remove }) => (
                 <>
                   {fields.map((field) => (
                     <Row key={field.key} gutter={8} align="middle" style={{ marginTop: 8 }}>
                       <Col span={3}>
-                        <Form.Item name={[field.name, 'name']} style={{ marginBottom: 0 }}>
+                        <Form.Item
+                          name={[field.name, 'name']}
+                          style={{ marginBottom: 0 }}
+                          rules={field.name === 0 ? [{ required: true, message: '填姓名' }] : undefined}
+                        >
                           <Input placeholder="姓名" />
                         </Form.Item>
                       </Col>
@@ -197,7 +217,11 @@ export default function ProjectFormFields({
                         </Form.Item>
                       </Col>
                       <Col span={4}>
-                        <Form.Item name={[field.name, 'phone']} style={{ marginBottom: 0 }}>
+                        <Form.Item
+                          name={[field.name, 'phone']}
+                          style={{ marginBottom: 0 }}
+                          rules={field.name === 0 ? [{ required: true, message: '填电话' }] : undefined}
+                        >
                           <Input placeholder="电话" />
                         </Form.Item>
                       </Col>
@@ -246,6 +270,7 @@ export default function ProjectFormFields({
               name="site_address"
               label="项目地点（客户工厂）"
               tooltip="直接影响现场安装成本与差旅；深圳/惠州双工厂调度要看它"
+              rules={[{ required: true, message: '必填：在什么地方交付' }]}
             >
               <Input placeholder="如：佛山顺德" />
             </Form.Item>
@@ -288,6 +313,7 @@ export default function ProjectFormFields({
               name="deadline"
               label="商机截止时间"
               tooltip="客户要求我们什么时候把这件事定下来（如 9/20 前必须定）"
+              rules={[{ required: true, message: '必填：商机什么时候截止' }]}
             >
               <DatePicker style={{ width: '100%' }} />
             </Form.Item>

@@ -97,6 +97,7 @@ def main() -> None:
         "contacts": [{"name": "刘工", "title": "设备科", "phone": "13800000000", "role_tag": "技术对接人"}],
         "deadline": d(14), "delivery_days": 120, "deal_mode": "直签", "source": "老客户复购",
         "est_amount": 1600000, "project_desc": "1 台升降贴合机 + 输送段，节拍 12s/台",
+        "site_address": "佛山顺德 创维工业园",
     })["project_no"]
     pj = req("get", f"/api/v1/projects/{p}", "sales1")
     flag("S0", pj["stage"] == "线索", f"新商机阶段应为「线索」，实际 {pj['stage']}")

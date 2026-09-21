@@ -42,7 +42,7 @@ class LoginOut(BaseModel):
 class ContactIn(BaseModel):
     name: str
     title: str | None = None
-    phone: str | None = None
+    phone: str = Field(..., description="联系电话（必填：联系不上商机就丢了）")
     wechat: str | None = None
     email: str | None = None
     role_tag: str | None = Field(default=None, description="技术对接人 / 采购 / 决策人")
@@ -55,16 +55,16 @@ class ProjectCreateIn(BaseModel):
     customer_name: str = Field(..., description="客户名称")
     project_name: str = Field(..., description="项目名称")
     sales_id: int = Field(..., description="销售/商务负责人（必选：这个商机归谁跟）")
-    contacts: list[ContactIn] = Field(default_factory=list, description="客户方联系人（可多个）")
+    contacts: list[ContactIn] = Field(..., min_length=1, description="客户方联系人（至少 1 个：姓名+电话）")
     received_docs: list[str] = Field(default_factory=list, description="接收到的资料（清单勾选）")
-    project_desc: str | None = Field(default=None, description="项目描述")
-    deadline: date | None = Field(default=None, description="商机截止时间：客户要求何时把这件事定下来")
+    project_desc: str = Field(..., description="项目描述：这个项目是干什么的")
+    deadline: date = Field(..., description="商机截止时间：客户要求何时把这件事定下来")
     delivery_days: int | None = Field(default=None, description="项目交期天数（签约后起算，如 90）")
     deal_mode: str | None = Field(default=None, description="项目方式：投标 / 直签")
+    site_address: str = Field(..., description="项目地点（客户工厂）：在什么地方交付")
 
     # 建议字段
     source: str | None = None
-    site_address: str | None = None
     is_retrofit: bool = False
     product_type: str | None = None
     required_cycle: str | None = None
@@ -143,12 +143,12 @@ class PaymentTermIn(BaseModel):
 class DealIn(BaseModel):
     """成交登记：把商机定下来（周期 / 金额 / 付款方式 / 质保）。"""
 
-    period_start: date | None = Field(default=None, description="合同签订日 / 项目开始")
-    period_end: date | None = Field(default=None, description="合同交期")
-    amount: float | None = Field(default=None, description="合同金额")
+    period_start: date = Field(..., description="合同签订日 / 项目开始")
+    period_end: date = Field(..., description="合同交期")
+    amount: float = Field(..., gt=0, description="合同金额")
     amount_tax_incl: bool = True
     contract_no_customer: str | None = Field(default=None, description="客户方合同号")
-    warranty_months: int | None = Field(default=None, description="质保期（月）")
+    warranty_months: int = Field(..., description="质保期（月）")
     warranty_amount: float | None = Field(default=None, description="质保金")
     penalty_note: str | None = Field(default=None, description="交期与违约条款")
     acceptance_standard: str | None = Field(default=None, description="验收标准")
@@ -157,7 +157,7 @@ class DealIn(BaseModel):
     site_condition: str | None = Field(default=None, description="客户现场接收条件")
     is_batch_delivery: bool = True
     tech_agreement_frozen: bool = Field(default=False, description="技术协议已冻结 = 设计基线")
-    payment_terms: list[PaymentTermIn] = Field(default_factory=list)
+    payment_terms: list[PaymentTermIn] = Field(..., min_length=1, description="付款节点至少 1 个")
 
 
 class CloseIn(BaseModel):

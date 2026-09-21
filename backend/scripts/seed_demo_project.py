@@ -91,6 +91,7 @@ def main() -> None:
                 "source": "老客户复购",
                 "est_amount": 1600000,
                 "project_desc": "整线含 1 台升降贴合机 + 输送段，节拍 12s/台",
+                "site_address": "佛山顺德 创维工业园",
             },
         )["project_no"]
         print(f"  → 项目号 {p}")
