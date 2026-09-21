@@ -3,23 +3,37 @@ import { useCallback, useEffect, useState } from 'react'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 
 import NotificationsDrawer from '../components/NotificationsDrawer'
-import { TOKEN_KEY, unreadNotificationCount } from '../api/client'
+import { TOKEN_KEY, hasPerm, unreadNotificationCount } from '../api/client'
 
-const TABS = [
-  { key: '/m', label: '首页', icon: '🏠' },
-  { key: '/m/warehouse', label: '仓库', icon: '📦' },
-  { key: '/m/issues', label: '领料', icon: '🧰' },
-  { key: '/m/production', label: '制造', icon: '🏭' },
-  { key: '/m/me', label: '我的', icon: '👤' },
+// 底部入口按角色/权限显示（03 卷）：仓库看仓库、车间看制造/装配、交付/现场看发运
+const ALL_TABS: { key: string; label: string; icon: string; show: () => boolean }[] = [
+  { key: '/m', label: '首页', icon: '🏠', show: () => true },
+  {
+    key: '/m/warehouse',
+    label: '仓库',
+    icon: '📦',
+    show: () => hasPerm('warehouse:edit') || hasPerm('warehouse:view'),
+  },
+  { key: '/m/issues', label: '领料', icon: '🧰', show: () => true },
+  { key: '/m/production', label: '制造', icon: '🏭', show: () => hasPerm('mfg:view') },
+  { key: '/m/assembly', label: '装配', icon: '🔧', show: () => hasPerm('mfg:view') },
+  {
+    key: '/m/shipping',
+    label: '发运',
+    icon: '🚚',
+    show: () => hasPerm('ship:edit') || hasPerm('site:edit'),
+  },
+  { key: '/m/me', label: '我的', icon: '👤', show: () => true },
 ]
 
-/** 手机端外壳（03 卷）：顶栏 + 底部四个入口，页面走「清单 + 勾选 + 拍照」动线 */
+/** 手机端外壳（03 卷）：顶栏 + 底部入口（按角色），页面走「清单 + 勾选 + 拍照」动线 */
 export default function MobileLayout() {
   const loc = useLocation()
   const nav = useNavigate()
   const name = localStorage.getItem('txgk_name') ?? '用户'
   const [unread, setUnread] = useState(0)
   const [notifOpen, setNotifOpen] = useState(false)
+  const TABS = ALL_TABS.filter((t) => t.show())
 
   const refreshUnread = useCallback(() => {
     unreadNotificationCount()

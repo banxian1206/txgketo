@@ -26,6 +26,8 @@ import Manufacturing from './pages/Manufacturing'
 import Assembly from './pages/Assembly'
 import Shipping from './pages/Shipping'
 import ProductionM from './pages/m/ProductionM'
+import AssemblyM from './pages/m/AssemblyM'
+import ShippingM from './pages/m/ShippingM'
 import Workbench from './pages/Workbench'
 import DeptWorkbench from './pages/workbench/DeptWorkbench'
 import EngWorkbench from './pages/workbench/EngWorkbench'
@@ -54,6 +56,8 @@ export default function App() {
         <Route path="accept/:requestId" element={<AcceptM />} />
         <Route path="issues" element={<IssuesM />} />
         <Route path="production" element={<ProductionM />} />
+        <Route path="assembly" element={<AssemblyM />} />
+        <Route path="shipping" element={<ShippingM />} />
         <Route path="me" element={<MeM />} />
       </Route>
       <Route

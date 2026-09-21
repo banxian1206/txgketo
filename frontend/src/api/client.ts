@@ -1597,6 +1597,13 @@ export interface MobileHome {
     my_tasks: number
     to_review: number
     to_decide: number
+    to_dispatch: number
+    to_accept: number
+    to_transfer: number
+    assembling: number
+    to_debug: number
+    shipments_open: number
+    shipments_receive: number
   }
 }
 

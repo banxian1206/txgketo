@@ -39,6 +39,12 @@ DEMO_USERS: list[tuple[str, str, str, str, str | None, list[str]]] = [
     ("wh_director", "仓库总监", "WH", "总监", None, ["WAREHOUSE"]),
     # 车间
     ("shop1", "车间联络组员", "MFG", "组员", None, ["MFG"]),
+    ("assy1", "装配技师", "MFG", "组员", None, ["ASSY"]),
+    ("qc1", "质检员", "MFG", "组员", None, ["QC"]),
+    # 交付 / 现场 / 售后
+    ("delivery1", "交付发运", "GM", "组员", None, ["DELIVERY"]),
+    ("site1", "现场负责人", "GM", "组员", None, ["SITE"]),
+    ("service1", "售后工程师", "GM", "组员", None, ["SERVICE"]),
     # 项目 / 总经办 / 财务
     ("pm1", "项目经理", "GM", "组员", None, ["PM"]),
     ("gm", "总经理", "GM", "总监", None, ["GM"]),

@@ -16,12 +16,15 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_current_user
 from app.core.db import get_session
 from app.models.change import CR_PENDING, ChangeRequest
+from app.models.assembly import AssemblyRecord
 from app.models.engineering import Drawing
 from app.models.initiation import GoodsReceipt, PurchaseRequest
 from app.models.library import Item
 from app.models.platform import POSITION_DIRECTOR, POSITION_LEAD, User
+from app.models.production import PROD_DISPATCHED, PROD_DONE, PROD_RUNNING, PROD_WAIT, ProdOrder
 from app.models.project import Equipment, Project
 from app.models.review import TICKET_PENDING_DIRECTOR, TICKET_PENDING_LEAD, ReviewTicket
+from app.models.shipment import Shipment
 from app.models.task import Task
 from app.models.warehouse import MaterialIssue
 from app.services.notify import unread_count
@@ -78,6 +81,31 @@ def mobile_home(session: Session = Depends(get_session), current: User = Depends
         .where(Task.owner_id == current.id, Task.status.not_in(("已完成", "已取消"))),
     )
     unread = unread_count(session, current.id)
+    # 制造 / 装配 / 发运（S5–S7）：手机端也能干活
+    to_dispatch = _count(
+        session, select(func.count()).select_from(ProdOrder).where(ProdOrder.status == PROD_WAIT)
+    )
+    to_accept = _count(
+        session,
+        select(func.count()).select_from(ProdOrder).where(ProdOrder.status.in_((PROD_DISPATCHED, PROD_RUNNING))),
+    )
+    to_transfer = _count(
+        session, select(func.count()).select_from(ProdOrder).where(ProdOrder.status == PROD_DONE)
+    )
+    assembling = _count(
+        session, select(func.count()).select_from(AssemblyRecord).where(AssemblyRecord.status == "装配中")
+    )
+    to_debug = _count(
+        session, select(func.count()).select_from(AssemblyRecord).where(AssemblyRecord.status == "已装配")
+    )
+    shipments_open = _count(
+        session,
+        select(func.count()).select_from(Shipment).where(Shipment.status.in_(("已指令", "打包中", "已装车"))),
+    )
+    shipments_receive = _count(
+        session,
+        select(func.count()).select_from(Shipment).where(Shipment.status.in_(("在途", "已到货"))),
+    )
 
     if current.position == POSITION_DIRECTOR:
         to_review = _count(
@@ -120,6 +148,13 @@ def mobile_home(session: Session = Depends(get_session), current: User = Depends
             "my_tasks": my_tasks,
             "to_review": to_review,
             "to_decide": to_decide,
+            "to_dispatch": to_dispatch,
+            "to_accept": to_accept,
+            "to_transfer": to_transfer,
+            "assembling": assembling,
+            "to_debug": to_debug,
+            "shipments_open": shipments_open,
+            "shipments_receive": shipments_receive,
         },
     }
 

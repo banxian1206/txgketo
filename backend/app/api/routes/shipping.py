@@ -13,7 +13,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.api.deps import client_ip, get_current_user, require_permission
+from app.api.deps import client_ip, get_current_user, has_permission, require_permission
 from app.core.db import get_session
 from app.models.platform import User
 from app.models.shipment import RECEIPT_RESULTS, Shipment
@@ -300,13 +300,20 @@ class ReceiptIn(BaseModel):
     remark: str | None = None
 
 
+def _can_receive(current: User = Depends(get_current_user)) -> User:
+    """现场到货验收：交付发运（ship:edit）或现场（site:edit）都能做。"""
+    if not (has_permission(current, "ship:edit") or has_permission(current, "site:edit")):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "没有权限：ship:edit / site:edit")
+    return current
+
+
 @router.post("/{ship_id}/receipt")
 def receipt(
     ship_id: int,
     body: ReceiptIn,
     request: Request,
     session: Session = Depends(get_session),
-    current: User = Depends(require_permission("ship:edit")),
+    current: User = Depends(_can_receive),
 ):
     """现场到货验收（与发货指令 / 装箱清单对账）。"""
     sh = session.get(Shipment, ship_id)

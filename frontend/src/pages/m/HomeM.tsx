@@ -21,6 +21,13 @@ export default function HomeM() {
     { label: '待验收', value: c?.to_inspect ?? 0, to: '/m/warehouse' },
     { label: '待入库', value: c?.to_store ?? 0, to: '/m/warehouse' },
     { label: '领料', value: c?.issues ?? 0, to: '/m/issues' },
+    { label: '待下发排产', value: c?.to_dispatch ?? 0, to: '/m/production' },
+    { label: '待验收零件', value: c?.to_accept ?? 0, to: '/m/production' },
+    { label: '待转运', value: c?.to_transfer ?? 0, to: '/m/production' },
+    { label: '装配中', value: c?.assembling ?? 0, to: '/m/assembly' },
+    { label: '待厂内调试', value: c?.to_debug ?? 0, to: '/m/assembly' },
+    { label: '发运待办', value: c?.shipments_open ?? 0, to: '/m/shipping' },
+    { label: '到货待验收', value: c?.shipments_receive ?? 0, to: '/m/shipping' },
     { label: '我的任务', value: c?.my_tasks ?? 0, to: '/my-tasks' },
     { label: '待我审', value: c?.to_review ?? 0, to: '/reviews' },
     { label: '待我裁决', value: c?.to_decide ?? 0, to: '/changes' },
@@ -50,8 +57,8 @@ export default function HomeM() {
       </Row>
 
       <Typography.Paragraph type="secondary" style={{ fontSize: 12, marginTop: 12 }}>
-        手机端先做仓库两条动线：到货验收（看电子图纸 + 拍照 + 合格/不合格 → 入库）与领料。
-        不做扫码，清单 + 勾选 + 拍照就够了（03 卷）。
+        手机端动线（03 卷）：仓库（到货验收 / 入库 / 领料）、车间（制造下发·验收·转运、装配与齐套率）、发运（装车 / 发运 / 到货 / 现场验收）。
+        不做扫码，清单 + 勾选 + 拍照就够了。底部入口按你的角色显示。
       </Typography.Paragraph>
     </>
   )
