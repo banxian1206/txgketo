@@ -146,7 +146,7 @@ deploy/          docker-compose.dev.yml
 | **移动端 / 工作台（05 卷 P7）** | ✅ | `GET /drawings/{no}/file`、`/programs/{id}/file`（电子图纸/程序下载）；`goods_receipt.photos` + `POST/GET /goods-receipts/{id}/photos`；`routes/mobile.py`（`/m/home`、`/m/materials/{id}`）；`layouts/MobileLayout.tsx` + `pages/m/*`（仓库验收动线：看图→拍照→合格/不合格→入库；领料）；`utils/image.ts` 前端压缩；PWA manifest |
 | **用户·角色·组织（06 卷 A 步）** | ✅ | 岗位三级 + `title`（迁移 `d0f4a6c83b25`）；组织增改停用 `POST/PATCH /orgs`；`GET /my-scope`；用户管理按部门范围（部门负责人只能管本部门/只能勾本部门角色）；审核链 `director_for`（按部门找负责人）+ 自动跳级；`pages/Users.tsx`（用户 / 组织架构 / 角色说明 三页签） |
 | **工作台框架（06 卷 B 步）** | ✅ | `GET /workbench/me`（可见工作台 + 待办数字 + 我的项目）；侧栏三分组 + 按角色显示工作台；登录默认进「我的工作台」；`pages/Workbench.tsx` + `pages/workbench/DeptWorkbench.tsx`（部门台统一外壳）；`routes/workbench.py` |
-| **站内消息 + 红点（06 卷 C 步）** | ✅ | `models/notify.py` + `services/notify.py` + `routes/notifications.py`；触发钩子：任务派工/转派/拆分、评审提交/通过/退回/发布、改版申请/裁决/下发/完成、验收待入库/不合格、发布进采购池；**发布扇出**（项目团队全员 + 下游工艺 + 采购）；`components/NotificationsDrawer.tsx` + 顶栏铃铛红点（PC/移动端 60s 轮询）+ **我的工作台消息区**；**组长空缺自动跳级**、改版裁决通知只发本部门负责人、移动端消息链接映射 |
+| **站内消息 + 红点（06 卷 C 步）** | ✅ | `models/notify.py` + `services/notify.py` + `routes/notifications.py`；触发钩子：任务派工/转派/拆分、评审提交/通过/退回/发布、改版申请/裁决/下发/完成、验收合格→仓库·不合格→采购·直发现场→项目经理、**入库完成→采购+项目经理**、发布进采购池；**发布扇出**（项目团队全员 + 下游工艺 + 采购）；`components/NotificationsDrawer.tsx` + 顶栏铃铛红点（PC/移动端 60s 轮询）+ **我的工作台消息区**；**组长空缺自动跳级**、改版裁决通知只发本部门负责人、移动端消息链接映射 |
 | 供应商主数据 + 报价 + 能供品类 | ✅ | `models/purchasing.py`、`routes/suppliers.py` |
 | 推荐供应商（多路证据打分） | ✅ | `GET /purchase/recommend/{item_no}` |
 | 价格参考（上次成交/历史区间/各家报价） | ✅ | `GET /purchase/price-reference/{item_no}` |
@@ -170,7 +170,7 @@ deploy/          docker-compose.dev.yml
 | 4 | 移动端离线队列 + Capacitor 打包 | 03 卷：现场弱网「拍完先存本地、有网再传」；需要时再打包 APK/ipa（同一份代码） |
 | 5 | **06 卷 D–E**（工程部工作台三视角 → 采购/仓库待办头） | 06 卷 §11 落地顺序 |
 | 6 | **接口级权限强校验 + 离职一键转交** | 06 卷 §10：本期不做，已记录，下期做（`require_permission` 接关键动作；任务/待审/项目角色转交） |
-| 7 | **「到货待验收」提醒没有触发点** | 系统无“到货登记”动作（验收由仓库发起）——若要提醒，需加到货登记或按 expected_date 扫描（下期，配合超期扫描） |
+| 7 | **超期扫描（任务/交期到期提醒）** | 本期只展示“超期”，**自动扫描下期**。注：**没有“到货登记”这个动作**（新流程已废弃，AGENTS §8.1：采购侧不登记到货/发货，状态由仓库验收/入库推着变）——所以不存在“到货提醒”，仓库是主动看「待验收」清单收货；验收/入库的通知已接 |
 
 > 本轮顺手修复：`update_purchase_request` 漏导入 `REQUEST_STATUS`，改采购需求状态会 500。
 

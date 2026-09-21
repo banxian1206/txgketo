@@ -1125,6 +1125,21 @@ def inspect_purchase_request(
             biz_id=gr.id,
             actor_id=current.id,
         )
+    elif receipt_status == "现场已验收":
+        # 直发客户现场：由现场验收，提醒项目经理
+        project = session.get(Project, project_no)
+        if project is not None and project.pm_id:
+            notify.notify(
+                session,
+                [project.pm_id],
+                type_=notify.TYPE_WAREHOUSE,
+                title=f"直发现场已验收：{row.item_no} × {body.qty:g}",
+                body=f"{project_no} {row.equip_no or ''}（{receipt_no}）",
+                link="/projects",
+                biz_type="goods_receipt",
+                biz_id=gr.id,
+                actor_id=current.id,
+            )
     session.commit()
     return {
         "receipt_id": gr.id,
@@ -1207,6 +1222,31 @@ def store_receipt(
         + (f"，说明：{body.note}" if body.note else ""),
         ip=client_ip(request),
     )
+    # ★ 站内消息（06 卷 §9）：入库完成 → 提醒采购（跟单闭环）+ 项目经理（进度）
+    notify.notify_role(
+        session,
+        "PURCHASE",
+        type_=notify.TYPE_PURCHASE,
+        title=f"已入库：{gr.item_no} × {gr.qty:g} → {gr.location}",
+        body=f"{gr.receipt_no}（{gr.project_no} {row.equip_no if row and row.equip_no else ''}）",
+        link="/purchase",
+        biz_type="goods_receipt",
+        biz_id=gr.id,
+        actor_id=current.id,
+    )
+    project = session.get(Project, gr.project_no)
+    if project is not None and project.pm_id:
+        notify.notify(
+            session,
+            [project.pm_id],
+            type_=notify.TYPE_WAREHOUSE,
+            title=f"货已入库：{gr.item_no} × {gr.qty:g}",
+            body=f"{gr.project_no} {row.equip_no if row and row.equip_no else ''} → {gr.location}",
+            link="/warehouse",
+            biz_type="goods_receipt",
+            biz_id=gr.id,
+            actor_id=current.id,
+        )
     session.commit()
     return {
         "receipt_no": gr.receipt_no,
