@@ -2487,3 +2487,160 @@ export async function debugAssembly(
   const { data } = await api.post<AssemblyRecordRow>(`/assembly/records/${id}/debug`, body)
   return data
 }
+
+// ============================== 发运（S7）=============================
+// PM 勾选要发的设备 → 发货指令 → 打包 → 装车（拍照）→ 发运（分批）→ 现场到货验收。
+
+export interface ToShipRow {
+  equip_no: string
+  equip_name: string
+  assembly_status?: string | null
+  kitting_rate: number
+  ready: boolean
+  in_open_shipment: boolean
+}
+
+export interface PackingItemRow {
+  id: number
+  equip_no?: string | null
+  part_item_no: string
+  part_name?: string | null
+  qty: number
+  package_no?: string | null
+  weight?: number | null
+  size?: string | null
+  disassembled: boolean
+  photos: string[]
+  remark?: string | null
+}
+
+export interface ShipmentLineRow {
+  id: number
+  equip_no: string
+  equip_name?: string | null
+  qty: number
+  remark?: string | null
+}
+
+export interface SiteReceiptRow {
+  id: number
+  result: string
+  shortage_detail: { equip_no?: string; item?: string; qty?: number; reason?: string }[]
+  photos: string[]
+  received_at?: string | null
+  remark?: string | null
+}
+
+export interface ShipmentRow {
+  id: number
+  shipment_no: string
+  project_no: string
+  status: string
+  plan_ship_date?: string | null
+  vehicle?: string | null
+  driver?: string | null
+  plate_no?: string | null
+  instruct_at?: string | null
+  depart_at?: string | null
+  arrive_at?: string | null
+  signed_at?: string | null
+  photos: string[]
+  remark?: string | null
+  lines: ShipmentLineRow[]
+  packing: PackingItemRow[]
+  receipts: SiteReceiptRow[]
+}
+
+export async function toShip(projectNo: string) {
+  const { data } = await api.get<ToShipRow[]>('/shipping/to-ship', { params: { project_no: projectNo } })
+  return data
+}
+
+export async function createShipment(body: {
+  project_no: string
+  equip_nos: string[]
+  plan_ship_date?: string
+  remark?: string
+}) {
+  const { data } = await api.post<ShipmentRow>('/shipping/instructions', body)
+  return data
+}
+
+export async function listShipments(params?: { project_no?: string; status?: string }) {
+  const { data } = await api.get<ShipmentRow[]>('/shipping/list', { params })
+  return data
+}
+
+export async function shippingWorkbench(projectNo?: string) {
+  const { data } = await api.get<{ counts: Record<string, number>; shipments: ShipmentRow[] }>(
+    '/shipping/workbench',
+    { params: projectNo ? { project_no: projectNo } : {} },
+  )
+  return data
+}
+
+export async function packShipment(
+  id: number,
+  items: {
+    equip_no?: string
+    part_item_no: string
+    part_name?: string
+    qty: number
+    package_no?: string
+    weight?: number
+    size?: string
+    disassembled?: boolean
+    photos?: string[]
+    remark?: string
+  }[],
+) {
+  const { data } = await api.post<ShipmentRow>(`/shipping/${id}/pack`, { items })
+  return data
+}
+
+export async function loadShipment(
+  id: number,
+  body: { vehicle?: string; driver?: string; plate_no?: string; photos: string[]; remark?: string },
+) {
+  const { data } = await api.post<ShipmentRow>(`/shipping/${id}/load`, body)
+  return data
+}
+
+export async function departShipment(
+  id: number,
+  body: { depart_at?: string; photos?: string[]; remark?: string } = {},
+) {
+  const { data } = await api.post<ShipmentRow>(`/shipping/${id}/depart`, body)
+  return data
+}
+
+export async function arriveShipment(id: number) {
+  const { data } = await api.post<ShipmentRow>(`/shipping/${id}/arrive`)
+  return data
+}
+
+export async function receiptShipment(
+  id: number,
+  body: {
+    result: string
+    shortage_detail?: { equip_no?: string; item?: string; qty?: number; reason?: string }[]
+    photos: string[]
+    remark?: string
+  },
+) {
+  const { data } = await api.post<ShipmentRow>(`/shipping/${id}/receipt`, body)
+  return data
+}
+
+export async function uploadShipPhotos(projectNo: string, ref: string, files: File[]) {
+  const form = new FormData()
+  files.forEach((f) => form.append('files', f))
+  const { data } = await api.post<{ token: string; filename: string }[]>('/shipping/photos', form, {
+    params: { project_no: projectNo, ref },
+  })
+  return data
+}
+
+export function shipPhotoUrl(token: string) {
+  return `/shipping/photos?token=${encodeURIComponent(token)}`
+}

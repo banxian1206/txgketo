@@ -3,6 +3,7 @@
 from app.models.base import Base
 from app.models.engineering import BomItem, Drawing, DrawingVersion
 from app.models.assembly import AssemblyRecord, KittingSnapshot
+from app.models.shipment import PackingItem, Shipment, ShipmentLine, SiteReceipt
 from app.models.review import DesignRelease, ReviewAction, ReviewTicket, ReviewTicketItem
 from app.models.program import EquipmentProgram, EquipmentProgramVersion
 from app.models.production import (
@@ -87,6 +88,10 @@ __all__ = [
     "NumberRule",
     "NumberSeq",
     "OutsourceTask",
+    "PackingItem",
+    "Shipment",
+    "ShipmentLine",
+    "SiteReceipt",
     "ProdAcceptance",
     "ProdOrder",
     "ProdTask",

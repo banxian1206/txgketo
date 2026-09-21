@@ -24,6 +24,7 @@ import Users from './pages/Users'
 import Warehouse from './pages/Warehouse'
 import Manufacturing from './pages/Manufacturing'
 import Assembly from './pages/Assembly'
+import Shipping from './pages/Shipping'
 import ProductionM from './pages/m/ProductionM'
 import Workbench from './pages/Workbench'
 import DeptWorkbench from './pages/workbench/DeptWorkbench'
@@ -84,6 +85,7 @@ export default function App() {
         <Route path="warehouse" element={<Warehouse />} />
         <Route path="manufacturing" element={<Manufacturing />} />
         <Route path="assembly" element={<Assembly />} />
+        <Route path="shipping" element={<Shipping />} />
         <Route path="projects/:projectNo/design/:equipNo" element={<EquipmentDesign />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />

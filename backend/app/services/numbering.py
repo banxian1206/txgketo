@@ -31,6 +31,7 @@ class ObjectType(StrEnum):
     SERVICE_ORDER = "SERVICE_ORDER"  # 售后工单
     PROD_ORDER = "PROD_ORDER"  # 排产订单（车间自制件）
     OUTSOURCE = "OUTSOURCE"  # 外协任务单
+    SHIPMENT = "SHIPMENT"  # 发货指令 / 发运批次
 
 
 # 默认规则（seed 时写入数据库；改规则只改数据，不改代码）
@@ -90,6 +91,13 @@ DEFAULT_RULES: list[dict] = [
         "template": "WX{YY}{seq:03}",
         "scope": "global_year",
         "remark": "自制件发出去加工",
+    },
+    {
+        "object_type": ObjectType.SHIPMENT,
+        "name": "发货指令（发运批次）",
+        "template": "FH{YY}{seq:03}",
+        "scope": "global_year",
+        "remark": "项目经理勾选本次要发的设备",
     },
 ]
 

@@ -54,17 +54,9 @@ async def upload_photos(
     current: User = Depends(require_permission("mfg:edit")),
 ):
     """制造拍照上传（下发/验收/转运）：返回 token，前端把它放进 photos 列表。"""
-    from pathlib import Path as _Path
+    from app.services.photos import save_photos
 
-    from app.core.config import settings
-    from app.services.files import save_upload
-
-    folder = _Path(settings.upload_dir) / project_no / "manufacturing" / (ref or "misc")
-    out = []
-    for f in files[:20]:
-        stored, name = await save_upload(f, folder)
-        rel = str(_Path(stored).relative_to(_Path(settings.upload_dir)))
-        out.append({"token": rel, "filename": name})
+    out = await save_photos(files, project_no=project_no, area="manufacturing", ref=ref)
     audit.log(
         session,
         user=current,
@@ -84,18 +76,12 @@ def get_photo(
     _: User = Depends(get_current_user),
 ):
     """按 token 取回制造照片（带鉴权）。"""
-    from pathlib import Path as _Path
-
     from fastapi.responses import FileResponse
 
-    from app.core.config import settings
-    from app.services.files import guess_media_type
+    from app.services.photos import media_type_of, resolve_photo
 
-    base = _Path(settings.upload_dir).resolve()
-    path = (base / token).resolve()
-    if not str(path).startswith(str(base)) or not path.exists():
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "照片不存在")
-    return FileResponse(path, media_type=guess_media_type(path.name))
+    path = resolve_photo(token)
+    return FileResponse(path, media_type=media_type_of(path))
 
 
 # --------------------------------------------------------------------------
