@@ -1,0 +1,9 @@
+{
+  "name": "同兴高科项目管理系统",
+  "short_name": "同兴高科",
+  "start_url": "/m",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f5f5f5",
+  "theme_color": "#1f6feb"
+}

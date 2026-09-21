@@ -67,6 +67,9 @@ export default function AppLayout() {
               {name.slice(0, 1)}
             </Avatar>
             <Typography.Text>{name}</Typography.Text>
+            <Link to="/m" style={{ fontSize: 13 }}>
+              手机端
+            </Link>
             <a
               onClick={() => {
                 localStorage.removeItem(TOKEN_KEY)

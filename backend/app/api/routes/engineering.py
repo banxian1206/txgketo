@@ -15,6 +15,7 @@ from fastapi import (
     UploadFile,
     status,
 )
+from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -35,6 +36,7 @@ from app.models.platform import User
 from app.models.project import Equipment, Project
 from app.models.task import Task
 from app.services import audit, change_flow
+from app.services.files import guess_media_type
 from app.services.numbering import (
     EMPTY,
     compose_mech_drawing_no,
@@ -636,6 +638,31 @@ def list_versions(
         }
         for v in rows
     ]
+
+
+@router.get("/drawings/{drawing_no}/file")
+def get_drawing_file(
+    drawing_no: str, session: Session = Depends(get_session), _: User = Depends(get_current_user)
+):
+    """看/下电子图纸（手机端看图比对、外协随单）：返回当前版本的附件。"""
+    row = session.get(Drawing, drawing_no)
+    if row is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "图纸不存在")
+    ver = _current_version_row(session, drawing_no)
+    if ver is None or not ver.file_path:
+        ver = session.scalar(
+            select(DrawingVersion)
+            .where(DrawingVersion.drawing_no == drawing_no, DrawingVersion.file_path.is_not(None))
+            .order_by(DrawingVersion.id.desc())
+        )
+    if ver is None or not ver.file_path:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, f"{drawing_no} 还没上传图纸文件")
+    path = Path(ver.file_path)
+    if not path.exists():
+        raise HTTPException(status.HTTP_410_GONE, "图纸文件已不存在")
+    return FileResponse(
+        path, media_type=guess_media_type(ver.filename), filename=ver.filename or f"{drawing_no}.pdf"
+    )
 
 
 # ============================================================================

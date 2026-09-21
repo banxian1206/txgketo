@@ -12,6 +12,7 @@ from app.api.routes import (
     health,
     initiation,
     library,
+    mobile,
     numbering,
     platform,
     programs,
@@ -46,6 +47,7 @@ for r in (
     reviews,
     programs,
     changes,
+    mobile,
     suppliers,
     warehouse,
 ):

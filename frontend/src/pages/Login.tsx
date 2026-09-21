@@ -35,7 +35,9 @@ export default function Login() {
               localStorage.setItem(TOKEN_KEY, data.access_token)
               localStorage.setItem('txgk_name', data.user.name)
               localStorage.setItem('txgk_user', JSON.stringify(data.user))
-              nav('/projects')
+              // 手机（窄屏）默认进移动端；电脑进项目列表（03 卷：手机端是主要终端）
+              const isPhone = window.matchMedia('(max-width: 820px)').matches
+              nav(isPhone ? '/m' : '/projects')
             } catch (e) {
               message.error(errMsg(e))
             } finally {

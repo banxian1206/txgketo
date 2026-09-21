@@ -22,6 +22,7 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
 )
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base, TimestampMixin
@@ -203,6 +204,8 @@ class GoodsReceipt(Base, TimestampMixin):
     inspected_by: Mapped[int | None] = mapped_column(ForeignKey("app_user.id"))
     inspected_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     inspect_note: Mapped[str | None] = mapped_column(Text)
+    # ★ 验收照片（05 卷 §8.2 / 03 卷手机端）：[{filename, stored_path, by, at}]
+    photos: Mapped[list | None] = mapped_column(JSONB)
     location: Mapped[str | None] = mapped_column(String(64))  # 入库库位
     # ★ 验收与入库拆开：验收合格 → 待入库；入库时记是谁、什么时候入的
     stored_by: Mapped[int | None] = mapped_column(ForeignKey("app_user.id"))

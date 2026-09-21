@@ -1266,6 +1266,7 @@ export async function inspectPurchase(
   body: { receipt_date: string; qty: number; result: string; note?: string },
 ) {
   const { data } = await api.post<{
+    receipt_id: number
     receipt_no: string
     receipt_status: string
     request_status: string
@@ -1283,6 +1284,88 @@ export async function storeReceipt(receiptId: number, body: { location?: string;
     request_status: string
   }>(`/goods-receipts/${receiptId}/store`, body)
   return data
+}
+
+// ============================== 移动端（03 卷） ==================================
+
+export interface MobileHome {
+  user: { id: number; name: string; profession?: string | null; position?: string | null }
+  counts: {
+    to_inspect: number
+    to_store: number
+    issues: number
+    my_tasks: number
+    to_review: number
+    to_decide: number
+  }
+}
+
+export async function mobileHome() {
+  const { data } = await api.get<MobileHome>('/m/home')
+  return data
+}
+
+export interface MobileMaterial {
+  id: number
+  project_no: string | null
+  project_name?: string | null
+  equip_no?: string | null
+  equip_name?: string | null
+  item_no: string
+  display_name: string
+  spec_text?: string | null
+  brand?: string | null
+  qty: number
+  qty_received: number
+  unit?: string | null
+  po_no?: string | null
+  supplier_name?: string | null
+  need_date?: string | null
+  expected_date?: string | null
+  status: string
+  deliver_to?: string | null
+  part_no?: string | null
+  drawing?: {
+    drawing_no: string
+    title: string
+    version: string
+    kind: string
+    file_url: string
+  } | null
+  receipts: {
+    id: number
+    receipt_no: string
+    qty: number
+    unit?: string | null
+    status: string
+    receipt_date?: string | null
+    location?: string | null
+    inspect_note?: string | null
+    photos: { filename?: string | null; by?: string | null; at?: string | null; url: string }[]
+  }[]
+}
+
+export async function mobileMaterial(requestId: number) {
+  const { data } = await api.get<MobileMaterial>(`/m/materials/${requestId}`)
+  return data
+}
+
+/** 验收拍照（手机端）：一次可传多张（前端已压缩） */
+export async function uploadReceiptPhotos(receiptId: number, files: File[]) {
+  const form = new FormData()
+  files.forEach((f) => form.append('files', f))
+  const { data } = await api.post<{
+    count: number
+    photos: { filename?: string | null; url: string }[]
+  }>(`/goods-receipts/${receiptId}/photos`, form)
+  return data
+}
+
+/** 带鉴权取文件（图纸/照片/程序）→ objectURL + MIME，供 <img>/<iframe> 直接用 */
+export async function fetchFileBlob(path: string): Promise<{ url: string; type: string }> {
+  const { data } = await api.get(path, { responseType: 'blob' })
+  const blob = data as Blob
+  return { url: URL.createObjectURL(blob), type: blob.type || '' }
 }
 
 export async function purchaseWorkbench() {

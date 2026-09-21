@@ -91,8 +91,8 @@ deploy/          docker-compose.dev.yml
 
 ## 8. 当前进度（交接记录）
 
-> 更新于：**05 卷 P6 改版（ECN）**落地（改版申请 → 总监裁决/下发 → 改版任务 → 重走两级审核 → 新版本；BOM 行替代；影响面人工处理；冻结内容改版必须走申请，新版/程序/图纸都被门禁拦住）。
-> 下一步：**05 卷 P7 工作台/移动端**（仓库手机看电子图纸 + 拍照验收、各工作台默认筛选）。
+> 更新于：**05 卷 P7 工作台/移动端**落地（图纸/程序电子文件读取、验收照片、移动端 `/m` 动线：仓库验收·领料；图片前端压缩；PWA manifest）。**05 卷 P1–P7 全部落地**。
+> 下一步（未做）：制造/装配/发运/现场/验收/售后（S5–S11）；Excel 历史采购导入；领料数量算法对齐；离线照片队列 + Capacitor 打包（真需要时）。
 
 ### 8.1 采购状态线（客户口径，别再改回去了）
 
@@ -143,6 +143,7 @@ deploy/          docker-compose.dev.yml
 | **PLC 程序版本（05 卷 P4）** | ✅ | `models/program.py`（程序 + 程序版本）+ `routes/programs.py`（建程序/上传草稿/改版/版本留档）；程序走评审单（`review_flow` 支持 PROGRAM，发布后任务联动）；设计面「PLC 程序版本」卡片 |
 | **发布→采购触发 + 手工申请（05 卷 P5）** | ✅ | `services/bom_demand.py`（`release_demand`/`plan_release_purchase`/`create_release_demands`，BUY_TYPES 加外协/定制）；发布时自动进池（`review_flow._publish_round`）；`POST /purchase/manual-request`；`purchase_request` 加 attribution/requester_id/source_release_id，project_no 可空；采购池显示来源/批次/归属/申请人；`components/ManualPurchaseModal.tsx` |
 | **改版申请 ECN（05 卷 P6）** | ✅ | `models/change.py` + `services/change_flow.py`（申请/裁决/下发/修订/影响面/完成）+ `routes/changes.py`；图纸/程序/BOM 行的 new-version 被门禁拦住（必须先批准并下发）；BOM 替代行 `superseded_by_id`（旧行排除出需求）；`pages/Changes.tsx`、`components/ChangeRequestModal.tsx`/`ChangeDetailModal.tsx` |
+| **移动端 / 工作台（05 卷 P7）** | ✅ | `GET /drawings/{no}/file`、`/programs/{id}/file`（电子图纸/程序下载）；`goods_receipt.photos` + `POST/GET /goods-receipts/{id}/photos`；`routes/mobile.py`（`/m/home`、`/m/materials/{id}`）；`layouts/MobileLayout.tsx` + `pages/m/*`（仓库验收动线：看图→拍照→合格/不合格→入库；领料）；`utils/image.ts` 前端压缩；PWA manifest |
 | 供应商主数据 + 报价 + 能供品类 | ✅ | `models/purchasing.py`、`routes/suppliers.py` |
 | 推荐供应商（多路证据打分） | ✅ | `GET /purchase/recommend/{item_no}` |
 | 价格参考（上次成交/历史区间/各家报价） | ✅ | `GET /purchase/price-reference/{item_no}` |
@@ -163,7 +164,7 @@ deploy/          docker-compose.dev.yml
 | 1 | Excel 历史采购导入 | 客户已确认后期要做（物料/供应商/单价/数量/日期 → 写价格库） |
 | 2 | 制造 / 装配 / 发运 / 现场 / 验收 / 售后 | 流程上还没做（见 `../00 方案` §3 S5–S11） |
 | 3 | 领料单数量算法对齐 | `warehouse/generate-issue` 还是旧算法（材料只乘直接父件、标准件不乘）；建议改成 `bom_demand` 那套按树累计 |
-| 4 | 工程设计流转（05 卷 P7） | P7 工作台/移动端（仓库手机看电子图纸 + 拍照验收、各工作台默认筛选）；口径见 `../05 工程设计流转·审核·冻结·改版.md` |
+| 4 | 移动端离线队列 + Capacitor 打包 | 03 卷：现场弱网「拍完先存本地、有网再传」；需要时再打包 APK/ipa（同一份代码） |
 
 > 本轮顺手修复：`update_purchase_request` 漏导入 `REQUEST_STATUS`，改采购需求状态会 500。
 
@@ -204,6 +205,12 @@ POST /api/v1/change-requests/{id}/decide          总监裁决（批准/否决�
 POST /api/v1/change-requests/{id}/dispatch        批准后下发改版任务
 POST /api/v1/change-requests/{id}/revise-bom      BOM 行改版：生成替代草稿行
 GET  /api/v1/change-requests/{id}/impact          影响面（已生成采购需求/已领料，人工处理）
+GET  /api/v1/drawings/{no}/file                   电子图纸（当前版本附件，手机看图/外协随单）
+GET  /api/v1/programs/{id}/file                   程序文件（当前版本附件）
+POST /api/v1/goods-receipts/{id}/photos           验收拍照（手机端，多张）
+GET  /api/v1/goods-receipts/{id}/photos/{idx}     看验收照片
+GET  /api/v1/m/home                               手机端首页待办（按角色）
+GET  /api/v1/m/materials/{request_id}             手机端一条货详情（物料+供应商+图纸+到货单/照片）
 GET/POST/PATCH /api/v1/users                      用户与岗位：专业/岗位（审核人）、组织、角色、停用、重置密码
 POST /api/v1/warehouse/projects/{no}/equipment/{equip}/generate-issue  按 BOM 生成领料单
 GET  /api/v1/purchase/recommend/{item_no}         推荐供应商（打分+理由）

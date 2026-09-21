@@ -2,8 +2,14 @@ import { Card, Typography } from 'antd'
 import { Navigate, Route, Routes } from 'react-router-dom'
 
 import AppLayout from './layouts/AppLayout'
+import MobileLayout from './layouts/MobileLayout'
 import Changes from './pages/Changes'
 import Login from './pages/Login'
+import AcceptM from './pages/m/AcceptM'
+import HomeM from './pages/m/HomeM'
+import IssuesM from './pages/m/IssuesM'
+import MeM from './pages/m/MeM'
+import WarehouseM from './pages/m/WarehouseM'
 import NumberRules from './pages/NumberRules'
 import ProjectCreate from './pages/ProjectCreate'
 import ProjectDetailPage from './pages/ProjectDetailPage'
@@ -42,6 +48,20 @@ export default function App() {
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
+      <Route
+        path="/m"
+        element={
+          <RequireAuth>
+            <MobileLayout />
+          </RequireAuth>
+        }
+      >
+        <Route index element={<HomeM />} />
+        <Route path="warehouse" element={<WarehouseM />} />
+        <Route path="accept/:requestId" element={<AcceptM />} />
+        <Route path="issues" element={<IssuesM />} />
+        <Route path="me" element={<MeM />} />
+      </Route>
       <Route
         path="/"
         element={

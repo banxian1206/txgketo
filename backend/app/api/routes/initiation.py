@@ -3,15 +3,19 @@
 from __future__ import annotations
 
 from datetime import UTC, date, datetime, timedelta
+from pathlib import Path
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile, status
+from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import delete, or_, select
 from sqlalchemy.orm import Session
 
 from app.api.deps import client_ip, get_current_user
+from app.core.config import settings
 from app.core.db import get_session
 from app.models.engineering import Drawing
+from app.services.files import guess_media_type, save_upload
 from app.models.initiation import (
     ATTRIBUTIONS,
     DEFAULT_MILESTONES,
@@ -1098,6 +1102,7 @@ def inspect_purchase_request(
     )
     session.commit()
     return {
+        "receipt_id": gr.id,
         "receipt_no": receipt_no,
         "receipt_status": gr.status,
         "request_status": row.status,
@@ -1187,6 +1192,73 @@ def store_receipt(
 
 
 
+@purchase_router.post("/goods-receipts/{receipt_id}/photos", status_code=status.HTTP_201_CREATED)
+async def upload_receipt_photos(
+    receipt_id: int,
+    request: Request,
+    files: list[UploadFile] = File(...),
+    session: Session = Depends(get_session),
+    current: User = Depends(get_current_user),
+):
+    """验收拍照（手机端）：一次可传多张，存到到货单上（03 卷：清单 + 勾选 + 拍照）。"""
+    gr = session.get(GoodsReceipt, receipt_id)
+    if gr is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "到货单不存在")
+    photos = list(gr.photos or [])
+    folder = Path(settings.upload_dir) / gr.project_no / "receipts" / gr.receipt_no
+    for f in files[:20]:
+        stored, name = await save_upload(f, folder)
+        photos.append(
+            {
+                "filename": name,
+                "stored_path": stored,
+                "by": current.name,
+                "at": datetime.now(UTC).isoformat(),
+            }
+        )
+    gr.photos = photos
+    audit.log(
+        session,
+        user=current,
+        action="photos",
+        object_type="goods_receipt",
+        object_ref=gr.receipt_no,
+        summary=f"到货验收拍照 {gr.receipt_no}：新增 {min(len(files), 20)} 张（共 {len(photos)} 张）",
+        ip=client_ip(request),
+    )
+    session.commit()
+    return {
+        "count": len(photos),
+        "photos": [
+            {"filename": p.get("filename"), "by": p.get("by"), "at": p.get("at"), "url": f"/goods-receipts/{receipt_id}/photos/{i}"}
+            for i, p in enumerate(photos)
+        ],
+    }
+
+
+@purchase_router.get("/goods-receipts/{receipt_id}/photos/{idx}")
+def get_receipt_photo(
+    receipt_id: int,
+    idx: int,
+    session: Session = Depends(get_session),
+    _: User = Depends(get_current_user),
+):
+    """看验收照片。"""
+    gr = session.get(GoodsReceipt, receipt_id)
+    if gr is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "到货单不存在")
+    photos = gr.photos or []
+    if idx < 0 or idx >= len(photos):
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "照片不存在")
+    photo = photos[idx]
+    path = Path(photo.get("stored_path") or "")
+    if not path.exists():
+        raise HTTPException(status.HTTP_410_GONE, "照片文件已不存在")
+    return FileResponse(
+        path, media_type=guess_media_type(photo.get("filename")), filename=photo.get("filename")
+    )
+
+
 @purchase_router.get("/goods-receipts")
 def list_receipts(
     deliver_to: str | None = None,
@@ -1238,6 +1310,15 @@ def list_receipts(
             "inspected_at": g.inspected_at,
             "location": g.location,
             "inspect_note": g.inspect_note,
+            "photos": [
+                {
+                    "filename": p.get("filename"),
+                    "by": p.get("by"),
+                    "at": p.get("at"),
+                    "url": f"/goods-receipts/{g.id}/photos/{i}",
+                }
+                for i, p in enumerate(g.photos or [])
+            ],
             "stored_by": names.get(g.stored_by) if g.stored_by else None,
             "stored_at": g.stored_at,
             "resolve_note": g.resolve_note,

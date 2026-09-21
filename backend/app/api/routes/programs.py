@@ -19,6 +19,7 @@ from fastapi import (
     UploadFile,
     status,
 )
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -31,6 +32,7 @@ from app.models.platform import User
 from app.models.program import EquipmentProgram, EquipmentProgramVersion
 from app.models.task import Task
 from app.services import audit, change_flow
+from app.services.files import guess_media_type
 from app.services.review_flow import current_program_version_row
 
 router = APIRouter(tags=["程序版本"])
@@ -298,6 +300,32 @@ def list_program_versions(
     ).all()
     names = _names(session)
     return [_version_dict(v, names) for v in rows]
+
+
+@router.get("/programs/{program_id}/file")
+def get_program_file(
+    program_id: int, session: Session = Depends(get_session), _: User = Depends(get_current_user)
+):
+    """看/下程序文件（当前版本附件）。"""
+    row = _get_program(session, program_id)
+    ver = current_program_version_row(session, program_id)
+    if ver is None or not ver.file_path:
+        ver = session.scalar(
+            select(EquipmentProgramVersion)
+            .where(
+                EquipmentProgramVersion.program_id == program_id,
+                EquipmentProgramVersion.file_path.is_not(None),
+            )
+            .order_by(EquipmentProgramVersion.id.desc())
+        )
+    if ver is None or not ver.file_path:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, f"{row.name} 还没上传程序文件")
+    path = Path(ver.file_path)
+    if not path.exists():
+        raise HTTPException(status.HTTP_410_GONE, "程序文件已不存在")
+    return FileResponse(
+        path, media_type=guess_media_type(ver.filename), filename=ver.filename or row.name
+    )
 
 
 @router.delete("/programs/{program_id}")
