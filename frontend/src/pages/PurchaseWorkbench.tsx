@@ -21,6 +21,7 @@ import {
 } from '../api/client'
 
 const ORDER_STATUS_COLOR: Record<string, string> = {
+  现场待验收: 'gold',
   在途: 'gold',
   待入库: 'processing',
   部分到货: 'cyan',

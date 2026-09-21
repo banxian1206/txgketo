@@ -14,7 +14,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.models.assembly import ASSY_DEBUG_DONE, ASSY_DONE, AssemblyRecord, KittingSnapshot
@@ -23,6 +23,7 @@ from app.models.initiation import GoodsReceipt, PurchaseRequest
 from app.models.library import Item
 from app.models.production import OS_OK, PROD_TRANSFERRED, OutsourceTask, ProdOrder
 from app.models.project import Equipment
+from app.models.warehouse import MaterialIssue, MaterialIssueLine
 from app.services.bom_demand import _stock_available
 
 SOURCE_SELF_MADE = "自制件"
@@ -35,6 +36,17 @@ ARRIVED_STATUS = ("待入库", "部分到货", "已完成")
 
 def _qty(v) -> float:
     return float(v or 0)
+
+
+def _issued_to_workshop(session: Session, project_no: str) -> dict[str, float]:
+    """本项目已领走到车间的数量（领料单已领走）：从装配视角，这些料也算到位。"""
+    rows = session.execute(
+        select(MaterialIssueLine.item_no, func.sum(MaterialIssueLine.qty_required))
+        .join(MaterialIssue, MaterialIssue.id == MaterialIssueLine.issue_id)
+        .where(MaterialIssue.project_no == project_no, MaterialIssue.status == "已领走")
+        .group_by(MaterialIssueLine.item_no)
+    ).all()
+    return {item_no: float(qty or 0) for item_no, qty in rows}
 
 
 def _ready_purchased(
@@ -75,6 +87,7 @@ def compute(session: Session, project_no: str, equip_no: str) -> dict:
     published = [d for d in drawings if d.status == DRAWING_PUBLISHED]
     tree_nos = {d.drawing_no for d in drawings}
     stock = _stock_available(session)
+    issued = _issued_to_workshop(session, project_no)
 
     prod = {
         o.item_no: o
@@ -93,8 +106,10 @@ def compute(session: Session, project_no: str, equip_no: str) -> dict:
 
     lines: list[dict] = []
 
-    # ① 有图号的件：自制 / 外协 / 定制 / 标准
+    # ① 有图号的件：自制 / 外协 / 定制 / 标准（总装图是装配对象，不计入齐套）
     for d in published:
+        if d.parent_drawing_no is None:
+            continue
         need = _qty(d.qty) or 1
         if d.source_type == SOURCE_SELF_MADE:
             o = prod.get(d.drawing_no)
@@ -130,7 +145,8 @@ def compute(session: Session, project_no: str, equip_no: str) -> dict:
     for b in rows:
         need = _qty(b.qty) or 1
         have = stock.get(b.child_item_no, 0.0)
-        ready = have >= need
+        taken = issued.get(b.child_item_no, 0.0)  # 已领到车间（本项目）
+        ready = have + taken >= need
         it = items.get(b.child_item_no)
         lines.append(
             {

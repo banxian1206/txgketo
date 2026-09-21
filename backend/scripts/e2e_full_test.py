@@ -153,8 +153,8 @@ def main() -> None:
     flag("S1", root_no == f"{p}-01A-00-00-00-00", f"总装图号应为 {p}-01A-00-00-00-00")
     ms = req("get", f"/api/v1/projects/{p}/milestones", "pm1")
     ms_list = ms if isinstance(ms, list) else ms.get("items", [])
-    flag("S1", all(not m.get("plan_start") for m in ms_list),
-         "备注：标准节点生成后日期为空，需要人工补（不影响流程）")
+    flag("S1", all(m.get("plan_start") and m.get("plan_end") for m in ms_list),
+         "标准节点应带默认计划起止日期（按合同周期均分）")
     print(f"  阶段={pj['stage']}；设备 {eqs[0]['equip_no']}；团队 {len(mem)} 人；节点 {len(ms_list)}；长周期件 {len(prs)} 条")
     STAGES.append(("S1 立项", "团队10人/设备01A/节点8个/长周期件下单，阶段=执行中；总装图自动生成"))
 
@@ -181,7 +181,7 @@ def main() -> None:
     flag("S2", tk["status"] == "待总监审", f"经理提交应跳过组长直接「待总监审」，实际 {tk['status']}")
     req("post", f"/api/v1/review-tickets/{tk['id']}/review", "eng_director", json={"action": "通过", "note": "OK"})
     tk = req("get", f"/api/v1/tasks/{t_mech['task_id']}/review-ticket", "mech_manager")
-    flag("S2", tk["status"] == "已通过", f"总监通过后评审单应「已通过」，实际 {tk['status']}")
+    flag("S2", tk["status"] == "已发布", f"总监通过后评审单应「已发布」，实际 {tk['status']}")
     pool1 = req("get", "/api/v1/purchase/pool", "buyer1")
     mine1 = [{**r, "item_no": g["item_no"]} for g in pool1 for r in g["requests"]
              if r["project_no"] == p]
@@ -264,9 +264,8 @@ def main() -> None:
     req("post", f"/api/v1/manufacturing/projects/{p}/equipment/01A/generate-orders", "shop1", (201,), json={})
     orders = {o["item_no"]: o for o in req("get", "/api/v1/manufacturing/orders", "shop1",
                                            params={"project_no": p})}
-    flag("S5", set(orders) == {f"{p}-01A-00-00-00-00", dr1["drawing_no"], frame_no},
-         f"自制件排产应为 总装+主体+机架 3 张，实际 {sorted(orders)}")
-    flag("S5", True, "备注：总装图（00-00-00-00）也被当成一个「自制件」生成排产单 —— 语义上总装是装配对象不是加工零件")
+    flag("S5", set(orders) == {dr1["drawing_no"], frame_no},
+         f"自制件排产应为 主体+机架 2 张（总装图不排产），实际 {sorted(orders)}")
     ph = photos("shop1", "manufacturing", p, "e2e")
 
     def flow(o: dict, path: str) -> None:
@@ -286,18 +285,17 @@ def main() -> None:
 
     flow(orders[frame_no], "start-ok")
     flow(orders[dr1["drawing_no"]], "start")
-    flow(orders[f"{p}-01A-00-00-00-00"], "dispatch-ng")
     sts = {o["item_no"]: o["status"] for o in req("get", "/api/v1/manufacturing/orders", "shop1",
                                                   params={"project_no": p})}
-    flag("S5", sts[frame_no] == "已转运" and sts[dr1["drawing_no"]] == "制造中"
-         and sts[f"{p}-01A-00-00-00-00"] == "返工", f"排产三种状态不符：{sts}")
+    flag("S5", sts[frame_no] == "已转运" and sts[dr1["drawing_no"]] == "制造中",
+         f"排产状态不符：{sts}")
     osr = req("get", "/api/v1/manufacturing/outsource", "shop1", params={"project_no": p})[0]
     req("post", f"/api/v1/manufacturing/outsource/{osr['id']}/send", "shop1",
         json={"supplier_name": "恒钲钣金", "due_date": d(20), "material_supplied": True})
     req("post", f"/api/v1/manufacturing/outsource/{osr['id']}/return", "shop1", json={})
     req("post", f"/api/v1/manufacturing/outsource/{osr['id']}/accept", "shop1", json={"result": "合格"})
-    print("  机架已转运 / 主体在制 / 总装返工；外协件回厂验收合格")
-    STAGES.append(("S5 制造", "排产3张(转运/在制/返工)+外协1张(合格)；下发/验收/转运全部拍照留痕"))
+    print("  机架已转运 / 主体在制；外协件回厂验收合格（总装图不再排产）")
+    STAGES.append(("S5 制造", "排产2张(转运/在制)+外协1张(合格)；下发/验收/转运全部拍照留痕"))
 
     # ================= S6 装配 =================
     stage("S6 装配与厂内调试（assy1）")

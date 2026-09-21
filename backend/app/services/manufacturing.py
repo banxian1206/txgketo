@@ -106,6 +106,8 @@ def generate_orders(
     orders: list[ProdOrder] = []
     outsource: list[OutsourceTask] = []
     for d in published:
+        if d.parent_drawing_no is None:
+            continue  # ★ 总装图是装配对象，不是车间加工件，不排产
         if d.source_type not in (SOURCE_SELF_MADE, SOURCE_OUTSOURCE):
             continue
         qty = float(mult.get(d.drawing_no, 1) or 1)

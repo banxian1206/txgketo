@@ -16,6 +16,7 @@ const STATUS_COLOR: Record<string, string> = {
   待总监审: 'gold',
   已退回: 'error',
   已撤回: 'default',
+  已发布: 'success',
   已通过: 'success',
 }
 

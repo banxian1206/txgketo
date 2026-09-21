@@ -226,7 +226,7 @@ def main() -> None:
         orders = {o["item_no"]: o for o in c.get("/api/v1/manufacturing/orders", headers=login("shop1"),
                                                  params={"project_no": p}).json()}
         ph = photos("shop1", "manufacturing", p, "demo")
-        root_no, body_no, frame_no = f"{p}-01A-00-00-00-00", f"{p}-01A-01-00-00-00", dr_frame["drawing_no"]
+        body_no, frame_no = f"{p}-01A-01-00-00-00", dr_frame["drawing_no"]
 
         def mfg_flow(o: dict, path: str) -> None:
             oid = o["id"]
@@ -246,7 +246,7 @@ def main() -> None:
 
         mfg_flow(orders[frame_no], "start-ok")   # 机架：做完 → 转运装配区
         mfg_flow(orders[body_no], "start")        # 主体：在制（看板能看到）
-        mfg_flow(orders[root_no], "dispatch-ng")  # 总装：不合格 → 返工
+        # 总装图（00-00-00-00）不再排产：它是装配对象，不是加工零件
 
         # 外协：发出 → 回厂 → 合格
         osr = c.get("/api/v1/manufacturing/outsource", headers=login("shop1"), params={"project_no": p}).json()

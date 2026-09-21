@@ -379,17 +379,27 @@ def generate_milestones(
     session: Session = Depends(get_session),
     current: User = Depends(get_current_user),
 ):
-    """按标准节点一键生成（日期留空，自己按实际情况填）。已存在的不动。"""
+    """按标准节点一键生成：按合同周期均分出每个节点的计划起止（可再手工调整）。已存在的不动。"""
     project = _get_project(session, project_no)
     existing = {
         m.name
         for m in session.scalars(select(Milestone).where(Milestone.project_no == project_no)).all()
     }
+    # 时间轴：有合同周期用合同周期；只有交期天数用交期天数；都没有按今天起 120 天兜底
+    start = project.period_start or date.today()
+    end = project.period_end or (
+        start + timedelta(days=project.delivery_days or 120)
+    )
+    total_days = max((end - start).days, len(DEFAULT_MILESTONES))
+    seg = total_days / len(DEFAULT_MILESTONES)
     created = []
     for i, name in enumerate(DEFAULT_MILESTONES, start=1):
         if name in existing:
             continue
-        session.add(Milestone(project_no=project_no, seq=i, name=name, status="未开始"))
+        seg_start = start + timedelta(days=round((i - 1) * seg))
+        seg_end = start + timedelta(days=round(i * seg)) if i < len(DEFAULT_MILESTONES) else end
+        session.add(Milestone(project_no=project_no, seq=i, name=name,
+                              plan_start=seg_start, plan_end=seg_end, status="未开始"))
         created.append(name)
     if created:
         audit.log(
@@ -985,7 +995,13 @@ def _recalc_request_status(session: Session, row: PurchaseRequest) -> str:
     if any(g.status == "不合格" for g in gs):
         row.status = "不合格"
     elif pending > 0:
-        row.status = "待入库"
+        pending_rows = [g for g in gs if g.status in ("待入库", "现场待验收")]
+        # 全是直发现场的货 → 等「现场待验收」，不要误导成要仓库入库
+        row.status = (
+            "现场待验收"
+            if pending_rows and all(g.deliver_to == "直发客户现场" for g in pending_rows)
+            else "待入库"
+        )
     elif qty <= 0:
         row.status = "已退货" if any(g.status == "已退货" for g in gs) else "已取消"
     elif stored + site >= qty - 1e-6:
@@ -1433,7 +1449,7 @@ def purchase_workbench(session: Session = Depends(get_session), _: User = Depend
                 ),
             }
         )
-    order = {"不合格": 0, "待采购": 1, "在途": 2, "已下单": 3, "待入库": 4, "部分到货": 5}
+    order = {"不合格": 0, "待采购": 1, "在途": 2, "已下单": 3, "待入库": 4, "现场待验收": 4, "部分到货": 5}
     return sorted(out, key=lambda x: (order.get(x["status"], 9), x.get("need_date") or "9999"))
 
 
@@ -1840,7 +1856,7 @@ ORDER_ACTIVE_STATUS = ("待采购", "在途", "已下单", "部分到货")
 # 验收不合格：由采购协商 → 换货（回在途）/ 退货（结束）
 ORDER_FAILED_STATUS = ("不合格",)
 # 已落地（验收中/已入库/已退）：取消、改供应商都动不了
-ORDER_BLOCKED_STATUS = ("待入库", "已入库", "现场已验收", "已退货", "已取消")
+ORDER_BLOCKED_STATUS = ("待入库", "现场待验收", "已入库", "现场已验收", "已退货", "已取消")
 
 
 def _order_rows(session: Session, key: str) -> list[PurchaseRequest]:
@@ -1865,6 +1881,8 @@ def _order_status(rows: list[PurchaseRequest]) -> str:
         return "不合格"
     if "待入库" in st:
         return "待入库"
+    if "现场待验收" in st:
+        return "现场待验收"
     done = {"已入库", "现场已验收"}
     if st <= done:
         return "已完成"
