@@ -91,8 +91,8 @@ deploy/          docker-compose.dev.yml
 
 ## 8. 当前进度（交接记录）
 
-> 更新于：**06 卷 E 步**落地：采购/仓库工作台加「待办头」、商务部台（商机/待立项/回款）、项目经理台（项目全链进度+风险）。**06 卷 A–E 全部落地**。
-> 下一步（未做）：制造/装配/发运/现场/验收/售后（S5–S11）；Excel 历史采购导入；领料数量算法对齐；离线队列 + Capacitor；接口级权限强校验 + 离职转交；超期扫描。
+> 更新于：**06 卷 F 步（账号权限收尾）**落地：接口级权限强校验（`require_permission`，采购下单类→`purchase:edit`、验收/入库/领料→`warehouse:edit`）、金额分档（`purchase:price` 采购价 / `project:amount` 项目金额，无权限返回 null）、**离职/停用一键转交**（任务/待审/项目角色/图·程序·BOM 归属）。
+> 下一步：制造/装配/发运/现场/验收/售后（S5–S11）；Excel 历史采购导入；领料数量算法对齐；离线队列 + Capacitor；超期扫描。
 
 ### 8.1 采购状态线（客户口径，别再改回去了）
 
@@ -150,6 +150,7 @@ deploy/          docker-compose.dev.yml
 | **工程部工作台（06 卷 D 步）** | ✅ | `GET /workbench/eng/board`（设备×四专业进度、待终审、待裁决改版、卡住/超期）；`pages/workbench/EngWorkbench.tsx`（组员/经理/总监三视角按岗位自动切；我的任务·评审单·改版 / 我组待审·组员进度 / 部门看板） |
 | **工作台收尾（06 卷 E 步）** | ✅ | 采购工作台待办头（待下单/在途/验收不合格/退换）+ 仓库待办头（待验收/待入库/待领料）；`GET /workbench/sales/board` + `SalesWorkbench.tsx`（商机/待立项/回款）；`GET /workbench/pm/board` + `PmWorkbench.tsx`（项目全链进度/风险）；车间台仍留位 |
 | **账号与角色可用性（06 卷 §4）** | ✅ | 岗位统一三级（组员/经理/总监，迁移 `f3a5c7e9b104`）；**演示账号一键生成**（`services/demo.py` + `POST /demo-users` + `scripts/seed_demo_users.py`，19 个，密码 `txgk@123`）；**以某人身份查看**（`X-Impersonate`，GET 生效、写操作 403、顶栏橙色横幅） |
+| **权限强校验 + 金额分档 + 离职转交（06 卷 F 步）** | ✅ | `deps.require_permission`/`has_permission`/`scrub_money`；采购下单类→`purchase:edit`、验收/入库/领料→`warehouse:edit`；金额：`purchase:price`（采购单/报价/价格参考）、`project:amount`（项目金额/列表）无权限返回 null；`POST /users/{id}/handover` 一键转交；前端 `hasPerm()` 按钮显隐 + Users 页「转交」弹窗 |
 | 供应商主数据 + 报价 + 能供品类 | ✅ | `models/purchasing.py`、`routes/suppliers.py` |
 | 推荐供应商（多路证据打分） | ✅ | `GET /purchase/recommend/{item_no}` |
 | 价格参考（上次成交/历史区间/各家报价） | ✅ | `GET /purchase/price-reference/{item_no}` |
@@ -171,8 +172,7 @@ deploy/          docker-compose.dev.yml
 | 2 | 制造 / 装配 / 发运 / 现场 / 验收 / 售后 | 流程上还没做（见 `../00 方案` §3 S5–S11） |
 | 3 | 领料单数量算法对齐 | `warehouse/generate-issue` 还是旧算法（材料只乘直接父件、标准件不乘）；建议改成 `bom_demand` 那套按树累计 |
 | 4 | 移动端离线队列 + Capacitor 打包 | 03 卷：现场弱网「拍完先存本地、有网再传」；需要时再打包 APK/ipa（同一份代码） |
-| 6 | **接口级权限强校验 + 离职一键转交** | 06 卷 §10：本期不做，已记录，下期做（`require_permission` 接关键动作；任务/待审/项目角色转交） |
-| 7 | **超期扫描（任务/交期到期提醒）** | 本期只展示“超期”，**自动扫描下期**。注：**没有“到货登记”这个动作**（新流程已废弃，AGENTS §8.1：采购侧不登记到货/发货，状态由仓库验收/入库推着变）——所以不存在“到货提醒”，仓库是主动看「待验收」清单收货；验收/入库的通知已接 |
+| 6 | **超期扫描（任务/交期到期提醒）** | 本期只展示“超期”，**自动扫描下期**。注：**没有“到货登记”这个动作**（新流程已废弃，AGENTS §8.1：采购侧不登记到货/发货，状态由仓库验收/入库推着变）——所以不存在“到货提醒”，仓库是主动看「待验收」清单收货；验收/入库的通知已接 |
 
 > 本轮顺手修复：`update_purchase_request` 漏导入 `REQUEST_STATUS`，改采购需求状态会 500。
 
@@ -222,6 +222,8 @@ GET  /api/v1/m/materials/{request_id}             手机端一条货详情（物
 GET  /api/v1/my-scope                             我能管什么（是否管理员/总监、可勾角色、可选岗位）
 POST /api/v1/demo-users                           演示账号：{action: create/disable/enable}（仅管理员）
    以某人身份查看（仅管理员，只读）：请求头 X-Impersonate: <user_id>；写操作一律 403
+POST /api/v1/users/{id}/handover                  离职/停用一键转交：{to_user_id, deactivate}
+   权限强校验：采购下单类→purchase:edit；验收/入库/领料→warehouse:edit；金额→purchase:price / project:amount（无权限返回 null）
 POST/PATCH /api/v1/orgs（/{id}）                   组织维护：部门/组 增改停用（停用不删）
 GET  /api/v1/users?org_id&role_code&is_active&q   用户列表（筛选；管理权限在后端校验）
 GET  /api/v1/workbench/me                          我的工作台：可见工作台 + 待办数字 + 我的项目

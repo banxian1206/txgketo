@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
-from app.api.deps import client_ip, get_current_user
+from app.api.deps import client_ip, get_current_user, has_permission, scrub_money
 from app.core.db import get_session
 from app.models.initiation import PurchaseRequest
 from app.models.library import SOURCE_STANDARD, Item, StdCategory, StdClass
@@ -246,14 +246,15 @@ def _quote_dict(q: SupplierQuote, supplier: Supplier | None, item: Item | None) 
 
 @router.get("/suppliers/{supplier_id}/quotes")
 def list_quotes(
-    supplier_id: int, session: Session = Depends(get_session), _: User = Depends(get_current_user)
+    supplier_id: int, session: Session = Depends(get_session), current: User = Depends(get_current_user)
 ):
     rows = session.scalars(
         select(SupplierQuote).where(SupplierQuote.supplier_id == supplier_id).order_by(SupplierQuote.quote_date.desc())
     ).all()
     items = {i.item_no: i for i in session.scalars(select(Item)).all()}
     sup = session.get(Supplier, supplier_id)
-    return [_quote_dict(q, sup, items.get(q.item_no)) for q in rows]
+    out = [_quote_dict(q, sup, items.get(q.item_no)) for q in rows]
+    return out if has_permission(current, "purchase:price") else scrub_money(out)
 
 
 @router.post("/suppliers/{supplier_id}/quotes", status_code=status.HTTP_201_CREATED)
@@ -312,7 +313,7 @@ def add_quote(
 
 @router.get("/purchase/price-reference/{item_no}")
 def price_reference(
-    item_no: str, session: Session = Depends(get_session), _: User = Depends(get_current_user)
+    item_no: str, session: Session = Depends(get_session), current: User = Depends(get_current_user)
 ):
     item = session.get(Item, item_no)
     if item is None:
@@ -342,7 +343,7 @@ def price_reference(
         .limit(5)
     ).all()
 
-    return {
+    result = {
         "item_no": item_no,
         "display_name": item.display_name,
         "spec_text": item.spec_text,
@@ -373,6 +374,7 @@ def price_reference(
             for p in pr_prices
         ],
     }
+    return result if has_permission(current, "purchase:price") else scrub_money(result)
 
 
 # ============================================================================

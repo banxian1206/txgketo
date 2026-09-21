@@ -43,3 +43,53 @@ def client_ip(request: Request) -> str | None:
     if fwd:
         return fwd.split(",")[0].strip()
     return request.client.host if request.client else None
+
+
+# ---------------------------------------------------------------------------
+# 权限（06 卷 §4/§10）：关键动作强校验
+# ---------------------------------------------------------------------------
+
+
+def permissions_of(user: User) -> set[str]:
+    return {p.code for r in user.roles for p in r.permissions}
+
+
+def has_permission(user: User, code: str) -> bool:
+    return user.is_superuser or code in permissions_of(user)
+
+
+def require_permission(code: str):
+    """用法：current: User = Depends(require_permission("purchase:edit"))"""
+
+    def dep(current: User = Depends(get_current_user)) -> User:
+        if not has_permission(current, code):
+            raise HTTPException(status.HTTP_403_FORBIDDEN, f"没有权限：{code}")
+        return current
+
+    return dep
+
+
+# 金额字段名（无对应权限时抹成 None，前端直接不显示）
+MONEY_KEYS = {
+    "unit_price",
+    "amount",
+    "amount_tax_incl",
+    "total_amount",
+    "est_amount",
+    "price",
+    "avg_price",
+    "min_price",
+    "max_price",
+    "last_price",
+    "performance_deposit",
+    "warranty_amount",
+}
+
+
+def scrub_money(obj):
+    """递归把金额字段抹掉（无金额权限时用）。"""
+    if isinstance(obj, dict):
+        return {k: (None if k in MONEY_KEYS else scrub_money(v)) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [scrub_money(x) for x in obj]
+    return obj

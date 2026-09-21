@@ -60,6 +60,7 @@ PERMISSIONS: list[tuple[str, str, str]] = [
     ("project:view", "查看项目", "项目"),
     ("project:edit", "新建/编辑项目", "项目"),
     ("project:close", "关闭项目", "项目"),
+    ("project:amount", "查看项目金额", "项目"),
     ("customer:view", "查看客户", "项目"),
     ("customer:edit", "维护客户", "项目"),
     ("contract:view", "查看合同金额", "商务"),
@@ -70,6 +71,7 @@ PERMISSIONS: list[tuple[str, str, str]] = [
     ("std:edit", "维护标准库", "标准库"),
     ("purchase:view", "查看采购", "采购"),
     ("purchase:edit", "采购下单", "采购"),
+    ("purchase:price", "查看采购价格", "采购"),
     ("warehouse:view", "查看库存", "仓库"),
     ("warehouse:edit", "到货验收/入库/领料", "仓库"),
     ("mfg:view", "查看制造任务", "制造"),
@@ -85,15 +87,15 @@ PERMISSIONS: list[tuple[str, str, str]] = [
 
 ROLES: list[tuple[str, str, list[str]]] = [
     ("ADMIN", "系统管理员", ["system:admin"]),
-    ("GM", "经营决策", ["project:view", "contract:view", "cost:view"]),
-    ("SALES", "销售/商务", ["project:view", "project:edit", "customer:view", "customer:edit", "contract:view", "contract:edit", "payment:edit"]),
+    ("GM", "经营决策", ["project:view", "project:amount", "contract:view", "cost:view", "purchase:price"]),
+    ("SALES", "销售/商务", ["project:view", "project:edit", "project:amount", "customer:view", "customer:edit", "contract:view", "contract:edit", "payment:edit"]),
     ("SCHEME", "方案工程师", ["project:view", "customer:view"]),
     ("DESIGN", "设计", ["project:view", "design:edit", "std:view"]),
     ("DESIGN_AUDIT", "技术审核", ["project:view", "design:edit", "design:audit", "std:view"]),
     ("CRAFT", "工艺", ["project:view", "design:edit", "std:view", "std:edit"]),
-    ("PM", "项目经理", ["project:view", "project:edit", "project:close", "contract:view", "design:edit", "purchase:view", "mfg:view", "ship:edit", "site:edit", "acceptance:edit"]),
-    ("PURCHASE", "采购", ["project:view", "purchase:view", "purchase:edit", "std:view", "warehouse:view"]),
-    ("PURCHASE_LEAD", "采购经理", ["project:view", "purchase:view", "purchase:edit", "std:view", "std:edit", "warehouse:view", "cost:view"]),
+    ("PM", "项目经理", ["project:view", "project:edit", "project:close", "project:amount", "contract:view", "design:edit", "purchase:view", "mfg:view", "ship:edit", "site:edit", "acceptance:edit"]),
+    ("PURCHASE", "采购", ["project:view", "purchase:view", "purchase:edit", "purchase:price", "std:view", "warehouse:view"]),
+    ("PURCHASE_LEAD", "采购经理", ["project:view", "purchase:view", "purchase:edit", "purchase:price", "std:view", "std:edit", "warehouse:view", "cost:view"]),
     ("WAREHOUSE", "仓库", ["project:view", "warehouse:view", "warehouse:edit", "purchase:view", "std:view"]),
     ("MFG", "制造执行", ["project:view", "mfg:view", "mfg:edit", "warehouse:edit"]),
     ("ASSY", "装配", ["project:view", "mfg:view", "mfg:edit"]),
@@ -101,7 +103,7 @@ ROLES: list[tuple[str, str, list[str]]] = [
     ("DELIVERY", "交付发运", ["project:view", "ship:edit", "warehouse:view"]),
     ("SITE", "现场服务", ["project:view", "site:edit", "acceptance:edit"]),
     ("SERVICE", "售后", ["project:view", "service:edit"]),
-    ("FIN", "财务", ["project:view", "contract:view", "cost:view", "payment:edit"]),
+    ("FIN", "财务", ["project:view", "project:amount", "contract:view", "cost:view", "purchase:price", "payment:edit"]),
 ]
 
 ADMIN_USERNAME = "admin"

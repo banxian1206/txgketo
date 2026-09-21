@@ -24,6 +24,7 @@ class UserOut(BaseModel):
     title: str | None = None
     is_active: bool = True
     is_superuser: bool = False
+    permissions: list[str] = []
 
 
 class UserAdminOut(UserOut):

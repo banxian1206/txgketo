@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
-from app.api.deps import client_ip, get_current_user
+from app.api.deps import client_ip, get_current_user, require_permission
 from app.core.db import get_session
 from app.models.engineering import BOM_MATERIAL, Drawing
 from app.models.initiation import GoodsReceipt, PurchaseRequest
@@ -78,7 +78,7 @@ def create_location(
     body: LocationIn,
     request: Request,
     session: Session = Depends(get_session),
-    current: User = Depends(get_current_user),
+    current: User = Depends(require_permission("warehouse:edit")),
 ):
     dup = session.scalar(
         select(WarehouseLocation).where(
@@ -250,7 +250,7 @@ def inbound(
     body: InboundIn,
     request: Request,
     session: Session = Depends(get_session),
-    current: User = Depends(get_current_user),
+    current: User = Depends(require_permission("warehouse:edit")),
 ):
     """手工入库（没走采购流程的东西，比如退料回库、盘盈）。"""
     if session.get(Item, body.item_no) is None:
@@ -347,7 +347,7 @@ def generate_issue(
     equip_no: str,
     request: Request,
     session: Session = Depends(get_session),
-    current: User = Depends(get_current_user),
+    current: User = Depends(require_permission("warehouse:edit")),
 ):
     """★ 按设备的 BOM 展开领料需求 → 查库存 → 生成领料单（缺的标出来）。
 
@@ -454,7 +454,7 @@ def pick_issue(
     body: IssueActionIn,
     request: Request,
     session: Session = Depends(get_session),
-    current: User = Depends(get_current_user),
+    current: User = Depends(require_permission("warehouse:edit")),
 ):
     """仓库备料完成：锁定库存（qty_locked += 需求）。"""
     issue = session.get(MaterialIssue, issue_id)
@@ -491,7 +491,7 @@ def hand_over_issue(
     body: IssueActionIn,
     request: Request,
     session: Session = Depends(get_session),
-    current: User = Depends(get_current_user),
+    current: User = Depends(require_permission("warehouse:edit")),
 ):
     """车间领走：扣库存、解锁占用、写出库流水。"""
     issue = session.get(MaterialIssue, issue_id)

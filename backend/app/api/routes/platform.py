@@ -7,7 +7,7 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
@@ -15,6 +15,9 @@ from app.api.deps import client_ip, get_current_user
 from app.api.schemas import UserAdminOut, UserOut
 from app.core.db import get_session
 from app.core.security import hash_password
+from app.models.change import CR_ACTIVE, ChangeRequest
+from app.models.engineering import BomItem, Drawing
+from app.models.initiation import Milestone, ProjectMember, PurchaseRequest
 from app.models.platform import (
     DEPT_ROLE_CODES,
     LEGACY_POSITIONS,
@@ -26,6 +29,9 @@ from app.models.platform import (
     Role,
     User,
 )
+from app.models.program import EquipmentProgram
+from app.models.review import TICKET_PENDING, ReviewTicket
+from app.models.task import Task
 from app.services import audit
 
 router = APIRouter(tags=["平台"])
@@ -551,3 +557,112 @@ def update_user(
     return UserAdminOut(
         **UserOut.model_validate(user).model_dump(), roles=[r.code for r in user.roles]
     )
+
+
+class HandoverIn(BaseModel):
+    to_user_id: int
+    deactivate: bool = Field(default=True, description="转交后停用原账号")
+
+
+@router.post("/users/{user_id}/handover")
+def handover_user(
+    user_id: int,
+    body: HandoverIn,
+    request: Request,
+    session: Session = Depends(get_session),
+    current: User = Depends(get_current_user),
+):
+    """离职/停用一键转交（06 卷 §10）：把未完成的任务、待审的评审单、项目角色、图/程序/BOM 归属转给另一个人。
+
+    管理员全部可转；总监只能在本部门内转。转完可顺带停用原账号。
+    """
+    scope = _require_manage(session, current)
+    from_user = session.get(User, user_id)
+    if from_user is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "用户不存在")
+    to_user = session.get(User, body.to_user_id)
+    if to_user is None:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "接收人不存在")
+    if from_user.id == to_user.id:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "不能转交给自己")
+    if from_user.is_superuser:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "不能转交系统管理员")
+    if not scope["admin"]:
+        allowed = _subtree_ids(session, scope["department"].id)
+        if from_user.org_id not in allowed or to_user.org_id not in allowed:
+            raise HTTPException(status.HTTP_403_FORBIDDEN, "只能在本部门内转交")
+
+    moved: dict[str, int] = {}
+    # 未完成的任务
+    tasks = session.scalars(
+        select(Task).where(Task.owner_id == from_user.id, Task.status.not_in(("已完成", "已取消")))
+    ).all()
+    for t in tasks:
+        t.owner_id = to_user.id
+    moved["未完成任务"] = len(tasks)
+    # 待审/进行中的评审单（提交人）
+    tickets = session.scalars(
+        select(ReviewTicket).where(
+            ReviewTicket.submitter_id == from_user.id, ReviewTicket.status.in_(TICKET_PENDING)
+        )
+    ).all()
+    for t in tickets:
+        t.submitter_id = to_user.id
+    moved["待审评审单"] = len(tickets)
+    # 项目角色
+    members = session.scalars(select(ProjectMember).where(ProjectMember.user_id == from_user.id)).all()
+    for m in members:
+        m.user_id = to_user.id
+    moved["项目角色"] = len(members)
+    # 图 / 程序 / BOM 行的归属
+    drawings = session.scalars(select(Drawing).where(Drawing.owner_id == from_user.id)).all()
+    for d in drawings:
+        d.owner_id = to_user.id
+    moved["图纸归属"] = len(drawings)
+    programs = session.scalars(
+        select(EquipmentProgram).where(EquipmentProgram.owner_id == from_user.id)
+    ).all()
+    for p in programs:
+        p.owner_id = to_user.id
+    moved["程序归属"] = len(programs)
+    boms = session.scalars(select(BomItem).where(BomItem.owner_id == from_user.id)).all()
+    for b in boms:
+        b.owner_id = to_user.id
+    moved["BOM 行归属"] = len(boms)
+    # 未结束的改版申请
+    crs = session.scalars(
+        select(ChangeRequest).where(
+            ChangeRequest.applicant_id == from_user.id, ChangeRequest.status.in_(CR_ACTIVE)
+        )
+    ).all()
+    for c in crs:
+        c.applicant_id = to_user.id
+    moved["进行中改版申请"] = len(crs)
+    # 里程碑 / 手工采购申请
+    milestones = session.scalars(select(Milestone).where(Milestone.owner_id == from_user.id)).all()
+    for m in milestones:
+        m.owner_id = to_user.id
+    moved["里程碑"] = len(milestones)
+    reqs = session.scalars(
+        select(PurchaseRequest).where(PurchaseRequest.requester_id == from_user.id)
+    ).all()
+    for r in reqs:
+        r.requester_id = to_user.id
+    moved["手工采购申请"] = len(reqs)
+
+    if body.deactivate:
+        from_user.is_active = False
+    audit.log(
+        session,
+        user=current,
+        action="handover",
+        object_type="user",
+        object_ref=from_user.username,
+        summary=f"转交 {from_user.name} → {to_user.name}："
+        + "；".join(f"{k} {v}" for k, v in moved.items() if v)
+        + ("；已停用原账号" if body.deactivate else ""),
+        detail={"moved": moved, "to_user": to_user.username, "deactivate": body.deactivate},
+        ip=client_ip(request),
+    )
+    session.commit()
+    return {"ok": True, "moved": moved, "deactivated": body.deactivate}

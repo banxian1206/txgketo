@@ -301,6 +301,28 @@ export async function getMyScope() {
   return data
 }
 
+/** 前端权限判断（06 卷 §4）：读登录时存的 permissions */
+export function hasPerm(code: string): boolean {
+  try {
+    const u = JSON.parse(localStorage.getItem('txgk_user') ?? '{}') as {
+      is_superuser?: boolean
+      permissions?: string[]
+    }
+    return u.is_superuser === true || (u.permissions ?? []).includes(code)
+  } catch {
+    return false
+  }
+}
+
+/** 离职/停用一键转交（06 卷 §10） */
+export async function handoverUser(userId: number, body: { to_user_id: number; deactivate: boolean }) {
+  const { data } = await api.post<{ ok: boolean; moved: Record<string, number>; deactivated: boolean }>(
+    `/users/${userId}/handover`,
+    body,
+  )
+  return data
+}
+
 /** 演示账号（06 卷 §4，仅管理员）：一键生成 / 停用 / 启用 */
 export interface DemoUserRow {
   username: string

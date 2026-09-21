@@ -11,7 +11,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import delete, or_, select
 from sqlalchemy.orm import Session
 
-from app.api.deps import client_ip, get_current_user
+from app.api.deps import client_ip, get_current_user, has_permission, require_permission, scrub_money
 from app.core.config import settings
 from app.core.db import get_session
 from app.models.engineering import Drawing
@@ -884,7 +884,7 @@ def order(
     body: OrderIn,
     request: Request,
     session: Session = Depends(get_session),
-    current: User = Depends(get_current_user),
+    current: User = Depends(require_permission("purchase:edit")),
 ):
     """采购员下单 → 状态「已下单」，并同步采购任务。"""
     row = session.get(PurchaseRequest, request_id)
@@ -1039,7 +1039,7 @@ def inspect_purchase_request(
     body: AcceptanceIn,
     request: Request,
     session: Session = Depends(get_session),
-    current: User = Depends(get_current_user),
+    current: User = Depends(require_permission("warehouse:edit")),
 ):
     """仓库验收（分批可多次）：合格 → 待入库；不合格 → 采购「验收不合格」里协商。"""
     row = session.get(PurchaseRequest, request_id)
@@ -1161,7 +1161,7 @@ def store_receipt(
     body: StoreIn,
     request: Request,
     session: Session = Depends(get_session),
-    current: User = Depends(get_current_user),
+    current: User = Depends(require_permission("warehouse:edit")),
 ):
     """入库：验收合格（待入库）的货 → 选库位入库，记库存与流水。分批入库就一批一批来。"""
     from app.models.warehouse import MOVE_IN, StockItem, StockMove
@@ -1263,7 +1263,7 @@ async def upload_receipt_photos(
     request: Request,
     files: list[UploadFile] = File(...),
     session: Session = Depends(get_session),
-    current: User = Depends(get_current_user),
+    current: User = Depends(require_permission("warehouse:edit")),
 ):
     """验收拍照（手机端）：一次可传多张，存到到货单上（03 卷：清单 + 勾选 + 拍照）。"""
     gr = session.get(GoodsReceipt, receipt_id)
@@ -1631,7 +1631,7 @@ def generate_equipment_purchase(
     body: GeneratePurchaseIn,
     request: Request,
     session: Session = Depends(get_session),
-    current: User = Depends(get_current_user),
+    current: User = Depends(require_permission("design:edit")),
 ):
     """★ BOM → 净需求 → 进采购池（常规件通道，00 卷 §3.1②）。
 
@@ -1730,7 +1730,7 @@ def merge_order(
     body: MergeOrderIn,
     request: Request,
     session: Session = Depends(get_session),
-    current: User = Depends(get_current_user),
+    current: User = Depends(require_permission("purchase:edit")),
 ):
     """合并下单：一次把多条需求下给同一个供应商，共用一张采购单号。"""
     from app.models.purchasing import Supplier, SupplierQuote
@@ -1956,7 +1956,9 @@ def _order_maps(session: Session):
 
 
 @purchase_router.get("/purchase/orders")
-def list_purchase_orders(session: Session = Depends(get_session), _: User = Depends(get_current_user)):
+def list_purchase_orders(
+    session: Session = Depends(get_session), current: User = Depends(get_current_user)
+):
     """采购单列表（合并单按 po_no 归拢；没号的历史单条单各自成单）。"""
     rows = session.scalars(
         select(PurchaseRequest)
@@ -1970,11 +1972,15 @@ def list_purchase_orders(session: Session = Depends(get_session), _: User = Depe
     agg = _receipt_qty_map(session, [r.id for r in rows])
     out = [_order_summary(key, mrs, items, projects, equips, agg) for key, mrs in groups.items()]
     out.sort(key=lambda o: (o["ordered_at"] or date.min, o["key"]), reverse=True)
+    if not has_permission(current, "purchase:price"):
+        return scrub_money(out)
     return out
 
 
 @purchase_router.get("/purchase/orders/{key}")
-def get_purchase_order(key: str, session: Session = Depends(get_session), _: User = Depends(get_current_user)):
+def get_purchase_order(
+    key: str, session: Session = Depends(get_session), current: User = Depends(get_current_user)
+):
     """采购单详情：单头 + 每行需求（项目/设备/物料/价格/状态/到货单）。"""
     rows = _order_rows(session, key)
     if not rows:
@@ -2036,10 +2042,13 @@ def get_purchase_order(key: str, session: Session = Depends(get_session), _: Use
                 ],
             }
         )
-    return {
+    result = {
         "order": _order_summary(key, rows, items, projects, equips, agg),
         "lines": lines,
     }
+    if not has_permission(current, "purchase:price"):
+        return scrub_money(result)
+    return result
 
 
 class CancelOrderIn(BaseModel):
@@ -2053,7 +2062,7 @@ def cancel_purchase_order(
     body: CancelOrderIn,
     request: Request,
     session: Session = Depends(get_session),
-    current: User = Depends(get_current_user),
+    current: User = Depends(require_permission("purchase:edit")),
 ):
     """取消采购：没到货的可以取消；已到货/入库的部分按实际留着，不合格的走换货/退货。"""
     rows = _order_rows(session, key)
@@ -2122,7 +2131,7 @@ def change_order_supplier(
     body: ChangeSupplierIn,
     request: Request,
     session: Session = Depends(get_session),
-    current: User = Depends(get_current_user),
+    current: User = Depends(require_permission("purchase:edit")),
 ):
     from app.models.purchasing import Supplier, SupplierQuote
 
@@ -2196,7 +2205,7 @@ def negotiate_failed_lines(
     body: NegotiateIn,
     request: Request,
     session: Session = Depends(get_session),
-    current: User = Depends(get_current_user),
+    current: User = Depends(require_permission("purchase:edit")),
 ):
     """验收不合格的回采购处理：换货（回「在途」等补发）或退货（数量减掉、结束）。"""
     rows = _order_rows(session, key)

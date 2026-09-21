@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.api.deps import client_ip, get_current_user
+from app.api.deps import client_ip, get_current_user, permissions_of
 from app.api.schemas import LoginIn, LoginOut, UserOut
 from app.core.db import get_session
 from app.core.security import create_access_token, verify_password
@@ -12,6 +12,12 @@ from app.models.platform import User
 from app.services import audit
 
 router = APIRouter(tags=["认证"])
+
+
+def _user_out(user: User) -> UserOut:
+    out = UserOut.model_validate(user)
+    out.permissions = sorted(permissions_of(user))
+    return out
 
 
 @router.post("/auth/login", response_model=LoginOut)
@@ -33,9 +39,9 @@ def login(body: LoginIn, request: Request, session: Session = Depends(get_sessio
         ip=client_ip(request),
     )
     session.commit()
-    return LoginOut(access_token=create_access_token(user.username), user=UserOut.model_validate(user))
+    return LoginOut(access_token=create_access_token(user.username), user=_user_out(user))
 
 
 @router.get("/auth/me", response_model=UserOut)
 def me(user: User = Depends(get_current_user)) -> UserOut:
-    return UserOut.model_validate(user)
+    return _user_out(user)

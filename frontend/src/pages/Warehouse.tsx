@@ -21,7 +21,7 @@ import dayjs from 'dayjs'
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
-import { api, errMsg, inspectPurchase, storeReceipt, type GoodsReceiptRow } from '../api/client'
+import { api, errMsg, hasPerm, inspectPurchase, storeReceipt, type GoodsReceiptRow } from '../api/client'
 
 const ISSUE_COLOR: Record<string, string> = { 待备料: 'gold', 已备料: 'processing', 已领走: 'success' }
 
@@ -77,6 +77,7 @@ export default function Warehouse() {
   const { message } = App.useApp()
   const nav = useNavigate()
   const [wb, setWb] = useState<Workbench | null>(null)
+  const canStore = hasPerm('warehouse:edit')
   const [tab, setTab] = useState('todo')
   const [stock, setStock] = useState<StockRow[]>([])
   const [issueCount, setIssueCount] = useState(0)
@@ -258,7 +259,7 @@ export default function Warehouse() {
                     {
                       title: '操作', key: 'a', width: 100, fixed: 'right',
                       render: (_: unknown, r) => (
-                        <Button type="primary" size="small" onClick={() => openAccept(r)}>验收</Button>
+                        <Button type="primary" size="small" disabled={!canStore} onClick={() => openAccept(r)}>验收</Button>
                       ),
                     },
                   ]}
@@ -300,7 +301,7 @@ export default function Warehouse() {
                     {
                       title: '操作', key: 'a', width: 100, fixed: 'right',
                       render: (_: unknown, r) => (
-                        <Button type="primary" size="small" onClick={() => openStore(r)}>入库</Button>
+                        <Button type="primary" size="small" disabled={!canStore} onClick={() => openStore(r)}>入库</Button>
                       ),
                     },
                   ]}
@@ -335,8 +336,8 @@ export default function Warehouse() {
                       title: '操作', key: 'a', width: 150,
                       render: (_: unknown, r: IssueRow) => (
                         <Space>
-                          {r.status === '待备料' && <Button size="small" type="primary" onClick={() => void issueAction(r.id, 'pick')}>备料完成</Button>}
-                          {r.status === '已备料' && <Button size="small" type="primary" onClick={() => void issueAction(r.id, 'hand-over')}>车间领走</Button>}
+                          {r.status === '待备料' && <Button size="small" type="primary" disabled={!canStore} onClick={() => void issueAction(r.id, 'pick')}>备料完成</Button>}
+                          {r.status === '已备料' && <Button size="small" type="primary" disabled={!canStore} onClick={() => void issueAction(r.id, 'hand-over')}>车间领走</Button>}
                         </Space>
                       ),
                     },

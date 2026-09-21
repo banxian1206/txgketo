@@ -12,6 +12,7 @@ import {
   listGoodsReceipts,
   purchaseOrders,
   purchasePool,
+  hasPerm,
   type GoodsReceiptRow,
   type PurchaseOrderSummary,
   type PurchasePoolDemand,
@@ -100,6 +101,7 @@ export default function PurchaseWorkbench() {
 
   const poolRequests = pool.reduce((s, g) => s + g.request_count, 0)
   const openOrders = orders.filter((o) => o.status !== '已取消' && o.status !== '已完成')
+  const canBuy = hasPerm('purchase:edit')
 
   const selectedGroups = useMemo(
     () => pool.filter((g) => selected.includes(g.item_no)),
@@ -165,7 +167,7 @@ export default function PurchaseWorkbench() {
                 <Space style={{ marginBottom: 12 }} wrap>
                   <Button
                     type="primary"
-                    disabled={selected.length === 0}
+                    disabled={selected.length === 0 || !canBuy}
                     onClick={() => setMergeOpen(true)}
                   >
                     合并下单
@@ -372,6 +374,7 @@ export default function PurchaseWorkbench() {
                         <Button
                           size="small"
                           type={g.mergeable ? 'default' : 'primary'}
+                          disabled={!canBuy}
                           onClick={() => openMerge([g])}
                         >
                           {g.mergeable ? '合并下单' : '去下单'}

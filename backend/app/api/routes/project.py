@@ -9,7 +9,7 @@ from fastapi.responses import FileResponse
 from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
-from app.api.deps import client_ip, get_current_user
+from app.api.deps import client_ip, get_current_user, has_permission, scrub_money
 from app.api.schemas import (
     CloseIn,
     ContactIn,
@@ -146,7 +146,7 @@ def create_project(
 def list_projects(
     stage: str | None = None,
     session: Session = Depends(get_session),
-    _: User = Depends(get_current_user),
+    current: User = Depends(get_current_user),
 ):
     stmt = select(Project).order_by(Project.created_at.desc())
     if stage:
@@ -166,7 +166,7 @@ def list_projects(
             {"id": aid, "filename": filename, "category": category}
         )
 
-    return [
+    out = [
         _out(
             r,
             names.get(r.customer_id),
@@ -176,6 +176,13 @@ def list_projects(
         )
         for r in rows
     ]
+    if not has_permission(current, "project:amount"):
+        for o in out:
+            o.amount = None
+            o.est_amount = None
+            o.performance_deposit = None
+            o.warranty_amount = None
+    return out
 
 
 @router.get("/projects/{project_no}", response_model=ProjectOut)
@@ -410,7 +417,7 @@ def _guess_media_type(filename: str) -> str:
 
 @router.get("/projects/{project_no}/detail")
 def get_project_detail(
-    project_no: str, session: Session = Depends(get_session), _: User = Depends(get_current_user)
+    project_no: str, session: Session = Depends(get_session), current: User = Depends(get_current_user)
 ) -> dict:
     """详情抽屉一次拉齐：基本信息 + 联系人 + 资料包 + 付款节点 + 操作记录。"""
     project = session.get(Project, project_no)
@@ -433,7 +440,7 @@ def get_project_detail(
         u = session.get(User, uid)
         return u.name if u else None
 
-    return {
+    result = {
         "project": _out(project, customer.name if customer else None).model_dump(),
         "contacts": [
             {
@@ -464,6 +471,7 @@ def get_project_detail(
         "sales_name": _user_name(project.sales_id),
         "pm_name": _user_name(project.pm_id),
     }
+    return result if has_permission(current, "project:amount") else scrub_money(result)
 
 
 # ---------------------------------------------------------------------------

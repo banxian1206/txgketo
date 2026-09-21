@@ -32,6 +32,7 @@ import {
   listOrgs,
   listRoles,
   listUsers,
+  handoverUser,
   setDemoUsersActive,
   updateOrg,
   updateUser,
@@ -147,6 +148,11 @@ export default function Users() {
   const [demoOpen, setDemoOpen] = useState(false)
   const [demoUsers, setDemoUsers] = useState<DemoUserRow[]>([])
   const [demoPassword, setDemoPassword] = useState('')
+  // 转交
+  const [handoverTarget, setHandoverTarget] = useState<UserRow | null>(null)
+  const [handoverTo, setHandoverTo] = useState<number | undefined>()
+  const [handoverDeactivate, setHandoverDeactivate] = useState(true)
+  const [handoverSaving, setHandoverSaving] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -368,6 +374,28 @@ export default function Users() {
     window.location.href = '/workbench'
   }
 
+  const doHandover = async () => {
+    if (!handoverTarget || !handoverTo) return
+    setHandoverSaving(true)
+    try {
+      const r = await handoverUser(handoverTarget.id, {
+        to_user_id: handoverTo,
+        deactivate: handoverDeactivate,
+      })
+      const moved = Object.entries(r.moved)
+        .filter(([, v]) => v > 0)
+        .map(([k, v]) => `${k} ${v}`)
+        .join('；')
+      message.success(`已转交${r.deactivated ? '并停用' : ''}：${moved || '没有待转交内容'}`)
+      setHandoverTarget(null)
+      await Promise.all([load(), loadUsers()])
+    } catch (e) {
+      message.error(errMsg(e))
+    } finally {
+      setHandoverSaving(false)
+    }
+  }
+
   const columns: ColumnsType<UserRow> = [
     { title: '账号', dataIndex: 'username', width: 110 },
     {
@@ -418,6 +446,18 @@ export default function Users() {
       render: (_: unknown, r: UserRow) => (
         <Space size="small">
           <a onClick={() => openEditUser(r)}>编辑</a>
+          {scope?.can_manage_users && (
+            <a
+              onClick={() => {
+                setHandoverTarget(r)
+                setHandoverTo(undefined)
+                setHandoverDeactivate(true)
+              }}
+              title="离职/停用：把任务、待审、项目角色转给别人"
+            >
+              转交
+            </a>
+          )}
           {scope?.is_admin && (
             <a onClick={() => impersonate(r)} title="以他的身份查看（只读）">
               以此人查看
@@ -688,6 +728,40 @@ export default function Users() {
             </Form.Item>
           )}
         </Form>
+      </Modal>
+
+      {/* 转交 */}
+      <Modal
+        title={`转交：${handoverTarget?.name ?? ''}`}
+        open={!!handoverTarget}
+        onCancel={() => setHandoverTarget(null)}
+        onOk={() => void doHandover()}
+        confirmLoading={handoverSaving}
+        okButtonProps={{ disabled: !handoverTo }}
+        okText="转交"
+        destroyOnClose
+      >
+        <Typography.Paragraph type="secondary" style={{ fontSize: 12 }}>
+          把 TA 手上<strong>未完成的任务、待审的评审单、项目角色、图纸/程序/BOM 归属</strong>
+          转给另一个人，便于离职交接。
+        </Typography.Paragraph>
+        <Space direction="vertical" style={{ width: '100%' }} size={12}>
+          <Select
+            style={{ width: '100%' }}
+            placeholder="转交给谁"
+            value={handoverTo}
+            onChange={setHandoverTo}
+            showSearch
+            optionFilterProp="label"
+            options={users
+              .filter((u) => u.id !== handoverTarget?.id && u.is_active)
+              .map((u) => ({ value: u.id, label: `${u.name}（${orgName(u.org_id)}）` }))}
+          />
+          <Space>
+            <Switch checked={handoverDeactivate} onChange={setHandoverDeactivate} />
+            <span style={{ fontSize: 13 }}>转交后停用原账号（推荐）</span>
+          </Space>
+        </Space>
       </Modal>
 
       {/* 演示账号清单 */}

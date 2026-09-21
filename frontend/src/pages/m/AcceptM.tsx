@@ -23,6 +23,7 @@ import AuthedImage from '../../components/AuthedImage'
 import {
   errMsg,
   fetchFileBlob,
+  hasPerm,
   inspectPurchase,
   mobileMaterial,
   storeReceipt,
@@ -56,6 +57,7 @@ export default function AcceptM() {
   const [storeFor, setStoreFor] = useState<{ id: number; no: string } | null>(null)
   const [location, setLocation] = useState('')
   const fileRef = useRef<HTMLInputElement>(null)
+  const canStore = hasPerm('warehouse:edit')
 
   const load = useCallback(async () => {
     if (!requestId) return
@@ -229,7 +231,7 @@ export default function AcceptM() {
             value={note}
             onChange={(e) => setNote(e.target.value)}
           />
-          <Button type="primary" block loading={saving} onClick={() => void doInspect()}>
+          <Button type="primary" block loading={saving} disabled={!canStore} onClick={() => void doInspect()}>
             提交验收{photos.length ? `（含 ${photos.length} 张照片）` : ''}
           </Button>
         </Space>
@@ -244,7 +246,7 @@ export default function AcceptM() {
                 <span>
                   {g.receipt_no} · {g.qty} {g.unit ?? ''}
                 </span>
-                <Button size="small" type="primary" onClick={() => setStoreFor({ id: g.id, no: g.receipt_no })}>
+                <Button size="small" type="primary" disabled={!canStore} onClick={() => setStoreFor({ id: g.id, no: g.receipt_no })}>
                   选库位入库
                 </Button>
               </Space>
