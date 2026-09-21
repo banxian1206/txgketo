@@ -346,12 +346,35 @@ def submit_round(
             )
         )
 
-    # 审核链：组长本人提交 → 跳过一级（05 卷 §0.1#13）
+    # 审核链（06 卷 §2/#2）：组长空缺自动跳级；部门负责人必须有，否则不让提交
     need_lead, _ = chain_levels(user.position)
-    if need_lead:
+    lead = team_lead_for(session, task.profession) if need_lead else None
+    boss = director_for(session, user)
+    if boss is None:
+        raise ReviewFlowError("本部门还没配「部门负责人」—— 先到「用户与权限」把审核人配好再提交")
+
+    if need_lead and lead is not None:
         ticket.status = TICKET_PENDING_LEAD
-    else:
+        reviewer = lead
+    elif need_lead and lead is None:
+        # 组长空缺 → 自动跳级到部门负责人（06 卷 §2）
         ticket.status = TICKET_PENDING_DIRECTOR
+        reviewer = boss
+        session.add(
+            ReviewAction(
+                ticket_id=ticket.id,
+                round_no=round_no,
+                level=1,
+                reviewer_id=user.id,
+                action=ACTION_SKIP,
+                note="组长空缺，自动跳级到部门负责人（06 卷 §2）",
+                acted_at=now,
+            )
+        )
+    else:
+        # 组长本人提交 → 跳过一级（05 卷 §0.1#13）
+        ticket.status = TICKET_PENDING_DIRECTOR
+        reviewer = boss
         session.add(
             ReviewAction(
                 ticket_id=ticket.id,
@@ -366,20 +389,18 @@ def submit_round(
     ticket.current_round = round_no
     ticket.submitter_id = user.id
 
-    # ★ 站内消息：提醒下一级审核人（06 卷 §9）
-    reviewer = team_lead_for(session, task.profession) if need_lead else director_for(session, user)
-    if reviewer is not None:
-        notify.notify(
-            session,
-            [reviewer.id],
-            type_=notify.TYPE_REVIEW,
-            title=f"有评审单等你审核：{ticket.ticket_no}（{ticket.equip_no or ''} {ticket.profession or ''}）",
-            body=note or None,
-            link="/reviews",
-            biz_type="review_ticket",
-            biz_id=ticket.id,
-            actor_id=user.id,
-        )
+    # ★ 站内消息：提醒实际审核人（06 卷 §9；不提醒自己）
+    notify.notify(
+        session,
+        [reviewer.id],
+        type_=notify.TYPE_REVIEW,
+        title=f"有评审单等你审核：{ticket.ticket_no}（{ticket.equip_no or ''} {ticket.profession or ''}）",
+        body=note or None,
+        link="/reviews",
+        biz_type="review_ticket",
+        biz_id=ticket.id,
+        actor_id=user.id,
+    )
 
     audit.log(
         session,
@@ -419,12 +440,16 @@ def review_ticket(
     level = 1 if ticket.status == TICKET_PENDING_LEAD else 2
     if level == 1:
         lead = team_lead_for(session, ticket.profession)
-        if lead is None or lead.id != user.id:
+        if lead is None:
+            raise ReviewFlowError("组长空缺（提交时应已自动跳级）；请让部门负责人审核")
+        if lead.id != user.id:
             raise ReviewFlowError("只有本专业组长能审这一级")
     else:
         submitter = session.get(User, ticket.submitter_id) if ticket.submitter_id else None
         boss = director_for(session, submitter) if submitter else director(session)
-        if boss is None or boss.id != user.id:
+        if boss is None:
+            raise ReviewFlowError("本部门还没配部门负责人——先到「用户与权限」配审核人")
+        if boss.id != user.id:
             raise ReviewFlowError("只有本部门的部门负责人能审这一级")
 
     now = datetime.now(UTC)

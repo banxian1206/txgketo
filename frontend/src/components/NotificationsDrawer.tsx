@@ -18,6 +18,11 @@ const TYPE_COLOR: Record<string, string> = {
   purchase: 'orange',
 }
 
+// 移动端（/m）里点击消息：把 PC 路由映射到移动页
+const MOBILE_LINK: Record<string, string> = {
+  '/warehouse': '/m/warehouse',
+}
+
 interface Props {
   open: boolean
   onClose: () => void
@@ -57,8 +62,12 @@ export default function NotificationsDrawer({ open, onClose, onReadChange }: Pro
       /* 忽略已读失败 */
     }
     onClose()
-    if (n.link) nav(n.link)
-    else void load()
+    if (n.link) {
+      const onMobile = typeof window !== 'undefined' && window.location.pathname.startsWith('/m')
+      nav(onMobile ? (MOBILE_LINK[n.link] ?? n.link) : n.link)
+    } else {
+      void load()
+    }
     onReadChange?.(Math.max(0, unread - (n.is_read ? 0 : 1)))
   }
 

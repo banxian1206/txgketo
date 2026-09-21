@@ -42,6 +42,7 @@ from app.models.task import Task
 from app.models.warehouse import MaterialIssue, MaterialIssueLine
 from app.services import audit, notify
 from app.services.numbering import next_number, year_scope_key
+from app.services.reviewers import director_for
 
 
 class ChangeFlowError(ValueError):
@@ -198,17 +199,31 @@ def create_request(
         summary=f"改版申请 {row.cr_no}：{info['title']}（{info['version']}）—— {row.reason}",
         ip=ip,
     )
-    # ★ 站内消息：提醒部门负责人裁决（06 卷 §9）
-    notify.notify_directors(
-        session,
-        type_=notify.TYPE_CHANGE,
-        title=f"有改版申请等你裁决：{row.cr_no}",
-        body=f"{info['title']} —— {row.reason}",
-        link="/changes",
-        biz_type="change_request",
-        biz_id=row.id,
-        actor_id=user.id,
-    )
+    # ★ 站内消息：提醒**申请人所在部门**的部门负责人裁决（06 卷 §9）
+    boss = director_for(session, user)
+    if boss is not None:
+        notify.notify(
+            session,
+            [boss.id],
+            type_=notify.TYPE_CHANGE,
+            title=f"有改版申请等你裁决：{row.cr_no}",
+            body=f"{info['title']} —— {row.reason}",
+            link="/changes",
+            biz_type="change_request",
+            biz_id=row.id,
+            actor_id=user.id,
+        )
+    else:
+        notify.notify_directors(
+            session,
+            type_=notify.TYPE_CHANGE,
+            title=f"有改版申请等你裁决：{row.cr_no}",
+            body=f"{info['title']} —— {row.reason}",
+            link="/changes",
+            biz_type="change_request",
+            biz_id=row.id,
+            actor_id=user.id,
+        )
     return row
 
 

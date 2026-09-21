@@ -1,8 +1,25 @@
-import { App, Card, Col, Row, Space, Statistic, Table, Tag, Typography } from 'antd'
-import { useEffect, useState } from 'react'
+import { App, Button, Card, Col, List, Row, Space, Statistic, Table, Tag, Typography } from 'antd'
+import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
-import { errMsg, workbenchMe, type WorkbenchMe } from '../api/client'
+import NotificationsDrawer from '../components/NotificationsDrawer'
+import {
+  errMsg,
+  listNotifications,
+  markAllNotificationsRead,
+  markNotificationRead,
+  workbenchMe,
+  type NotificationRow,
+  type WorkbenchMe,
+} from '../api/client'
+
+const TYPE_COLOR: Record<string, string> = {
+  task: 'blue',
+  review: 'gold',
+  change: 'purple',
+  warehouse: 'cyan',
+  purchase: 'orange',
+}
 
 const STAGE_COLOR: Record<string, string> = {
   线索: 'default',
@@ -25,12 +42,32 @@ export default function Workbench() {
   const { message } = App.useApp()
   const nav = useNavigate()
   const [data, setData] = useState<WorkbenchMe | null>(null)
+  const [messages, setMessages] = useState<NotificationRow[]>([])
+  const [notifOpen, setNotifOpen] = useState(false)
+
+  const load = useCallback(async () => {
+    try {
+      const [me, notif] = await Promise.all([workbenchMe(), listNotifications()])
+      setData(me)
+      setMessages(notif.items.slice(0, 5))
+    } catch (e) {
+      message.error(errMsg(e))
+    }
+  }, [message])
 
   useEffect(() => {
-    workbenchMe()
-      .then(setData)
-      .catch((e) => message.error(errMsg(e)))
-  }, [message])
+    void load()
+  }, [load])
+
+  const openMessage = async (n: NotificationRow) => {
+    try {
+      if (!n.is_read) await markNotificationRead(n.id)
+    } catch {
+      /* 忽略 */
+    }
+    if (n.link) nav(n.link)
+    else await load()
+  }
 
   const c = data?.counts
   const todos: TodoCard[] = [
@@ -99,6 +136,41 @@ export default function Workbench() {
           </Space>
         </Card>
       )}
+
+      <Card
+        size="small"
+        title={`最新消息（未读 ${data?.counts.unread ?? 0}）`}
+        style={{ marginTop: 12 }}
+        extra={
+          <Space>
+            <Button size="small" disabled={!data?.counts.unread} onClick={() => void markAllNotificationsRead().then(load)}>
+              全部已读
+            </Button>
+            <Button size="small" onClick={() => setNotifOpen(true)}>
+              查看全部
+            </Button>
+          </Space>
+        }
+      >
+        <List
+          size="small"
+          dataSource={messages}
+          locale={{ emptyText: '没有消息' }}
+          renderItem={(n) => (
+            <List.Item style={{ cursor: 'pointer', padding: '6px 0' }} onClick={() => void openMessage(n)}>
+              <Space size={6} wrap>
+                <Tag color={TYPE_COLOR[n.type] ?? 'default'}>{n.type}</Tag>
+                <span style={{ fontWeight: n.is_read ? 400 : 600 }}>{n.title}</span>
+                <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                  {n.created_at ? n.created_at.slice(5, 16).replace('T', ' ') : ''}
+                </Typography.Text>
+              </Space>
+            </List.Item>
+          )}
+        />
+      </Card>
+
+      <NotificationsDrawer open={notifOpen} onClose={() => setNotifOpen(false)} onReadChange={() => void load()} />
 
       <Card size="small" title="我参与的项目" style={{ marginTop: 12 }}>
         <Table

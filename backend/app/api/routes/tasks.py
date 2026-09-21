@@ -428,7 +428,7 @@ def update_task(
             ip=client_ip(request),
         )
         # ★ 站内消息：转派给谁就提醒谁（06 卷 §9）
-        if old_owner_id is not None and row.owner_id != old_owner_id:
+        if row.owner_id is not None and row.owner_id != old_owner_id:
             notify.notify(
                 session,
                 [row.owner_id],

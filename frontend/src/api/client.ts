@@ -328,6 +328,7 @@ export interface WorkbenchMe {
     to_purchase: number
     my_leads: number
     my_projects: number
+    unread: number
   }
   my_projects: { project_no: string; project_name: string; stage: string }[]
 }

@@ -19,6 +19,7 @@ from app.models.project import Project
 from app.models.review import TICKET_PENDING_DIRECTOR, TICKET_PENDING_LEAD, ReviewTicket
 from app.models.task import Task
 from app.models.warehouse import MaterialIssue
+from app.services import notify
 
 router = APIRouter(prefix="/workbench", tags=["工作台"])
 
@@ -204,6 +205,7 @@ def workbench_me(session: Session = Depends(get_session), current: User = Depend
             "to_purchase": to_purchase,
             "my_leads": my_leads,
             "my_projects": len(project_nos),
+            "unread": notify.unread_count(session, current.id),
         },
         "my_projects": [
             {"project_no": p.project_no, "project_name": p.project_name, "stage": p.stage}
