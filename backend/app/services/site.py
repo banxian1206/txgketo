@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 
 from app.models.initiation import GoodsReceipt, ProjectMember
 from app.models.site import (
+    COMMISSION_DONE,
     COMMISSION_ONSITE,
     COMMISSION_STARTED,
     ISSUE_CLOSED,
@@ -203,6 +204,12 @@ def commission_arrive(session: Session, row: SiteCommission) -> SiteCommission:
 
 def commission_start(session: Session, row: SiteCommission) -> SiteCommission:
     row.status = COMMISSION_STARTED
+    return row
+
+
+def commission_finish(session: Session, row: SiteCommission) -> SiteCommission:
+    """调试完成 → 可以申请客户验收（S10）。"""
+    row.status = COMMISSION_DONE
     return row
 
 

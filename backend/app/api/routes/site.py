@@ -296,6 +296,25 @@ def commission_arrive(
     return site_svc.commission_dict(row)
 
 
+@router.post("/commission/{cid}/finish")
+def commission_finish(
+    cid: int,
+    request: Request,
+    session: Session = Depends(get_session),
+    current: User = Depends(require_permission("site:edit")),
+):
+    row = session.get(SiteCommission, cid)
+    if row is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "申请不存在")
+    site_svc.commission_finish(session, row)
+    audit.log(
+        session, user=current, action="site_commission_finish", object_type="site_commission",
+        object_ref=str(cid), summary=f"现场调试完成：{row.project_no}（可申请客户验收）", ip=client_ip(request),
+    )
+    session.commit()
+    return site_svc.commission_dict(row)
+
+
 @router.post("/commission/{cid}/start")
 def commission_start(
     cid: int,

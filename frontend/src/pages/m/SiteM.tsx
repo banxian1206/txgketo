@@ -7,11 +7,15 @@ import {
   acceptSiteIncoming,
   addSiteDaily,
   addSiteIssue,
+  applyAcceptance,
   commissionArrive,
   commissionStart,
+  confirmAcceptance,
   errMsg,
+  finishCommission,
   hasPerm,
   linkSiteIssue,
+  listAcceptances,
   listProjects,
   requestCommission,
   saveSiteSurvey,
@@ -19,6 +23,7 @@ import {
   sitePhotoUrl,
   siteWorkbench,
   uploadSitePhotos,
+  type AcceptanceRow,
   type SiteCommissionRow,
   type SiteDailyRow,
   type SiteIncomingPending,
@@ -27,7 +32,7 @@ import {
 } from '../../api/client'
 import MfgPhotoPicker from '../../components/MfgPhotoPicker'
 
-type Kind = 'survey' | 'daily' | 'issue' | 'commission' | 'incoming'
+type Kind = 'survey' | 'daily' | 'issue' | 'commission' | 'incoming' | 'acc-apply' | 'acc-confirm'
 const ISSUE_COLOR: Record<string, string> = { 待处理: 'error', 已转变更: 'processing', 已闭环: 'success' }
 const COMMISSION_COLOR: Record<string, string> = { 已申请: 'gold', 已到现场: 'processing', 已开始调试: 'success' }
 
@@ -39,21 +44,24 @@ export default function SiteM() {
   const [projectNo, setProjectNo] = useState<string | undefined>()
   const [wb, setWb] = useState<SiteWorkbench | null>(null)
   const [incoming, setIncoming] = useState<{ pending: SiteIncomingPending[]; done: SiteIncomingPending[] }>({ pending: [], done: [] })
+  const [accs, setAccs] = useState<AcceptanceRow[]>([])
   const [photos, setPhotos] = useState<string[]>([])
   const [videos, setVideos] = useState<string[]>([])
-  const [modal, setModal] = useState<{ kind: Kind; target?: SiteIncomingPending; issue?: SiteIssueRow } | null>(null)
+  const [modal, setModal] = useState<{ kind: Kind; target?: SiteIncomingPending; issue?: SiteIssueRow; acc?: AcceptanceRow } | null>(null)
   const [saving, setSaving] = useState(false)
   const [form] = Form.useForm()
 
   const load = useCallback(
     async (pno?: string) => {
       try {
-        const [w, inc] = await Promise.all([
+        const [w, inc, ac] = await Promise.all([
           siteWorkbench(pno),
           pno ? siteIncoming(pno) : Promise.resolve({ pending: [], done: [] }),
+          pno ? listAcceptances(pno) : Promise.resolve([]),
         ])
         setWb(w)
         setIncoming(inc)
+        setAccs(ac)
       } catch (e) {
         message.error(errMsg(e))
       }
@@ -73,7 +81,7 @@ export default function SiteM() {
     void load(pno)
   }
 
-  const open = (kind: Kind, target?: SiteIncomingPending, issue?: SiteIssueRow) => {
+  const open = (kind: Kind, target?: SiteIncomingPending, issue?: SiteIssueRow, acc?: AcceptanceRow) => {
     setPhotos([])
     setVideos([])
     form.resetFields()
@@ -81,7 +89,8 @@ export default function SiteM() {
     if (kind === 'survey') form.setFieldsValue({})
     if (kind === 'incoming') form.setFieldsValue({ result: '齐', shortage: [] })
     if (kind === 'commission') form.setFieldsValue({ plan_date: dayjs().add(3, 'day') })
-    setModal({ kind, target, issue })
+    if (kind === 'acc-confirm') form.setFieldsValue({ result: '通过', accepted_at: dayjs() })
+    setModal({ kind, target, issue, acc })
   }
 
   const submit = async () => {
@@ -112,6 +121,12 @@ export default function SiteM() {
           result: v.result,
           shortage_detail: (v.shortage ?? []).filter((s: { item?: string }) => s.item),
           photos, remark: v.remark,
+        })
+      } else if (modal.kind === 'acc-apply') {
+        await applyAcceptance({ project_no: projectNo, remark: v.remark })
+      } else if (modal.kind === 'acc-confirm' && modal.acc) {
+        await confirmAcceptance(modal.acc.id, {
+          result: v.result, signed_by: v.signed_by, accepted_at: v.accepted_at?.format('YYYY-MM-DD'), remark: v.remark,
         })
       }
       message.success('已提交')
@@ -231,6 +246,32 @@ export default function SiteM() {
                       </Space>
                       {canEdit && m.status === '已申请' && <Button size="small" style={{ marginTop: 8 }} onClick={() => void commissionArrive(m.id).then(() => void load(projectNo))}>已到现场</Button>}
                       {canEdit && m.status === '已到现场' && <Button size="small" type="primary" style={{ marginTop: 8 }} onClick={() => void commissionStart(m.id).then(() => void load(projectNo))}>开始调试</Button>}
+                      {canEdit && m.status === '已开始调试' && <Button size="small" type="primary" style={{ marginTop: 8 }} onClick={() => void finishCommission(m.id).then(() => void load(projectNo))}>调试完成</Button>}
+                    </Card>
+                  ))}
+                </>
+              ),
+            },
+            {
+              key: 'acceptance',
+              label: `客户验收 ${accs.length}`,
+              children: (
+                <>
+                  {canEdit && <Button type="primary" block style={{ marginBottom: 10 }} onClick={() => open('acc-apply')}>＋ 申请客户验收</Button>}
+                  {accs.length === 0 && <Empty description="还没验收单" />}
+                  {accs.map((a) => (
+                    <Card key={a.id} size="small" style={{ marginBottom: 10 }}>
+                      <Space>
+                        <Tag color={a.status === '已通过' ? 'success' : a.status === '未通过' ? 'error' : 'gold'}>{a.status}</Tag>
+                        <span>资料 {a.doc_count} 个（已签 {a.signed_count}）</span>
+                      </Space>
+                      {a.warranty_start && (
+                        <div style={{ fontSize: 12, color: '#666', marginTop: 4 }}>质保 {a.warranty_start} ~ {a.warranty_end}</div>
+                      )}
+                      {a.signed_by && <div style={{ fontSize: 12, color: '#666' }}>客户签字：{a.signed_by}</div>}
+                      {canEdit && a.status === '待验收' && (
+                        <Button size="small" type="primary" style={{ marginTop: 8 }} onClick={() => open('acc-confirm', undefined, undefined, a)}>客户确认验收</Button>
+                      )}
                     </Card>
                   ))}
                 </>
@@ -261,7 +302,7 @@ export default function SiteM() {
 
       <Modal
         open={!!modal}
-        title={modal?.kind === 'survey' ? '现场勘测' : modal?.kind === 'daily' ? '每日汇报' : modal?.kind === 'issue' ? '上报现场问题' : modal?.kind === 'commission' ? '申请调试' : `来货清点 · ${modal?.target?.item_no ?? ''}`}
+        title={modal?.kind === 'survey' ? '现场勘测' : modal?.kind === 'daily' ? '每日汇报' : modal?.kind === 'issue' ? '上报现场问题' : modal?.kind === 'commission' ? '申请调试' : modal?.kind === 'acc-apply' ? '申请客户验收' : modal?.kind === 'acc-confirm' ? '客户确认验收' : `来货清点 · ${modal?.target?.item_no ?? ''}`}
         onCancel={() => setModal(null)}
         onOk={() => void submit()}
         confirmLoading={saving}
@@ -336,6 +377,30 @@ export default function SiteM() {
               <Form.Item name="dispatch_to" label="派谁去（调试工程师）"><Input placeholder="如 王工" /></Form.Item>
               <Form.Item name="plan_date" label="计划到场日期"><DatePicker style={{ width: '100%' }} /></Form.Item>
               <Form.Item name="remark" label="备注"><Input /></Form.Item>
+            </>
+          )}
+
+          {modal?.kind === 'acc-apply' && (
+            <>
+              <Typography.Paragraph type="secondary" style={{ fontSize: 12 }}>
+                现场调试完成 → 申请客户验收。资料包在 PC「验收与质保」页上传（要传要签的东西很多）。
+              </Typography.Paragraph>
+              <Form.Item name="remark" label="说明"><Input placeholder="现场调试完成，具备验收条件" /></Form.Item>
+            </>
+          )}
+
+          {modal?.kind === 'acc-confirm' && (
+            <>
+              <Form.Item name="result" label="验收结论" rules={[{ required: true }]}>
+                <Radio.Group optionType="button" buttonStyle="solid">
+                  <Radio.Button value="通过">通过</Radio.Button>
+                  <Radio.Button value="不通过">不通过</Radio.Button>
+                </Radio.Group>
+              </Form.Item>
+              <Form.Item name="signed_by" label="客户签字人"><Input placeholder="如 客户 张工" /></Form.Item>
+              <Form.Item name="accepted_at" label="验收日期"><DatePicker style={{ width: '100%' }} /></Form.Item>
+              <Form.Item name="remark" label="备注"><Input /></Form.Item>
+              <Typography.Text type="secondary" style={{ fontSize: 12 }}>通过后自动进入质保期，项目阶段推进到「质保」。</Typography.Text>
             </>
           )}
 

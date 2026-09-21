@@ -6,6 +6,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.routes import (
+    acceptance,
     assembly,
     auth,
     changes,
@@ -53,6 +54,7 @@ app.add_middleware(
 for r in (
     health,
     auth,
+    acceptance,
     assembly,
     platform,
     project,

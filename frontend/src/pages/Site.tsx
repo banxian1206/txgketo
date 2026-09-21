@@ -24,6 +24,7 @@ import {
   acceptSiteIncoming,
   commissionArrive,
   commissionStart,
+  finishCommission,
   errMsg,
   hasPerm,
   linkSiteIssue,
@@ -263,6 +264,7 @@ export default function Site() {
                           <Space size={4}>
                             {canEdit && r.status === '已申请' && <a onClick={() => void commissionArrive(r.id).then(() => void load(projectNo))}>已到现场</a>}
                             {canEdit && r.status === '已到现场' && <a onClick={() => void commissionStart(r.id).then(() => void load(projectNo))}>开始调试</a>}
+                            {canEdit && r.status === '已开始调试' && <a onClick={() => void finishCommission(r.id).then(() => void load(projectNo))}>调试完成</a>}
                           </Space>
                         ),
                       },

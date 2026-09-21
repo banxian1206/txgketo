@@ -16,6 +16,7 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_current_user
 from app.core.db import get_session
 from app.models.change import CR_PENDING, ChangeRequest
+from app.models.acceptance import Acceptance
 from app.models.assembly import AssemblyRecord
 from app.models.engineering import Drawing
 from app.models.initiation import GoodsReceipt, PurchaseRequest
@@ -113,6 +114,9 @@ def mobile_home(session: Session = Depends(get_session), current: User = Depends
     site_to_dispatch = _count(
         session, select(func.count()).select_from(SiteCommission).where(SiteCommission.status == "已申请")
     )
+    acceptance_pending = _count(
+        session, select(func.count()).select_from(Acceptance).where(Acceptance.status == "待验收")
+    )
 
     if current.position == POSITION_DIRECTOR:
         to_review = _count(
@@ -164,6 +168,7 @@ def mobile_home(session: Session = Depends(get_session), current: User = Depends
             "shipments_receive": shipments_receive,
             "site_open_issues": site_open_issues,
             "site_to_dispatch": site_to_dispatch,
+            "acceptance_pending": acceptance_pending,
         },
     }
 

@@ -13,7 +13,8 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models.assembly import AssemblyRecord
-from app.models.project import Equipment
+from app.models.project import Equipment, Project
+from app.services import project_stage
 from app.models.shipment import (
     SHIP_ARRIVED,
     SHIP_INSTRUCTED,
@@ -216,6 +217,14 @@ def depart(
         sh.photos = list(sh.photos or []) + list(photos)
     if remark:
         sh.remark = remark
+    # 发运即进入「交付中」阶段（执行中 → 交付中）
+    project = session.get(Project, sh.project_no)
+    if project is not None and project.stage not in (project_stage.DELIVERING, project_stage.WARRANTY, project_stage.CLOSED):
+        try:
+            project_stage.assert_transition(project.stage, project_stage.DELIVERING)
+            project.stage = project_stage.DELIVERING
+        except project_stage.StageError:
+            pass
     return sh
 
 

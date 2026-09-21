@@ -5,6 +5,7 @@ from app.models.engineering import BomItem, Drawing, DrawingVersion
 from app.models.assembly import AssemblyRecord, KittingSnapshot
 from app.models.shipment import PackingItem, Shipment, ShipmentLine, SiteReceipt
 from app.models.site import SiteCommission, SiteDaily, SiteIncoming, SiteIssue, SiteSurvey
+from app.models.acceptance import Acceptance, AcceptanceDocument
 from app.models.review import DesignRelease, ReviewAction, ReviewTicket, ReviewTicketItem
 from app.models.program import EquipmentProgram, EquipmentProgramVersion
 from app.models.production import (
@@ -51,6 +52,8 @@ from app.models.project import (
 )
 
 __all__ = [
+    "Acceptance",
+    "AcceptanceDocument",
     "Attachment",
     "AssemblyRecord",
     "AuditLog",

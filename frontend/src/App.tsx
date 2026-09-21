@@ -26,6 +26,7 @@ import Manufacturing from './pages/Manufacturing'
 import Assembly from './pages/Assembly'
 import Shipping from './pages/Shipping'
 import Site from './pages/Site'
+import AcceptancePage from './pages/Acceptance'
 import ProductionM from './pages/m/ProductionM'
 import AssemblyM from './pages/m/AssemblyM'
 import ShippingM from './pages/m/ShippingM'
@@ -94,6 +95,7 @@ export default function App() {
         <Route path="assembly" element={<Assembly />} />
         <Route path="shipping" element={<Shipping />} />
         <Route path="site" element={<Site />} />
+        <Route path="acceptance" element={<AcceptancePage />} />
         <Route path="projects/:projectNo/design/:equipNo" element={<EquipmentDesign />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
