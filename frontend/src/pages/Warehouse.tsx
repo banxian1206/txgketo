@@ -11,6 +11,7 @@ import {
   Modal,
   Radio,
   Row,
+  Select,
   Space,
   Table,
   Tabs,
@@ -21,7 +22,7 @@ import dayjs from 'dayjs'
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
-import { api, errMsg, hasPerm, inspectPurchase, storeReceipt, type GoodsReceiptRow } from '../api/client'
+import { api, errMsg, generateEquipmentIssue, hasPerm, inspectPurchase, listEquipment, listProjects, storeReceipt, type GoodsReceiptRow } from '../api/client'
 
 const ISSUE_COLOR: Record<string, string> = { 待备料: 'gold', 已备料: 'processing', 已领走: 'success' }
 
@@ -78,6 +79,12 @@ export default function Warehouse() {
   const nav = useNavigate()
   const [wb, setWb] = useState<Workbench | null>(null)
   const canStore = hasPerm('warehouse:edit')
+  // 生成领料单（按设备）
+  const [genProject, setGenProject] = useState<string | undefined>()
+  const [genEquip, setGenEquip] = useState<string | undefined>()
+  const [genProjects, setGenProjects] = useState<{ project_no: string; project_name: string }[]>([])
+  const [genEquips, setGenEquips] = useState<{ equip_no: string; equip_name: string }[]>([])
+  const [genLoading, setGenLoading] = useState(false)
   const [tab, setTab] = useState('todo')
   const [stock, setStock] = useState<StockRow[]>([])
   const [issueCount, setIssueCount] = useState(0)
@@ -106,6 +113,42 @@ export default function Warehouse() {
   }, [message])
 
   useEffect(() => { void load() }, [load])
+
+  // 生成领料单用：项目列表
+  useEffect(() => {
+    listProjects()
+      .then((rows) => setGenProjects(rows.map((p) => ({ project_no: p.project_no, project_name: p.project_name }))))
+      .catch(() => undefined)
+  }, [])
+
+  const onGenProject = async (no?: string) => {
+    setGenProject(no)
+    setGenEquip(undefined)
+    setGenEquips([])
+    if (!no) return
+    try {
+      const rows = await listEquipment(no)
+      setGenEquips(rows.map((e) => ({ equip_no: e.equip_no, equip_name: e.equip_name })))
+    } catch (e) {
+      message.error(errMsg(e))
+    }
+  }
+
+  const doGenerateIssue = async () => {
+    if (!genProject || !genEquip) return
+    setGenLoading(true)
+    try {
+      const r = await generateEquipmentIssue(genProject, genEquip)
+      message.success(
+        `已生成领料单 ${r.issue_no}（${r.line_count} 种${r.shortage_count ? `，缺料 ${r.shortage_count} 种` : '，库存都够'}）—— 到「领料」里去备料`,
+      )
+      await load()
+    } catch (e) {
+      message.error(errMsg(e))
+    } finally {
+      setGenLoading(false)
+    }
+  }
 
   const openAccept = (r: IncomingRow) => {
     setAcceptTarget(r)
@@ -206,6 +249,45 @@ export default function Warehouse() {
             label: `待办 (${(wb?.incoming.length ?? 0) + (wb?.pending_storage.length ?? 0) + (wb?.pending_issues.length ?? 0)})`,
             children: (
               <>
+                <Card size="small" title="生成领料单（按设备）" style={{ marginBottom: 12 }}>
+                  <Space wrap>
+                    <Select
+                      showSearch
+                      optionFilterProp="label"
+                      style={{ width: 260 }}
+                      placeholder="项目"
+                      value={genProject}
+                      onChange={(v: string | undefined) => void onGenProject(v)}
+                      options={genProjects.map((p) => ({
+                        value: p.project_no,
+                        label: `${p.project_no} ${p.project_name}`,
+                      }))}
+                    />
+                    <Select
+                      showSearch
+                      optionFilterProp="label"
+                      style={{ width: 220 }}
+                      placeholder="设备"
+                      value={genEquip}
+                      onChange={setGenEquip}
+                      options={genEquips.map((e) => ({
+                        value: e.equip_no,
+                        label: `${e.equip_no} ${e.equip_name}`,
+                      }))}
+                    />
+                    <Button
+                      type="primary"
+                      disabled={!canStore || !genProject || !genEquip}
+                      loading={genLoading}
+                      onClick={() => void doGenerateIssue()}
+                    >
+                      生成领料单
+                    </Button>
+                    <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                      按设备展开：自制件的原材料 + 整台设备的标准件；缺料会标出来，生成后到下面「领料」里备料 → 车间领走。
+                    </Typography.Text>
+                  </Space>
+                </Card>
                 <Typography.Title level={5}>① 验收（货到了就验：合格 / 不合格）</Typography.Title>
                 <Typography.Paragraph type="secondary" style={{ fontSize: 12 }}>
                   分批送的货分批验收：合格 → 进「待入库」；不合格 → 回采购「验收不合格」协商换货/退货。

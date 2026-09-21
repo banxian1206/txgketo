@@ -1883,6 +1883,36 @@ export async function generateEquipmentPurchase(
   return data
 }
 
+/** 登记回款（可多次）：某个付款节点收到一笔款（payment:edit） */
+export async function registerPayment(
+  projectNo: string,
+  seq: number,
+  body: { received_amount?: number; received_date?: string; remark?: string },
+) {
+  const form = new FormData()
+  if (body.received_amount != null) form.append('received_amount', String(body.received_amount))
+  if (body.received_date) form.append('received_date', body.received_date)
+  if (body.remark) form.append('remark', body.remark)
+  const { data } = await api.post<{
+    ok: boolean
+    node_name: string
+    received_amount: number
+    unpaid: number
+  }>(`/projects/${projectNo}/payment-terms/${seq}/receive`, form)
+  return data
+}
+
+/** 按设备 BOM 生成领料单（自制件的原材料 + 整台设备的标准件） */
+export async function generateEquipmentIssue(projectNo: string, equipNo: string) {
+  const { data } = await api.post<{
+    issue_no: string
+    line_count: number
+    shortage_count: number
+    lines: { display_name: string; qty_required: number; shortage: boolean }[]
+  }>(`/warehouse/projects/${projectNo}/equipment/${equipNo}/generate-issue`)
+  return data
+}
+
 export interface MergeOrderLineIn {
   request_id: number
   qty?: number

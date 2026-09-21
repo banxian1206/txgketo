@@ -33,10 +33,12 @@ import {
   listRoles,
   listUsers,
   handoverUser,
+  listAuditLogs,
   setDemoUsersActive,
   updateOrg,
   updateUser,
   type DemoUserRow,
+  type AuditLog,
   type MyScope,
   type OrgRow,
   type RoleRow,
@@ -148,6 +150,9 @@ export default function Users() {
   const [demoOpen, setDemoOpen] = useState(false)
   const [demoUsers, setDemoUsers] = useState<DemoUserRow[]>([])
   const [demoPassword, setDemoPassword] = useState('')
+  // 操作日志
+  const [logs, setLogs] = useState<AuditLog[]>([])
+  const [logsLoading, setLogsLoading] = useState(false)
   // 转交
   const [handoverTarget, setHandoverTarget] = useState<UserRow | null>(null)
   const [handoverTo, setHandoverTo] = useState<number | undefined>()
@@ -189,6 +194,14 @@ export default function Users() {
   useEffect(() => {
     void loadUsers()
   }, [loadUsers])
+  useEffect(() => {
+    if (tab !== 'logs') return
+    setLogsLoading(true)
+    listAuditLogs({})
+      .then(setLogs)
+      .catch((e) => message.error(errMsg(e)))
+      .finally(() => setLogsLoading(false))
+  }, [tab, message])
 
   // 总监只看自己部门这棵树
   const visibleOrgs = useMemo(() => {
@@ -658,6 +671,51 @@ export default function Users() {
                       width: 170,
                       render: (_: unknown, r) => ROLE_MONEY[r.code] ?? '—',
                     },
+                  ]}
+                />
+              </>
+            ),
+          },
+          {
+            key: 'logs',
+            label: '操作日志',
+            children: (
+              <>
+                <Space style={{ marginBottom: 12 }}>
+                  <Button
+                    size="small"
+                    loading={logsLoading}
+                    onClick={() => {
+                      setLogsLoading(true)
+                      listAuditLogs({})
+                        .then(setLogs)
+                        .catch((e) => message.error(errMsg(e)))
+                        .finally(() => setLogsLoading(false))
+                    }}
+                  >
+                    刷新
+                  </Button>
+                  <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                    最近 100 条写操作（谁、何时、干了什么）—— 所有写操作都留痕。
+                  </Typography.Text>
+                </Space>
+                <Table<AuditLog>
+                  rowKey="id"
+                  size="small"
+                  loading={logsLoading}
+                  dataSource={logs}
+                  pagination={{ pageSize: 20, showSizeChanger: false }}
+                  columns={[
+                    {
+                      title: '时间',
+                      dataIndex: 'created_at',
+                      width: 150,
+                      render: (v: string | null) => (v ? v.slice(5, 16).replace('T', ' ') : '—'),
+                    },
+                    { title: '操作人', dataIndex: 'username', width: 110, render: (v: string | null) => v ?? '系统' },
+                    { title: '动作', dataIndex: 'action', width: 110 },
+                    { title: '对象', key: 'obj', width: 180, render: (_: unknown, r: AuditLog) => `${r.object_type ?? ''} ${r.object_ref ?? ''}` },
+                    { title: '摘要', dataIndex: 'summary' },
                   ]}
                 />
               </>

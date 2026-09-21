@@ -151,6 +151,7 @@ deploy/          docker-compose.dev.yml
 | **工作台收尾（06 卷 E 步）** | ✅ | 采购工作台待办头（待下单/在途/验收不合格/退换）+ 仓库待办头（待验收/待入库/待领料）；`GET /workbench/sales/board` + `SalesWorkbench.tsx`（商机/待立项/回款）；`GET /workbench/pm/board` + `PmWorkbench.tsx`（项目全链进度/风险）；车间台仍留位 |
 | **账号与角色可用性（06 卷 §4）** | ✅ | 岗位统一三级（组员/经理/总监，迁移 `f3a5c7e9b104`）；**演示账号一键生成**（`services/demo.py` + `POST /demo-users` + `scripts/seed_demo_users.py`，19 个，密码 `txgk@123`）；**以某人身份查看**（`X-Impersonate`，GET 生效、写操作 403、顶栏橙色横幅） |
 | **权限强校验 + 金额分档 + 离职转交（06 卷 F 步）** | ✅ | `deps.require_permission`/`has_permission`/`scrub_money`；采购下单类→`purchase:edit`、验收/入库/领料→`warehouse:edit`；金额：`purchase:price`（采购单/报价/价格参考）、`project:amount`（项目金额/列表）无权限返回 null；`POST /users/{id}/handover` 一键转交；前端 `hasPerm()` 按钮显隐 + Users 页「转交」弹窗 |
+| **入口补齐（领料 / 回款 / 日志）** | ✅ | ① 仓库待办页「生成领料单（按设备）」（`generateEquipmentIssue`）；② `POST /projects/{p}/payment-terms/{seq}/receive` 登记回款（多次累加、超额拦截）+ 项目详情付款节点「登记回款」（`payment:edit`）；③「用户与权限」加「操作日志」页签（`GET /audit-logs`） |
 | 供应商主数据 + 报价 + 能供品类 | ✅ | `models/purchasing.py`、`routes/suppliers.py` |
 | 推荐供应商（多路证据打分） | ✅ | `GET /purchase/recommend/{item_no}` |
 | 价格参考（上次成交/历史区间/各家报价） | ✅ | `GET /purchase/price-reference/{item_no}` |
@@ -223,6 +224,7 @@ GET  /api/v1/my-scope                             我能管什么（是否管理
 POST /api/v1/demo-users                           演示账号：{action: create/disable/enable}（仅管理员）
    以某人身份查看（仅管理员，只读）：请求头 X-Impersonate: <user_id>；写操作一律 403
 POST /api/v1/users/{id}/handover                  离职/停用一键转交：{to_user_id, deactivate}
+POST /api/v1/projects/{p}/payment-terms/{seq}/receive  登记回款（多次累加；payment:edit）
    权限强校验：采购下单类→purchase:edit；验收/入库/领料→warehouse:edit；金额→purchase:price / project:amount（无权限返回 null）
 POST/PATCH /api/v1/orgs（/{id}）                   组织维护：部门/组 增改停用（停用不删）
 GET  /api/v1/users?org_id&role_code&is_active&q   用户列表（筛选；管理权限在后端校验）

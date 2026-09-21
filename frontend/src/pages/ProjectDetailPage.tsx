@@ -55,6 +55,8 @@ import {
   type DesignOverviewRow,
   type ProjectDetail as Detail,
   type ProjectUpdate,
+  hasPerm,
+  registerPayment,
 } from '../api/client'
 
 const ATT_CATEGORIES = ['客户资料', '方案', '报价', '合同', '技术协议', '其他']
@@ -116,6 +118,13 @@ export default function ProjectDetailPage() {
   const [dealForm] = Form.useForm()
   const [closeForm] = Form.useForm()
   const [contactForm] = Form.useForm<ContactIn>()
+  // 回款登记
+  const [receiveTarget, setReceiveTarget] = useState<{
+    seq: number
+    node_name: string
+    unpaid: number
+  } | null>(null)
+  const [receiveForm] = Form.useForm()
 
   const load = useCallback(async () => {
     if (!projectNo) return
@@ -150,6 +159,32 @@ export default function ProjectDetailPage() {
       }
     })()
   }, [load])
+
+  const openReceive = (t: { seq: number; node_name: string; amount?: number | null; received_amount?: number | null }) => {
+    const unpaid = Math.max(0, Number(t.amount ?? 0) - Number(t.received_amount ?? 0))
+    setReceiveTarget({ seq: t.seq, node_name: t.node_name, unpaid })
+    receiveForm.setFieldsValue({ received_amount: unpaid || undefined, received_date: dayjs() })
+  }
+
+  const doReceive = async () => {
+    if (!receiveTarget || !projectNo) return
+    const v = await receiveForm.validateFields()
+    setSaving(true)
+    try {
+      const r = await registerPayment(projectNo, receiveTarget.seq, {
+        received_amount: v.received_amount,
+        received_date: v.received_date?.format('YYYY-MM-DD'),
+        remark: v.remark,
+      })
+      message.success(`已登记回款：${r.node_name}，本节点还欠 ¥${Number(r.unpaid).toLocaleString()}`)
+      setReceiveTarget(null)
+      await load()
+    } catch (e) {
+      message.error(errMsg(e))
+    } finally {
+      setSaving(false)
+    }
+  }
 
   /** 滚动时高亮当前区块（吸顶锚点条用） */
   useEffect(() => {
@@ -769,8 +804,47 @@ export default function ProjectDetailPage() {
                       align: 'right',
                       render: (v: number | null) => (v ? `¥${v.toLocaleString()}` : <Tag>未收</Tag>),
                     },
+                    {
+                      title: '操作',
+                      key: 'recv',
+                      width: 100,
+                      render: (_: unknown, t: { seq: number; node_name: string; amount?: number | null; received_amount?: number | null }) => {
+                        const unpaid = Math.max(0, Number(t.amount ?? 0) - Number(t.received_amount ?? 0))
+                        if (!hasPerm('payment:edit')) return <Typography.Text type="secondary">—</Typography.Text>
+                        return unpaid > 0 ? (
+                          <a onClick={() => openReceive(t)}>登记回款</a>
+                        ) : (
+                          <Tag color="success">已收齐</Tag>
+                        )
+                      },
+                    },
                   ]}
                 />
+
+                <Modal
+                  title={`登记回款：${receiveTarget?.node_name ?? ''}`}
+                  open={!!receiveTarget}
+                  onCancel={() => setReceiveTarget(null)}
+                  onOk={() => void doReceive()}
+                  confirmLoading={saving}
+                  okText="登记"
+                  destroyOnClose
+                >
+                  <Typography.Paragraph type="secondary" style={{ fontSize: 12 }}>
+                    这个节点还有未收 ¥{Number(receiveTarget?.unpaid ?? 0).toLocaleString()}；可多次登记，未收不超总额。
+                  </Typography.Paragraph>
+                  <Form form={receiveForm} layout="vertical" preserve={false}>
+                    <Form.Item name="received_amount" label="本次实收金额" rules={[{ required: true, message: '填金额' }]}>
+                      <InputNumber style={{ width: '100%' }} min={0.01} />
+                    </Form.Item>
+                    <Form.Item name="received_date" label="收款日期">
+                      <DatePicker style={{ width: '100%' }} />
+                    </Form.Item>
+                    <Form.Item name="remark" label="备注">
+                      <Input placeholder="如：银行转账 / 承兑" />
+                    </Form.Item>
+                  </Form>
+                </Modal>
               </>
             )}
           </Card>

@@ -9,7 +9,7 @@ from fastapi.responses import FileResponse
 from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
-from app.api.deps import client_ip, get_current_user, has_permission, scrub_money
+from app.api.deps import client_ip, get_current_user, has_permission, require_permission, scrub_money
 from app.api.schemas import (
     CloseIn,
     ContactIn,
@@ -786,3 +786,58 @@ def preview_attachment(
     if not path.exists():
         raise HTTPException(status.HTTP_410_GONE, "文件已不存在")
     return FileResponse(path, media_type=_guess_media_type(row.filename))
+
+
+@router.post("/projects/{project_no}/payment-terms/{seq}/receive")
+def receive_payment(
+    project_no: str,
+    seq: int,
+    request: Request,
+    received_amount: float | None = Form(default=None, description="本次实收金额；不填=按节点剩余全额"),
+    received_date: date | None = Form(default=None),
+    remark: str | None = Form(default=None),
+    session: Session = Depends(get_session),
+    current: User = Depends(require_permission("payment:edit")),
+):
+    """登记回款（可多次累加）：某个付款节点收到一笔款。
+
+    权限：`payment:edit`（销售/商务、财务）。
+    """
+    row = session.scalar(
+        select(PaymentTerm).where(PaymentTerm.project_no == project_no, PaymentTerm.seq == seq)
+    )
+    if row is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "付款节点不存在")
+    remaining = max(0.0, float(row.amount or 0) - float(row.received_amount or 0))
+    amount = float(received_amount) if received_amount is not None else remaining
+    if amount <= 0:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "这个节点没有待收金额了")
+    if amount > remaining + 1e-6:
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            f"本次回款 {amount:g} 超过该节点未收金额 {remaining:g}",
+        )
+    row.received_amount = float(row.received_amount or 0) + amount
+    row.received_date = received_date or date.today()
+    if remark:
+        row.remark = (f"{row.remark} {remark}" if row.remark else remark)[:255]
+    audit.log(
+        session,
+        user=current,
+        action="receive_payment",
+        object_type="project",
+        object_ref=project_no,
+        summary=f"登记回款：{project_no} 节点{seq} {row.node_name} +¥{amount:,.2f}"
+        + (f"（累计 {float(row.received_amount):,.2f}/{float(row.amount or 0):,.2f}）" if row.amount else ""),
+        detail={"seq": seq, "amount": amount, "received_date": str(row.received_date)},
+        ip=client_ip(request),
+    )
+    session.commit()
+    return {
+        "ok": True,
+        "seq": seq,
+        "node_name": row.node_name,
+        "received_amount": float(row.received_amount or 0),
+        "received_date": row.received_date,
+        "unpaid": max(0.0, float(row.amount or 0) - float(row.received_amount or 0)),
+    }
