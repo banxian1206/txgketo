@@ -15,9 +15,9 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_current_user
 from app.core.db import get_session
 from app.models.change import CR_ACTIVE, CR_PENDING, ChangeRequest
-from app.models.initiation import GoodsReceipt, ProjectMember, PurchaseRequest
+from app.models.initiation import GoodsReceipt, Milestone, ProjectMember, PurchaseRequest
 from app.models.platform import POSITION_DIRECTOR, POSITION_LEAD, Org, User
-from app.models.project import Equipment, Project
+from app.models.project import Equipment, PaymentTerm, Project
 from app.models.review import (
     TICKET_PENDING_DIRECTOR,
     TICKET_PENDING_LEAD,
@@ -216,6 +216,157 @@ def eng_board(session: Session = Depends(get_session), current: User = Depends(g
             }
             for t in overdue_tasks
         ],
+    }
+
+
+@router.get("/sales/board")
+def sales_board(session: Session = Depends(get_session), current: User = Depends(get_current_user)):
+    """商务部工作台（06 卷 §3）：我的商机 / 待成交 / 待立项 / 回款。"""
+    today = datetime.now(UTC).date()
+    projects = session.scalars(
+        select(Project).where(Project.sales_id == current.id).order_by(Project.project_no.desc())
+    ).all()
+    nos = [p.project_no for p in projects]
+    terms = (
+        session.scalars(select(PaymentTerm).where(PaymentTerm.project_no.in_(nos))).all() if nos else []
+    )
+    by_proj: dict[str, float] = {}
+    payments: list[dict] = []
+    for t in terms:
+        unpaid = max(0.0, float(t.amount or 0) - float(t.received_amount or 0))
+        by_proj[t.project_no] = by_proj.get(t.project_no, 0.0) + unpaid
+        if unpaid > 0:
+            payments.append(
+                {
+                    "project_no": t.project_no,
+                    "node_name": t.node_name,
+                    "amount": float(t.amount or 0),
+                    "unpaid": round(unpaid, 2),
+                    "expect_date": t.expect_date,
+                    "overdue": bool(t.expect_date and t.expect_date < today),
+                }
+            )
+    payments.sort(key=lambda x: (x["expect_date"] is None, x["expect_date"] or today))
+    stage_count: dict[str, int] = {}
+    rows = []
+    for p in projects:
+        stage_count[p.stage] = stage_count.get(p.stage, 0) + 1
+        overdue_follow = bool(p.stage == "线索" and p.deadline and p.deadline < today)
+        rows.append(
+            {
+                "project_no": p.project_no,
+                "project_name": p.project_name,
+                "stage": p.stage,
+                "deadline": p.deadline,
+                "amount": float(p.amount or 0),
+                "unpaid": round(by_proj.get(p.project_no, 0.0), 2),
+                "overdue_follow": overdue_follow,
+            }
+        )
+    return {
+        "summary": {
+            "my_leads": stage_count.get("线索", 0),
+            "to_initiate": stage_count.get("成交待立项", 0),
+            "executing": sum(v for k, v in stage_count.items() if k in ("执行中", "交付中")),
+            "overdue_followup": sum(1 for r in rows if r["overdue_follow"]),
+            "payments_due": len(payments),
+            "payments_overdue": sum(1 for x in payments if x["overdue"]),
+        },
+        "projects": rows,
+        "payments": payments[:50],
+    }
+
+
+@router.get("/pm/board")
+def pm_board(session: Session = Depends(get_session), current: User = Depends(get_current_user)):
+    """项目经理台（06 卷 §3）：我项目的全链进度 + 风险 + 待办。"""
+    today = datetime.now(UTC).date()
+    pm_nos = set(session.scalars(select(Project.project_no).where(Project.pm_id == current.id)).all())
+    member_nos = set(
+        session.scalars(select(ProjectMember.project_no).where(ProjectMember.user_id == current.id)).all()
+    )
+    nos = sorted(pm_nos | member_nos)
+    projects = session.scalars(select(Project).where(Project.project_no.in_(nos))).all() if nos else []
+
+    equipments: dict[str, list[str]] = {}
+    for e in session.scalars(select(Equipment).where(Equipment.project_no.in_(nos))).all() if nos else []:
+        equipments.setdefault(e.project_no, []).append(e.equip_no)
+    released: dict[str, set[tuple[str, str]]] = {}
+    for r in session.scalars(select(DesignRelease).where(DesignRelease.project_no.in_(nos))).all() if nos else []:
+        if r.profession in ("机械", "电气", "程序", "工艺") and r.equip_no:
+            released.setdefault(r.project_no, set()).add((r.equip_no, r.profession))
+    tasks = session.scalars(select(Task).where(Task.project_no.in_(nos))).all() if nos else []
+    reqs = (
+        session.scalars(select(PurchaseRequest).where(PurchaseRequest.project_no.in_(nos))).all()
+        if nos
+        else []
+    )
+    milestones = (
+        session.scalars(select(Milestone).where(Milestone.project_no.in_(nos))).all() if nos else []
+    )
+
+    rows = []
+    for p in projects:
+        my_eq = equipments.get(p.project_no, [])
+        design_total = len(my_eq) * 4
+        design_done = len(released.get(p.project_no, set()))
+        my_tasks = [t for t in tasks if t.project_no == p.project_no]
+        overdue_tasks = [
+            t
+            for t in my_tasks
+            if t.plan_end and t.plan_end < today and t.status not in ("已完成", "已取消")
+        ]
+        my_reqs = [r for r in reqs if r.project_no == p.project_no]
+        to_purchase = [r for r in my_reqs if r.status == "待采购"]
+        in_transit = [r for r in my_reqs if r.status in ("在途", "部分到货")]
+        stored = [r for r in my_reqs if r.status == "已入库"]
+        late_milestones = [
+            m
+            for m in milestones
+            if m.project_no == p.project_no
+            and m.plan_end
+            and m.plan_end < today
+            and m.status not in ("已完成",)
+        ]
+        overdue_delivery = [
+            r for r in to_purchase if r.need_date and r.need_date < today
+        ]
+        risks: list[str] = []
+        if overdue_tasks:
+            risks.append(f"任务超期 {len(overdue_tasks)}")
+        if overdue_delivery:
+            risks.append(f"缺料超期 {len(overdue_delivery)}")
+        if late_milestones:
+            risks.append(f"节点延期 {len(late_milestones)}")
+        rows.append(
+            {
+                "project_no": p.project_no,
+                "project_name": p.project_name,
+                "stage": p.stage,
+                "deadline": p.deadline,
+                "delivery_days": p.delivery_days,
+                "design_done": design_done,
+                "design_total": design_total,
+                "purchase": {
+                    "to_purchase": len(to_purchase),
+                    "in_transit": len(in_transit),
+                    "stored": len(stored),
+                },
+                "overdue_tasks": len(overdue_tasks),
+                "shortage": len(to_purchase),
+                "risks": risks,
+            }
+        )
+    rows.sort(key=lambda r: (-len(r["risks"]), r["project_no"]))
+    return {
+        "summary": {
+            "projects": len(rows),
+            "at_risk": sum(1 for r in rows if r["risks"]),
+            "shortage": sum(r["shortage"] for r in rows),
+            "overdue_tasks": sum(r["overdue_tasks"] for r in rows),
+            "in_transit": sum(r["purchase"]["in_transit"] for r in rows),
+        },
+        "projects": rows,
     }
 
 

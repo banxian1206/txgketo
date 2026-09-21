@@ -1,0 +1,153 @@
+import { App, Button, Card, Col, Progress, Row, Space, Spin, Table, Tag, Typography } from 'antd'
+import type { ColumnsType } from 'antd/es/table'
+import { useCallback, useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+
+import { errMsg, pmBoard, workbenchMe, type PmBoard, type PmProjectRow, type WorkbenchMe } from '../../api/client'
+
+const STAGE_COLOR: Record<string, string> = {
+  线索: 'default',
+  成交待立项: 'gold',
+  执行中: 'processing',
+  交付中: 'cyan',
+  质保: 'purple',
+  已关闭: 'default',
+}
+
+/** 项目经理台（06 卷 §3）：我项目的全链进度（设计 → 采购 → 到货/入库）+ 风险/待办 */
+export default function PmWorkbench() {
+  const { message } = App.useApp()
+  const nav = useNavigate()
+  const [me, setMe] = useState<WorkbenchMe | null>(null)
+  const [data, setData] = useState<PmBoard | null>(null)
+  const [loading, setLoading] = useState(true)
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    try {
+      const [who, board] = await Promise.all([workbenchMe(), pmBoard()])
+      setMe(who)
+      setData(board)
+    } catch (e) {
+      message.error(errMsg(e))
+    } finally {
+      setLoading(false)
+    }
+  }, [message])
+
+  useEffect(() => {
+    void load()
+  }, [load])
+
+  const s = data?.summary
+
+  const columns: ColumnsType<PmProjectRow> = [
+    {
+      title: '项目',
+      key: 'project',
+      width: 220,
+      render: (_: unknown, r: PmProjectRow) => (
+        <a onClick={() => nav(`/projects/${r.project_no}`)}>
+          {r.project_no} {r.project_name}
+        </a>
+      ),
+    },
+    {
+      title: '阶段',
+      dataIndex: 'stage',
+      width: 100,
+      render: (v: string) => <Tag color={STAGE_COLOR[v] ?? 'default'}>{v}</Tag>,
+    },
+    {
+      title: '设计进度',
+      key: 'design',
+      width: 160,
+      render: (_: unknown, r: PmProjectRow) => (
+        <Space direction="vertical" size={0} style={{ width: 130 }}>
+          <Progress
+            percent={r.design_total ? Math.round((r.design_done / r.design_total) * 100) : 0}
+            size="small"
+            status={r.design_total && r.design_done === r.design_total ? 'success' : 'active'}
+          />
+          <Typography.Text type="secondary" style={{ fontSize: 11 }}>
+            已发布 {r.design_done}/{r.design_total}
+          </Typography.Text>
+        </Space>
+      ),
+    },
+    {
+      title: '采购 / 到货',
+      key: 'purchase',
+      width: 190,
+      render: (_: unknown, r: PmProjectRow) => (
+        <Space size={4} wrap>
+          <Tag color={r.purchase.to_purchase ? 'gold' : 'default'}>待采购 {r.purchase.to_purchase}</Tag>
+          <Tag color={r.purchase.in_transit ? 'processing' : 'default'}>在途 {r.purchase.in_transit}</Tag>
+          <Tag color={r.purchase.stored ? 'success' : 'default'}>已入库 {r.purchase.stored}</Tag>
+        </Space>
+      ),
+    },
+    {
+      title: '风险',
+      key: 'risks',
+      render: (_: unknown, r: PmProjectRow) =>
+        r.risks.length ? (
+          <Space size={4} wrap>
+            {r.risks.map((x) => (
+              <Tag key={x} color="red">
+                {x}
+              </Tag>
+            ))}
+          </Space>
+        ) : (
+          <Tag color="success">正常</Tag>
+        ),
+    },
+  ]
+
+  return (
+    <Spin spinning={loading}>
+      <Card size="small" style={{ marginBottom: 12 }}>
+        <Space wrap>
+          <Typography.Title level={5} style={{ margin: 0 }}>
+            项目经理台
+          </Typography.Title>
+          <Tag color="blue">{me?.user.position || '—'}</Tag>
+          <Button size="small" onClick={() => void load()}>
+            刷新
+          </Button>
+          <Button size="small" onClick={() => nav('/projects')}>
+            商机 / 项目
+          </Button>
+        </Space>
+      </Card>
+
+      <Row gutter={[12, 12]} style={{ marginBottom: 12 }}>
+        {[
+          { label: '我负责的项目', value: s?.projects ?? 0, color: '#1f6feb' },
+          { label: '有风险项目', value: s?.at_risk ?? 0, color: '#f5222d' },
+          { label: '缺料（待采购）', value: s?.shortage ?? 0, color: '#fa8c16' },
+          { label: '在途采购', value: s?.in_transit ?? 0, color: '#13c2c2' },
+          { label: '超期任务', value: s?.overdue_tasks ?? 0, color: '#f5222d' },
+        ].map((x) => (
+          <Col xs={12} sm={8} md={4} key={x.label}>
+            <Card size="small" style={{ textAlign: 'center' }}>
+              <div style={{ fontSize: 12, color: '#888' }}>{x.label}</div>
+              <div style={{ fontSize: 22, fontWeight: 600, color: x.value ? x.color : '#bbb' }}>{x.value}</div>
+            </Card>
+          </Col>
+        ))}
+      </Row>
+
+      <Card size="small" title="我负责的项目（全链进度）">
+        <Table
+          rowKey="project_no"
+          size="small"
+          dataSource={data?.projects ?? []}
+          columns={columns}
+          pagination={{ pageSize: 15, showSizeChanger: false }}
+        />
+      </Card>
+    </Spin>
+  )
+}

@@ -2,6 +2,7 @@ import {
   App,
   Button,
   Card,
+  Col,
   DatePicker,
   Empty,
   Form,
@@ -9,6 +10,7 @@ import {
   InputNumber,
   Modal,
   Radio,
+  Row,
   Space,
   Table,
   Tabs,
@@ -75,6 +77,7 @@ export default function Warehouse() {
   const { message } = App.useApp()
   const nav = useNavigate()
   const [wb, setWb] = useState<Workbench | null>(null)
+  const [tab, setTab] = useState('todo')
   const [stock, setStock] = useState<StockRow[]>([])
   const [issueCount, setIssueCount] = useState(0)
   const [moves, setMoves] = useState<MoveRow[]>([])
@@ -177,7 +180,25 @@ export default function Warehouse() {
       }
       extra={<Button onClick={() => void load()}>刷新</Button>}
     >
+      {/* 待办头（06 卷 §8） */}
+      <Row gutter={[12, 12]} style={{ marginBottom: 12 }}>
+        {[
+          { label: '待验收', value: wb?.incoming.length ?? 0, hint: '货到了就验' },
+          { label: '待入库', value: wb?.pending_storage.length ?? 0, hint: '验收合格选库位' },
+          { label: '待领料', value: wb?.pending_issues.length ?? 0, hint: '备料/领走' },
+        ].map((s) => (
+          <Col xs={8} key={s.label}>
+            <Card size="small" hoverable onClick={() => setTab('todo')} style={{ textAlign: 'center' }}>
+              <div style={{ fontSize: 12, color: '#888' }}>{s.label}</div>
+              <div style={{ fontSize: 22, fontWeight: 600, color: s.value ? '#1f6feb' : '#bbb' }}>{s.value}</div>
+              <div style={{ fontSize: 11, color: '#aaa' }}>{s.hint}</div>
+            </Card>
+          </Col>
+        ))}
+      </Row>
       <Tabs
+        activeKey={tab}
+        onChange={setTab}
         items={[
           {
             key: 'todo',

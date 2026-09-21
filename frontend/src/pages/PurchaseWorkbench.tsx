@@ -1,4 +1,4 @@
-import { App, Button, Card, Empty, Space, Table, Tabs, Tag, Typography } from 'antd'
+import { App, Button, Card, Col, Empty, Row, Space, Table, Tabs, Tag, Typography } from 'antd'
 import dayjs from 'dayjs'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
@@ -53,6 +53,7 @@ export default function PurchaseWorkbench() {
   const [resolveReceipts, setResolveReceipts] = useState<GoodsReceiptRow[]>([])
   const [doneReceipts, setDoneReceipts] = useState<GoodsReceiptRow[]>([])
   const [selected, setSelected] = useState<string[]>([])
+  const [tab, setTab] = useState('pool')
   const [manualOpen, setManualOpen] = useState(false)
   const [mergeOpen, setMergeOpen] = useState(false)
   const [orderKey, setOrderKey] = useState<string | null>(null)
@@ -129,7 +130,26 @@ export default function PurchaseWorkbench() {
 
   return (
     <Card title="采购工作台" extra={<Button onClick={() => void load()}>刷新</Button>}>
+      {/* 待办头（06 卷 §8）：进页面第一眼看到该处理什么 */}
+      <Row gutter={[12, 12]} style={{ marginBottom: 12 }}>
+        {[
+          { label: '采购池待下单', value: poolRequests, sub: `${pool.length} 种`, tab: 'pool', color: poolRequests ? '#1f6feb' : '#bbb' },
+          { label: '在途采购单', value: openOrders.length, sub: '等货', tab: 'orders', color: openOrders.length ? '#fa8c16' : '#bbb' },
+          { label: '验收不合格', value: failedReceipts.length, sub: '待跟供应商协商', tab: 'failed', color: failedReceipts.length ? '#f5222d' : '#bbb' },
+          { label: '退换处理中', value: resolveReceipts.length, sub: '换货/退货', tab: 'resolve', color: resolveReceipts.length ? '#722ed1' : '#bbb' },
+        ].map((s) => (
+          <Col xs={12} md={6} key={s.label}>
+            <Card size="small" hoverable onClick={() => setTab(s.tab)} style={{ textAlign: 'center' }}>
+              <div style={{ fontSize: 12, color: '#888' }}>{s.label}</div>
+              <div style={{ fontSize: 22, fontWeight: 600, color: s.color }}>{s.value}</div>
+              <div style={{ fontSize: 11, color: '#aaa' }}>{s.sub}</div>
+            </Card>
+          </Col>
+        ))}
+      </Row>
       <Tabs
+        activeKey={tab}
+        onChange={setTab}
         items={[
           // ---------------------------------------------------------------- ① 采购池
           {

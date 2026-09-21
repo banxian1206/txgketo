@@ -405,6 +405,65 @@ export async function engBoard() {
   return data
 }
 
+// ------------------- 商务部 / 项目经理 看板（06 卷 §3）-------------------
+
+export interface SalesBoard {
+  summary: {
+    my_leads: number
+    to_initiate: number
+    executing: number
+    overdue_followup: number
+    payments_due: number
+    payments_overdue: number
+  }
+  projects: {
+    project_no: string
+    project_name: string
+    stage: string
+    deadline?: string | null
+    amount: number
+    unpaid: number
+    overdue_follow: boolean
+  }[]
+  payments: {
+    project_no: string
+    node_name: string
+    amount: number
+    unpaid: number
+    expect_date?: string | null
+    overdue: boolean
+  }[]
+}
+
+export async function salesBoard() {
+  const { data } = await api.get<SalesBoard>('/workbench/sales/board')
+  return data
+}
+
+export interface PmProjectRow {
+  project_no: string
+  project_name: string
+  stage: string
+  deadline?: string | null
+  delivery_days?: number | null
+  design_done: number
+  design_total: number
+  purchase: { to_purchase: number; in_transit: number; stored: number }
+  overdue_tasks: number
+  shortage: number
+  risks: string[]
+}
+
+export interface PmBoard {
+  summary: { projects: number; at_risk: number; shortage: number; overdue_tasks: number; in_transit: number }
+  projects: PmProjectRow[]
+}
+
+export async function pmBoard() {
+  const { data } = await api.get<PmBoard>('/workbench/pm/board')
+  return data
+}
+
 // ------------------- 站内消息（06 卷 §9）-------------------
 
 export interface NotificationRow {

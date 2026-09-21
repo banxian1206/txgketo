@@ -25,6 +25,8 @@ import Warehouse from './pages/Warehouse'
 import Workbench from './pages/Workbench'
 import DeptWorkbench from './pages/workbench/DeptWorkbench'
 import EngWorkbench from './pages/workbench/EngWorkbench'
+import PmWorkbench from './pages/workbench/PmWorkbench'
+import SalesWorkbench from './pages/workbench/SalesWorkbench'
 import { TOKEN_KEY } from './api/client'
 
 function RequireAuth({ children }: { children: JSX.Element }) {
@@ -59,8 +61,8 @@ export default function App() {
       >
         <Route index element={<Workbench />} />
         <Route path="workbench" element={<Workbench />} />
-        <Route path="workbench/sales" element={<DeptWorkbench kind="sales" />} />
-        <Route path="workbench/pm" element={<DeptWorkbench kind="pm" />} />
+        <Route path="workbench/sales" element={<SalesWorkbench />} />
+        <Route path="workbench/pm" element={<PmWorkbench />} />
         <Route path="workbench/eng" element={<EngWorkbench />} />
         <Route path="workbench/shop" element={<DeptWorkbench kind="shop" />} />
         <Route path="projects" element={<Projects />} />
