@@ -3,6 +3,7 @@
 from app.models.base import Base
 from app.models.engineering import BomItem, Drawing, DrawingVersion
 from app.models.review import DesignRelease, ReviewAction, ReviewTicket, ReviewTicketItem
+from app.models.program import EquipmentProgram, EquipmentProgramVersion
 from app.models.warehouse import (
     MaterialIssue,
     MaterialIssueLine,
@@ -65,6 +66,8 @@ __all__ = [
     "ProjectMember",
     "PurchaseRequest",
     "DesignRelease",
+    "EquipmentProgram",
+    "EquipmentProgramVersion",
     "ReviewAction",
     "ReviewTicket",
     "ReviewTicketItem",

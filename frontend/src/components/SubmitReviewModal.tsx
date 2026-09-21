@@ -71,6 +71,9 @@ export default function SubmitReviewModal({ task, open, onClose, onDone }: Props
         out.push({ item_type: 'SOURCE_TAG', item_ref: s.drawing_no, source_type: v })
       }
     })
+    cand.programs.forEach((p) => {
+      if (checked[`P:${p.program_id}`]) out.push({ item_type: 'PROGRAM', item_ref: String(p.program_id) })
+    })
     return out
   }, [cand, checked, tags])
 
@@ -98,7 +101,8 @@ export default function SubmitReviewModal({ task, open, onClose, onDone }: Props
     !cand.drawings.length &&
     !cand.std_bom.length &&
     !cand.material_bom.length &&
-    !cand.source_tags.length
+    !cand.source_tags.length &&
+    !cand.programs.length
 
   const toggle = (key: string, on: boolean) => setChecked((p) => ({ ...p, [key]: on }))
 
@@ -191,6 +195,26 @@ export default function SubmitReviewModal({ task, open, onClose, onDone }: Props
                   options={['自制件', '外协件', '定制件'].map((v) => ({ value: v, label: v }))}
                 />
               </Space>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {!!cand?.programs.length && (
+        <div style={SECTION_STYLE}>
+          <Typography.Text strong>PLC 程序版本</Typography.Text>
+          <div style={{ marginTop: 6 }}>
+            {cand.programs.map((p) => (
+              <div key={p.program_id}>
+                <Checkbox
+                  checked={!!checked[`P:${p.program_id}`]}
+                  onChange={(e) => toggle(`P:${p.program_id}`, e.target.checked)}
+                >
+                  {p.name}
+                  <Tag style={{ marginLeft: 6 }}>{p.version}</Tag>
+                  {p.filename ? <Tag color="green">已传文件</Tag> : <Tag color="orange">未传文件</Tag>}
+                </Checkbox>
+              </div>
             ))}
           </div>
         </div>

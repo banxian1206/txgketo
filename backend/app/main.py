@@ -13,6 +13,7 @@ from app.api.routes import (
     library,
     numbering,
     platform,
+    programs,
     project,
     reviews,
     suppliers,
@@ -42,6 +43,7 @@ for r in (
     tasks,
     engineering,
     reviews,
+    programs,
     suppliers,
     warehouse,
 ):

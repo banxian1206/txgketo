@@ -26,6 +26,7 @@ from app.models.engineering import (
 )
 from app.models.library import Item
 from app.models.platform import User
+from app.models.program import EquipmentProgram, EquipmentProgramVersion
 from app.models.review import (
     ACTION_PASS,
     ACTION_REJECT,
@@ -78,13 +79,28 @@ def current_version_row(session: Session, drawing_no: str) -> DrawingVersion | N
     )
 
 
+def current_program_version_row(session: Session, program_id: int) -> EquipmentProgramVersion | None:
+    return session.scalar(
+        select(EquipmentProgramVersion).where(
+            EquipmentProgramVersion.program_id == program_id,
+            EquipmentProgramVersion.is_current.is_(True),
+        )
+    )
+
+
 def candidates(session: Session, task: Task) -> dict:
     """这条任务下、还在草稿态的可提交内容（05 卷 §3.1 勾选清单）。
 
     ★ 归属判断在任务层（提交时校验 task.owner_id）—— 组长拆给组员的子任务，
       组员可以提交该设备该专业下任何草稿内容，不卡单条内容是谁建的。
     """
-    out: dict = {"drawings": [], "std_bom": [], "material_bom": [], "source_tags": []}
+    out: dict = {
+        "drawings": [],
+        "std_bom": [],
+        "material_bom": [],
+        "source_tags": [],
+        "programs": [],
+    }
     if task.equip_no is None:
         return out
     project_no, equip_no, prof = task.project_no, task.equip_no, task.profession
@@ -145,6 +161,25 @@ def candidates(session: Session, task: Task) -> dict:
                         "status": d.status,
                     }
                 )
+
+    if prof == "程序":
+        for p in session.scalars(
+            select(EquipmentProgram).where(
+                EquipmentProgram.project_no == project_no,
+                EquipmentProgram.equip_no == equip_no,
+                EquipmentProgram.status == "草稿",
+            ).order_by(EquipmentProgram.id)
+        ).all():
+            ver = current_program_version_row(session, p.id)
+            out["programs"].append(
+                {
+                    "program_id": p.id,
+                    "name": p.name,
+                    "version": p.current_version,
+                    "status": p.status,
+                    "filename": ver.filename if ver else None,
+                }
+            )
     return out
 
 
@@ -227,7 +262,31 @@ def _lock_and_snapshot(
         return {"drawing_no": d.drawing_no, "title": d.title, "old": d.source_type, "new": new}
 
     if item_type == ITEM_PROGRAM:
-        raise ReviewFlowError("PLC 程序版本还没上线（P4）")
+        if prof != "程序":
+            raise ReviewFlowError("只有程序任务能提交程序版本")
+        try:
+            program_id = int(item_ref)
+        except ValueError as exc:
+            raise ReviewFlowError(f"程序号不对：{item_ref}") from exc
+        p = session.get(EquipmentProgram, program_id)
+        if p is None or p.project_no != project_no or p.equip_no != equip_no:
+            raise ReviewFlowError(f"程序不存在或不属于本设备：{item_ref}")
+        if p.status != "草稿":
+            raise ReviewFlowError(f"程序「{p.name}」当前是「{p.status}」，只有草稿能提交")
+        ver = current_program_version_row(session, p.id)
+        if ver is None:
+            ver = EquipmentProgramVersion(program_id=p.id, version=p.current_version, is_current=True)
+            session.add(ver)
+            session.flush()
+        ver.submitted_by = user.id
+        ver.submitted_at = now
+        p.status = "审核中"
+        return {
+            "program_id": p.id,
+            "name": p.name,
+            "version": ver.version,
+            "filename": ver.filename,
+        }
     raise ReviewFlowError(f"未知提交类型：{item_type}")
 
 
@@ -451,6 +510,13 @@ def _unlock_round(session: Session, ticket: ReviewTicket, round_no: int) -> None
                 continue
             if b is not None and b.status == BOM_ROW_REVIEWING:
                 b.status = BOM_ROW_DRAFT
+        elif it.item_type == ITEM_PROGRAM:
+            try:
+                p = session.get(EquipmentProgram, int(it.item_ref))
+            except ValueError:
+                continue
+            if p is not None and p.status == "审核中":
+                p.status = "草稿"
 
 
 def _publish_round(
@@ -524,7 +590,28 @@ def _publish_round(
                     {"drawing_no": d.drawing_no, "old": it.snapshot.get("old"), "new": d.source_type}
                 )
         elif it.item_type == ITEM_PROGRAM:
-            summary["programs"].append({"program_ref": it.item_ref, "version": it.version})
+            try:
+                p = session.get(EquipmentProgram, int(it.item_ref))
+            except ValueError:
+                continue
+            if p is not None:
+                ver = current_program_version_row(session, p.id)
+                if ver is not None:
+                    ver.reviewed_by = director_user.id
+                    ver.reviewed_at = now
+                    ver.published_by = director_user.id
+                    ver.published_at = now
+                    ver.review_note = note or None
+                    ver.is_current = True
+                p.status = "已发布"
+                summary["programs"].append(
+                    {
+                        "program_id": p.id,
+                        "name": p.name,
+                        "version": ver.version if ver else p.current_version,
+                        "filename": ver.filename if ver else None,
+                    }
+                )
 
     release.summary = summary
     _maybe_complete_task(session, ticket.task_id)
@@ -597,7 +684,13 @@ def _maybe_complete_task(session: Session, task_id: int) -> None:
         if any(d.drawing_no not in tagged for d in drawings):
             return
     else:
-        return  # 程序任务等 P4
+        programs = session.scalars(
+            select(EquipmentProgram).where(
+                EquipmentProgram.project_no == project_no, EquipmentProgram.equip_no == equip_no
+            )
+        ).all()
+        if not programs or any(p.status != "已发布" for p in programs):
+            return
 
     task.status = "已完成"
     task.done_at = now

@@ -928,6 +928,7 @@ export interface ReviewCandidate {
   std_bom: { id: number; parent_ref: string; display_name: string; qty: number; unit?: string | null }[]
   material_bom: { id: number; parent_ref: string; display_name: string; qty: number; unit?: string | null }[]
   source_tags: { drawing_no: string; title: string; source_type: string; status: string }[]
+  programs: { program_id: number; name: string; version: string; status: string; filename?: string | null }[]
 }
 
 export interface ReviewSelection {
@@ -981,6 +982,73 @@ export async function reviewTicket(id: number, action: '通过' | '退回', note
 export async function withdrawTicket(id: number) {
   const { data } = await api.post<ReviewTicketDetail>(`/review-tickets/${id}/withdraw`)
   return data
+}
+
+// ============================== PLC 程序（05 卷 §8.1） ================================
+
+export interface ProgramItem {
+  id: number
+  project_no: string
+  equip_no: string
+  name: string
+  owner_id?: number | null
+  owner_name?: string | null
+  current_version: string
+  status: string
+  remark?: string | null
+  current_filename?: string | null
+}
+
+export interface ProgramVersionRow {
+  id: number
+  version: string
+  filename?: string | null
+  change_reason?: string | null
+  submitted_by?: string | null
+  submitted_at?: string | null
+  reviewed_by?: string | null
+  published_by?: string | null
+  published_at?: string | null
+  review_note?: string | null
+  is_current: boolean
+}
+
+export async function listPrograms(projectNo: string, equipNo: string) {
+  const { data } = await api.get<ProgramItem[]>(`/projects/${projectNo}/equipment/${equipNo}/programs`)
+  return data
+}
+
+export async function createProgram(
+  projectNo: string,
+  equipNo: string,
+  body: { name: string; remark?: string },
+) {
+  const { data } = await api.post<ProgramItem>(`/projects/${projectNo}/equipment/${equipNo}/programs`, body)
+  return data
+}
+
+export async function uploadProgramDraft(programId: number, changeReason: string, file?: File) {
+  const form = new FormData()
+  form.append('change_reason', changeReason ?? '')
+  if (file) form.append('file', file)
+  const { data } = await api.post<ProgramItem>(`/programs/${programId}/draft`, form)
+  return data
+}
+
+export async function newProgramVersion(programId: number, changeReason: string) {
+  const form = new FormData()
+  form.append('change_reason', changeReason ?? '')
+  const { data } = await api.post<ProgramItem>(`/programs/${programId}/new-version`, form)
+  return data
+}
+
+export async function listProgramVersions(programId: number) {
+  const { data } = await api.get<ProgramVersionRow[]>(`/programs/${programId}/versions`)
+  return data
+}
+
+export async function deleteProgram(programId: number) {
+  await api.delete(`/programs/${programId}`)
 }
 
 export async function newDrawingVersion(drawingNo: string, changeReason: string) {

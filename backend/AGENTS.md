@@ -91,8 +91,8 @@ deploy/          docker-compose.dev.yml
 
 ## 8. 当前进度（交接记录）
 
-> 更新于：**05 卷 P3 评审单**落地（提交 → 组长 → 总监 → 发布冻结；多轮留档/撤回/退回重提；「设计评审」工作台）。
-> 下一步：**05 卷 P4 PLC 程序版本**（表 + 上传 + 复用评审单）、**P5 发布→采购触发**（按发布批次 + 手工申请）。BOM → 净需求 → 采购池（常规件通道）已通，但只认已冻结行。
+> 更新于：**05 卷 P4 PLC 程序版本**落地（程序 + 程序版本，走评审单两级审核发布；程序不采购；任务联动覆盖程序任务）。
+> 下一步：**05 卷 P5 发布→采购触发**（按发布批次 + 手工申请/归属）→ P6 改版 → P7 工作台。BOM → 净需求 → 采购池只认已冻结行。
 
 ### 8.1 采购状态线（客户口径，别再改回去了）
 
@@ -138,6 +138,7 @@ deploy/          docker-compose.dev.yml
 | 标准库三层（类别→品类→型号，规格模板，防重复建码） | ✅ | `models/library.py`、`routes/library.py` |
 | 工程设计（图纸树/版本/设计BOM/材料BOM） | ✅ | `models/engineering.py`、`routes/engineering.py` |
 | **设计评审（05 卷 P3）** | ✅ | `models/review.py`（评审单/明细/审核记录/发布）+ `services/review_flow.py`（两级审核、发布=冻结、撤回/退回、任务联动）+ `routes/reviews.py`、`pages/Reviews.tsx`、`components/SubmitReviewModal.tsx`/`ReviewDetailModal.tsx`；图纸改「上传草稿 + 提交评审」，不再单级发布 |
+| **PLC 程序版本（05 卷 P4）** | ✅ | `models/program.py`（程序 + 程序版本）+ `routes/programs.py`（建程序/上传草稿/改版/版本留档）；程序走评审单（`review_flow` 支持 PROGRAM，发布后任务联动）；设计面「PLC 程序版本」卡片 |
 | 供应商主数据 + 报价 + 能供品类 | ✅ | `models/purchasing.py`、`routes/suppliers.py` |
 | 推荐供应商（多路证据打分） | ✅ | `GET /purchase/recommend/{item_no}` |
 | 价格参考（上次成交/历史区间/各家报价） | ✅ | `GET /purchase/price-reference/{item_no}` |
@@ -158,7 +159,7 @@ deploy/          docker-compose.dev.yml
 | 1 | Excel 历史采购导入 | 客户已确认后期要做（物料/供应商/单价/数量/日期 → 写价格库） |
 | 2 | 制造 / 装配 / 发运 / 现场 / 验收 / 售后 | 流程上还没做（见 `../00 方案` §3 S5–S11） |
 | 3 | 领料单数量算法对齐 | `warehouse/generate-issue` 还是旧算法（材料只乘直接父件、标准件不乘）；建议改成 `bom_demand` 那套按树累计 |
-| 4 | 工程设计流转（05 卷 P4–P7） | P4 程序版本 → P5 采购触发/手工申请 → P6 改版 → P7 工作台；口径见 `../05 工程设计流转·审核·冻结·改版.md` |
+| 4 | 工程设计流转（05 卷 P5–P7） | P5 采购触发/手工申请 → P6 改版 → P7 工作台；口径见 `../05 工程设计流转·审核·冻结·改版.md` |
 
 > 本轮顺手修复：`update_purchase_request` 漏导入 `REQUEST_STATUS`，改采购需求状态会 500。
 
@@ -188,6 +189,10 @@ POST /api/v1/review-tickets/{id}/review           两级审核（通过/退回�
 POST /api/v1/review-tickets/{id}/withdraw         提交人撤回（解锁回草稿）
 GET  /api/v1/projects/{p}/equipment/{e}/my-design-tasks  设计面「我的提交」卡片
 POST /api/v1/drawings/{no}/draft                  上传/更新草稿文件（审核走评审单，不再单级发布）
+GET  /api/v1/projects/{p}/equipment/{e}/programs  PLC 程序列表（建程序用 POST 同路径）
+POST /api/v1/programs/{id}/draft                  上传程序草稿
+POST /api/v1/programs/{id}/new-version            程序改版（V2 → 草稿）
+GET  /api/v1/programs/{id}/versions               程序版本留档
 GET/POST/PATCH /api/v1/users                      用户与岗位：专业/岗位（审核人）、组织、角色、停用、重置密码
 POST /api/v1/warehouse/projects/{no}/equipment/{equip}/generate-issue  按 BOM 生成领料单
 GET  /api/v1/purchase/recommend/{item_no}         推荐供应商（打分+理由）

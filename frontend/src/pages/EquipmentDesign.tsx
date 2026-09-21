@@ -31,21 +31,29 @@ import SubmitReviewModal from '../components/SubmitReviewModal'
 import {
   addBom,
   addDrawing,
+  createProgram,
   deleteDrawing,
+  deleteProgram,
   errMsg,
   generateEquipmentPurchase,
   getDesignTree,
   getMyDesignTasks,
+  listPrograms,
+  listProgramVersions,
   listStdItems,
   listVersions,
   newDrawingVersion,
+  newProgramVersion,
   removeBom,
   uploadDrawingDraft,
+  uploadProgramDraft,
   type BomLine,
   type DesignRoot,
   type DesignTree,
   type GeneratePurchaseResult,
   type MyDesignTask,
+  type ProgramItem,
+  type ProgramVersionRow,
   type StdItem,
   type VersionRow,
 } from '../api/client'
@@ -124,17 +132,30 @@ export default function EquipmentDesign({ projectNo: p0, equipNo: e0, embedded }
   const [purchaseForm] = Form.useForm()
   // 改版原因（Modal.confirm 里的小输入框）
   const reasonRef = { current: '' }
+  // PLC 程序版本
+  const [programs, setPrograms] = useState<ProgramItem[]>([])
+  const [progCreateOpen, setProgCreateOpen] = useState(false)
+  const [progUploadOpen, setProgUploadOpen] = useState(false)
+  const [progUploadTarget, setProgUploadTarget] = useState<ProgramItem | null>(null)
+  const [progVerOpen, setProgVerOpen] = useState(false)
+  const [progVersions, setProgVersions] = useState<ProgramVersionRow[]>([])
+  const [progVerTarget, setProgVerTarget] = useState<ProgramItem | null>(null)
+  const [progForm] = Form.useForm()
+  const [progUploadForm] = Form.useForm()
+  const progReasonRef = { current: '' }
 
   const load = useCallback(async () => {
     if (!projectNo || !equipNo) return
     setLoading(true)
     try {
-      const [d, mt] = await Promise.all([
+      const [d, mt, pg] = await Promise.all([
         getDesignTree(projectNo, equipNo),
         getMyDesignTasks(projectNo, equipNo),
+        listPrograms(projectNo, equipNo),
       ])
       setData(d)
       setMyTasks(mt)
+      setPrograms(pg)
       setSelected((prev) => (prev ? d.tree.find((t) => t.drawing_no === prev.drawing_no) ?? null : null))
     } catch (e) {
       message.error(errMsg(e))
@@ -210,6 +231,80 @@ export default function EquipmentDesign({ projectNo: p0, equipNo: e0, embedded }
     try {
       setVersions(await listVersions(no))
       setVerOpen(true)
+    } catch (e) {
+      message.error(errMsg(e))
+    }
+  }
+
+  const doCreateProgram = async () => {
+    const v = await progForm.validateFields()
+    setSaving(true)
+    try {
+      await createProgram(projectNo, equipNo, { name: v.name, remark: v.remark })
+      message.success('程序已建 —— 上传程序文件后到「我的提交」勾选提交评审')
+      setProgCreateOpen(false)
+      await load()
+    } catch (e) {
+      message.error(errMsg(e))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const doUploadProgram = async () => {
+    if (!progUploadTarget) return
+    const v = await progUploadForm.validateFields()
+    const file = progUploadForm.getFieldValue('file')?.[0]?.originFileObj as File | undefined
+    setSaving(true)
+    try {
+      await uploadProgramDraft(progUploadTarget.id, v.change_reason, file)
+      message.success('程序草稿已上传')
+      setProgUploadOpen(false)
+      await load()
+    } catch (e) {
+      message.error(errMsg(e))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const openProgramVersions = async (p: ProgramItem) => {
+    setProgVerTarget(p)
+    try {
+      setProgVersions(await listProgramVersions(p.id))
+      setProgVerOpen(true)
+    } catch (e) {
+      message.error(errMsg(e))
+    }
+  }
+
+  const doNewProgramVersion = (p: ProgramItem) => {
+    progReasonRef.current = ''
+    Modal.confirm({
+      title: `程序改版 ${p.name}`,
+      content: (
+        <Input
+          placeholder="改版原因（如：现场反馈报警逻辑要改）"
+          onChange={(e) => {
+            progReasonRef.current = e.target.value
+          }}
+        />
+      ),
+      onOk: () =>
+        newProgramVersion(p.id, progReasonRef.current)
+          .then(() => {
+            message.success('已生成新版本草稿')
+            return load()
+          })
+          .catch((e) => message.error(errMsg(e))),
+    })
+  }
+
+  const removeProgram = async (p: ProgramItem) => {
+    try {
+      await deleteProgram(p.id)
+      message.success('已删除')
+      await load()
     } catch (e) {
       message.error(errMsg(e))
     }
@@ -697,6 +792,80 @@ export default function EquipmentDesign({ projectNo: p0, equipNo: e0, embedded }
         </Col>
       </Row>
 
+      {/* PLC 程序版本（程序专业）：走评审单发布，不采购 */}
+      <Card
+        size="small"
+        title={`PLC 程序版本（${programs.length}）`}
+        style={{ marginTop: 16 }}
+        extra={
+          <Button
+            size="small"
+            onClick={() => {
+              progForm.resetFields()
+              setProgCreateOpen(true)
+            }}
+          >
+            + 新建程序
+          </Button>
+        }
+      >
+        <Table<ProgramItem>
+          rowKey="id"
+          size="small"
+          pagination={false}
+          dataSource={programs}
+          locale={{ emptyText: <Empty description="程序专业还没建程序（建好后走评审单两级审核发布）" /> }}
+          columns={[
+            { title: '程序', dataIndex: 'name' },
+            {
+              title: '版本',
+              dataIndex: 'current_version',
+              width: 70,
+              render: (v: string) => <Tag>{v}</Tag>,
+            },
+            {
+              title: '文件',
+              dataIndex: 'current_filename',
+              width: 200,
+              render: (v: string | null | undefined) => v ?? '—',
+            },
+            {
+              title: '状态',
+              dataIndex: 'status',
+              width: 90,
+              render: (v: string) => <Tag color={STATUS_COLOR[v] ?? 'default'}>{v}</Tag>,
+            },
+            {
+              title: '操作',
+              key: 'action',
+              width: 230,
+              render: (_: unknown, p: ProgramItem) => (
+                <Space size="small">
+                  {p.status === '草稿' && (
+                    <a
+                      onClick={() => {
+                        setProgUploadTarget(p)
+                        progUploadForm.resetFields()
+                        setProgUploadOpen(true)
+                      }}
+                    >
+                      上传程序
+                    </a>
+                  )}
+                  <a onClick={() => void openProgramVersions(p)}>版本</a>
+                  {p.status === '已发布' && <a onClick={() => doNewProgramVersion(p)}>改版</a>}
+                  {p.status === '草稿' && (
+                    <Popconfirm title={`删除程序 ${p.name}？`} onConfirm={() => void removeProgram(p)}>
+                      <a>删除</a>
+                    </Popconfirm>
+                  )}
+                </Space>
+              ),
+            },
+          ]}
+        />
+      </Card>
+
       {/* 新增组件/零件 */}
       {/* 生成采购需求（BOM → 净需求 → 进池） */}
       <Modal
@@ -995,6 +1164,99 @@ export default function EquipmentDesign({ projectNo: p0, equipNo: e0, embedded }
           ]}
         />
       </Modal>
+      {/* 新建程序 */}
+      <Modal
+        title={`新建程序 · ${equipNo}`}
+        open={progCreateOpen}
+        onCancel={() => setProgCreateOpen(false)}
+        onOk={() => void doCreateProgram()}
+        confirmLoading={saving}
+        okText="创建"
+        destroyOnClose
+      >
+        <Form form={progForm} layout="vertical" preserve={false}>
+          <Form.Item name="name" label="程序名称" rules={[{ required: true, message: '请填程序名称' }]}>
+            <Input placeholder="如：PLC 主控程序 / HMI 画面 / 机器人程序" />
+          </Form.Item>
+          <Form.Item name="remark" label="备注">
+            <Input.TextArea rows={2} />
+          </Form.Item>
+        </Form>
+      </Modal>
+
+      {/* 上传程序草稿 */}
+      <Modal
+        title={`上传程序草稿 · ${progUploadTarget?.name ?? ''}`}
+        open={progUploadOpen}
+        onCancel={() => setProgUploadOpen(false)}
+        onOk={() => void doUploadProgram()}
+        confirmLoading={saving}
+        okText="上传"
+        destroyOnClose
+      >
+        <Form form={progUploadForm} layout="vertical" preserve={false}>
+          <Form.Item
+            name="file"
+            label="程序文件"
+            valuePropName="fileList"
+            getValueFromEvent={(e) => e?.fileList}
+          >
+            <Upload maxCount={1} beforeUpload={() => false}>
+              <Button>选择程序文件</Button>
+            </Upload>
+          </Form.Item>
+          <Form.Item name="change_reason" label="版本说明">
+            <Input.TextArea rows={2} placeholder="如：首版 / 修复报警逻辑" />
+          </Form.Item>
+        </Form>
+      </Modal>
+
+      {/* 程序版本历史 */}
+      <Modal
+        title={`程序版本 · ${progVerTarget?.name ?? ''}`}
+        open={progVerOpen}
+        width={760}
+        footer={null}
+        onCancel={() => setProgVerOpen(false)}
+      >
+        <Table<ProgramVersionRow>
+          rowKey="id"
+          size="small"
+          pagination={false}
+          dataSource={progVersions}
+          columns={[
+            {
+              title: '版本',
+              dataIndex: 'version',
+              width: 80,
+              render: (v: string, r: ProgramVersionRow) => (
+                <Tag color={r.is_current ? 'green' : 'default'}>{v}</Tag>
+              ),
+            },
+            { title: '文件', dataIndex: 'filename', render: (v: string | null) => v || '—' },
+            {
+              title: '提交 / 发布',
+              key: 'who',
+              render: (_: unknown, r: ProgramVersionRow) => (
+                <Typography.Text style={{ fontSize: 12 }}>
+                  {r.submitted_by ?? '—'} → {r.published_by ?? '—'}
+                </Typography.Text>
+              ),
+            },
+            {
+              title: '原因 / 意见',
+              key: 'note',
+              render: (_: unknown, r: ProgramVersionRow) => (
+                <Typography.Text style={{ fontSize: 12 }}>
+                  {r.change_reason ?? '—'}
+                  {r.review_note ? `（审核：${r.review_note}）` : ''}
+                </Typography.Text>
+              ),
+            },
+          ]}
+        />
+      </Modal>
+
       {/* 提交评审 / 审核记录 */}
       <SubmitReviewModal
         task={reviewTask}
