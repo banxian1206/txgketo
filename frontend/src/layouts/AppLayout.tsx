@@ -4,7 +4,14 @@ import { useCallback, useEffect, useState } from 'react'
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom'
 
 import NotificationsDrawer from '../components/NotificationsDrawer'
-import { TOKEN_KEY, unreadNotificationCount, workbenchMe, type WorkbenchItem } from '../api/client'
+import {
+  IMPERSONATE_KEY,
+  IMPERSONATE_NAME_KEY,
+  TOKEN_KEY,
+  unreadNotificationCount,
+  workbenchMe,
+  type WorkbenchItem,
+} from '../api/client'
 
 const { Header, Sider, Content } = Layout
 
@@ -24,6 +31,7 @@ export default function AppLayout() {
   })()
   // 用户与权限：系统管理员 + 总监（06 卷 §4）
   const canManageUsers = me.is_superuser === true || me.position === '总监'
+  const impersonateName = localStorage.getItem(IMPERSONATE_NAME_KEY)
   const [workbenches, setWorkbenches] = useState<WorkbenchItem[]>([
     { key: 'mine', name: '我的工作台', route: '/workbench', visible: true },
   ])
@@ -105,6 +113,30 @@ export default function AppLayout() {
         />
       </Sider>
       <Layout>
+        {impersonateName && (
+          <div
+            style={{
+              background: '#fa8c16',
+              color: '#fff',
+              padding: '6px 20px',
+              fontSize: 13,
+              display: 'flex',
+              justifyContent: 'space-between',
+            }}
+          >
+            <span>正在以「{impersonateName}」身份查看（只读，不能提交/审批/下单）</span>
+            <a
+              style={{ color: '#fff', textDecoration: 'underline' }}
+              onClick={() => {
+                localStorage.removeItem(IMPERSONATE_KEY)
+                localStorage.removeItem(IMPERSONATE_NAME_KEY)
+                window.location.href = '/users'
+              }}
+            >
+              退出查看
+            </a>
+          </div>
+        )}
         <Header
           style={{
             background: '#fff',
@@ -131,6 +163,8 @@ export default function AppLayout() {
                 localStorage.removeItem(TOKEN_KEY)
                 localStorage.removeItem('txgk_name')
                 localStorage.removeItem('txgk_user')
+                localStorage.removeItem(IMPERSONATE_KEY)
+                localStorage.removeItem(IMPERSONATE_NAME_KEY)
                 nav('/login')
               }}
             >

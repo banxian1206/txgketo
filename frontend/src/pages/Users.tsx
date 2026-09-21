@@ -20,17 +20,22 @@ import type { ColumnsType } from 'antd/es/table'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import {
+  IMPERSONATE_KEY,
+  IMPERSONATE_NAME_KEY,
   POSITIONS,
   PROFESSIONS,
   createOrg,
   createUser,
   errMsg,
+  generateDemoUsers,
   getMyScope,
   listOrgs,
   listRoles,
   listUsers,
+  setDemoUsersActive,
   updateOrg,
   updateUser,
+  type DemoUserRow,
   type MyScope,
   type OrgRow,
   type RoleRow,
@@ -138,6 +143,10 @@ export default function Users() {
   const [orgOpen, setOrgOpen] = useState(false)
   const [orgEditing, setOrgEditing] = useState<OrgRow | null>(null)
   const [orgForm] = Form.useForm()
+  // 演示账号
+  const [demoOpen, setDemoOpen] = useState(false)
+  const [demoUsers, setDemoUsers] = useState<DemoUserRow[]>([])
+  const [demoPassword, setDemoPassword] = useState('')
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -330,6 +339,35 @@ export default function Users() {
 
   const orgName = (id?: number | null) => orgs.find((o) => o.id === id)?.name ?? '—'
 
+  const doGenerateDemo = async () => {
+    try {
+      const r = await generateDemoUsers()
+      setDemoUsers(r.users)
+      setDemoPassword(r.password)
+      setDemoOpen(true)
+      message.success(`演示账号已就绪（${r.users.length} 个，密码 ${r.password}）`)
+      await Promise.all([load(), loadUsers()])
+    } catch (e) {
+      message.error(errMsg(e))
+    }
+  }
+
+  const doDisableDemo = async () => {
+    try {
+      const r = await setDemoUsersActive('disable')
+      message.success(`已停用 ${r.count} 个演示账号`)
+      await Promise.all([load(), loadUsers()])
+    } catch (e) {
+      message.error(errMsg(e))
+    }
+  }
+
+  const impersonate = (r: UserRow) => {
+    localStorage.setItem(IMPERSONATE_KEY, String(r.id))
+    localStorage.setItem(IMPERSONATE_NAME_KEY, r.name)
+    window.location.href = '/workbench'
+  }
+
   const columns: ColumnsType<UserRow> = [
     { title: '账号', dataIndex: 'username', width: 110 },
     {
@@ -376,8 +414,17 @@ export default function Users() {
     {
       title: '操作',
       key: 'action',
-      width: 80,
-      render: (_: unknown, r: UserRow) => <a onClick={() => openEditUser(r)}>编辑</a>,
+      width: 150,
+      render: (_: unknown, r: UserRow) => (
+        <Space size="small">
+          <a onClick={() => openEditUser(r)}>编辑</a>
+          {scope?.is_admin && (
+            <a onClick={() => impersonate(r)} title="以他的身份查看（只读）">
+              以此人查看
+            </a>
+          )}
+        </Space>
+      ),
     },
   ]
 
@@ -454,6 +501,14 @@ export default function Users() {
                     <Button type="primary" onClick={openCreateUser}>
                       新建用户
                     </Button>
+                  )}
+                  {scope?.is_admin && (
+                    <>
+                      <Button onClick={() => void doGenerateDemo()}>生成演示账号</Button>
+                      <Popconfirm title="停用所有演示账号？（不删，可再启用）" onConfirm={() => void doDisableDemo()}>
+                        <Button>停用演示账号</Button>
+                      </Popconfirm>
+                    </>
                   )}
                 </Space>
                 <Table<UserRow>
@@ -633,6 +688,38 @@ export default function Users() {
             </Form.Item>
           )}
         </Form>
+      </Modal>
+
+      {/* 演示账号清单 */}
+      <Modal
+        open={demoOpen}
+        title={`演示账号（密码统一 ${demoPassword}）`}
+        width={760}
+        footer={<Button onClick={() => setDemoOpen(false)}>关闭</Button>}
+        onCancel={() => setDemoOpen(false)}
+      >
+        <Typography.Paragraph type="secondary" style={{ fontSize: 12 }}>
+          用不同账号登录即可验证「工作台 / 菜单可见 / 两级审核 / 通知」。
+          两级审核示例：<b>mech1</b> 提交 → <b>mech_manager</b> → <b>eng_director</b>。
+          上线前请「停用演示账号」或改密。
+        </Typography.Paragraph>
+        <Table<DemoUserRow>
+          rowKey="username"
+          size="small"
+          dataSource={demoUsers}
+          pagination={false}
+          columns={[
+            { title: '账号', dataIndex: 'username', width: 130 },
+            { title: '姓名', dataIndex: 'name', width: 110 },
+            { title: '部门', dataIndex: 'org', width: 100, render: (v: string | null) => v ?? '—' },
+            { title: '岗位', dataIndex: 'position', width: 70 },
+            {
+              title: '角色',
+              dataIndex: 'roles',
+              render: (v: string[]) => v.map((x) => <Tag key={x}>{x}</Tag>),
+            },
+          ]}
+        />
       </Modal>
 
       {/* 组织编辑 */}

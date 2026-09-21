@@ -28,6 +28,16 @@ from app.core.config import settings
 
 app = FastAPI(title=settings.app_name, version="0.1.0")
 
+
+@app.middleware("http")
+async def _block_impersonated_writes(request, call_next):
+    """「以某人身份查看」只能看（06 卷 §4）：带 X-Impersonate 头的写操作一律 403。"""
+    if request.headers.get("x-impersonate") and request.method not in ("GET", "HEAD", "OPTIONS"):
+        from fastapi.responses import JSONResponse
+
+        return JSONResponse(status_code=403, content={"detail": "以他人身份查看时只能看，不能操作"})
+    return await call_next(request)
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origin_list,

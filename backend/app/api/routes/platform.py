@@ -177,6 +177,44 @@ def list_orgs(
     return [_org_dict(session, r, counts) for r in session.scalars(stmt).all()]
 
 
+class DemoUsersIn(BaseModel):
+    action: str = "create"  # create / disable / enable
+
+
+@router.post("/demo-users")
+def demo_users(
+    body: DemoUsersIn,
+    request: Request,
+    session: Session = Depends(get_session),
+    current: User = Depends(get_current_user),
+):
+    """一键生成/停用演示账号（06 卷 §4；仅系统管理员）。"""
+    if not current.is_superuser:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "只有系统管理员能生成演示账号")
+    from app.services.demo import DEMO_PASSWORD, seed_demo, set_demo_active
+
+    if body.action == "disable":
+        n = set_demo_active(session, False)
+        result: dict = {"action": "disable", "count": n}
+    elif body.action == "enable":
+        n = set_demo_active(session, True)
+        result = {"action": "enable", "count": n}
+    else:
+        rows = seed_demo(session)
+        result = {"action": "create", "password": DEMO_PASSWORD, "users": rows}
+    audit.log(
+        session,
+        user=current,
+        action="demo_users",
+        object_type="user",
+        object_ref="demo",
+        summary=f"演示账号：{result['action']}",
+        ip=client_ip(request),
+    )
+    session.commit()
+    return result
+
+
 @router.get("/my-scope")
 def my_scope(session: Session = Depends(get_session), current: User = Depends(get_current_user)):
     """我能不能管用户/组织、能勾哪些角色（06 卷 §4）。"""

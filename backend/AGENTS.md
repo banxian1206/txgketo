@@ -149,6 +149,7 @@ deploy/          docker-compose.dev.yml
 | **站内消息 + 红点（06 卷 C 步）** | ✅ | `models/notify.py` + `services/notify.py` + `routes/notifications.py`；触发钩子：任务派工/转派/拆分、评审提交/通过/退回/发布、改版申请/裁决/下发/完成、验收合格→仓库·不合格→采购·直发现场→项目经理、**入库完成→采购+项目经理**、发布进采购池；**发布扇出**（项目团队全员 + 下游工艺 + 采购）；`components/NotificationsDrawer.tsx` + 顶栏铃铛红点（PC/移动端 60s 轮询）+ **我的工作台消息区**；**经理空缺自动跳级**、改版裁决通知只发申请人所在部门的总监、移动端消息链接映射 |
 | **工程部工作台（06 卷 D 步）** | ✅ | `GET /workbench/eng/board`（设备×四专业进度、待终审、待裁决改版、卡住/超期）；`pages/workbench/EngWorkbench.tsx`（组员/经理/总监三视角按岗位自动切；我的任务·评审单·改版 / 我组待审·组员进度 / 部门看板） |
 | **工作台收尾（06 卷 E 步）** | ✅ | 采购工作台待办头（待下单/在途/验收不合格/退换）+ 仓库待办头（待验收/待入库/待领料）；`GET /workbench/sales/board` + `SalesWorkbench.tsx`（商机/待立项/回款）；`GET /workbench/pm/board` + `PmWorkbench.tsx`（项目全链进度/风险）；车间台仍留位 |
+| **账号与角色可用性（06 卷 §4）** | ✅ | 岗位统一三级（组员/经理/总监，迁移 `f3a5c7e9b104`）；**演示账号一键生成**（`services/demo.py` + `POST /demo-users` + `scripts/seed_demo_users.py`，19 个，密码 `txgk@123`）；**以某人身份查看**（`X-Impersonate`，GET 生效、写操作 403、顶栏橙色横幅） |
 | 供应商主数据 + 报价 + 能供品类 | ✅ | `models/purchasing.py`、`routes/suppliers.py` |
 | 推荐供应商（多路证据打分） | ✅ | `GET /purchase/recommend/{item_no}` |
 | 价格参考（上次成交/历史区间/各家报价） | ✅ | `GET /purchase/price-reference/{item_no}` |
@@ -219,6 +220,8 @@ GET  /api/v1/goods-receipts/{id}/photos/{idx}     看验收照片
 GET  /api/v1/m/home                               手机端首页待办（按角色）
 GET  /api/v1/m/materials/{request_id}             手机端一条货详情（物料+供应商+图纸+到货单/照片）
 GET  /api/v1/my-scope                             我能管什么（是否管理员/总监、可勾角色、可选岗位）
+POST /api/v1/demo-users                           演示账号：{action: create/disable/enable}（仅管理员）
+   以某人身份查看（仅管理员，只读）：请求头 X-Impersonate: <user_id>；写操作一律 403
 POST/PATCH /api/v1/orgs（/{id}）                   组织维护：部门/组 增改停用（停用不删）
 GET  /api/v1/users?org_id&role_code&is_active&q   用户列表（筛选；管理权限在后端校验）
 GET  /api/v1/workbench/me                          我的工作台：可见工作台 + 待办数字 + 我的项目

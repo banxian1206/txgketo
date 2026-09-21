@@ -1,12 +1,17 @@
 import axios from 'axios'
 
 export const TOKEN_KEY = 'txgk_token'
+// 管理员「以某人身份查看」（只读，06 卷 §4）
+export const IMPERSONATE_KEY = 'txgk_impersonate'
+export const IMPERSONATE_NAME_KEY = 'txgk_impersonate_name'
 
 export const api = axios.create({ baseURL: '/api/v1', timeout: 20000 })
 
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem(TOKEN_KEY)
   if (token) config.headers.Authorization = `Bearer ${token}`
+  const imp = localStorage.getItem(IMPERSONATE_KEY)
+  if (imp) config.headers['X-Impersonate'] = imp
   return config
 })
 
@@ -293,6 +298,31 @@ export async function listUsers(params?: {
 
 export async function getMyScope() {
   const { data } = await api.get<MyScope>('/my-scope')
+  return data
+}
+
+/** 演示账号（06 卷 §4，仅管理员）：一键生成 / 停用 / 启用 */
+export interface DemoUserRow {
+  username: string
+  name: string
+  password: string
+  org?: string | null
+  position: string
+  profession?: string | null
+  roles: string[]
+  created: boolean
+}
+
+export async function generateDemoUsers() {
+  const { data } = await api.post<{ action: string; password: string; users: DemoUserRow[] }>(
+    '/demo-users',
+    { action: 'create' },
+  )
+  return data
+}
+
+export async function setDemoUsersActive(action: 'enable' | 'disable') {
+  const { data } = await api.post<{ action: string; count: number }>('/demo-users', { action })
   return data
 }
 

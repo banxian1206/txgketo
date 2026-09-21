@@ -13,6 +13,7 @@ bearer = HTTPBearer(auto_error=False)
 
 
 def get_current_user(
+    request: Request,
     creds: HTTPAuthorizationCredentials | None = Depends(bearer),
     session: Session = Depends(get_session),
 ) -> User:
@@ -24,6 +25,16 @@ def get_current_user(
     user = session.scalar(select(User).where(User.username == payload["sub"]))
     if user is None or not user.is_active:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "用户不存在或已停用")
+
+    # ★ 管理员「以某人身份查看」（06 卷 §4）：只对 GET 生效（写操作被中间件拦截）
+    impersonate = request.headers.get("x-impersonate")
+    if impersonate and user.is_superuser:
+        try:
+            target = session.get(User, int(impersonate))
+        except ValueError:
+            target = None
+        if target is not None and target.is_active:
+            return target
     return user
 
 
