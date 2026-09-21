@@ -31,7 +31,7 @@ uv pip install -q -r requirements-dev.txt
 
 echo "③ 后端 API :8208 …"
 stop_app
-nohup .venv/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port 8208 > /tmp/txgketo-api.log 2>&1 &
+nohup .venv/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port 8208 --reload > /tmp/txgketo-api.log 2>&1 &
 
 echo "④ 前端 :5207 …"
 cd "$ROOT/frontend"
