@@ -11,27 +11,36 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import client_ip, get_current_user
 from app.core.db import get_session
-from app.models.engineering import Drawing  # noqa: E402
-from app.models.library import Item  # noqa: E402
-from app.services.numbering import next_number  # noqa: E402
+from app.models.engineering import Drawing
 from app.models.initiation import (
+    ATTRIBUTIONS,
     DEFAULT_MILESTONES,
     DELIVER_TO,
-    GoodsReceipt,
     EQUIPMENT_KINDS,
     MILESTONE_STATUS,
     PROJECT_ROLES,
     REQUEST_DONE,
     REQUEST_STATUS,
+    SOURCE_LONG_LEAD,
+    SOURCE_MANUAL,
+    SOURCE_REGULAR,
+    SOURCE_RETRY,
+    GoodsReceipt,
     Milestone,
     ProjectMember,
     PurchaseRequest,
 )
+from app.models.library import Item
 from app.models.platform import User
-from app.models.project import Equipment, Project  # noqa: F401
-from app.services import audit, project_stage
-from app.services import bom_demand
-from app.services.numbering import make_equip_no, next_letter
+from app.models.project import Equipment, Project
+from app.models.review import DesignRelease
+from app.services import audit, bom_demand, project_stage
+from app.services.numbering import (
+    make_equip_no,
+    next_letter,
+    next_number,
+    year_scope_key,
+)
 
 router = APIRouter(prefix="/projects/{project_no}", tags=["立项"])
 # 跨项目接口（采购工作台 / 到货验收）单独一个 router，不带项目号前缀
@@ -595,10 +604,11 @@ def add_purchase_request(
     row = PurchaseRequest(
         project_no=project_no,
         equip_no=body.equip_no,
+        attribution="项目",
         item_no=body.item_no,
         qty=body.qty,
         unit=body.unit or item.unit,
-        source="长周期",
+        source=SOURCE_LONG_LEAD,
         lead_days=body.lead_days,
         supplier_name=body.supplier_name,
         need_date=body.need_date,
@@ -743,8 +753,8 @@ def initiate_project(
 
     # ★ 每台设备一立项就有它的【总装图】(设备编号 + 00-00-00-00)——
     #   设备在立项时就有编号，不能等到第一张图才出现
-    from app.models.engineering import Drawing  # noqa: PLC0415
-    from app.services.numbering import EMPTY, compose_mech_drawing_no  # noqa: PLC0415
+    from app.models.engineering import Drawing
+    from app.services.numbering import EMPTY, compose_mech_drawing_no
 
     roots_created = 0
     for eq in equipments:
@@ -783,7 +793,7 @@ def initiate_project(
     not_ordered = [r for r in long_lead if not r.ordered_at]
 
     # 任务必须先分派到人 —— 否则立项完没人知道自己该干什么
-    from app.models.task import Task  # noqa: PLC0415
+    from app.models.task import Task
 
     tasks = session.scalars(select(Task).where(Task.project_no == project_no)).all()
     if not tasks:
@@ -881,7 +891,7 @@ def order(
 
     item = session.get(Item, row.item_no)
     if body.supplier_id:
-        from app.models.purchasing import Supplier  # noqa: PLC0415
+        from app.models.purchasing import Supplier
 
         sup = session.get(Supplier, body.supplier_id)
         if sup is None:
@@ -908,7 +918,7 @@ def order(
     row.status = "在途"  # 下完单就是在途（等货）
     # ★ 成交价落进价格库 —— 下次买同一个东西就能看到"上次多少钱"
     if row.unit_price:
-        from app.models.purchasing import SupplierQuote  # noqa: PLC0415
+        from app.models.purchasing import SupplierQuote
 
         if row.supplier_id:
             session.add(
@@ -985,7 +995,7 @@ def _recalc_request_status(session: Session, row: PurchaseRequest) -> str:
 
 def _resolve_location(session: Session, location: str | None):
     """入库库位：填了就找/建，没填用「待定」。"""
-    from app.models.warehouse import WarehouseLocation  # noqa: PLC0415
+    from app.models.warehouse import WarehouseLocation
 
     loc = None
     if location:
@@ -1046,7 +1056,7 @@ def inspect_purchase_request(
         receipt_status = "现场已验收"  # 直发的由现场验收（现场模块以后接）
     else:
         receipt_status = "待入库"
-    receipt_no = next_number(session, "RECEIPT", scope_key=project_no)
+    receipt_no = next_number(session, "RECEIPT", scope_key=year_scope_key())
     gr = GoodsReceipt(
         receipt_no=receipt_no,
         project_no=project_no,
@@ -1109,7 +1119,7 @@ def store_receipt(
     current: User = Depends(get_current_user),
 ):
     """入库：验收合格（待入库）的货 → 选库位入库，记库存与流水。分批入库就一批一批来。"""
-    from app.models.warehouse import MOVE_IN, StockItem, StockMove  # noqa: PLC0415
+    from app.models.warehouse import MOVE_IN, StockItem, StockMove
 
     gr = session.get(GoodsReceipt, receipt_id)
     if gr is None:
@@ -1268,7 +1278,7 @@ def purchase_workbench(session: Session = Depends(get_session), _: User = Depend
 
 def _sync_purchase_task(session: Session, req: PurchaseRequest, status: str, note: str) -> None:
     """采购需求状态一变，对应的采购任务跟着变（任务是指派到人的那件事）。"""
-    from app.models.task import Task  # noqa: PLC0415
+    from app.models.task import Task
 
     t = session.scalar(
         select(Task).where(Task.task_type == "采购", Task.ref_id == req.id, Task.ref_type == "purchase_request")
@@ -1297,6 +1307,7 @@ def purchase_pool(session: Session = Depends(get_session), _: User = Depends(get
     ).all()
     items = {i.item_no: i for i in session.scalars(select(Item)).all()}
     projects = {p.project_no: p.project_name for p in session.scalars(select(Project)).all()}
+    names = {u.id: u.name for u in session.scalars(select(User)).all()}
 
     groups: dict[str, dict] = {}
     for r in rows:
@@ -1326,6 +1337,10 @@ def purchase_pool(session: Session = Depends(get_session), _: User = Depends(get
                 "qty": float(r.qty or 0),
                 "need_date": r.need_date,
                 "source": r.source,
+                "attribution": r.attribution,
+                "requester_id": r.requester_id,
+                "requester_name": names.get(r.requester_id) if r.requester_id else None,
+                "source_release_id": r.source_release_id,
                 "lead_days": r.lead_days,
                 "origin_request_id": r.origin_request_id,
                 "remark": r.remark,
@@ -1362,6 +1377,21 @@ def purchase_pool(session: Session = Depends(get_session), _: User = Depends(get
     for g in out:
         for x in g["requests"]:
             x["part_title"] = part_titles.get(x.get("part_no"))
+    # 来源发布批次：设计发布/工艺发布的需求能追到哪一次冻结
+    rel_ids = {
+        x["source_release_id"] for g in out for x in g["requests"] if x.get("source_release_id")
+    }
+    rel_nos = (
+        {
+            r.id: r.release_no
+            for r in session.scalars(select(DesignRelease).where(DesignRelease.id.in_(rel_ids)))
+        }
+        if rel_ids
+        else {}
+    )
+    for g in out:
+        for x in g["requests"]:
+            x["source_release_no"] = rel_nos.get(x.get("source_release_id"))
     for g in out:
         g["request_count"] = len(g["requests"])
         g["mergeable"] = len(g["requests"]) > 1  # ★ 可合并
@@ -1369,6 +1399,78 @@ def purchase_pool(session: Session = Depends(get_session), _: User = Depends(get
     # 可合并的排前面（那是要攒的），其次按最紧急的需要到货日
     out.sort(key=lambda g: (not g["mergeable"], g["earliest_need"] or date.max))
     return out
+
+
+class ManualPurchaseIn(BaseModel):
+    """手工采购申请（05 卷 §6）：任何部门/个人可提，免审核直入池。"""
+
+    attribution: str = Field(description="项目 / 辅料 / 办公用品 / 其他")
+    project_no: str | None = None
+    equip_no: str | None = None
+    item_no: str
+    qty: float = Field(gt=0)
+    unit: str | None = None
+    need_date: date | None = None
+    note: str | None = None
+
+
+@purchase_router.post("/purchase/manual-request", status_code=status.HTTP_201_CREATED)
+def create_manual_purchase_request(
+    body: ManualPurchaseIn,
+    request: Request,
+    session: Session = Depends(get_session),
+    current: User = Depends(get_current_user),
+):
+    """手工申请：提交即进采购池，不需要审批（不合理由采购退回并记原因）。"""
+    if body.attribution not in ATTRIBUTIONS:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, f"归属只能是：{'/'.join(ATTRIBUTIONS)}")
+    if body.attribution == "项目" and not body.project_no:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "归属「项目」时必须选项目")
+    if body.project_no and session.get(Project, body.project_no) is None:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, f"项目不存在：{body.project_no}")
+    item = session.get(Item, body.item_no)
+    if item is None:
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            f"标准库里没有 {body.item_no} —— 先去标准库把它建出来，再回来选",
+        )
+    row = PurchaseRequest(
+        project_no=body.project_no,
+        equip_no=body.equip_no,
+        attribution=body.attribution,
+        requester_id=current.id,
+        item_no=body.item_no,
+        qty=body.qty,
+        unit=body.unit or item.unit,
+        source=SOURCE_MANUAL,
+        status="待采购",
+        need_date=body.need_date,
+        is_long_lead=False,
+        remark=body.note,
+    )
+    session.add(row)
+    session.flush()
+    audit.log(
+        session,
+        user=current,
+        action="create",
+        object_type="purchase_request",
+        object_ref=str(row.id),
+        summary=f"手工采购申请（{body.attribution}）：{item.display_name} × {body.qty}"
+        + (f"，用于 {body.note}" if body.note else ""),
+        ip=client_ip(request),
+    )
+    session.commit()
+    return {
+        "id": row.id,
+        "item_no": row.item_no,
+        "display_name": item.display_name,
+        "qty": float(row.qty or 0),
+        "unit": row.unit,
+        "attribution": row.attribution,
+        "source": row.source,
+        "status": row.status,
+    }
 
 
 class GeneratePurchaseIn(BaseModel):
@@ -1411,11 +1513,12 @@ def generate_equipment_purchase(
         row = PurchaseRequest(
             project_no=project_no,
             equip_no=equip_no,
+            attribution="项目",
             part_no=line.part_no,
             item_no=line.item_no,
             qty=qty,
             unit=line.unit,
-            source="常规",
+            source=SOURCE_REGULAR,
             status="待采购",
             need_date=need_date,
             is_long_lead=False,
@@ -1484,7 +1587,7 @@ def merge_order(
     current: User = Depends(get_current_user),
 ):
     """合并下单：一次把多条需求下给同一个供应商，共用一张采购单号。"""
-    from app.models.purchasing import Supplier, SupplierQuote  # noqa: PLC0415
+    from app.models.purchasing import Supplier, SupplierQuote
 
     sup = session.get(Supplier, body.supplier_id)
     if sup is None:
@@ -1875,7 +1978,7 @@ def change_order_supplier(
     session: Session = Depends(get_session),
     current: User = Depends(get_current_user),
 ):
-    from app.models.purchasing import Supplier, SupplierQuote  # noqa: PLC0415
+    from app.models.purchasing import Supplier, SupplierQuote
 
     sup = session.get(Supplier, body.supplier_id)
     if sup is None:
@@ -1897,7 +2000,7 @@ def change_order_supplier(
     for r in target:
         r.supplier_id = sup.id
         r.supplier_name = sup.name
-        if r.id in price_map and price_map[r.id]:
+        if price_map.get(r.id):
             r.unit_price = price_map[r.id]
             if r.qty:
                 r.amount = float(price_map[r.id]) * float(r.qty)
@@ -2000,10 +2103,11 @@ def negotiate_failed_lines(
             retry = PurchaseRequest(
                 project_no=r.project_no,
                 equip_no=r.equip_no,
+                attribution=r.attribution,
                 item_no=r.item_no,
                 qty=failed_qty,
                 unit=r.unit,
-                source="退货重采",
+                source=SOURCE_RETRY,
                 lead_days=r.lead_days,
                 need_date=r.need_date,
                 status="待采购",

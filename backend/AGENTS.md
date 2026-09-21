@@ -91,8 +91,8 @@ deploy/          docker-compose.dev.yml
 
 ## 8. 当前进度（交接记录）
 
-> 更新于：**05 卷 P4 PLC 程序版本**落地（程序 + 程序版本，走评审单两级审核发布；程序不采购；任务联动覆盖程序任务）。
-> 下一步：**05 卷 P5 发布→采购触发**（按发布批次 + 手工申请/归属）→ P6 改版 → P7 工作台。BOM → 净需求 → 采购池只认已冻结行。
+> 更新于：**05 卷 P5 发布→采购触发**落地（发布自动进池：标准件/定制件/原材料/外协件；手工申请免审核 + 归属；来源追溯 source_release_id；顺带修正单据编号跨项目撞号）。
+> 下一步：**05 卷 P6 改版（ECN）** → P7 工作台/移动端（图纸查看 + 拍照验收）。
 
 ### 8.1 采购状态线（客户口径，别再改回去了）
 
@@ -117,6 +117,8 @@ deploy/          docker-compose.dev.yml
   采购侧不登记到货/发货，状态被仓库推着变
 - **零件归属**：`purchase_request.part_no`（图号）——合并单里能看出「这 10 个方通分别给哪个零件的」
 - 常规件通道：设备设计面「生成采购需求（进池）」= **已冻结（发布过）的** BOM 展开 − 库存 − 在跑需求（幂等，重复点不会重复进池）；草稿/审核中的行不算数（05 卷 §4）
+- **发布 = 采购触发（05 卷 §5，P5）**：评审发布时按这一批冻结内容自动进池 —— 机械/电气发布→标准件/定制件；工艺发布→原材料/外协件；程序不采购。每条带 `source_release_id`（哪次发布冻结）；采购池显示来源/发布批次/归属/申请人；手工申请 `POST /purchase/manual-request` 免审核直入池（归属：项目/辅料/办公用品/其他）
+- ★ **单据编号**：TK/GR/MI/RV/RL 模板不含项目号 → 一律**全局按年**取号（`scope_key=year_scope_key()`）；修正前按项目取号会跨项目撞号（迁移 `a7c1e3f50b26`）
 - 长周期件立项即下单：状态「在途」+ 自动发号（旧「已下单」中间态已归一，迁移 `e9c06543ffaa`）
 - 合并单 = 一张单（一个 `po_no`）+ 多行需求，**每行带项目/设备归属**；
   采购单详情（`GET /purchase/orders/{key}`）就是仓库对单、以后发货对单的地方
@@ -139,6 +141,7 @@ deploy/          docker-compose.dev.yml
 | 工程设计（图纸树/版本/设计BOM/材料BOM） | ✅ | `models/engineering.py`、`routes/engineering.py` |
 | **设计评审（05 卷 P3）** | ✅ | `models/review.py`（评审单/明细/审核记录/发布）+ `services/review_flow.py`（两级审核、发布=冻结、撤回/退回、任务联动）+ `routes/reviews.py`、`pages/Reviews.tsx`、`components/SubmitReviewModal.tsx`/`ReviewDetailModal.tsx`；图纸改「上传草稿 + 提交评审」，不再单级发布 |
 | **PLC 程序版本（05 卷 P4）** | ✅ | `models/program.py`（程序 + 程序版本）+ `routes/programs.py`（建程序/上传草稿/改版/版本留档）；程序走评审单（`review_flow` 支持 PROGRAM，发布后任务联动）；设计面「PLC 程序版本」卡片 |
+| **发布→采购触发 + 手工申请（05 卷 P5）** | ✅ | `services/bom_demand.py`（`release_demand`/`plan_release_purchase`/`create_release_demands`，BUY_TYPES 加外协/定制）；发布时自动进池（`review_flow._publish_round`）；`POST /purchase/manual-request`；`purchase_request` 加 attribution/requester_id/source_release_id，project_no 可空；采购池显示来源/批次/归属/申请人；`components/ManualPurchaseModal.tsx` |
 | 供应商主数据 + 报价 + 能供品类 | ✅ | `models/purchasing.py`、`routes/suppliers.py` |
 | 推荐供应商（多路证据打分） | ✅ | `GET /purchase/recommend/{item_no}` |
 | 价格参考（上次成交/历史区间/各家报价） | ✅ | `GET /purchase/price-reference/{item_no}` |
@@ -159,7 +162,7 @@ deploy/          docker-compose.dev.yml
 | 1 | Excel 历史采购导入 | 客户已确认后期要做（物料/供应商/单价/数量/日期 → 写价格库） |
 | 2 | 制造 / 装配 / 发运 / 现场 / 验收 / 售后 | 流程上还没做（见 `../00 方案` §3 S5–S11） |
 | 3 | 领料单数量算法对齐 | `warehouse/generate-issue` 还是旧算法（材料只乘直接父件、标准件不乘）；建议改成 `bom_demand` 那套按树累计 |
-| 4 | 工程设计流转（05 卷 P5–P7） | P5 采购触发/手工申请 → P6 改版 → P7 工作台；口径见 `../05 工程设计流转·审核·冻结·改版.md` |
+| 4 | 工程设计流转（05 卷 P6–P7） | P6 改版（ECN）→ P7 工作台/移动端（图纸查看 + 拍照验收）；口径见 `../05 工程设计流转·审核·冻结·改版.md` |
 
 > 本轮顺手修复：`update_purchase_request` 漏导入 `REQUEST_STATUS`，改采购需求状态会 500。
 
@@ -193,6 +196,7 @@ GET  /api/v1/projects/{p}/equipment/{e}/programs  PLC 程序列表（建程序�
 POST /api/v1/programs/{id}/draft                  上传程序草稿
 POST /api/v1/programs/{id}/new-version            程序改版（V2 → 草稿）
 GET  /api/v1/programs/{id}/versions               程序版本留档
+POST /api/v1/purchase/manual-request              手工采购申请（归属：项目/辅料/办公用品/其他；免审核直入池）
 GET/POST/PATCH /api/v1/users                      用户与岗位：专业/岗位（审核人）、组织、角色、停用、重置密码
 POST /api/v1/warehouse/projects/{no}/equipment/{equip}/generate-issue  按 BOM 生成领料单
 GET  /api/v1/purchase/recommend/{item_no}         推荐供应商（打分+理由）

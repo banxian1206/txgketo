@@ -255,8 +255,8 @@ TASK_RULE: dict = {
     "object_type": "TASK",
     "name": "任务",
     "template": "TK{YY}{seq:03}",
-    "scope": "project",
-    "remark": "按项目取流水",
+    "scope": "global_year",
+    "remark": "按年全局流水（模板里没带项目号，必须全局取号，否则跨项目撞号）",
 }
 
 # 采购单编号规则（合并下单时一张单一个号）
@@ -273,8 +273,8 @@ ISSUE_RULE: dict = {
     "object_type": "ISSUE",
     "name": "领料单",
     "template": "MI{YY}{seq:03}",
-    "scope": "project",
-    "remark": "",
+    "scope": "global_year",
+    "remark": "全局按年取号，避免跨项目撞号",
 }
 
 # 供应商编号规则
@@ -291,8 +291,8 @@ RECEIPT_RULE: dict = {
     "object_type": "RECEIPT",
     "name": "到货单",
     "template": "GR{YY}{seq:03}",
-    "scope": "project",
-    "remark": "",
+    "scope": "global_year",
+    "remark": "全局按年取号，避免跨项目撞号",
 }
 
 # 评审单编号规则（05 卷 §8.1）：一个任务一张单，多轮提交共用
@@ -300,7 +300,7 @@ REVIEW_TICKET_RULE: dict = {
     "object_type": "REVIEW_TICKET",
     "name": "评审单",
     "template": "RV{YY}{seq:03}",
-    "scope": "project",
+    "scope": "global_year",
     "remark": "一个任务一张单，多轮提交共用",
 }
 
@@ -309,7 +309,7 @@ DESIGN_RELEASE_RULE: dict = {
     "object_type": "DESIGN_RELEASE",
     "name": "设计发布",
     "template": "RL{YY}{seq:03}",
-    "scope": "project",
+    "scope": "global_year",
     "remark": "一次审核通过 = 一个冻结批次",
 }
 

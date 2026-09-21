@@ -1280,7 +1280,7 @@ export async function negotiateOrder(
 
 export interface PurchasePoolDemand {
   id: number
-  project_no: string
+  project_no: string | null
   project_name?: string | null
   equip_no?: string | null
   part_no?: string | null
@@ -1288,6 +1288,11 @@ export interface PurchasePoolDemand {
   qty: number
   need_date?: string | null
   source: string
+  attribution?: string | null
+  requester_id?: number | null
+  requester_name?: string | null
+  source_release_id?: number | null
+  source_release_no?: string | null
   lead_days?: number | null
   origin_request_id?: number | null
   origin_po_no?: string | null
@@ -1309,6 +1314,36 @@ export interface PurchasePoolGroup {
 /** 采购池：所有「待采购」的需求，按物料归拢，标出哪些可合并 */
 export async function purchasePool() {
   const { data } = await api.get<PurchasePoolGroup[]>('/purchase/pool')
+  return data
+}
+
+// ------------------- 手工采购申请（05 卷 §6）-------------------
+
+/** 归属（与后端 ATTRIBUTIONS 对齐） */
+export const ATTRIBUTIONS = ['项目', '辅料', '办公用品', '其他']
+
+export interface ManualPurchaseIn {
+  attribution: string
+  project_no?: string | null
+  equip_no?: string | null
+  item_no: string
+  qty: number
+  unit?: string | null
+  need_date?: string | null
+  note?: string | null
+}
+
+/** 手工申请：任何部门/个人可提，免审核直入采购池 */
+export async function createManualPurchaseRequest(body: ManualPurchaseIn) {
+  const { data } = await api.post<{
+    id: number
+    item_no: string
+    display_name: string
+    qty: number
+    attribution: string
+    source: string
+    status: string
+  }>('/purchase/manual-request', body)
   return data
 }
 

@@ -31,7 +31,7 @@ interface MergeLine {
   display_name: string
   spec_text?: string | null
   unit?: string | null
-  project_no: string
+  project_no: string | null
   project_name?: string | null
   equip_no?: string | null
   qty: number

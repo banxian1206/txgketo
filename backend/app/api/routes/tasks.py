@@ -18,7 +18,7 @@ from app.models.platform import POSITION_DIRECTOR, POSITION_LEAD, User
 from app.models.project import Equipment, Project
 from app.models.task import PROFESSIONS, TASK_STATUS, Task
 from app.services import audit
-from app.services.numbering import next_number
+from app.services.numbering import next_number, year_scope_key
 from app.services.reviewers import team_lead_for
 
 router = APIRouter(tags=["任务"])
@@ -192,7 +192,7 @@ def generate_tasks(
             if prof == "工艺":
                 mech = design_by_key.get((eq.equip_no, "机械"))
                 dep_id = mech.id if mech else None
-            task_no = next_number(session, "TASK", scope_key=project_no)
+            task_no = next_number(session, "TASK", scope_key=year_scope_key())
             row = Task(
                 task_no=task_no,
                 project_no=project_no,
@@ -227,7 +227,7 @@ def generate_tasks(
             item = items.get(r.item_no)
             if purchase_owner is None:
                 unassigned.append(f"{item.display_name if item else r.item_no} 采购（没定「采购负责人」）")
-            task_no = next_number(session, "TASK", scope_key=project_no)
+            task_no = next_number(session, "TASK", scope_key=year_scope_key())
             row = Task(
                 task_no=task_no,
                 project_no=project_no,
@@ -448,7 +448,7 @@ def split_task(
         owner = session.get(User, item.owner_id)
         if owner is None:
             raise HTTPException(status.HTTP_404_NOT_FOUND, f"用户不存在：{item.owner_id}")
-        task_no = next_number(session, "TASK", scope_key=row.project_no)
+        task_no = next_number(session, "TASK", scope_key=year_scope_key())
         child = Task(
             task_no=task_no,
             project_no=row.project_no,

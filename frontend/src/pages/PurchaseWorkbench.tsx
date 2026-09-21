@@ -3,6 +3,7 @@ import dayjs from 'dayjs'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
+import ManualPurchaseModal from '../components/ManualPurchaseModal'
 import MergeOrderModal from '../components/MergeOrderModal'
 import PurchaseOrderDrawer from '../components/PurchaseOrderDrawer'
 import ReceiptNegotiateModal from '../components/ReceiptNegotiateModal'
@@ -52,6 +53,7 @@ export default function PurchaseWorkbench() {
   const [resolveReceipts, setResolveReceipts] = useState<GoodsReceiptRow[]>([])
   const [doneReceipts, setDoneReceipts] = useState<GoodsReceiptRow[]>([])
   const [selected, setSelected] = useState<string[]>([])
+  const [manualOpen, setManualOpen] = useState(false)
   const [mergeOpen, setMergeOpen] = useState(false)
   const [orderKey, setOrderKey] = useState<string | null>(null)
   const [drawerOpen, setDrawerOpen] = useState(false)
@@ -138,7 +140,7 @@ export default function PurchaseWorkbench() {
                 <Typography.Paragraph type="secondary" style={{ fontSize: 12 }}>
                   <b>先查仓库 → 缺的进池 → 攒一攒合并下单</b>
                   （00 卷 §3.1②）。各设计小组下单节点不一样，但东西大差不差：勾选同类物料一起买，
-                  量大了价格才好谈，供应商也愿意一次送。
+                  量大了价格才好谈，供应商也愿意一次送。手工申请（车间耗品/现场缺件/辅料）免审核，提交即进池。
                 </Typography.Paragraph>
                 <Space style={{ marginBottom: 12 }} wrap>
                   <Button
@@ -154,6 +156,7 @@ export default function PurchaseWorkbench() {
                       清空选择
                     </Button>
                   )}
+                  <Button onClick={() => setManualOpen(true)}>手工申请</Button>
                   <Typography.Text type="secondary" style={{ fontSize: 12 }}>
                     单个物料只有一条需求时，点行尾「去下单」即可。
                   </Typography.Text>
@@ -183,14 +186,17 @@ export default function PurchaseWorkbench() {
                         scroll={{ x: 1160 }}
                         columns={[
                           {
-                            title: '项目',
+                            title: '项目 / 归属',
                             dataIndex: 'project_no',
-                            width: 250,
-                            render: (v: string, r) => (
-                              <a onClick={() => nav(`/projects/${v}`)}>
-                                {v} {r.project_name ?? ''}
-                              </a>
-                            ),
+                            width: 260,
+                            render: (v: string | null, r) =>
+                              v ? (
+                                <a onClick={() => nav(`/projects/${v}`)}>
+                                  {v} {r.project_name ?? ''}
+                                </a>
+                              ) : (
+                                <Tag color="blue">{r.attribution ?? '公司级'}</Tag>
+                              ),
                           },
                           {
                             title: '设备',
@@ -237,7 +243,7 @@ export default function PurchaseWorkbench() {
                           {
                             title: '来源',
                             dataIndex: 'source',
-                            width: 130,
+                            width: 150,
                             render: (v: string, r) =>
                               v === '退货重采' ? (
                                 <>
@@ -249,7 +255,19 @@ export default function PurchaseWorkbench() {
                                   )}
                                 </>
                               ) : (
-                                <Tag>{v}</Tag>
+                                <>
+                                  <Tag>{v}</Tag>
+                                  {r.source_release_no && (
+                                    <div style={{ fontSize: 12, color: '#8c8c8c' }}>
+                                      {r.source_release_no}
+                                    </div>
+                                  )}
+                                  {v === '手工' && r.requester_name && (
+                                    <div style={{ fontSize: 12, color: '#8c8c8c' }}>
+                                      {r.requester_name}
+                                    </div>
+                                  )}
+                                </>
                               ),
                           },
                           {
@@ -818,6 +836,11 @@ export default function PurchaseWorkbench() {
         ]}
       />
 
+      <ManualPurchaseModal
+        open={manualOpen}
+        onClose={() => setManualOpen(false)}
+        onDone={() => void load()}
+      />
       <MergeOrderModal
         open={mergeOpen}
         groups={selectedGroups}

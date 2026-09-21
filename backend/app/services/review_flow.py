@@ -49,8 +49,8 @@ from app.models.review import (
     ReviewTicketItem,
 )
 from app.models.task import Task
-from app.services import audit
-from app.services.numbering import next_number
+from app.services import audit, bom_demand
+from app.services.numbering import next_number, year_scope_key
 from app.services.reviewers import chain_levels, director, team_lead_for
 
 LEVEL_LABEL = {1: "组长", 2: "总监"}
@@ -312,7 +312,7 @@ def submit_round(
     now = datetime.now(UTC)
     if ticket is None:
         ticket = ReviewTicket(
-            ticket_no=next_number(session, "REVIEW_TICKET", scope_key=task.project_no),
+            ticket_no=next_number(session, "REVIEW_TICKET", scope_key=year_scope_key()),
             task_id=task.id,
             project_no=task.project_no,
             equip_no=task.equip_no,
@@ -529,7 +529,7 @@ def _publish_round(
 ) -> DesignRelease:
     """二级通过：这一轮勾选的内容整体冻结，写一条发布批次。"""
     release = DesignRelease(
-        release_no=next_number(session, "DESIGN_RELEASE", scope_key=ticket.project_no),
+        release_no=next_number(session, "DESIGN_RELEASE", scope_key=year_scope_key()),
         ticket_id=ticket.id,
         round_no=round_no,
         project_no=ticket.project_no,
@@ -613,6 +613,10 @@ def _publish_round(
                     }
                 )
 
+    release.summary = summary
+    # ★ 发布 = 采购触发（05 卷 §5）：这一批冻结的内容净需求自动进采购池
+    created = bom_demand.create_release_demands(session, release)
+    summary["purchase_requests"] = [r.id for r in created]
     release.summary = summary
     _maybe_complete_task(session, ticket.task_id)
     return release

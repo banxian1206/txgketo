@@ -27,7 +27,7 @@ from app.models.warehouse import (
     WarehouseLocation,
 )
 from app.services import audit
-from app.services.numbering import next_number
+from app.services.numbering import next_number, year_scope_key
 
 router = APIRouter(prefix="/warehouse", tags=["仓库"])
 
@@ -389,7 +389,7 @@ def generate_issue(
             "这台设备还没有可领的料（标准件或材料 BOM 都是空的）",
         )
 
-    issue_no = next_number(session, "ISSUE", scope_key=project_no)
+    issue_no = next_number(session, "ISSUE", scope_key=year_scope_key())
     issue = MaterialIssue(
         issue_no=issue_no,
         project_no=project_no,

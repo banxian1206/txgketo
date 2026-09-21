@@ -122,6 +122,18 @@ class Milestone(Base, TimestampMixin):
     remark: Mapped[str | None] = mapped_column(String(255))
 
 
+# 采购需求归属（05 卷 §6）：手工申请必带
+ATTRIBUTIONS = ("项目", "辅料", "办公用品", "其他")
+
+# 采购需求来源（05 卷 §5）
+SOURCE_LONG_LEAD = "长周期"
+SOURCE_REGULAR = "常规"  # 设计面手动补跑
+SOURCE_DESIGN_RELEASE = "设计发布"  # 机械/电气评审发布触发
+SOURCE_CRAFT_RELEASE = "工艺发布"  # 工艺评审发布触发
+SOURCE_MANUAL = "手工"  # 手工申请（免审核）
+SOURCE_RETRY = "退货重采"
+
+
 class PurchaseRequest(Base, TimestampMixin):
     """采购需求。
 
@@ -132,8 +144,13 @@ class PurchaseRequest(Base, TimestampMixin):
     __tablename__ = "purchase_request"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    project_no: Mapped[str] = mapped_column(ForeignKey("project.project_no", ondelete="CASCADE"))
+    # 手工申请可以不挂项目（辅料/办公用品是公司级需求）—— 归属里区分
+    project_no: Mapped[str | None] = mapped_column(ForeignKey("project.project_no", ondelete="CASCADE"))
     equip_no: Mapped[str | None] = mapped_column(String(16))
+    # 归属（05 卷 §6）：项目 / 辅料 / 办公用品 / 其他
+    attribution: Mapped[str | None] = mapped_column(String(16))
+    # 手工申请的申请人（05 卷 §6）
+    requester_id: Mapped[int | None] = mapped_column(ForeignKey("app_user.id"))
     # ★ 零件归属：这条需求是给哪个零件的（图号）；挂设备总装/没零件的为空
     part_no: Mapped[str | None] = mapped_column(String(48))
     # ★ 从标准库里选（引用，不复制名称/型号）—— 库里没有就去库里建
@@ -141,6 +158,8 @@ class PurchaseRequest(Base, TimestampMixin):
     qty: Mapped[float | None] = mapped_column(Numeric(14, 3))
     unit: Mapped[str | None] = mapped_column(String(16))
     source: Mapped[str] = mapped_column(String(16), default="长周期", server_default="长周期")
+    # ★ 依据哪一次发布冻结出来的（05 卷 §5）：设计发布/工艺发布的需求都带它
+    source_release_id: Mapped[int | None] = mapped_column(ForeignKey("design_release.id"))
     # ★ 退货重采：这条待采购需求是从哪条旧需求退货回来的（换供应商重买，留个根）
     origin_request_id: Mapped[int | None] = mapped_column(ForeignKey("purchase_request.id"))
     lead_days: Mapped[int | None] = mapped_column(Integer)  # 采购周期（天）
