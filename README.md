@@ -92,6 +92,9 @@
 ```bash
 ./dev.sh          # 一键：数据库 → 后端 :8208 → 前端 :5207
 ./dev.sh stop     # 停后端与前端
+
+# （可选）生成演示账号 + 一条「商机→售后」全链路演示项目
+(cd backend && .venv/bin/python -m scripts.seed_demo_users && .venv/bin/python -m scripts.seed_demo_project)
 ```
 
 | 用途 | 地址 |

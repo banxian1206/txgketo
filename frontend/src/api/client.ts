@@ -2064,7 +2064,7 @@ export interface ItemLite {
 
 /** 物料搜索（标准件库，按编码/品名/规格/品牌/型号模糊） */
 export async function searchItems(q: string, limit = 30) {
-  const { data } = await api.get<ItemLite[]>('/items', { params: { q, limit } })
+  const { data } = await api.get<ItemLite[]>('/library/items', { params: { q, limit } })
   return data
 }
 
