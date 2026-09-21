@@ -91,8 +91,8 @@ deploy/          docker-compose.dev.yml
 
 ## 8. 当前进度（交接记录）
 
-> 更新于：**06 卷 A 步（用户/角色/组织）**落地：岗位统一三级（成员/组长/部门负责人）+ 称谓、组织页面可维护、用户管理（管理员 + 部门负责人管本部门、角色受部门范围限制）、审核链自动跳级/按部门找部门负责人。
-> 下一步：**06 卷 B 步（工作台框架 + 我的工作台）** → C 站内消息 → D 工程部工作台 → E 采购/仓库待办头。
+> 更新于：**06 卷 B 步（工作台框架）**落地：`/workbench/me`（按角色算可见工作台 + 待办数字 + 我的项目）、侧栏三分组（工作台/业务/基础数据）、登录默认进「我的工作台」、7 个工作台入口（工程/商务/项目/车间为统一外壳，采购/仓库接现有页）。
+> 下一步：**06 卷 C 步（站内消息 + 红点）** → D 工程部工作台 → E 采购/仓库待办头。
 
 ### 8.1 采购状态线（客户口径，别再改回去了）
 
@@ -145,6 +145,7 @@ deploy/          docker-compose.dev.yml
 | **改版申请 ECN（05 卷 P6）** | ✅ | `models/change.py` + `services/change_flow.py`（申请/裁决/下发/修订/影响面/完成）+ `routes/changes.py`；图纸/程序/BOM 行的 new-version 被门禁拦住（必须先批准并下发）；BOM 替代行 `superseded_by_id`（旧行排除出需求）；`pages/Changes.tsx`、`components/ChangeRequestModal.tsx`/`ChangeDetailModal.tsx` |
 | **移动端 / 工作台（05 卷 P7）** | ✅ | `GET /drawings/{no}/file`、`/programs/{id}/file`（电子图纸/程序下载）；`goods_receipt.photos` + `POST/GET /goods-receipts/{id}/photos`；`routes/mobile.py`（`/m/home`、`/m/materials/{id}`）；`layouts/MobileLayout.tsx` + `pages/m/*`（仓库验收动线：看图→拍照→合格/不合格→入库；领料）；`utils/image.ts` 前端压缩；PWA manifest |
 | **用户·角色·组织（06 卷 A 步）** | ✅ | 岗位三级 + `title`（迁移 `d0f4a6c83b25`）；组织增改停用 `POST/PATCH /orgs`；`GET /my-scope`；用户管理按部门范围（部门负责人只能管本部门/只能勾本部门角色）；审核链 `director_for`（按部门找负责人）+ 自动跳级；`pages/Users.tsx`（用户 / 组织架构 / 角色说明 三页签） |
+| **工作台框架（06 卷 B 步）** | ✅ | `GET /workbench/me`（可见工作台 + 待办数字 + 我的项目）；侧栏三分组 + 按角色显示工作台；登录默认进「我的工作台」；`pages/Workbench.tsx` + `pages/workbench/DeptWorkbench.tsx`（部门台统一外壳）；`routes/workbench.py` |
 | 供应商主数据 + 报价 + 能供品类 | ✅ | `models/purchasing.py`、`routes/suppliers.py` |
 | 推荐供应商（多路证据打分） | ✅ | `GET /purchase/recommend/{item_no}` |
 | 价格参考（上次成交/历史区间/各家报价） | ✅ | `GET /purchase/price-reference/{item_no}` |
@@ -166,7 +167,7 @@ deploy/          docker-compose.dev.yml
 | 2 | 制造 / 装配 / 发运 / 现场 / 验收 / 售后 | 流程上还没做（见 `../00 方案` §3 S5–S11） |
 | 3 | 领料单数量算法对齐 | `warehouse/generate-issue` 还是旧算法（材料只乘直接父件、标准件不乘）；建议改成 `bom_demand` 那套按树累计 |
 | 4 | 移动端离线队列 + Capacitor 打包 | 03 卷：现场弱网「拍完先存本地、有网再传」；需要时再打包 APK/ipa（同一份代码） |
-| 5 | **06 卷 B–E**（工作台框架/我的工作台 → 站内消息 → 工程部工作台 → 采购仓库待办头） | 06 卷 §11 落地顺序 |
+| 5 | **06 卷 C–E**（站内消息 + 红点 → 工程部工作台三视角 → 采购/仓库待办头） | 06 卷 §11 落地顺序 |
 | 6 | **接口级权限强校验 + 离职一键转交** | 06 卷 §10：本期不做，已记录，下期做（`require_permission` 接关键动作；任务/待审/项目角色转交） |
 
 > 本轮顺手修复：`update_purchase_request` 漏导入 `REQUEST_STATUS`，改采购需求状态会 500。
@@ -217,7 +218,7 @@ GET  /api/v1/m/materials/{request_id}             手机端一条货详情（物
 GET  /api/v1/my-scope                             我能管什么（是否管理员/部门负责人、可勾角色、可选岗位）
 POST/PATCH /api/v1/orgs（/{id}）                   组织维护：部门/组 增改停用（停用不删）
 GET  /api/v1/users?org_id&role_code&is_active&q   用户列表（筛选；管理权限在后端校验）
-GET/POST/PATCH /api/v1/users                      用户与岗位：专业/岗位（审核人）、组织、角色、停用、重置密码
+GET  /api/v1/workbench/me                          我的工作台：可见工作台 + 待办数字 + 我的项目
 POST /api/v1/warehouse/projects/{no}/equipment/{equip}/generate-issue  按 BOM 生成领料单
 GET  /api/v1/purchase/recommend/{item_no}         推荐供应商（打分+理由）
 GET  /api/v1/purchase/price-reference/{item_no}   价格参考

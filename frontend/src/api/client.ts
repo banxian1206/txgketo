@@ -296,6 +296,47 @@ export async function getMyScope() {
   return data
 }
 
+// ------------------- 工作台（06 卷 §8）-------------------
+
+export interface WorkbenchItem {
+  key: string
+  name: string
+  route: string
+  visible: boolean
+}
+
+export interface WorkbenchMe {
+  user: {
+    id: number
+    name: string
+    position?: string | null
+    title?: string | null
+    profession?: string | null
+    roles: string[]
+    department: { id: number; name: string } | null
+  }
+  workbenches: WorkbenchItem[]
+  counts: {
+    my_tasks: number
+    to_review: number
+    to_decide: number
+    my_changes: number
+    to_change: number
+    to_inspect: number
+    to_store: number
+    issues: number
+    to_purchase: number
+    my_leads: number
+    my_projects: number
+  }
+  my_projects: { project_no: string; project_name: string; stage: string }[]
+}
+
+export async function workbenchMe() {
+  const { data } = await api.get<WorkbenchMe>('/workbench/me')
+  return data
+}
+
 export async function createOrg(body: {
   name: string
   parent_id?: number | null

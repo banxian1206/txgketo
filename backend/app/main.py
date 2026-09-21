@@ -21,6 +21,7 @@ from app.api.routes import (
     suppliers,
     tasks,
     warehouse,
+    workbench,
 )
 from app.core.config import settings
 
@@ -48,6 +49,7 @@ for r in (
     programs,
     changes,
     mobile,
+    workbench,
     suppliers,
     warehouse,
 ):

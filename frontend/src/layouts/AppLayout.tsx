@@ -1,7 +1,8 @@
 import { Avatar, Layout, Menu, Space, Typography } from 'antd'
+import { useEffect, useState } from 'react'
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom'
 
-import { TOKEN_KEY } from '../api/client'
+import { TOKEN_KEY, workbenchMe, type WorkbenchItem } from '../api/client'
 
 const { Header, Sider, Content } = Layout
 
@@ -21,6 +22,17 @@ export default function AppLayout() {
   })()
   // 用户与权限：系统管理员 + 部门负责人（06 卷 §4）
   const canManageUsers = me.is_superuser === true || me.position === '部门负责人'
+  const [workbenches, setWorkbenches] = useState<WorkbenchItem[]>([
+    { key: 'mine', name: '我的工作台', route: '/workbench', visible: true },
+  ])
+
+  useEffect(() => {
+    workbenchMe()
+      .then((d) => setWorkbenches(d.workbenches.filter((w) => w.visible)))
+      .catch(() => undefined)
+  }, [])
+
+  const selected = loc.pathname === '/' ? '/workbench' : loc.pathname
 
   return (
     <Layout style={{ minHeight: '100%' }}>
@@ -40,19 +52,38 @@ export default function AppLayout() {
         <Menu
           theme="dark"
           mode="inline"
-          selectedKeys={[loc.pathname]}
+          selectedKeys={[selected]}
           items={[
-            { key: '/', label: <Link to="/">首页</Link> },
-            { key: '/my-tasks', label: <Link to="/my-tasks">我的任务</Link> },
-            { key: '/reviews', label: <Link to="/reviews">设计评审</Link> },
-            { key: '/changes', label: <Link to="/changes">改版</Link> },
-            { key: '/projects', label: <Link to="/projects">商机 / 项目</Link> },
-            { key: '/warehouse', label: <Link to="/warehouse">仓库</Link> },
-            { key: '/purchase', label: <Link to="/purchase">采购工作台</Link> },
-            { key: '/suppliers', label: <Link to="/suppliers">供应商</Link> },
-            { key: '/library', label: <Link to="/library">标准库</Link> },
-            { key: '/numbering', label: <Link to="/numbering">编号规则</Link> },
-            ...(canManageUsers ? [{ key: '/users', label: <Link to="/users">用户与权限</Link> }] : []),
+            {
+              type: 'group',
+              label: '工作台',
+              children: workbenches.map((w) => ({
+                key: w.route,
+                label: <Link to={w.route}>{w.name}</Link>,
+              })),
+            },
+            {
+              type: 'group',
+              label: '业务',
+              children: [
+                { key: '/my-tasks', label: <Link to="/my-tasks">我的任务</Link> },
+                { key: '/projects', label: <Link to="/projects">商机 / 项目</Link> },
+                { key: '/reviews', label: <Link to="/reviews">设计评审</Link> },
+                { key: '/changes', label: <Link to="/changes">改版</Link> },
+                { key: '/suppliers', label: <Link to="/suppliers">供应商</Link> },
+              ],
+            },
+            {
+              type: 'group',
+              label: '基础数据 / 管理',
+              children: [
+                { key: '/library', label: <Link to="/library">标准库</Link> },
+                { key: '/numbering', label: <Link to="/numbering">编号规则</Link> },
+                ...(canManageUsers
+                  ? [{ key: '/users', label: <Link to="/users">用户与权限</Link> }]
+                  : []),
+              ],
+            },
           ]}
         />
       </Sider>

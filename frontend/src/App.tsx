@@ -1,4 +1,3 @@
-import { Card, Typography } from 'antd'
 import { Navigate, Route, Routes } from 'react-router-dom'
 
 import AppLayout from './layouts/AppLayout'
@@ -23,25 +22,12 @@ import Reviews from './pages/Reviews'
 import Suppliers from './pages/Suppliers'
 import Users from './pages/Users'
 import Warehouse from './pages/Warehouse'
+import Workbench from './pages/Workbench'
+import DeptWorkbench from './pages/workbench/DeptWorkbench'
 import { TOKEN_KEY } from './api/client'
 
 function RequireAuth({ children }: { children: JSX.Element }) {
   return localStorage.getItem(TOKEN_KEY) ? children : <Navigate to="/login" replace />
-}
-
-function Home() {
-  return (
-    <Card>
-      <Typography.Title level={4}>同兴高科项目管理系统</Typography.Title>
-      <Typography.Paragraph type="secondary">
-        流程：商机 → 立项 → 工程设计（设计BOM + 材料BOM）→ 采购 → 仓库 → 制造 → 装配调试 →
-        发货发运 → 现场安装 → 现场调试 → 客户验收 → 质保售后
-      </Typography.Paragraph>
-      <Typography.Paragraph type="secondary">
-        当前已实现：平台基础（组织/用户/角色/权限/操作日志）· 发号引擎 · 商机登记。
-      </Typography.Paragraph>
-    </Card>
-  )
 }
 
 export default function App() {
@@ -70,7 +56,12 @@ export default function App() {
           </RequireAuth>
         }
       >
-        <Route index element={<Home />} />
+        <Route index element={<Workbench />} />
+        <Route path="workbench" element={<Workbench />} />
+        <Route path="workbench/sales" element={<DeptWorkbench kind="sales" />} />
+        <Route path="workbench/pm" element={<DeptWorkbench kind="pm" />} />
+        <Route path="workbench/eng" element={<DeptWorkbench kind="eng" />} />
+        <Route path="workbench/shop" element={<DeptWorkbench kind="shop" />} />
         <Route path="projects" element={<Projects />} />
         <Route path="projects/new" element={<ProjectCreate />} />
         <Route path="projects/:projectNo" element={<ProjectDetailPage />} />
