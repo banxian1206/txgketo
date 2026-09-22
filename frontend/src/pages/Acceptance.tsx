@@ -28,12 +28,12 @@ import {
   confirmAcceptance,
   errMsg,
   hasPerm,
-  listProjects,
   signAcceptanceDoc,
   uploadAcceptanceDocs,
   type AcceptanceRow,
   type AcceptanceWorkbench,
 } from '../api/client'
+import { SelectProject } from '../components/fields'
 import { acceptanceDocUrl } from '../api/client'
 import { readSession } from '../contexts/session'
 
@@ -54,13 +54,6 @@ export default function AcceptancePage() {
   const [files, setFiles] = useState<File[]>([])
   const [saving, setSaving] = useState(false)
   const [form] = Form.useForm()
-  const [projects, setProjects] = useState<{ project_no: string; project_name: string }[]>([])
-
-  useEffect(() => {
-    listProjects()
-      .then((ps) => setProjects(ps.map((p) => ({ project_no: p.project_no, project_name: p.project_name }))))
-      .catch(() => undefined)
-  }, [])
 
   const load = useCallback(async () => {
     try {
@@ -241,12 +234,7 @@ export default function AcceptancePage() {
       <Modal open={applyOpen} title="申请客户验收" onCancel={() => setApplyOpen(false)} onOk={() => void doApply()} confirmLoading={saving} okText="申请" destroyOnHidden>
         <Form form={form} layout="vertical" preserve={false}>
           <Form.Item name="project_no" label="项目号" rules={[{ required: true, message: '选项目' }]}>
-            <Select
-              showSearch
-              optionFilterProp="label"
-              placeholder="选项目"
-              options={projects.map((p) => ({ value: p.project_no, label: `${p.project_no} ${p.project_name}` }))}
-            />
+            <SelectProject />
           </Form.Item>
           <Form.Item name="remark" label="说明"><Input placeholder="现场调试完成，具备验收条件" /></Form.Item>
         </Form>

@@ -1,5 +1,5 @@
+import { useEffect, useState } from 'react'
 import { App, DatePicker, Form, Input, InputNumber, Modal, Select, Typography } from 'antd'
-import { useCallback, useEffect, useState } from 'react'
 
 import {
   ATTRIBUTIONS,
@@ -7,10 +7,9 @@ import {
   errMsg,
   listEquipment,
   listProjects,
-  listStdItems,
   type EquipmentItem,
-  type StdItem,
 } from '../api/client'
+import { SelectStdItem } from './fields'
 
 interface Props {
   open: boolean
@@ -24,17 +23,8 @@ export default function ManualPurchaseModal({ open, onClose, onDone }: Props) {
   const [form] = Form.useForm()
   const [projects, setProjects] = useState<{ project_no: string; project_name: string }[]>([])
   const [equipments, setEquipments] = useState<EquipmentItem[]>([])
-  const [items, setItems] = useState<StdItem[]>([])
   const [saving, setSaving] = useState(false)
   const [attribution, setAttribution] = useState('项目')
-
-  const searchItems = useCallback(async (q?: string) => {
-    try {
-      setItems(await listStdItems({ q, limit: 50 }))
-    } catch {
-      setItems([])
-    }
-  }, [])
 
   useEffect(() => {
     if (!open) return
@@ -42,9 +32,8 @@ export default function ManualPurchaseModal({ open, onClose, onDone }: Props) {
     form.setFieldsValue({ attribution: '项目', qty: 1 })
     setAttribution('项目')
     setEquipments([])
-    void searchItems()
     void listProjects().then(setProjects).catch(() => setProjects([]))
-  }, [open, form, searchItems])
+  }, [open, form])
 
   const onProjectChange = async (no?: string) => {
     form.setFieldValue('equip_no', undefined)
@@ -139,13 +128,7 @@ export default function ManualPurchaseModal({ open, onClose, onDone }: Props) {
             </Typography.Text>
           }
         >
-          <Select
-            showSearch
-            filterOption={false}
-            onSearch={(q) => void searchItems(q)}
-            placeholder="搜标准库（如：焊丝 / 螺丝 / 方通）"
-            options={items.map((i) => ({ value: i.item_no, label: `${i.item_no} ${i.display_name}` }))}
-          />
+          <SelectStdItem />
         </Form.Item>
         <Form.Item name="qty" label="数量" rules={[{ required: true, message: '填数量' }]}>
           <InputNumber style={{ width: '100%' }} min={0.001} />

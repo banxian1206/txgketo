@@ -25,6 +25,7 @@ import { useNavigate } from 'react-router-dom'
 
 import AuthedImage from '../components/AuthedImage'
 import AppModal from '../components/AppModal'
+import { SelectLocation } from '../components/fields'
 import { useRequest } from '../hooks/useRequest'
 import { useSubmit } from '../hooks/useSubmit'
 
@@ -654,10 +655,7 @@ export default function Warehouse() {
               <InputNumber min={0.001} style={{ width: 140 }} />
             </Form.Item>
             <Form.Item name="location_id" label="入库库位" rules={[{ required: true, message: '选库位' }]} style={{ minWidth: 240 }}>
-              <Select
-                placeholder="选库位"
-                options={locs.filter((l) => l.is_active).map((l) => ({ value: l.id, label: `${l.warehouse} ${l.code}${l.name ? ` ${l.name}` : ''}` }))}
-              />
+              <SelectLocation valueMode="id" placeholder="选库位" />
             </Form.Item>
           </Space>
           <Space style={{ display: 'flex' }} size="middle" align="start">
@@ -788,13 +786,7 @@ export default function Warehouse() {
         onClose={() => setStoreOpen(false)}
       >
           <Form.Item name="location" label="入库库位" rules={[{ required: true, message: '入库必须定库位' }]}>
-            <Select
-              showSearch
-              placeholder="选库位（没有就先到「库位」页签新建）"
-              options={locs
-                .filter((l) => l.is_active)
-                .map((l) => ({ value: `${l.warehouse} ${l.code}`, label: `${l.warehouse} ${l.code}${l.name ? ` ${l.name}` : ''}` }))}
-            />
+            <SelectLocation valueMode="text" />
           </Form.Item>
           <Form.Item name="note" label="备注" style={{ marginBottom: 0 }}>
             <Input placeholder="可不填" />

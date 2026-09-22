@@ -29,7 +29,6 @@ import {
   hasPerm,
   listSparePartMoves,
   listSpareParts,
-  listProjects,
   moveSparePart,
   servicePhotoUrl,
   serviceWorkbench,
@@ -40,6 +39,7 @@ import {
   type SparePartRow,
 } from '../api/client'
 import MfgPhotoPicker from '../components/MfgPhotoPicker'
+import { SelectEquipment, SelectProject } from '../components/fields'
 
 const SO_COLOR: Record<string, string> = {
   待受理: 'error',
@@ -65,13 +65,8 @@ export default function Service() {
   const [photos, setPhotos] = useState<string[]>([])
   const [saving, setSaving] = useState(false)
   const [form] = Form.useForm()
-  const [projects, setProjects] = useState<{ project_no: string; project_name: string }[]>([])
-
-  useEffect(() => {
-    listProjects()
-      .then((ps) => setProjects(ps.map((p) => ({ project_no: p.project_no, project_name: p.project_name }))))
-      .catch(() => undefined)
-  }, [])
+  // 字段组件联动：设备按已选项目过滤（重构 1.4，原手填 equip_no）
+  const watchProject = Form.useWatch('project_no', form)
 
   const load = useCallback(async () => {
     try {
@@ -292,14 +287,11 @@ export default function Service() {
           {modal?.kind === 'create' && (
             <>
               <Form.Item name="project_no" label="项目号" rules={[{ required: true, message: '选项目' }]}>
-                <Select
-                  showSearch
-                  optionFilterProp="label"
-                  placeholder="选项目"
-                  options={projects.map((p) => ({ value: p.project_no, label: `${p.project_no} ${p.project_name}` }))}
-                />
+                <SelectProject />
               </Form.Item>
-              <Form.Item name="equip_no" label="设备号（可选）"><Input placeholder="如 01A" /></Form.Item>
+              <Form.Item name="equip_no" label="设备号（可选）">
+                <SelectEquipment projectNo={watchProject} />
+              </Form.Item>
               <Form.Item name="fault" label="故障描述" rules={[{ required: true, message: '必填：出了什么问题' }]}><Input.TextArea rows={2} /></Form.Item>
             </>
           )}

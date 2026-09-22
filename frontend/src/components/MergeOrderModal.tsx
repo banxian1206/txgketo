@@ -18,12 +18,11 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import {
   errMsg,
-  listSuppliers,
   mergeOrder,
   recommendSuppliers,
   type PurchasePoolGroup,
-  type SupplierRow,
 } from '../api/client'
+import { SelectSupplier } from './fields'
 
 interface MergeLine {
   request_id: number
@@ -94,7 +93,6 @@ export default function MergeOrderModal({
   const [form] = Form.useForm()
   const deliverTo = Form.useWatch('deliver_to', form)
   const [lines, setLines] = useState<MergeLine[]>([])
-  const [suppliers, setSuppliers] = useState<SupplierRow[]>([])
   const [recos, setRecos] = useState<RecoRow[]>([])
   const [recoNote, setRecoNote] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
@@ -113,11 +111,6 @@ export default function MergeOrderModal({
     })
     setRecos([])
     setRecoNote(null)
-    try {
-      setSuppliers(await listSuppliers())
-    } catch {
-      setSuppliers([])
-    }
     // 按选中的物料分别取推荐，再按供应商归并
     const uniq = [...new Map(groups.map((g) => [g.item_no, g])).values()]
     const notes: string[] = []
@@ -465,12 +458,7 @@ export default function MergeOrderModal({
             style={{ minWidth: 280 }}
             rules={[{ required: true, message: '请选供应商' }]}
           >
-            <Select
-              showSearch
-              optionFilterProp="label"
-              placeholder="从供应商里选"
-              options={suppliers.map((x) => ({ value: x.id, label: `${x.code} ${x.name}` }))}
-            />
+            <SelectSupplier />
           </Form.Item>
           <Form.Item
             name="po_no"
