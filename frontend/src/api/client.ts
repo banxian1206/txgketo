@@ -784,6 +784,21 @@ export async function createStdItem(body: {
   return data
 }
 
+/** 物料详情（编辑时拉全量规格） */
+export async function getStdItem(itemNo: string) {
+  const { data } = await api.get<StdItem>(`/library/items/${itemNo}`)
+  return data
+}
+
+/** 编辑物料（品牌/型号/规格/单位/停用）—— 部分更新 */
+export async function updateStdItem(
+  itemNo: string,
+  body: { unit?: string; brand?: string; mfr_model?: string; is_active?: boolean; spec?: Record<string, unknown> },
+) {
+  const { data } = await api.patch<StdItem>(`/library/items/${itemNo}`, body)
+  return data
+}
+
 // ============================== 立项（团队 / 设备 / 节点 / 长周期采购）==========
 
 export interface ProjectMember {
@@ -1552,6 +1567,7 @@ export interface GoodsReceiptRow {
   resolved_by?: string | null
   resolved_at?: string | null
   retries?: { id: number; status: string; po_no?: string | null }[]
+  photos?: { filename?: string | null; by?: string | null; at?: string | null; url: string }[]
 }
 
 export async function listGoodsReceipts(params: { deliver_to?: string; status?: string }) {
@@ -1677,6 +1693,16 @@ export async function fetchFileBlob(path: string): Promise<{ url: string; type: 
   const { data } = await api.get(path, { responseType: 'blob' })
   const blob = data as Blob
   return { url: URL.createObjectURL(blob), type: blob.type || '' }
+}
+
+/** 图纸当前版本文件（带鉴权，配合 AuthedFileLink 用） */
+export function drawingFileUrl(drawingNo: string) {
+  return `/drawings/${drawingNo}/file`
+}
+
+/** PLC 程序当前版本文件 */
+export function programFileUrl(programId: number) {
+  return `/programs/${programId}/file`
 }
 
 export async function purchaseWorkbench() {

@@ -33,6 +33,7 @@ import {
   loadShipment,
   markShipItems,
   receiptShipment,
+  setItemPlacePhotos,
   shipPhotoUrl,
   toShip,
   uploadShipPhotos,
@@ -80,6 +81,10 @@ export default function Shipping() {
 
   const [detail, setDetail] = useState<ShipmentRow | null>(null)
   const [saving, setSaving] = useState(false)
+
+  // 摆放位置照片
+  const [placeItem, setPlaceItem] = useState<ShipmentItemRow | null>(null)
+  const [placePhotos, setPlacePhotos] = useState<string[]>([])
 
   const load = useCallback(
     async (pno?: string): Promise<ShipmentRow[]> => {
@@ -138,6 +143,24 @@ export default function Shipping() {
       } catch (e) {
         message.error(errMsg(e))
       }
+    }
+  }
+
+  const savePlacePhotos = async () => {
+    if (!placeItem || !detail) return
+    setSaving(true)
+    try {
+      await setItemPlacePhotos(placeItem.id, placePhotos)
+      message.success('已保存摆放位置照片')
+      setPlaceItem(null)
+      const list = await listShipments({ project_no: detail.project_no })
+      const fresh = list.find((s) => s.id === detail.id)
+      if (fresh) setDetail(fresh)
+      setShipments(list)
+    } catch (e) {
+      message.error(errMsg(e))
+    } finally {
+      setSaving(false)
     }
   }
 
@@ -511,12 +534,11 @@ export default function Shipping() {
                   <Typography.Text>{p.ref}</Typography.Text>
                   <Typography.Text type="secondary" style={{ fontSize: 12 }}>{p.name ?? ''} × {p.qty}</Typography.Text>
                   {p.check_result && <Tag color={p.check_result === '到' ? 'success' : 'error'}>现场：{p.check_result}</Tag>}
+                  <a onClick={() => { setPlaceItem(p); setPlacePhotos([]) }}>摆放拍照</a>
                 </Space>
                 <Space wrap style={{ marginTop: 4 }}>
                   {[...p.photos, ...p.place_photos].map((ph) => (
-                    <a key={ph} href={shipPhotoUrl(ph)} target="_blank" rel="noreferrer">
-                      <AuthedImage path={shipPhotoUrl(ph)} size={48} />
-                    </a>
+                    <AuthedImage key={ph} path={shipPhotoUrl(ph)} size={48} />
                   ))}
                 </Space>
               </div>
@@ -537,9 +559,7 @@ export default function Shipping() {
                 )}
                 <Space wrap style={{ marginTop: 6 }}>
                   {r.photos.map((p) => (
-                    <a key={p} href={shipPhotoUrl(p)} target="_blank" rel="noreferrer">
-                      <AuthedImage path={shipPhotoUrl(p)} size={56} />
-                    </a>
+                    <AuthedImage key={p} path={shipPhotoUrl(p)} size={56} />
                   ))}
                 </Space>
               </Card>
@@ -550,9 +570,7 @@ export default function Shipping() {
                 <Typography.Title level={5} style={{ marginTop: 16 }}>装车 / 发运照片</Typography.Title>
                 <Space wrap>
                   {detail.photos.map((p) => (
-                    <a key={p} href={shipPhotoUrl(p)} target="_blank" rel="noreferrer">
-                      <AuthedImage path={shipPhotoUrl(p)} size={56} />
-                    </a>
+                    <AuthedImage key={p} path={shipPhotoUrl(p)} size={56} />
                   ))}
                 </Space>
               </>
@@ -560,6 +578,27 @@ export default function Shipping() {
           </>
         )}
       </Drawer>
+
+      {/* 摆放位置照片（散件不装箱：登记每件放在车上的位置） */}
+      <Modal
+        title={`摆放位置照片 · ${placeItem?.ref ?? ''}`}
+        open={!!placeItem}
+        onCancel={() => setPlaceItem(null)}
+        onOk={() => void savePlacePhotos()}
+        confirmLoading={saving}
+        okText="保存"
+        destroyOnClose
+      >
+        <MfgPhotoPicker
+          projectNo={detail?.project_no ?? ''}
+          refNo={detail?.shipment_no ?? ''}
+          value={placePhotos}
+          onChange={setPlacePhotos}
+          upload={uploadShipPhotos}
+          photoUrl={shipPhotoUrl}
+          label="摆放位置照片"
+        />
+      </Modal>
     </Card>
   )
 }

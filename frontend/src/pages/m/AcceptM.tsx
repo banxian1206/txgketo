@@ -219,7 +219,7 @@ export default function AcceptM() {
           </Space>
           <Space>
             <span>本次到货数量</span>
-            <InputNumber min={0.001} value={qty} onChange={(v) => setQty(Number(v ?? 1))} style={{ width: 120 }} />
+            <InputNumber min={0.001} max={data ? Math.max(0.001, data.qty - data.qty_received) : undefined} value={qty} onChange={(v) => setQty(Number(v ?? 1))} style={{ width: 120 }} />
           </Space>
           <Radio.Group value={result} onChange={(e) => setResult(e.target.value)}>
             <Radio.Button value="合格">合格</Radio.Button>

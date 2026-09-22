@@ -23,6 +23,7 @@ import {
   errMsg,
   listEquipment,
   listMembers,
+  removeMember,
   listMilestones,
   listPurchaseRequests,
   removeEquipment,
@@ -101,9 +102,14 @@ export function TeamEditor({ projectNo, users, onChanged }: Props) {
     try {
       if (userId) {
         await saveMember(projectNo, userId, role)
-        await load()
-        onChanged?.()
+      } else {
+        // 清空选择 = 解绑该角色（后端 DELETE /members/{id}）
+        const found = rows.find((x) => x.project_role === role)
+        if (!found?.id) return
+        await removeMember(projectNo, found.id)
       }
+      await load()
+      onChanged?.()
     } catch (e) {
       message.error(errMsg(e))
     } finally {

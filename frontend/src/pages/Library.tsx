@@ -19,8 +19,10 @@ import { useCallback, useEffect, useState } from 'react'
 import {
   createStdItem,
   errMsg,
+  getStdItem,
   listLibraryCategories,
   listStdItems,
+  updateStdItem,
   type SpecFieldDef,
   type StdCategoryInfo,
   type StdClassInfo,
@@ -39,6 +41,7 @@ export default function Library() {
   const [q, setQ] = useState('')
   const [loading, setLoading] = useState(false)
   const [open, setOpen] = useState(false)
+  const [editing, setEditing] = useState<StdItem | null>(null)
   const [saving, setSaving] = useState(false)
   const [form] = Form.useForm()
 
@@ -78,9 +81,27 @@ export default function Library() {
   }, [loadItems])
 
   const openCreate = () => {
+    setEditing(null)
     form.resetFields()
     form.setFieldsValue({ unit: '件' })
     setOpen(true)
+  }
+
+  const openEdit = async (item: StdItem) => {
+    try {
+      const full = await getStdItem(item.item_no)
+      setEditing(full)
+      const v: Record<string, unknown> = { unit: full.unit }
+      for (const f of activeClass?.spec_template ?? []) {
+        const val = full.spec?.[f.code]
+        if (val !== undefined && val !== null) v[`spec_${f.code}`] = val
+      }
+      form.resetFields()
+      form.setFieldsValue(v)
+      setOpen(true)
+    } catch (e) {
+      message.error(errMsg(e))
+    }
   }
 
   const submit = async () => {
@@ -97,14 +118,19 @@ export default function Library() {
     }
     setSaving(true)
     try {
-      const created = await createStdItem({
-        std_class_code: activeClass!.code,
-        spec,
-        unit: v.unit,
-        brand,
-        mfr_model: mfrModel,
-      })
-      message.success(`已建码：${created.item_no}（${created.display_name}）`)
+      if (editing) {
+        await updateStdItem(editing.item_no, { unit: v.unit, spec, brand, mfr_model: mfrModel })
+        message.success(`已更新 ${editing.item_no}`)
+      } else {
+        const created = await createStdItem({
+          std_class_code: activeClass!.code,
+          spec,
+          unit: v.unit,
+          brand,
+          mfr_model: mfrModel,
+        })
+        message.success(`已建码：${created.item_no}（${created.display_name}）`)
+      }
       setOpen(false)
       await Promise.all([loadItems(), loadCats()])
     } catch (e) {
@@ -217,6 +243,12 @@ export default function Library() {
                 width: 100,
                 render: (v: string | null) => v || '—',
               },
+              {
+                title: '操作',
+                key: 'a',
+                width: 80,
+                render: (_: unknown, r: StdItem) => <a onClick={() => void openEdit(r)}>编辑</a>,
+              },
             ]}
           />
           <Typography.Paragraph type="secondary" style={{ fontSize: 12, marginTop: 12 }}>
@@ -227,18 +259,19 @@ export default function Library() {
 
       {/* 新建物料：按品类规格模板动态生成表单 */}
       <Modal
-        title={`新建物料 · ${activeClass?.name ?? ''}`}
+        title={editing ? `编辑物料 · ${editing.item_no}` : `新建物料 · ${activeClass?.name ?? ''}`}
         open={open}
         width={720}
         onCancel={() => setOpen(false)}
         onOk={() => void submit()}
         confirmLoading={saving}
-        okText="建码"
+        okText={editing ? '保存' : '建码'}
         destroyOnClose
       >
         <Typography.Paragraph type="secondary" style={{ fontSize: 12 }}>
-          编码由系统自动发（{activeClass?.category_code}-{activeClass?.code}-0001 形式）；
-          规格按品类模板逐字段填写，缺一项都存不了
+          {editing
+            ? '改规格/品牌/型号/单位（编码不变）；留空即清空该字段'
+            : `编码由系统自动发（${activeClass?.category_code}-${activeClass?.code}-0001 形式）；规格按品类模板逐字段填写，缺一项都存不了`}
         </Typography.Paragraph>
         <Form form={form} layout="vertical" preserve={false}>
           <Row gutter={12}>

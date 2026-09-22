@@ -35,7 +35,12 @@ export default function SubmitReviewModal({ task, open, onClose, onDone }: Props
     try {
       const data = await getReviewCandidates(task.task_id)
       setCand(data)
-      setChecked({})
+      // ★ 总装图是设备父级：默认勾选（已传文件时）
+      const init: Record<string, boolean> = {}
+      data.drawings.forEach((d) => {
+        if (d.drawing_no.endsWith('-00-00-00-00') && d.filename) init[`D:${d.drawing_no}`] = true
+      })
+      setChecked(init)
       setNote('')
       const t: Record<string, string> = {}
       data.source_tags.forEach((s) => {
@@ -132,10 +137,15 @@ export default function SubmitReviewModal({ task, open, onClose, onDone }: Props
           <div style={{ marginTop: 6 }}>
             {cand.drawings.map((d) => (
               <div key={d.drawing_no}>
-                <Checkbox checked={!!checked[`D:${d.drawing_no}`]} onChange={(e) => toggle(`D:${d.drawing_no}`, e.target.checked)}>
+                <Checkbox
+                  disabled={!d.filename}
+                  checked={!!checked[`D:${d.drawing_no}`]}
+                  onChange={(e) => toggle(`D:${d.drawing_no}`, e.target.checked)}
+                >
                   {d.drawing_no} {d.title}
+                  {d.drawing_no.endsWith('-00-00-00-00') && <Tag color="purple" style={{ marginLeft: 6 }}>总装图</Tag>}
                   <Tag style={{ marginLeft: 6 }}>{d.version}</Tag>
-                  {d.filename ? <Tag color="green">已传文件</Tag> : <Tag color="orange">未传文件</Tag>}
+                  {d.filename ? <Tag color="green">已传文件</Tag> : <Tag color="orange">未传文件（请先上传）</Tag>}
                 </Checkbox>
               </div>
             ))}
@@ -207,12 +217,13 @@ export default function SubmitReviewModal({ task, open, onClose, onDone }: Props
             {cand.programs.map((p) => (
               <div key={p.program_id}>
                 <Checkbox
+                  disabled={!p.filename}
                   checked={!!checked[`P:${p.program_id}`]}
                   onChange={(e) => toggle(`P:${p.program_id}`, e.target.checked)}
                 >
                   {p.name}
                   <Tag style={{ marginLeft: 6 }}>{p.version}</Tag>
-                  {p.filename ? <Tag color="green">已传文件</Tag> : <Tag color="orange">未传文件</Tag>}
+                  {p.filename ? <Tag color="green">已传文件</Tag> : <Tag color="orange">未传文件（请先上传）</Tag>}
                 </Checkbox>
               </div>
             ))}

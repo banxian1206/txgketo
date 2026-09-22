@@ -29,6 +29,7 @@ import {
   acceptOutsource,
   acceptProdOrder,
   dispatchProdOrder,
+  drawingFileUrl,
   errMsg,
   generateProdOrders,
   hasPerm,
@@ -46,6 +47,7 @@ import {
 } from '../api/client'
 import MfgPhotoPicker from '../components/MfgPhotoPicker'
 import AuthedImage from '../components/AuthedImage'
+import AuthedFileLink from '../components/AuthedFileLink'
 
 const STATUS_COLOR: Record<string, string> = {
   待领料: 'default',
@@ -282,6 +284,7 @@ export default function Manufacturing() {
           {kind === 'running' && canEdit && <a onClick={() => openAction('accept', r)}>验收</a>}
           {kind === 'transfer' && canEdit && <a onClick={() => openAction('transfer', r)}>转运</a>}
           {kind === 'rework' && canEdit && <a onClick={() => openAction('dispatch', r)}>重新下发</a>}
+          <AuthedFileLink path={drawingFileUrl(r.item_no)}>看图纸</AuthedFileLink>
           <a onClick={() => setDetail(r)}>详情</a>
         </Space>
       ),
@@ -575,9 +578,7 @@ export default function Manufacturing() {
                 </Typography.Text>
                 <Space wrap style={{ marginTop: 6 }}>
                   {t.photos.map((p) => (
-                    <a key={p} href={mfgPhotoUrl(p)} target="_blank" rel="noreferrer">
-                      <AuthedImage path={mfgPhotoUrl(p)} size={56} />
-                    </a>
+                    <AuthedImage key={p} path={mfgPhotoUrl(p)} size={56} />
                   ))}
                 </Space>
               </Card>
@@ -594,9 +595,7 @@ export default function Manufacturing() {
                 </div>
                 <Space wrap style={{ marginTop: 6 }}>
                   {[...a.photos, ...a.transfer_photos].map((p) => (
-                    <a key={p} href={mfgPhotoUrl(p)} target="_blank" rel="noreferrer">
-                      <AuthedImage path={mfgPhotoUrl(p)} size={56} />
-                    </a>
+                    <AuthedImage key={p} path={mfgPhotoUrl(p)} size={56} />
                   ))}
                 </Space>
               </Card>

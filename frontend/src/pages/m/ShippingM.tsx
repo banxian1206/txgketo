@@ -183,9 +183,7 @@ export default function ShippingM() {
                   ))}
                   <Space wrap style={{ marginTop: 6 }}>
                     {[...s.photos, ...s.receipts.flatMap((r) => r.photos)].map((p) => (
-                      <a key={p} href={shipPhotoUrl(p)} target="_blank" rel="noreferrer">
-                        <AuthedImage path={shipPhotoUrl(p)} size={48} />
-                      </a>
+                      <AuthedImage key={p} path={shipPhotoUrl(p)} size={48} />
                     ))}
                   </Space>
                 </div>

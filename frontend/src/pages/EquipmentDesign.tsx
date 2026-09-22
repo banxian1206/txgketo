@@ -28,6 +28,7 @@ import type { Dayjs } from 'dayjs'
 import ReviewDetailModal from '../components/ReviewDetailModal'
 import SubmitReviewModal from '../components/SubmitReviewModal'
 import ChangeRequestModal from '../components/ChangeRequestModal'
+import AuthedFileLink from '../components/AuthedFileLink'
 
 import {
   addBom,
@@ -35,6 +36,7 @@ import {
   createProgram,
   deleteDrawing,
   deleteProgram,
+  drawingFileUrl,
   errMsg,
   generateEquipmentPurchase,
   getDesignTree,
@@ -46,9 +48,11 @@ import {
   me,
   newDrawingVersion,
   newProgramVersion,
+  programFileUrl,
   removeBom,
   uploadDrawingDraft,
   uploadProgramDraft,
+  updateDrawing,
   type BomLine,
   type ChangeBrief,
   type DesignRoot,
@@ -252,6 +256,16 @@ export default function EquipmentDesign({ projectNo: p0, equipNo: e0, embedded }
       message.error(errMsg(e))
     } finally {
       setSaving(false)
+    }
+  }
+
+  const doRename = async (drawingNo: string, title: string) => {
+    try {
+      await updateDrawing(drawingNo, { title })
+      message.success('已改名')
+      await load()
+    } catch (e) {
+      message.error(errMsg(e))
     }
   }
 
@@ -638,7 +652,20 @@ export default function EquipmentDesign({ projectNo: p0, equipNo: e0, embedded }
             {
               title: '名称',
               dataIndex: 'title',
-              render: (v: string) => <span className="row-title">{v}</span>,
+              render: (v: string, r: TreeNode) =>
+                r.status === '草稿' ? (
+                  <Typography.Text
+                    editable={{
+                      onChange: (nv) => {
+                        if (nv && nv !== v) void doRename(r.drawing_no, nv)
+                      },
+                    }}
+                  >
+                    {v}
+                  </Typography.Text>
+                ) : (
+                  <span className="row-title">{v}</span>
+                ),
             },
             {
               title: '数量',
@@ -694,6 +721,7 @@ export default function EquipmentDesign({ projectNo: p0, equipNo: e0, embedded }
                     加子件
                   </a>
                   <a onClick={() => void openVersions(r.drawing_no)}>版本</a>
+                  <AuthedFileLink path={drawingFileUrl(r.drawing_no)}>看图纸</AuthedFileLink>
                   {r.status === '草稿' && (
                     <a
                       onClick={() => {
@@ -965,6 +993,9 @@ export default function EquipmentDesign({ projectNo: p0, equipNo: e0, embedded }
                     </a>
                   )}
                   <a onClick={() => void openProgramVersions(p)}>版本</a>
+                  {p.current_filename && (
+                    <AuthedFileLink path={programFileUrl(p.id)}>下载程序</AuthedFileLink>
+                  )}
                   {p.status === '已发布' && !p.change_request && (
                     <a
                       onClick={() =>

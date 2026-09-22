@@ -22,6 +22,8 @@ import dayjs from 'dayjs'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
+import AuthedImage from '../components/AuthedImage'
+
 import { api, createLocation, errMsg, generateEquipmentIssue, hasPerm, inspectPurchase, listEquipment, listLocations, listProjects, manualInbound, searchItems, storeReceipt, type GoodsReceiptRow, type ItemLite, type LocationRow } from '../api/client'
 
 const ISSUE_COLOR: Record<string, string> = { 待备料: 'gold', 已备料: 'processing', 已领走: 'success' }
@@ -443,6 +445,19 @@ export default function Warehouse() {
                     },
                     { title: '验收日期', dataIndex: 'receipt_date', width: 105 },
                     {
+                      title: '验收照片', key: 'photos', width: 140,
+                      render: (_: unknown, r) =>
+                        r.photos?.length ? (
+                          <Space wrap size={4}>
+                            {r.photos.map((p, i) => (
+                              <AuthedImage key={i} path={p.url} size={40} />
+                            ))}
+                          </Space>
+                        ) : (
+                          '—'
+                        ),
+                    },
+                    {
                       title: '操作', key: 'a', width: 100, fixed: 'right',
                       render: (_: unknown, r) => (
                         <Button type="primary" size="small" disabled={!canStore} onClick={() => openStore(r)}>入库</Button>
@@ -690,7 +705,12 @@ export default function Warehouse() {
               style={{ minWidth: 180 }}
               rules={[{ required: true }]}
             >
-              <InputNumber style={{ width: '100%' }} min={0.001} addonAfter={acceptTarget?.unit ?? undefined} />
+              <InputNumber
+                style={{ width: '100%' }}
+                min={0.001}
+                max={acceptTarget ? Math.max(0.001, acceptTarget.qty - acceptTarget.qty_received) : undefined}
+                addonAfter={acceptTarget?.unit ?? undefined}
+              />
             </Form.Item>
           </Space>
           <Form.Item
