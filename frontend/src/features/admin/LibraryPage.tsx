@@ -27,8 +27,8 @@ import {
   type StdCategoryInfo,
   type StdClassInfo,
   type StdItem,
-} from '../api/client'
-import { T } from '../theme/tokens'
+} from '../../api/client'
+import { T } from '../../theme/tokens'
 
 /**
  * 标准库（01 卷 §5）：三层 → 类别 → 品类 → 型号

@@ -19,7 +19,7 @@ import {
 import type { ColumnsType } from 'antd/es/table'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
-import { useAuth } from '../contexts/AuthContext'
+import { useAuth } from '../../contexts/AuthContext'
 
 import {
   POSITIONS,
@@ -43,7 +43,7 @@ import {
   type OrgRow,
   type RoleRow,
   type UserRow,
-} from '../api/client'
+} from '../../api/client'
 
 /** 角色 → 可见工作台（06 卷 §5） */
 const ROLE_WORKBENCH: Record<string, string> = {

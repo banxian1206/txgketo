@@ -12,17 +12,17 @@ import { useNavigate, useParams } from 'react-router-dom'
 
 import type { Dayjs } from 'dayjs'
 
-import DesignHeaderCard from '../components/design/DesignHeaderCard'
-import MySubmitsCard from '../components/design/MySubmitsCard'
-import DrawingsCard from '../components/design/DrawingsCard'
-import BomStdCard from '../components/design/BomStdCard'
-import BomMaterialCard from '../components/design/BomMaterialCard'
-import ProgramsCard from '../components/design/ProgramsCard'
-import DrawingsModals from '../components/design/DrawingsModals'
-import ProgramsModals from '../components/design/ProgramsModals'
-import ReviewDetailModal from '../components/ReviewDetailModal'
-import SubmitReviewModal from '../components/SubmitReviewModal'
-import ChangeRequestModal from '../components/ChangeRequestModal'
+import DesignHeaderCard from '../../components/design/DesignHeaderCard'
+import MySubmitsCard from '../../components/design/MySubmitsCard'
+import DrawingsCard from '../../components/design/DrawingsCard'
+import BomStdCard from '../../components/design/BomStdCard'
+import BomMaterialCard from '../../components/design/BomMaterialCard'
+import ProgramsCard from '../../components/design/ProgramsCard'
+import DrawingsModals from '../../components/design/DrawingsModals'
+import ProgramsModals from '../../components/design/ProgramsModals'
+import ReviewDetailModal from '../../components/ReviewDetailModal'
+import SubmitReviewModal from '../../components/SubmitReviewModal'
+import ChangeRequestModal from '../../components/ChangeRequestModal'
 
 import {
   addBom,
@@ -51,7 +51,7 @@ import {
   type StdItem,
   type User,
   type VersionRow,
-} from '../api/client'
+} from '../../api/client'
 
 interface TreeNode {
   drawing_no: string

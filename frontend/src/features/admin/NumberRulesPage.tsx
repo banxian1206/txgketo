@@ -2,7 +2,7 @@ import { App, Button, Card, Col, Input, Row, Space, Table, Tag, Typography } fro
 import type { ColumnsType } from 'antd/es/table'
 import { useEffect, useState } from 'react'
 
-import { composeDrawingNo, errMsg, listNumberRules, parseDrawingNo } from '../api/client'
+import { composeDrawingNo, errMsg, listNumberRules, parseDrawingNo } from '../../api/client'
 
 interface Rule {
   object_type: string

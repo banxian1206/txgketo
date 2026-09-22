@@ -21,7 +21,7 @@ import {
   LongLeadEditor,
   MilestoneEditor,
   TeamEditor,
-} from '../components/InitiationEditors'
+} from '../../components/InitiationEditors'
 import {
   errMsg,
   generateMilestones,
@@ -39,7 +39,7 @@ import {
   type MilestoneItem,
   type ProjectDetail,
   type PurchaseRequestItem,
-} from '../api/client'
+} from '../../api/client'
 
 /**
  * 立项（00 卷 §3 S1）：项目组全体会议要定的三件事

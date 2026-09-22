@@ -13,7 +13,7 @@ import { useNavigate } from 'react-router-dom'
 
 import ProjectFormFields, {
   type ProjectFormValues,
-} from '../components/ProjectFormFields'
+} from '../../components/ProjectFormFields'
 import {
   createProject,
   errMsg,
@@ -23,7 +23,7 @@ import {
   uploadAttachment,
   type Project,
   type ProjectCreate,
-} from '../api/client'
+} from '../../api/client'
 
 /**
  * 新建商机（独立页面）。

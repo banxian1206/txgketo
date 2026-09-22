@@ -1,16 +1,16 @@
-import ProjectHeader from '../components/project/ProjectHeader'
-import ProjectAnchorBar from '../components/project/ProjectAnchorBar'
-import BasicCard from '../components/project/BasicCard'
-import CustomerCard from '../components/project/CustomerCard'
-import RequireCard from '../components/project/RequireCard'
-import TimeCard from '../components/project/TimeCard'
-import DealCard from '../components/project/DealCard'
-import DesignProgressCard from '../components/project/DesignProgressCard'
-import EquipmentsCard from '../components/project/EquipmentsCard'
-import InitiateCards from '../components/project/InitiateCards'
-import AttsCard from '../components/project/AttsCard'
-import LogsCard from '../components/project/LogsCard'
-import DealModals from '../components/project/DealModals'
+import ProjectHeader from '../../components/project/ProjectHeader'
+import ProjectAnchorBar from '../../components/project/ProjectAnchorBar'
+import BasicCard from '../../components/project/BasicCard'
+import CustomerCard from '../../components/project/CustomerCard'
+import RequireCard from '../../components/project/RequireCard'
+import TimeCard from '../../components/project/TimeCard'
+import DealCard from '../../components/project/DealCard'
+import DesignProgressCard from '../../components/project/DesignProgressCard'
+import EquipmentsCard from '../../components/project/EquipmentsCard'
+import InitiateCards from '../../components/project/InitiateCards'
+import AttsCard from '../../components/project/AttsCard'
+import LogsCard from '../../components/project/LogsCard'
+import DealModals from '../../components/project/DealModals'
 import {
   App,
   Col,
@@ -24,7 +24,7 @@ import dayjs from 'dayjs'
 import { useCallback, useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 
-import AttachmentPreviewModal, { type PreviewState } from '../components/AttachmentPreviewModal'
+import AttachmentPreviewModal, { type PreviewState } from '../../components/AttachmentPreviewModal'
 import {
   closeProject,
   createContact,
@@ -48,7 +48,7 @@ import {
   kittingOverview,
   registerPayment,
   type KittingOverviewRow,
-} from '../api/client'
+} from '../../api/client'
 
 const ATT_CATEGORIES = ['客户资料', '方案', '报价', '合同', '技术协议', '其他']
 const CLOSE_REASONS = ['价格', '交期', '技术不满足', '客户取消', '对手中标', '其他']
