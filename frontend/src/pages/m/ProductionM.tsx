@@ -1,6 +1,7 @@
+import { useMfgBoard } from '../../hooks/useMfgBoard'
 import { App, Button, Card, Empty, Form, Input, Modal, Radio, Select, Space, Tabs, Tag, Typography } from 'antd'
 import dayjs from 'dayjs'
-import { useCallback, useEffect, useState } from 'react'
+import {useState} from 'react'
 
 import {
   acceptOutsource,
@@ -8,12 +9,10 @@ import {
   dispatchProdOrder,
   errMsg,
   hasPerm,
-  prodWorkbench,
   returnOutsource,
   sendOutsource,
   startProdOrder,
   transferProdOrder,
-  type MfgWorkbench,
   type OutsourceRow,
   type ProdOrderRow,
 } from '../../api/client'
@@ -30,28 +29,14 @@ type Kind = 'dispatch' | 'accept' | 'transfer' | 'os-send' | 'os-accept'
 export default function ProductionM() {
   const { message } = App.useApp()
   const canEdit = hasPerm('mfg:edit')
-  const [wb, setWb] = useState<MfgWorkbench | null>(null)
-  const [loading, setLoading] = useState(false)
   const [tab, setTab] = useState('wait')
   const [action, setAction] = useState<{ kind: Kind; order?: ProdOrderRow; os?: OutsourceRow } | null>(null)
   const [photos, setPhotos] = useState<string[]>([])
   const [saving, setSaving] = useState(false)
   const [form] = Form.useForm()
 
-  const load = useCallback(async () => {
-    setLoading(true)
-    try {
-      setWb(await prodWorkbench())
-    } catch (e) {
-      message.error(errMsg(e))
-    } finally {
-      setLoading(false)
-    }
-  }, [message])
-
-  useEffect(() => {
-    void load()
-  }, [load])
+  // 重构 2.3：看板数据走共享 hook（与另一端同源）
+  const { wb, loading, reload: load } = useMfgBoard()
 
   const open = (kind: Kind, order?: ProdOrderRow, os?: OutsourceRow) => {
     setPhotos([])

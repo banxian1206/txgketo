@@ -1,5 +1,6 @@
+import { useAsmBoard } from '../../hooks/useAsmBoard'
 import { App, Button, Card, Empty, Form, Input, Modal, Progress, Radio, Select, Space, Tag, Typography } from 'antd'
-import { useCallback, useEffect, useState } from 'react'
+import {useEffect, useState} from 'react'
 
 import {
   debugAssembly,
@@ -7,8 +8,6 @@ import {
   finishAssembly,
   getKitting,
   hasPerm,
-  kittingOverview,
-  listAssemblyRecords,
   listProjects,
   startAssembly,
   type AssemblyRecordRow,
@@ -28,8 +27,6 @@ export default function AssemblyM() {
   const canEdit = hasPerm('mfg:edit')
   const [projects, setProjects] = useState<{ project_no: string; project_name: string }[]>([])
   const [projectNo, setProjectNo] = useState<string | undefined>()
-  const [overview, setOverview] = useState<KittingOverviewRow[]>([])
-  const [records, setRecords] = useState<AssemblyRecordRow[]>([])
   const [detail, setDetail] = useState<KittingResult | null>(null)
   const [startTarget, setStartTarget] = useState<KittingOverviewRow | null>(null)
   const [debugTarget, setDebugTarget] = useState<AssemblyRecordRow | null>(null)
@@ -37,28 +34,14 @@ export default function AssemblyM() {
   const [saving, setSaving] = useState(false)
   const [form] = Form.useForm()
 
-  const load = useCallback(
-    async (pno?: string) => {
-      try {
-        const [ov, recs] = await Promise.all([
-          pno ? kittingOverview(pno) : Promise.resolve([]),
-          listAssemblyRecords(pno ? { project_no: pno } : {}),
-        ])
-        setOverview(ov)
-        setRecords(recs)
-      } catch (e) {
-        message.error(errMsg(e))
-      }
-    },
-    [message],
-  )
+  // 重构 2.3：看板数据走共享 hook（与另一端同源）
+  const { overview, records, reload: load } = useAsmBoard()
 
   useEffect(() => {
     listProjects()
       .then((rows) => setProjects(rows.map((p) => ({ project_no: p.project_no, project_name: p.project_name }))))
       .catch(() => undefined)
-    void load()
-  }, [load])
+  }, [])
 
   const pick = (pno?: string) => {
     setProjectNo(pno)

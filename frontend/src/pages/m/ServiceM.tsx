@@ -1,5 +1,6 @@
+import { useSvcBoard } from '../../hooks/useSvcBoard'
 import { App, Button, Card, Empty, Form, Input, InputNumber, Modal, Space, Tag } from 'antd'
-import { useCallback, useEffect, useState } from 'react'
+import {useState} from 'react'
 
 import {
   arriveServiceOrder,
@@ -9,11 +10,9 @@ import {
   fixServiceOrder,
   hasPerm,
   servicePhotoUrl,
-  serviceWorkbench,
   signServiceOrder,
   uploadServicePhotos,
   type ServiceOrderRow,
-  type ServiceWorkbench,
 } from '../../api/client'
 import MfgPhotoPicker from '../../components/MfgPhotoPicker'
 import { SERVICE_ORDER_STATUS as SO_COLOR } from '../../theme/status'
@@ -23,23 +22,13 @@ import { T } from '../../theme/tokens'
 export default function ServiceM() {
   const { message } = App.useApp()
   const canEdit = hasPerm('service:edit')
-  const [wb, setWb] = useState<ServiceWorkbench | null>(null)
   const [modal, setModal] = useState<{ kind: 'create' | 'dispatch' | 'fix' | 'sign'; order?: ServiceOrderRow } | null>(null)
   const [photos, setPhotos] = useState<string[]>([])
   const [saving, setSaving] = useState(false)
   const [form] = Form.useForm()
 
-  const load = useCallback(async () => {
-    try {
-      setWb(await serviceWorkbench())
-    } catch (e) {
-      message.error(errMsg(e))
-    }
-  }, [message])
-
-  useEffect(() => {
-    void load()
-  }, [load])
+  // 重构 2.3：看板数据走共享 hook（与另一端同源）
+  const { wb, reload: load } = useSvcBoard()
 
   const open = (kind: 'create' | 'dispatch' | 'fix' | 'sign', order?: ServiceOrderRow) => {
     setPhotos([])

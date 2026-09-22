@@ -1,3 +1,4 @@
+import { useShipBoard } from '../hooks/useShipBoard'
 import {
   App,
   Button,
@@ -19,7 +20,7 @@ import {
   Tag,
   Typography,
 } from 'antd'
-import { useCallback, useEffect, useState } from 'react'
+import {useEffect, useState} from 'react'
 
 import {
   addManualShipItem,
@@ -36,7 +37,6 @@ import {
   receiptShipment,
   setItemPlacePhotos,
   shipPhotoUrl,
-  toShip,
   uploadShipPhotos,
   type ShipmentItemRow,
   type ShipmentRow,
@@ -53,10 +53,7 @@ export default function Shipping() {
 
   const [projects, setProjects] = useState<{ project_no: string; project_name: string }[]>([])
   const [projectNo, setProjectNo] = useState<string | undefined>()
-  const [toShipRows, setToShipRows] = useState<ToShipRow[]>([])
   const [selectedEquips, setSelectedEquips] = useState<string[]>([])
-  const [shipments, setShipments] = useState<ShipmentRow[]>([])
-  const [loading, setLoading] = useState(false)
 
   // 发运清单勾选
   const [itemsShip, setItemsShip] = useState<ShipmentRow | null>(null)
@@ -81,33 +78,14 @@ export default function Shipping() {
   const [placeItem, setPlaceItem] = useState<ShipmentItemRow | null>(null)
   const [placePhotos, setPlacePhotos] = useState<string[]>([])
 
-  const load = useCallback(
-    async (pno?: string): Promise<ShipmentRow[]> => {
-      setLoading(true)
-      try {
-        const [ts, list] = await Promise.all([
-          pno ? toShip(pno) : Promise.resolve([]),
-          listShipments(pno ? { project_no: pno } : {}),
-        ])
-        setToShipRows(ts)
-        setShipments(list)
-        return list
-      } catch (e) {
-        message.error(errMsg(e))
-        return []
-      } finally {
-        setLoading(false)
-      }
-    },
-    [message],
-  )
+  // 重构 2.3：看板数据走共享 hook（与另一端同源）
+  const { toShipRows, shipments, setShipments, loading, reload: load } = useShipBoard()
 
   useEffect(() => {
     listProjects()
       .then((rows) => setProjects(rows.map((p) => ({ project_no: p.project_no, project_name: p.project_name }))))
       .catch(() => undefined)
-    void load()
-  }, [load])
+  }, [])
 
   const doInstruct = async () => {
     if (!projectNo || selectedEquips.length === 0) return

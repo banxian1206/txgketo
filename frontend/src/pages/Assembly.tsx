@@ -1,3 +1,4 @@
+import { useAsmBoard } from '../hooks/useAsmBoard'
 import {
   App,
   Card,
@@ -15,7 +16,7 @@ import {
   Tag,
   Typography,
 } from 'antd'
-import { useCallback, useEffect, useState } from 'react'
+import {useEffect, useState} from 'react'
 import { useNavigate } from 'react-router-dom'
 
 import {
@@ -24,13 +25,10 @@ import {
   finishAssembly,
   getKitting,
   hasPerm,
-  kittingOverview,
-  listAssemblyRecords,
   listProjects,
   startAssembly,
   type AssemblyRecordRow,
   type KittingLine,
-  type KittingOverviewRow,
   type KittingResult,
 } from '../api/client'
 import AuthedImage from '../components/AuthedImage'
@@ -48,10 +46,7 @@ export default function Assembly() {
 
   const [projects, setProjects] = useState<{ project_no: string; project_name: string }[]>([])
   const [projectNo, setProjectNo] = useState<string | undefined>()
-  const [overview, setOverview] = useState<KittingOverviewRow[]>([])
   const [detail, setDetail] = useState<{ equip_no: string; data: KittingResult } | null>(null)
-  const [records, setRecords] = useState<AssemblyRecordRow[]>([])
-  const [loading, setLoading] = useState(false)
 
   // 弹窗
   const [startTarget, setStartTarget] = useState<{ equip_no: string; rate: number } | null>(null)
@@ -72,31 +67,14 @@ export default function Assembly() {
     form.setFieldsValue({ result: '合格' })
   }, [debugTarget, form])
 
-  const load = useCallback(
-    async (pno?: string) => {
-      setLoading(true)
-      try {
-        const [ov, recs] = await Promise.all([
-          pno ? kittingOverview(pno) : Promise.resolve([]),
-          listAssemblyRecords(pno ? { project_no: pno } : {}),
-        ])
-        setOverview(ov)
-        setRecords(recs)
-      } catch (e) {
-        message.error(errMsg(e))
-      } finally {
-        setLoading(false)
-      }
-    },
-    [message],
-  )
+  // 重构 2.3：看板数据走共享 hook（与另一端同源）
+  const { overview, records, loading, reload: load } = useAsmBoard()
 
   useEffect(() => {
     listProjects()
       .then((rows) => setProjects(rows.map((p) => ({ project_no: p.project_no, project_name: p.project_name }))))
       .catch(() => undefined)
-    void load()
-  }, [load])
+  }, [])
 
   const pickProject = (pno?: string) => {
     setProjectNo(pno)

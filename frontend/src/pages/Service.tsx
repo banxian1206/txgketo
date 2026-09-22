@@ -1,3 +1,4 @@
+import { useSvcBoard } from '../hooks/useSvcBoard'
 import {
   App,
   Button,
@@ -17,7 +18,7 @@ import {
   Tag,
   Typography,
 } from 'antd'
-import { useCallback, useEffect, useState } from 'react'
+import {useState} from 'react'
 
 import {
   arriveServiceOrder,
@@ -28,14 +29,11 @@ import {
   fixServiceOrder,
   hasPerm,
   listSparePartMoves,
-  listSpareParts,
   moveSparePart,
   servicePhotoUrl,
-  serviceWorkbench,
   signServiceOrder,
   uploadServicePhotos,
   type ServiceOrderRow,
-  type ServiceWorkbench,
   type SparePartRow,
 } from '../api/client'
 import MfgPhotoPicker from '../components/MfgPhotoPicker'
@@ -50,8 +48,6 @@ export default function Service() {
   const { message } = App.useApp()
   const canEdit = hasPerm('service:edit')
 
-  const [wb, setWb] = useState<ServiceWorkbench | null>(null)
-  const [parts, setParts] = useState<SparePartRow[]>([])
   const [moves, setMoves] = useState<Record<number, { move_type: string; qty: number; moved_at?: string | null }[]>>({})
   const [tab, setTab] = useState('orders')
 
@@ -62,19 +58,8 @@ export default function Service() {
   // 字段组件联动：设备按已选项目过滤（重构 1.4，原手填 equip_no）
   const watchProject = Form.useWatch('project_no', form)
 
-  const load = useCallback(async () => {
-    try {
-      const [w, p] = await Promise.all([serviceWorkbench(), listSpareParts()])
-      setWb(w)
-      setParts(p)
-    } catch (e) {
-      message.error(errMsg(e))
-    }
-  }, [message])
-
-  useEffect(() => {
-    void load()
-  }, [load])
+  // 重构 2.3：看板数据走共享 hook（与另一端同源）
+  const { wb, parts, reload: load } = useSvcBoard({ full: true })
 
   const open = (kind: Kind, order?: ServiceOrderRow, part?: SparePartRow) => {
     setPhotos([])

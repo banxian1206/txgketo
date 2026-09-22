@@ -1,3 +1,4 @@
+import { useMfgBoard } from '../hooks/useMfgBoard'
 import {
   App,
   Button,
@@ -22,7 +23,7 @@ import {
   Typography,
 } from 'antd'
 import dayjs from 'dayjs'
-import { useCallback, useEffect, useState } from 'react'
+import {useEffect, useState} from 'react'
 import { useNavigate } from 'react-router-dom'
 
 import {
@@ -36,12 +37,10 @@ import {
   listEquipment,
   listProjects,
   mfgPhotoUrl,
-  prodWorkbench,
   returnOutsource,
   sendOutsource,
   startProdOrder,
   transferProdOrder,
-  type MfgWorkbench,
   type OutsourceRow,
   type ProdOrderRow,
 } from '../api/client'
@@ -61,8 +60,6 @@ export default function Manufacturing() {
   const nav = useNavigate()
   const canEdit = hasPerm('mfg:edit')
 
-  const [wb, setWb] = useState<MfgWorkbench | null>(null)
-  const [loading, setLoading] = useState(false)
   const [tab, setTab] = useState('wait')
 
   // 生成排产
@@ -83,23 +80,14 @@ export default function Manufacturing() {
   // 详情
   const [detail, setDetail] = useState<ProdOrderRow | null>(null)
 
-  const load = useCallback(async () => {
-    setLoading(true)
-    try {
-      setWb(await prodWorkbench())
-    } catch (e) {
-      message.error(errMsg(e))
-    } finally {
-      setLoading(false)
-    }
-  }, [message])
+  // 重构 2.3：看板数据走共享 hook（与另一端同源）
+  const { wb, loading, reload: load } = useMfgBoard()
 
   useEffect(() => {
-    void load()
     listProjects()
       .then((rows) => setProjects(rows.map((p) => ({ project_no: p.project_no, project_name: p.project_name }))))
       .catch(() => undefined)
-  }, [load])
+  }, [])
 
   const onGenProject = async (no?: string) => {
     setGenProject(no)

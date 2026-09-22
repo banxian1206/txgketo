@@ -1,5 +1,6 @@
+import { useShipBoard } from '../../hooks/useShipBoard'
 import { App, Button, Card, Checkbox, Empty, Form, Input, Modal, Select, Space, Tag, Typography } from 'antd'
-import { useCallback, useEffect, useState } from 'react'
+import {useEffect, useState} from 'react'
 
 import {
   arriveShipment,
@@ -8,14 +9,11 @@ import {
   errMsg,
   hasPerm,
   listProjects,
-  listShipments,
   loadShipment,
   receiptShipment,
   shipPhotoUrl,
-  toShip,
   uploadShipPhotos,
   type ShipmentRow,
-  type ToShipRow,
 } from '../../api/client'
 import AuthedImage from '../../components/AuthedImage'
 import MfgPhotoPicker from '../../components/MfgPhotoPicker'
@@ -29,9 +27,7 @@ export default function ShippingM() {
   const canReceive = hasPerm('ship:edit') || hasPerm('site:edit')
   const [projects, setProjects] = useState<{ project_no: string; project_name: string }[]>([])
   const [projectNo, setProjectNo] = useState<string | undefined>()
-  const [toShipRows, setToShipRows] = useState<ToShipRow[]>([])
   const [selected, setSelected] = useState<string[]>([])
-  const [shipments, setShipments] = useState<ShipmentRow[]>([])
   const [expanded, setExpanded] = useState<number | null>(null)
   const [loadTarget, setLoadTarget] = useState<ShipmentRow | null>(null)
   const [loadPhotos, setLoadPhotos] = useState<string[]>([])
@@ -40,28 +36,14 @@ export default function ShippingM() {
   const [receiptPhotos, setReceiptPhotos] = useState<string[]>([])
   const [saving, setSaving] = useState(false)
 
-  const load = useCallback(
-    async (pno?: string) => {
-      try {
-        const [ts, list] = await Promise.all([
-          pno ? toShip(pno) : Promise.resolve([]),
-          listShipments(pno ? { project_no: pno } : {}),
-        ])
-        setToShipRows(ts)
-        setShipments(list)
-      } catch (e) {
-        message.error(errMsg(e))
-      }
-    },
-    [message],
-  )
+  // 重构 2.3：看板数据走共享 hook（与另一端同源）
+  const { toShipRows, shipments, reload: load } = useShipBoard()
 
   useEffect(() => {
     listProjects()
       .then((rows) => setProjects(rows.map((p) => ({ project_no: p.project_no, project_name: p.project_name }))))
       .catch(() => undefined)
-    void load()
-  }, [load])
+  }, [])
 
   const doInstruct = async () => {
     if (!projectNo || selected.length === 0) return
