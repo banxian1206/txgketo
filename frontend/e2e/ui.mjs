@@ -327,6 +327,18 @@ try {
     } else check('AUTH-退出查看', false, '无「退出查看」入口');
   } else check('AUTH-伪装进入', false, 'Users 页无伪装入口（权限？admin 应可见）');
 
+  // —— 2.5 品牌位：侧栏反白字标真实加载（naturalWidth>0 = 非裂图非404）——
+  {
+    await page.waitForFunction(() => {
+      const i = document.querySelector('img[src*="logo-white"]');
+      return !!i && i.complete && i.naturalWidth > 0;
+    }, { timeout: 5000 }).catch(() => {});
+    const logo = page.locator('img[src*="logo-white"]').first();
+    const has = await logo.count();
+    const nw = has ? await logo.evaluate((img) => img.naturalWidth).catch(() => 0) : 0;
+    check('BRAND-侧栏logo', has > 0 && nw > 0, has ? `naturalWidth=${nw}` : '侧栏找不到 logo-white img');
+  }
+
   // —— 登出冒烟（session 清空 → 回登录页）——
   const logoutLink = page.getByText('退出', { exact: false }).last();
   if (await logoutLink.count()) {
@@ -334,6 +346,15 @@ try {
     await page.waitForURL(/\/login/, { timeout: 8000 }).catch(() => {});
     const onLogin = page.url().includes('/login');
     check('AUTH-登出', onLogin, onLogin ? '登出回登录页' : 'URL=' + page.url());
+    // 登录页品牌位（正色字标）
+    await page.waitForFunction(() => {
+      const i = document.querySelector('img[src*="brand/logo.png"]');
+      return !!i && i.complete && i.naturalWidth > 0;
+    }, { timeout: 5000 }).catch(() => {});
+    const lgo = page.locator('img[src*="brand/logo.png"]').first();
+    const lhas = await lgo.count();
+    const lnw = lhas ? await lgo.evaluate((img) => img.naturalWidth).catch(() => 0) : 0;
+    check('BRAND-登录logo', lhas > 0 && lnw > 0, lhas ? `naturalWidth=${lnw}` : '登录卡无正色字标');
   } else check('AUTH-登出', false, '顶栏无退出入口');
 
 } catch (e) {

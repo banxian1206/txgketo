@@ -1,4 +1,4 @@
-import { Badge, Typography } from 'antd'
+import { Badge, Space, Typography } from 'antd'
 import type { ReactNode } from 'react'
 import { useCallback, useEffect, useState } from 'react'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
@@ -95,7 +95,11 @@ export default function MobileLayout() {
           alignItems: 'center',
         }}
       >
-        <Typography.Text style={{ color: T.bg, fontWeight: 600 }}>同兴高科 · 移动端</Typography.Text>
+        {/* 品牌位（重构 2.5）：蓝底用反白字标，保留“移动端”端型标识 */}
+        <Space size={6}>
+          <img src="/brand/logo-white.png" alt="同兴高科 TXGK" style={{ height: 22 }} />
+          <Typography.Text style={{ color: T.bg, fontSize: 12, opacity: 0.85 }}>移动端</Typography.Text>
+        </Space>
         <a style={{ color: T.bg }} onClick={() => setNotifOpen(true)}>
           <Badge count={unread} size="small">
             <span style={{ fontSize: 16 }}><BellOutlined /></span>

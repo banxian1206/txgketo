@@ -23,9 +23,12 @@ export default function Login() {
       }}
     >
       <Card style={{ width: 380, boxShadow: '0 8px 32px rgba(0,0,0,.18)' }}>
-        <Typography.Title level={4} style={{ marginBottom: 4 }}>
-          同兴高科项目管理系统
-        </Typography.Title>
+        {/* 品牌位（重构 2.5 · 视觉规范 §6）：白卡内用正色字标替代标题文字 */}
+        <img
+          src="/brand/logo.png"
+          alt="同兴高科 TXGK"
+          style={{ height: 36, display: 'block', marginBottom: 4 }}
+        />
         <Typography.Paragraph type="secondary" style={{ marginBottom: 24 }}>
           Guangdong Tongxing High-Tech · TXGK
         </Typography.Paragraph>

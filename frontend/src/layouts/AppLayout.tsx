@@ -62,14 +62,16 @@ export default function AppLayout() {
           <div
             style={{
               color: T.bg,
-              padding: '16px 20px',
-              fontWeight: 600,
-              fontSize: 16,
-              lineHeight: 1.4,
+              padding: '16px 20px 12px',
               flexShrink: 0,
             }}
           >
-            同兴高科
+            {/* 品牌位（重构 2.5 · 视觉规范 §6）：反白字标替代主名文字（字标自带“同兴高科”，不叠文字避免重复） */}
+            <img
+              src="/brand/logo-white.png"
+              alt="同兴高科 TXGK"
+              style={{ height: 28, display: 'block', marginBottom: 4 }}
+            />
             <div style={{ fontSize: 12, opacity: 0.65, fontWeight: 400 }}>项目管理系统</div>
           </div>
           <div style={{ flex: 1, overflowY: 'auto' }}>
