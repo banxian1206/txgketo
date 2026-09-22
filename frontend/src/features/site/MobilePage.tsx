@@ -1,7 +1,9 @@
+import { useSiteBoard } from './hooks'
+import IncomingCheckFields from './components/IncomingCheckFields'
 import { App, Button, Card, DatePicker, Empty, Form, Input, InputNumber, Modal, Radio, Select, Space, Tabs, Tag, Typography } from 'antd'
 import { MinusCircleOutlined, PlusOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
-import { useCallback, useEffect, useState } from 'react'
+import {useState} from 'react'
 
 import {
   acceptSiteIncoming,
@@ -15,20 +17,15 @@ import {
   finishCommission,
   hasPerm,
   linkSiteIssue,
-  listAcceptances,
-  listProjects,
   requestCommission,
   saveSiteSurvey,
-  siteIncoming,
   sitePhotoUrl,
-  siteWorkbench,
   uploadSitePhotos,
   type AcceptanceRow,
   type SiteCommissionRow,
   type SiteDailyRow,
   type SiteIncomingPending,
   type SiteIssueRow,
-  type SiteWorkbench,
 } from '../../api/client'
 import MfgPhotoPicker from '../../components/MfgPhotoPicker'
 import { SITE_ISSUE_STATUS as ISSUE_COLOR } from '../../theme/status'
@@ -41,42 +38,14 @@ type Kind = 'survey' | 'daily' | 'issue' | 'commission' | 'incoming' | 'acc-appl
 export default function SiteM() {
   const { message } = App.useApp()
   const canEdit = hasPerm('site:edit') || hasPerm('project:edit')
-  const [projects, setProjects] = useState<{ project_no: string; project_name: string }[]>([])
-  const [projectNo, setProjectNo] = useState<string | undefined>()
-  const [wb, setWb] = useState<SiteWorkbench | null>(null)
-  const [incoming, setIncoming] = useState<{ pending: SiteIncomingPending[]; done: SiteIncomingPending[] }>({ pending: [], done: [] })
-  const [accs, setAccs] = useState<AcceptanceRow[]>([])
   const [photos, setPhotos] = useState<string[]>([])
   const [videos, setVideos] = useState<string[]>([])
   const [modal, setModal] = useState<{ kind: Kind; target?: SiteIncomingPending; issue?: SiteIssueRow; acc?: AcceptanceRow } | null>(null)
   const [saving, setSaving] = useState(false)
   const [form] = Form.useForm()
 
-  const load = useCallback(
-    async (pno?: string) => {
-      try {
-        const [w, inc, ac] = await Promise.all([
-          siteWorkbench(pno),
-          pno ? siteIncoming(pno) : Promise.resolve({ pending: [], done: [] }),
-          pno ? listAcceptances(pno) : Promise.resolve([]),
-        ])
-        setWb(w)
-        setIncoming(inc)
-        setAccs(ac)
-      } catch (e) {
-        message.error(errMsg(e))
-      }
-    },
-    [message],
-  )
-
-  useEffect(() => {
-    listProjects()
-      .then((rows) => setProjects(rows.map((p) => ({ project_no: p.project_no, project_name: p.project_name }))))
-      .catch(() => undefined)
-    void load()
-  }, [load])
-
+  // 重构 2.1：看板数据走共享 hook（与 PC 同源）
+  const { projectNo, setProjectNo, projects, wb, incoming, accs, reload: load } = useSiteBoard({ withAcceptance: true })
   const pick = (pno?: string) => {
     setProjectNo(pno)
     void load(pno)
@@ -411,29 +380,7 @@ export default function SiteM() {
 
           {modal?.kind === 'incoming' && (
             <>
-              <Form.Item name="result" label="清点结论" rules={[{ required: true }]}>
-                <Radio.Group optionType="button" buttonStyle="solid">
-                  <Radio.Button value="齐">齐</Radio.Button>
-                  <Radio.Button value="缺件">缺件</Radio.Button>
-                  <Radio.Button value="破损">破损</Radio.Button>
-                </Radio.Group>
-              </Form.Item>
-              <Form.List name="shortage">
-                {(fields, { add, remove }) => (
-                  <>
-                    {fields.map((f) => (
-                      <Space key={f.key} wrap style={{ marginBottom: 6 }}>
-                        <Form.Item name={[f.name, 'item']} style={{ marginBottom: 0 }}><Input placeholder="缺/损零件" style={{ width: 140 }} /></Form.Item>
-                        <Form.Item name={[f.name, 'qty']} style={{ marginBottom: 0 }}><InputNumber placeholder="数量" min={0} style={{ width: 80 }} /></Form.Item>
-                        <Form.Item name={[f.name, 'reason']} style={{ marginBottom: 0 }}><Input placeholder="原因" style={{ width: 130 }} /></Form.Item>
-                        <MinusCircleOutlined onClick={() => remove(f.name)} />
-                      </Space>
-                    ))}
-                    <Button type="dashed" block onClick={() => add()}>加一条</Button>
-                  </>
-                )}
-              </Form.List>
-              <Form.Item name="remark" label="备注" style={{ marginTop: 8 }}><Input /></Form.Item>
+                            <IncomingCheckFields />
               <Form.Item label="照片（必须）" required>
                 <MfgPhotoPicker projectNo={projectNo ?? ''} refNo="incoming" value={photos} onChange={setPhotos} upload={uploadSitePhotos} photoUrl={sitePhotoUrl} label="拍照" />
               </Form.Item>

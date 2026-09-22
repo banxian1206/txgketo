@@ -1,14 +1,13 @@
+import { useSiteBoard } from './hooks'
+import IncomingCheckFields from './components/IncomingCheckFields'
 import {
   App,
   Alert,
-  Button,
   Card,
   Col,
   Empty,
   Form,
-  Input,
   Modal,
-  Radio,
   Row,
   Select,
   Space,
@@ -18,7 +17,7 @@ import {
   Tag,
   Typography,
 } from 'antd'
-import { useCallback, useEffect, useState } from 'react'
+import {useState} from 'react'
 import { useNavigate } from 'react-router-dom'
 
 import {
@@ -29,61 +28,32 @@ import {
   errMsg,
   hasPerm,
   linkSiteIssue,
-  listProjects,
-  siteIncoming,
   sitePhotoUrl,
-  siteWorkbench,
   uploadSitePhotos,
   type SiteCommissionRow,
   type SiteDailyRow,
   type SiteIncomingPending,
   type SiteIssueRow,
   type SiteSurveyRow,
-  type SiteWorkbench,
-} from '../api/client'
-import AuthedImage from '../components/AuthedImage'
-import MfgPhotoPicker from '../components/MfgPhotoPicker'
-import { SITE_ISSUE_STATUS as ISSUE_COLOR } from '../theme/status'
-import { SITE_COMMISSION_STATUS as COMMISSION_COLOR } from '../theme/status'
-import { T } from '../theme/tokens'
+} from '../../api/client'
+import AuthedImage from '../../components/AuthedImage'
+import MfgPhotoPicker from '../../components/MfgPhotoPicker'
+import { SITE_ISSUE_STATUS as ISSUE_COLOR } from '../../theme/status'
+import { SITE_COMMISSION_STATUS as COMMISSION_COLOR } from '../../theme/status'
+import { T } from '../../theme/tokens'
 
 /** 现场台（PC，S8）：给项目经理/现场负责人看整体 —— 手机端是现场的主终端。 */
 export default function Site() {
   const { message } = App.useApp()
   const nav = useNavigate()
   const canEdit = hasPerm('site:edit') || hasPerm('project:edit')
-  const [projects, setProjects] = useState<{ project_no: string; project_name: string }[]>([])
-  const [projectNo, setProjectNo] = useState<string | undefined>()
-  const [wb, setWb] = useState<SiteWorkbench | null>(null)
-  const [incoming, setIncoming] = useState<{ pending: SiteIncomingPending[]; done: SiteIncomingPending[] }>({ pending: [], done: [] })
   const [target, setTarget] = useState<SiteIncomingPending | null>(null)
   const [photos, setPhotos] = useState<string[]>([])
   const [saving, setSaving] = useState(false)
   const [form] = Form.useForm()
 
-  const load = useCallback(
-    async (pno?: string) => {
-      try {
-        const [w, inc] = await Promise.all([
-          siteWorkbench(pno),
-          pno ? siteIncoming(pno) : Promise.resolve({ pending: [], done: [] }),
-        ])
-        setWb(w)
-        setIncoming(inc)
-      } catch (e) {
-        message.error(errMsg(e))
-      }
-    },
-    [message],
-  )
-
-  useEffect(() => {
-    listProjects()
-      .then((rows) => setProjects(rows.map((p) => ({ project_no: p.project_no, project_name: p.project_name }))))
-      .catch(() => undefined)
-    void load()
-  }, [load])
-
+  // 重构 2.1：看板数据走共享 hook（与移动端同源）
+  const { projectNo, setProjectNo, projects, wb, incoming, reload: load } = useSiteBoard()
   const doIncoming = async () => {
     if (!target) return
     const v = await form.validateFields()
@@ -316,29 +286,7 @@ export default function Site() {
         destroyOnHidden
       >
         <Form form={form} layout="vertical" preserve={false}>
-          <Form.Item name="result" label="清点结论" rules={[{ required: true }]}>
-            <Radio.Group optionType="button" buttonStyle="solid">
-              <Radio.Button value="齐">齐</Radio.Button>
-              <Radio.Button value="缺件">缺件</Radio.Button>
-              <Radio.Button value="破损">破损</Radio.Button>
-            </Radio.Group>
-          </Form.Item>
-          <Form.List name="shortage">
-            {(fields, { add, remove }) => (
-              <>
-                {fields.map((f) => (
-                  <Space key={f.key} wrap style={{ marginBottom: 6 }}>
-                    <Form.Item name={[f.name, 'item']} style={{ marginBottom: 0 }}><Input placeholder="缺/损零件" style={{ width: 170 }} /></Form.Item>
-                    <Form.Item name={[f.name, 'qty']} style={{ marginBottom: 0 }}><Input type="number" placeholder="数量" style={{ width: 90 }} /></Form.Item>
-                    <Form.Item name={[f.name, 'reason']} style={{ marginBottom: 0 }}><Input placeholder="原因" style={{ width: 150 }} /></Form.Item>
-                    <a onClick={() => remove(f.name)}>删</a>
-                  </Space>
-                ))}
-                <Button type="dashed" block onClick={() => add()}>加一条缺件</Button>
-              </>
-            )}
-          </Form.List>
-          <Form.Item name="remark" label="备注" style={{ marginTop: 8 }}><Input /></Form.Item>
+                    <IncomingCheckFields />
           <Form.Item label="照片（必须）" required>
             <MfgPhotoPicker projectNo={projectNo ?? ''} refNo="incoming" value={photos} onChange={setPhotos} upload={uploadSitePhotos} photoUrl={sitePhotoUrl} label="拍照" />
           </Form.Item>
