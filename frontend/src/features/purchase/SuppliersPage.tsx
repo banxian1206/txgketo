@@ -37,7 +37,7 @@ import {
   type StdCategoryInfo,
   type StdItem,
   type SupplierRow,
-} from '../api/client'
+} from '../../api/client'
 
 const KINDS = ['原材料', '标准件', '机加工', '外协', '电气', '气动', '其他']
 

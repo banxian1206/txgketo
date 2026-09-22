@@ -2,9 +2,9 @@ import { App, Button, Card, Table, Tabs, Tag, Typography } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import { useCallback, useEffect, useState } from 'react'
 
-import ReviewDetailModal from '../components/ReviewDetailModal'
-import { errMsg, listReviewTickets, me, type ReviewTicketBrief, type User } from '../api/client'
-import { REVIEW_STATUS as STATUS_COLOR } from '../theme/status'
+import ReviewDetailModal from '../../components/ReviewDetailModal'
+import { errMsg, listReviewTickets, me, type ReviewTicketBrief, type User } from '../../api/client'
+import { REVIEW_STATUS as STATUS_COLOR } from '../../theme/status'
 
 /** 设计评审：待我审核 / 我提交的 / 全部（05 卷 §3、§9 评审工作台） */
 export default function Reviews() {

@@ -17,7 +17,7 @@ import type { ColumnsType } from 'antd/es/table'
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
-import PurchaseActions from '../components/PurchaseActions'
+import PurchaseActions from '../../components/PurchaseActions'
 import {
   errMsg,
   listMyTasks,
@@ -30,9 +30,9 @@ import {
   type TaskItem,
   type User,
   type UserRow,
-} from '../api/client'
-import { TASK_STATUS as STATUS_COLOR } from '../theme/status'
-import { TASK_TYPE as TYPE_COLOR } from '../theme/status'
+} from '../../api/client'
+import { TASK_STATUS as STATUS_COLOR } from '../../theme/status'
+import { TASK_TYPE as TYPE_COLOR } from '../../theme/status'
 
 /** 我的任务（工作台）：我的任务 / 我组任务（经理，05 卷 §2.2） */
 export default function MyTasks() {

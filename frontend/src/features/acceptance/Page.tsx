@@ -32,12 +32,12 @@ import {
   uploadAcceptanceDocs,
   type AcceptanceRow,
   type AcceptanceWorkbench,
-} from '../api/client'
-import { SelectProject } from '../components/fields'
-import { acceptanceDocUrl } from '../api/client'
-import { readSession } from '../contexts/session'
-import { ACCEPTANCE_STATUS as ACC_COLOR } from '../theme/status'
-import { T } from '../theme/tokens'
+} from '../../api/client'
+import { SelectProject } from '../../components/fields'
+import { acceptanceDocUrl } from '../../api/client'
+import { readSession } from '../../contexts/session'
+import { ACCEPTANCE_STATUS as ACC_COLOR } from '../../theme/status'
+import { T } from '../../theme/tokens'
 
 const DOC_TYPES = ['技术协议', '图纸清单', '检验报告', '调试记录', '操作手册', '备件清单', '培训记录', '验收单', '其他']
 
