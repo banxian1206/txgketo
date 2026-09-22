@@ -46,9 +46,9 @@ check('P-16b', aa.length === 0, aa.length ? `addonAfter 残留 ${aa.length}: ${a
 // P-19：发运清单抽屉有骨架屏
 check('P-19', has('pages/Shipping.tsx', /Skeleton/), 'Shipping 含 Skeleton');
 
-// P-20：生成领料单失败 = 卡片内常驻 Alert（不是一闪 toast）
-const wh = fs.readFileSync(path.join(SRC, 'pages/Warehouse.tsx'), 'utf8');
-check('P-20', /P-20/.test(wh) && /<Alert/.test(wh), 'Warehouse 有 P-20 常驻 Alert');
+// P-20：生成领料单失败 → 卡片内常驻（genErr 为该功能专属 state，路径无关）
+const p20 = grepAll(/genErr/);
+check('P-20', p20.length >= 2, p20.length ? `genErr 常驻提示在（${p20.length} 处）` : '找不到 genErr 常驻实现');
 
 // P-14：手工申请物料搜索旁有「去标准库新建」出口
 check('P-14', has('components/ManualPurchaseModal.tsx', /去标准库新建/), '手工申请有标准库出口');

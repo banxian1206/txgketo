@@ -1,88 +1,23 @@
+import { useWarehouseBoard } from './hooks'
+import type { StorageRow } from './types'
 import { App, Button, Card, Empty, Input, Modal, Space, Spin, Tabs, Tag, Typography } from 'antd'
-import { useCallback, useEffect, useState } from 'react'
+import {useState} from 'react'
 import { useNavigate } from 'react-router-dom'
 
-import { api, errMsg, storeReceipt } from '../../api/client'
+import {errMsg, storeReceipt} from '../../api/client'
 import AuthedImage from '../../components/AuthedImage'
 
-interface Incoming {
-  id: number
-  project_no: string
-  project_name?: string | null
-  equip_no?: string | null
-  equip_name?: string | null
-  item_no: string
-  display_name: string
-  spec_text?: string | null
-  qty: number
-  qty_received: number
-  unit?: string | null
-  po_no?: string | null
-  supplier_name?: string | null
-  need_date?: string | null
-  expected_date?: string | null
-  overdue: boolean
-}
-
-interface PendingStorage {
-  id: number
-  receipt_no: string
-  project_no: string
-  project_name?: string | null
-  po_no?: string | null
-  equip_no?: string | null
-  equip_name?: string | null
-  supplier_name?: string | null
-  item_no: string
-  display_name: string
-  spec_text?: string | null
-  qty: number
-  unit?: string | null
-  receipt_date?: string | null
-  photos?: { filename?: string | null; url: string }[]
-}
-
-interface PendingIssue {
-  id: number
-  issue_no: string
-  project_no: string
-  equip_no?: string | null
-  status: string
-  line_count: number
-  shortage_count: number
-}
-
-interface Workbench {
-  incoming: Incoming[]
-  pending_storage: PendingStorage[]
-  pending_issues: PendingIssue[]
-}
 
 /** 手机端仓库：待验收 / 待入库 / 领料（03 卷：清单 + 勾选 + 拍照） */
 export default function WarehouseM() {
   const { message } = App.useApp()
   const nav = useNavigate()
-  const [wb, setWb] = useState<Workbench | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [storeFor, setStoreFor] = useState<PendingStorage | null>(null)
+  const [storeFor, setStoreFor] = useState<StorageRow | null>(null)
   const [location, setLocation] = useState('')
   const [saving, setSaving] = useState(false)
 
-  const load = useCallback(async () => {
-    setLoading(true)
-    try {
-      const { data } = await api.get<Workbench>('/warehouse/workbench')
-      setWb(data)
-    } catch (e) {
-      message.error(errMsg(e))
-    } finally {
-      setLoading(false)
-    }
-  }, [message])
-
-  useEffect(() => {
-    void load()
-  }, [load])
+  // 重构 2.0：与 PC 共享同一数据 hook（同源计数）
+  const { wb, loading, reload: load } = useWarehouseBoard()
 
   const doStore = async () => {
     if (!storeFor) return

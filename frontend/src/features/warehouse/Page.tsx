@@ -1,3 +1,5 @@
+import { useWarehouseBoard } from './hooks'
+import type { IncomingRow, IssueRow, MoveRow, StockRow, StorageRow } from './types'
 import {
   App,
   Alert,
@@ -20,62 +22,21 @@ import {
   Typography,
 } from 'antd'
 import dayjs from 'dayjs'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import {useEffect, useRef, useState} from 'react'
 import { useNavigate } from 'react-router-dom'
 
-import AuthedImage from '../components/AuthedImage'
-import AppModal from '../components/AppModal'
-import { SelectLocation } from '../components/fields'
-import { useRequest } from '../hooks/useRequest'
-import { useSubmit } from '../hooks/useSubmit'
+import AuthedImage from '../../components/AuthedImage'
+import AppModal from '../../components/AppModal'
+import { SelectLocation } from '../../components/fields'
+import { useRequest } from '../../hooks/useRequest'
+import { useSubmit } from '../../hooks/useSubmit'
 
-import { api, createLocation, errMsg, generateEquipmentIssue, hasPerm, inspectPurchase, listEquipment, listLocations, listProjects, manualInbound, searchItems, storeReceipt, type GoodsReceiptRow, type ItemLite, type LocationRow } from '../api/client'
-import { WH_ISSUE_STATUS as ISSUE_COLOR } from '../theme/status'
-import { T } from '../theme/tokens'
+import {api, createLocation, errMsg, generateEquipmentIssue, hasPerm, inspectPurchase, listEquipment, listLocations, listProjects, manualInbound, searchItems, storeReceipt, type ItemLite, type LocationRow} from '../../api/client'
+import { WH_ISSUE_STATUS as ISSUE_COLOR } from '../../theme/status'
+import { T } from '../../theme/tokens'
 
-/** 在路上 / 部分到货：货到了就在这行上验收 */
-interface IncomingRow {
-  id: number
-  project_no: string | null
-  attribution?: string | null
-  project_name?: string | null
-  equip_no?: string | null
-  equip_name?: string | null
-  item_no: string
-  display_name: string
-  spec_text?: string | null
-  qty: number
-  qty_received: number
-  unit?: string | null
-  po_no?: string | null
-  supplier_name?: string | null
-  need_date?: string | null
-  expected_date?: string | null
-  overdue: boolean
-}
 
-/** 验收合格、等入库 */
-type StorageRow = GoodsReceiptRow
 
-interface Workbench {
-  incoming: IncomingRow[]
-  pending_storage: StorageRow[]
-  pending_issues: IssueRow[]
-  stock: { item_kinds: number; out_of_stock: number }
-}
-interface StockRow {
-  id: number; item_no: string; display_name: string; spec_text?: string | null; unit?: string | null
-  location_name?: string | null; qty_on_hand: number; qty_locked: number; qty_available: number
-}
-interface IssueRow {
-  id: number; issue_no: string; project_no: string; equip_no?: string | null; status: string
-  line_count: number; shortage_count: number; issued_to?: string | null
-  lines: { id: number; item_no: string; display_name: string; qty_required: number; qty_issued: number; unit?: string | null; location_name?: string | null; shortage: boolean; for_part?: string | null }[]
-}
-interface MoveRow {
-  id: number; item_no: string; display_name: string; move_type: string; qty: number
-  from_location?: string | null; to_location?: string | null; ref_no?: string | null; remark?: string | null
-}
 
 /**
  * 仓库只有两个动作：
@@ -85,7 +46,6 @@ interface MoveRow {
 export default function Warehouse() {
   const { message } = App.useApp()
   const nav = useNavigate()
-  const [wb, setWb] = useState<Workbench | null>(null)
   const canStore = hasPerm('warehouse:edit')
   // 生成领料单（按设备）
   const [genProject, setGenProject] = useState<string | undefined>()
@@ -105,10 +65,6 @@ export default function Warehouse() {
   const [locForm] = Form.useForm()
   const itemSearchTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [tab, setTab] = useState('todo')
-  const [stock, setStock] = useState<StockRow[]>([])
-  const [issueCount, setIssueCount] = useState(0)
-  const [moves, setMoves] = useState<MoveRow[]>([])
-  const [loading, setLoading] = useState(false)
   const [acceptOpen, setAcceptOpen] = useState(false)
   const [acceptTarget, setAcceptTarget] = useState<IncomingRow | null>(null)
   const [storeOpen, setStoreOpen] = useState(false)
@@ -118,20 +74,8 @@ export default function Warehouse() {
   const [storeForm] = Form.useForm()
   const acceptResult = Form.useWatch('result', acceptForm)
 
-  const load = useCallback(async () => {
-    setLoading(true)
-    try {
-      const [a, b, c, d] = await Promise.all([
-        api.get<Workbench>('/warehouse/workbench').then((r) => r.data),
-        api.get<StockRow[]>('/warehouse/stock').then((r) => r.data),
-        api.get<IssueRow[]>('/warehouse/issues').then((r) => r.data),
-        api.get<MoveRow[]>('/warehouse/moves?limit=50').then((r) => r.data),
-      ])
-      setWb(a); setStock(b); setIssueCount(c.length); setMoves(d)
-    } catch (e) { message.error(errMsg(e)) } finally { setLoading(false) }
-  }, [message])
-
-  useEffect(() => { void load() }, [load])
+  // 重构 2.0：数据与刷新走共享 hook（与移动端同源，计数必然一致）
+  const { wb, stock, moves, issueCount, loading, reload: load } = useWarehouseBoard({ full: true })
 
   // 生成领料单用：项目列表
   useEffect(() => {
