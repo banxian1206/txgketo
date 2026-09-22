@@ -164,7 +164,8 @@ export default function ProjectDetailPage() {
 
   const doReceive = async () => {
     if (!receiveTarget || !projectNo) return
-    const v = await receiveForm.validateFields()
+    let v
+    try { v = await receiveForm.validateFields() } catch { return }
     setSaving(true)
     try {
       const r = await registerPayment(projectNo, receiveTarget.seq, {
@@ -305,7 +306,8 @@ export default function ProjectDetailPage() {
   }
 
   const submitClose = async () => {
-    const v = await closeForm.validateFields()
+    let v
+    try { v = await closeForm.validateFields() } catch { return }
     setSaving(true)
     try {
       await closeProject(projectNo, v)
@@ -337,7 +339,8 @@ export default function ProjectDetailPage() {
   }
 
   const submitContact = async () => {
-    const v = await contactForm.validateFields()
+    let v
+    try { v = await contactForm.validateFields() } catch { return }
     setSaving(true)
     try {
       if (editingContact) await updateContact(projectNo, editingContact.id, v)

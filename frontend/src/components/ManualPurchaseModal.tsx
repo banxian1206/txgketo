@@ -47,7 +47,8 @@ export default function ManualPurchaseModal({ open, onClose, onDone }: Props) {
   }
 
   const submit = async () => {
-    const v = await form.validateFields()
+    let v
+    try { v = await form.validateFields() } catch { return }
     setSaving(true)
     try {
       const r = await createManualPurchaseRequest({

@@ -147,7 +147,8 @@ export default function Manufacturing() {
 
   const submitAction = async () => {
     if (!action) return
-    const v = await form.validateFields()
+    let v
+    try { v = await form.validateFields() } catch { return }
     if (photos.length === 0) {
       message.warning('这一动作要拍照留痕')
       return

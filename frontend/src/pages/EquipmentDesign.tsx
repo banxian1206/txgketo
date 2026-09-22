@@ -160,7 +160,8 @@ export default function EquipmentDesign({ projectNo: p0, equipNo: e0, embedded }
   }
 
   const doAdd = async () => {
-    const v = await addForm.validateFields()
+    let v
+    try { v = await addForm.validateFields() } catch { return }
     // 哨兵值 __ROOT__ = 挂在设备总装下（不传父级，后端自动创建总装图）
     const parentRef = v.parent_drawing_no === '__ROOT__' ? undefined : v.parent_drawing_no
     if (v.kind === '标准件' && !parentRef) {
@@ -196,7 +197,8 @@ export default function EquipmentDesign({ projectNo: p0, equipNo: e0, embedded }
   }
 
   const doAddMaterial = async () => {
-    const v = await matForm.validateFields()
+    let v
+    try { v = await matForm.validateFields() } catch { return }
     setSaving(true)
     try {
       await addBom(projectNo, 'material', {
@@ -259,7 +261,8 @@ export default function EquipmentDesign({ projectNo: p0, equipNo: e0, embedded }
   }
 
   const doCreateProgram = async () => {
-    const v = await progForm.validateFields()
+    let v
+    try { v = await progForm.validateFields() } catch { return }
     setSaving(true)
     try {
       await createProgram(projectNo, equipNo, { name: v.name, remark: v.remark })
@@ -275,7 +278,8 @@ export default function EquipmentDesign({ projectNo: p0, equipNo: e0, embedded }
 
   const doUploadProgram = async () => {
     if (!progUploadTarget) return
-    const v = await progUploadForm.validateFields()
+    let v
+    try { v = await progUploadForm.validateFields() } catch { return }
     const file = progUploadForm.getFieldValue('file')?.[0]?.originFileObj as File | undefined
     setSaving(true)
     try {

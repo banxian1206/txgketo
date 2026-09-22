@@ -115,7 +115,8 @@ export default function Assembly() {
 
   const doStart = async () => {
     if (!startTarget || !projectNo) return
-    const v = await form.validateFields()
+    let v
+    try { v = await form.validateFields() } catch { return }
     setSaving(true)
     try {
       await startAssembly({
@@ -153,7 +154,8 @@ export default function Assembly() {
 
   const doDebug = async () => {
     if (!debugTarget) return
-    const v = await form.validateFields()
+    let v
+    try { v = await form.validateFields() } catch { return }
     setSaving(true)
     try {
       await debugAssembly(debugTarget.id, { result: v.result, note: v.note, photos })

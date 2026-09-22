@@ -49,7 +49,8 @@ export default function ServiceM() {
 
   const submit = async () => {
     if (!modal) return
-    const v = await form.validateFields()
+    let v
+    try { v = await form.validateFields() } catch { return }
     setSaving(true)
     try {
       if (modal.kind === 'create') {

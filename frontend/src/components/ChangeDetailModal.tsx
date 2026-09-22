@@ -100,7 +100,8 @@ export default function ChangeDetailModal({ crId, open, onClose, onChanged }: Pr
 
   const doRevise = async () => {
     if (!cr) return
-    const v = await reviseForm.validateFields()
+    let v
+    try { v = await reviseForm.validateFields() } catch { return }
     await act(
       () => reviseChangeBom(cr.id, { qty: v.qty, pos_no: v.pos_no ?? null, remark: v.remark ?? null }),
       '已生成替代草稿行 —— 到设计面「我的提交」里勾选提交评审',

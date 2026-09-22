@@ -267,7 +267,8 @@ addForm: FormInstance;
         width={560}
         onCancel={() => setSubmitOpen(false)}
         onOk={async () => {
-          const v = await submitForm.validateFields()
+          let v
+          try { v = await submitForm.validateFields() } catch { return }
           const file = submitForm.getFieldValue('file')?.[0]?.originFileObj as File | undefined
           setSaving(true)
           try {

@@ -183,7 +183,8 @@ export function EquipmentEditor({ projectNo, onChanged }: Omit<Props, 'users'>) 
   }
 
   const submit = async () => {
-    const v = await form.validateFields()
+    let v
+    try { v = await form.validateFields() } catch { return }
     setSaving(true)
     try {
       const created = await addEquipment(projectNo, { ...v, same_as: sameAs })
@@ -367,7 +368,8 @@ export function MilestoneEditor({ projectNo, users, onChanged }: Props) {
   const [addForm] = Form.useForm()
 
   const submitAdd = async () => {
-    const v = await addForm.validateFields()
+    let v
+    try { v = await addForm.validateFields() } catch { return }
     setAddSaving(true)
     try {
       await addMilestone(projectNo, {
@@ -592,7 +594,8 @@ export function LongLeadEditor({ projectNo, onChanged }: Omit<Props, 'users'>) {
   }
 
   const submit = async () => {
-    const v = await form.validateFields()
+    let v
+    try { v = await form.validateFields() } catch { return }
     const body = {
       ...v,
       need_date: v.need_date ? v.need_date.format('YYYY-MM-DD') : null,

@@ -97,7 +97,8 @@ export default function Warehouse() {
   }
 
   const doInbound = async () => {
-    const v = await inboundForm.validateFields()
+    let v
+    try { v = await inboundForm.validateFields() } catch { return }
     setSaving(true)
     try {
       await manualInbound({
@@ -120,7 +121,8 @@ export default function Warehouse() {
   }
 
   const doCreateLocation = async () => {
-    const v = await locForm.validateFields()
+    let v
+    try { v = await locForm.validateFields() } catch { return }
     setSaving(true)
     try {
       await createLocation(v)

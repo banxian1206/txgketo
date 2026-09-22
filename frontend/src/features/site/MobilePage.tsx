@@ -65,7 +65,8 @@ export default function SiteM() {
 
   const submit = async () => {
     if (!modal || !projectNo) return
-    const v = await form.validateFields()
+    let v
+    try { v = await form.validateFields() } catch { return }
     setSaving(true)
     try {
       if (modal.kind === 'survey') {

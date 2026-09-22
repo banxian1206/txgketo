@@ -70,7 +70,8 @@ export default function AcceptancePage() {
   }, [load])
 
   const doApply = async () => {
-    const v = await form.validateFields()
+    let v
+    try { v = await form.validateFields() } catch { return }
     setSaving(true)
     try {
       await applyAcceptance({ project_no: v.project_no, remark: v.remark })
@@ -86,7 +87,8 @@ export default function AcceptancePage() {
 
   const doConfirm = async () => {
     if (!confirmTarget) return
-    const v = await form.validateFields()
+    let v
+    try { v = await form.validateFields() } catch { return }
     setSaving(true)
     try {
       const r = await confirmAcceptance(confirmTarget.id, {

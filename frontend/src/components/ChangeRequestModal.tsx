@@ -31,7 +31,8 @@ export default function ChangeRequestModal({
 
   const submit = async () => {
     if (!targetType || !targetRef) return
-    const v = await form.validateFields()
+    let v
+    try { v = await form.validateFields() } catch { return }
     setSaving(true)
     try {
       const cr = await createChangeRequest({

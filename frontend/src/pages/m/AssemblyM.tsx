@@ -78,7 +78,8 @@ export default function AssemblyM() {
 
   const doStart = async () => {
     if (!startTarget || !projectNo) return
-    const v = await form.validateFields()
+    let v
+    try { v = await form.validateFields() } catch { return }
     setSaving(true)
     try {
       await startAssembly({ project_no: projectNo, equip_no: startTarget.equip_no, sub_assembly: v.sub_assembly, photos, remark: v.remark })
@@ -95,7 +96,8 @@ export default function AssemblyM() {
 
   const doDebug = async () => {
     if (!debugTarget) return
-    const v = await form.validateFields()
+    let v
+    try { v = await form.validateFields() } catch { return }
     setSaving(true)
     try {
       await debugAssembly(debugTarget.id, { result: v.result, note: v.note, photos })

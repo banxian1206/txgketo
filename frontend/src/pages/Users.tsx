@@ -271,7 +271,8 @@ export default function Users() {
   }
 
   const saveUser = async () => {
-    const v = await userForm.validateFields()
+    let v
+    try { v = await userForm.validateFields() } catch { return }
     setSaving(true)
     try {
       if (editUser) {
@@ -329,7 +330,8 @@ export default function Users() {
   }
 
   const saveOrg = async () => {
-    const v = await orgForm.validateFields()
+    let v
+    try { v = await orgForm.validateFields() } catch { return }
     setSaving(true)
     try {
       if (orgEditing) {

@@ -106,7 +106,8 @@ export default function Library() {
   }
 
   const submit = async () => {
-    const v = await form.validateFields()
+    let v
+    try { v = await form.validateFields() } catch { return }
     const template = activeClass?.spec_template ?? []
     const spec: Record<string, unknown> = {}
     let brand: string | undefined

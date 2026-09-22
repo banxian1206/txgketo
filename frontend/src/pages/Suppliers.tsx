@@ -84,7 +84,8 @@ export default function Suppliers() {
   }
 
   const submit = async () => {
-    const v = await form.validateFields()
+    let v
+    try { v = await form.validateFields() } catch { return }
     setSaving(true)
     try {
       if (editing) await updateSupplier(editing.id, v)
@@ -121,7 +122,8 @@ export default function Suppliers() {
 
   const submitQuote = async () => {
     if (!quoteFor) return
-    const v = await quoteForm.validateFields()
+    let v
+    try { v = await quoteForm.validateFields() } catch { return }
     setSaving(true)
     try {
       await addSupplierQuote(quoteFor.id, {
@@ -308,7 +310,8 @@ export default function Suppliers() {
               loading={saving}
               onClick={async () => {
                 if (!quoteFor) return
-                const v = await catForm.validateFields()
+                let v
+                try { v = await catForm.validateFields() } catch { return }
                 setSaving(true)
                 try {
                   await addSupplierCatalog(quoteFor.id, v)

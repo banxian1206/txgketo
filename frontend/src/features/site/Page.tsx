@@ -56,7 +56,8 @@ export default function Site() {
   const { projectNo, setProjectNo, projects, wb, incoming, reload: load } = useSiteBoard()
   const doIncoming = async () => {
     if (!target) return
-    const v = await form.validateFields()
+    let v
+    try { v = await form.validateFields() } catch { return }
     if (!photos.length) {
       message.warning('到货清点要拍照')
       return

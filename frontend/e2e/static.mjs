@@ -85,5 +85,10 @@ const strayParse = grepAll(/JSON\.parse\(localStorage/)
 check('AUTH-无散读', strayParse.length === 0,
   strayParse.length ? `JSON.parse(localStorage 散读: ${strayParse.slice(0, 4).join(', ')}` : '无散读（仅迁移器合法）');
 
+// 2.2：表单提交 reject 不许逃逸（P-09 类 pageerror 根治）——新代码禁写裸 validateFields
+const bareValidate = grepAll(/const \w+ = await \w+\.validateFields\(\)/);
+check('SUBMIT-无裸validate', bareValidate.length === 0,
+  bareValidate.length ? `裸 await validateFields 又出现: ${bareValidate.slice(0, 4).join(', ')}` : '0（一律 let+try/catch 或 useSubmit）');
+
 const fails = summary('静态回归');
 exitWith(fails);

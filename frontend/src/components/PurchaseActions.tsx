@@ -38,7 +38,8 @@ export default function PurchaseActions({
   const [orderDeliverTo, setOrderDeliverTo] = useState('公司仓库')
 
   const submitOrder = async () => {
-    const v = await orderForm.validateFields()
+    let v
+    try { v = await orderForm.validateFields() } catch { return }
     setSaving(true)
     try {
       await orderPurchase(row.project_no, row.id, {
