@@ -585,6 +585,7 @@ def workbench(session: Session = Depends(get_session), _: User = Depends(get_cur
             {
                 "id": r.id,
                 "project_no": r.project_no,
+                "attribution": r.attribution,
                 "project_name": projects.get(r.project_no),
                 "equip_no": r.equip_no,
                 "equip_name": equips.get((r.project_no, r.equip_no)),
@@ -610,6 +611,7 @@ def workbench(session: Session = Depends(get_session), _: User = Depends(get_cur
                 "id": g.id,
                 "receipt_no": g.receipt_no,
                 "project_no": g.project_no,
+                "attribution": reqs[g.request_id].attribution if g.request_id in reqs else None,
                 "project_name": projects.get(g.project_no),
                 "request_id": g.request_id,
                 "po_no": reqs[g.request_id].po_no if g.request_id in reqs else None,

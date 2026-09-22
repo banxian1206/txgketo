@@ -96,7 +96,7 @@ export default function AcceptM() {
   }
 
   const doInspect = async () => {
-    if (!data || !data.project_no) return
+    if (!data) return
     setSaving(true)
     try {
       const res = await inspectPurchase(data.project_no, data.id, {
@@ -173,7 +173,7 @@ export default function AcceptM() {
             供应商 {data.supplier_name ?? '—'} · 采购单 {data.po_no ?? '—'}
           </span>
           <span>
-            {data.project_no} {data.equip_no ?? ''} · 需要到货 {data.need_date ?? '—'} · 预计{' '}
+            {data.project_no ?? '（辅料 / 办公）'} {data.equip_no ?? ''} · 需要到货 {data.need_date ?? '—'} · 预计{' '}
             {data.expected_date ?? '—'}
           </span>
         </Space>

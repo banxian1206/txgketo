@@ -211,18 +211,24 @@ export default function EquipmentDesign({ projectNo: p0, equipNo: e0, embedded }
 
   const doAdd = async () => {
     const v = await addForm.validateFields()
+    // 哨兵值 __ROOT__ = 挂在设备总装下（不传父级，后端自动创建总装图）
+    const parentRef = v.parent_drawing_no === '__ROOT__' ? undefined : v.parent_drawing_no
+    if (v.kind === '标准件' && !parentRef) {
+      message.warning('标准件要挂在某张图纸下，请先新增一张自制件图纸')
+      return
+    }
     setSaving(true)
     try {
       if (v.kind === '标准件') {
         await addBom(projectNo, 'std', {
-          parent_ref: v.parent_drawing_no,
+          parent_ref: parentRef,
           child_item_no: v.child_item_no,
           qty: v.qty ?? 1,
         })
         message.success('标准件已挂上（从标准库引用，不出图）')
       } else {
         const d = await addDrawing(projectNo, equipNo, {
-          parent_drawing_no: v.parent_drawing_no,
+          parent_drawing_no: parentRef,
           title: v.title,
           qty: v.qty ?? 1,
           unit: v.unit ?? '件',
@@ -386,10 +392,9 @@ export default function EquipmentDesign({ projectNo: p0, equipNo: e0, embedded }
     ...(root
       ? [
           {
-            value: root.drawing_no,
-            label: `📦 ${root.equip_no} ${root.title}（${root.drawing_no}）${
-              root.exists ? '' : ' · 还没建，新增后自动创建'
-            }`,
+            // ★ 总装图还没建时用哨兵值：提交时不传父级，后端会自动创建总装图（P-01）
+            value: root.exists ? root.drawing_no : '__ROOT__',
+            label: `📦 ${root.equip_no} ${root.title}（${root.exists ? root.drawing_no : '新增后自动创建'}）`,
           },
         ]
       : []),
@@ -575,7 +580,7 @@ export default function EquipmentDesign({ projectNo: p0, equipNo: e0, embedded }
                 addForm.resetFields()
                 void searchItems()
                 addForm.setFieldsValue({
-                  parent_drawing_no: root?.drawing_no,
+                  parent_drawing_no: root ? (root.exists ? root.drawing_no : '__ROOT__') : undefined,
                   kind: '自制件',
                   qty: 1,
                   unit: '件',
@@ -714,7 +719,8 @@ export default function EquipmentDesign({ projectNo: p0, equipNo: e0, embedded }
                   <a
                     onClick={() => {
                       setSelected(r)
-                      addForm.setFieldsValue({ parent_drawing_no: r.drawing_no })
+                      addForm.resetFields()
+                      addForm.setFieldsValue({ parent_drawing_no: r.drawing_no, kind: '自制件', qty: 1, unit: '件' })
                       setAddOpen(true)
                     }}
                   >
@@ -1119,7 +1125,7 @@ export default function EquipmentDesign({ projectNo: p0, equipNo: e0, embedded }
         onOk={() => void doAdd()}
         confirmLoading={saving}
         okText="新增"
-        destroyOnClose
+        forceRender
       >
         <Form form={addForm} layout="vertical" preserve={false}>
           <Form.Item

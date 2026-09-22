@@ -1055,19 +1055,18 @@ class AcceptanceIn(BaseModel):
     note: str | None = Field(default=None, description="不合格时说明原因")
 
 
-@router.post("/purchase-requests/{request_id}/inspect")
-def inspect_purchase_request(
-    project_no: str,
-    request_id: int,
+def _perform_inspect(
+    session: Session,
+    row: PurchaseRequest,
     body: AcceptanceIn,
+    current: User,
     request: Request,
-    session: Session = Depends(get_session),
-    current: User = Depends(require_permission("warehouse:edit")),
-):
-    """仓库验收（分批可多次）：合格 → 待入库；不合格 → 采购「验收不合格」里协商。"""
-    row = session.get(PurchaseRequest, request_id)
-    if row is None or row.project_no != project_no:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "采购需求不存在")
+) -> dict:
+    """仓库验收核心（分批可多次）：合格 → 待入库；不合格 → 采购「验收不合格」里协商。
+
+    项目号取 `row.project_no`（可为空：辅料 / 办公用品 / 其他类采购，P-02）。
+    """
+    project_no = row.project_no
     if body.result not in ("合格", "不合格"):
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "验收结果只能是 合格 / 不合格")
     if body.result == "不合格" and not (body.note or "").strip():
@@ -1206,6 +1205,37 @@ def inspect_purchase_request(
     }
 
 
+@router.post("/purchase-requests/{request_id}/inspect")
+def inspect_purchase_request(
+    project_no: str,
+    request_id: int,
+    body: AcceptanceIn,
+    request: Request,
+    session: Session = Depends(get_session),
+    current: User = Depends(require_permission("warehouse:edit")),
+):
+    """仓库验收（项目内）：路径带项目号。"""
+    row = session.get(PurchaseRequest, request_id)
+    if row is None or row.project_no != project_no:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "采购需求不存在")
+    return _perform_inspect(session, row, body, current, request)
+
+
+@purchase_router.post("/purchase-requests/{request_id}/inspect")
+def inspect_purchase_request_any(
+    request_id: int,
+    body: AcceptanceIn,
+    request: Request,
+    session: Session = Depends(get_session),
+    current: User = Depends(require_permission("warehouse:edit")),
+):
+    """仓库验收（不依赖项目号）：辅料 / 办公用品 / 其他类采购用它（P-02）。"""
+    row = session.get(PurchaseRequest, request_id)
+    if row is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "采购需求不存在")
+    return _perform_inspect(session, row, body, current, request)
+
+
 class StoreIn(BaseModel):
     location: str = Field(..., description="入库库位（如 深圳仓 A-01-01）—— 入库必须定库位")
     note: str | None = None
@@ -1326,7 +1356,7 @@ async def upload_receipt_photos(
     if gr is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "到货单不存在")
     photos = list(gr.photos or [])
-    folder = Path(settings.upload_dir) / gr.project_no / "receipts" / gr.receipt_no
+    folder = Path(settings.upload_dir) / (gr.project_no or "_GENERAL") / "receipts" / gr.receipt_no
     for f in files[:20]:
         stored, name = await save_upload(f, folder)
         photos.append(
@@ -1407,6 +1437,7 @@ def list_receipts(
             "id": g.id,
             "receipt_no": g.receipt_no,
             "project_no": g.project_no,
+            "attribution": reqs[g.request_id].attribution if g.request_id in reqs else None,
             "project_name": projects.get(g.project_no),
             # ★ 这货是哪张采购单、哪个设备的：仓库入库/以后发货都靠这个对单
             "request_id": g.request_id,

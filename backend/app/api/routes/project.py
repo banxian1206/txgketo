@@ -187,7 +187,9 @@ def list_projects(
 
 @router.get("/projects/{project_no}", response_model=ProjectOut)
 def get_project(
-    project_no: str, session: Session = Depends(get_session), _: User = Depends(get_current_user)
+    project_no: str,
+    session: Session = Depends(get_session),
+    current: User = Depends(get_current_user),
 ):
     row = session.get(Project, project_no)
     if row is None:
@@ -197,7 +199,14 @@ def get_project(
         select(func.count()).select_from(Attachment).where(Attachment.project_no == project_no)
     )
     user_names = {u.id: u.name for u in session.scalars(select(User)).all()}
-    return _out(row, customer.name if customer else None, count or 0, None, user_names)
+    out = _out(row, customer.name if customer else None, count or 0, None, user_names)
+    # ★ 金额分档（06 卷 F 步）：无 project:amount 的角色不得看到合同/预估/质保金（与列表接口一致）
+    if not has_permission(current, "project:amount"):
+        out.amount = None
+        out.est_amount = None
+        out.performance_deposit = None
+        out.warranty_amount = None
+    return out
 
 
 # ---------------------------------------------------------------------------

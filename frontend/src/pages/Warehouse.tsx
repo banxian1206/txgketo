@@ -31,7 +31,8 @@ const ISSUE_COLOR: Record<string, string> = { 待备料: 'gold', 已备料: 'pro
 /** 在路上 / 部分到货：货到了就在这行上验收 */
 interface IncomingRow {
   id: number
-  project_no: string
+  project_no: string | null
+  attribution?: string | null
   project_name?: string | null
   equip_no?: string | null
   equip_name?: string | null
@@ -386,7 +387,11 @@ export default function Warehouse() {
                       title: '项目 / 设备', key: 'belong', width: 190,
                       render: (_: unknown, r) => (
                         <>
-                          <a onClick={() => nav(`/projects/${r.project_no}`)}>{r.project_no}</a>
+                          {r.project_no ? (
+                            <a onClick={() => nav(`/projects/${r.project_no}`)}>{r.project_no}</a>
+                          ) : (
+                            <Tag>{r.attribution ?? '辅料'}</Tag>
+                          )}
                           <div style={{ fontSize: 12, color: '#8c8c8c' }}>
                             {r.equip_no ? `${r.equip_no} ${r.equip_name ?? ''}` : (r.project_name ?? '')}
                           </div>
@@ -436,7 +441,11 @@ export default function Warehouse() {
                       title: '项目 / 设备', key: 'belong', width: 190,
                       render: (_: unknown, r) => (
                         <>
-                          <a onClick={() => nav(`/projects/${r.project_no}`)}>{r.project_no}</a>
+                          {r.project_no ? (
+                            <a onClick={() => nav(`/projects/${r.project_no}`)}>{r.project_no}</a>
+                          ) : (
+                            <Tag>{r.attribution ?? '辅料'}</Tag>
+                          )}
                           <div style={{ fontSize: 12, color: '#8c8c8c' }}>
                             {r.equip_no ? `${r.equip_no} ${r.equip_name ?? ''}` : (r.project_name ?? '')}
                           </div>
@@ -680,7 +689,7 @@ export default function Warehouse() {
       >
         <Typography.Paragraph type="secondary" style={{ fontSize: 12, marginTop: 0 }}>
           采购单 {acceptTarget?.po_no ?? '未编号'} · {acceptTarget?.supplier_name ?? '—'} ·{' '}
-          归属 {acceptTarget?.project_no} {acceptTarget?.equip_no ? `· ${acceptTarget.equip_no} ${acceptTarget.equip_name ?? ''}` : ''}
+          归属 {acceptTarget?.project_no ?? acceptTarget?.attribution ?? '—'} {acceptTarget?.equip_no ? `· ${acceptTarget.equip_no} ${acceptTarget.equip_name ?? ''}` : ''}
           {acceptTarget ? `　（订购 ${acceptTarget.qty} ${acceptTarget.unit ?? ''}，已到 ${acceptTarget.qty_received}）` : ''}
         </Typography.Paragraph>
         <Form form={acceptForm} layout="vertical">

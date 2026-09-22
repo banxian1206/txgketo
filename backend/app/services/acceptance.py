@@ -55,6 +55,8 @@ def apply_acceptance(
     if existing is not None:
         raise AcceptanceError("这个项目已经在申请验收中")
     project = session.get(Project, project_no)
+    if project is None:
+        raise AcceptanceError(f"项目不存在：{project_no}")
     row = Acceptance(
         project_no=project_no,
         applied_by=actor_id,

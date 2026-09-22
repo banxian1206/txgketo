@@ -1578,7 +1578,8 @@ export async function orderPurchase(
 export interface GoodsReceiptRow {
   id: number
   receipt_no: string
-  project_no: string
+  project_no: string | null
+  attribution?: string | null
   project_name?: string | null
   request_id?: number | null
   po_no?: string | null
@@ -1614,17 +1615,21 @@ export async function listGoodsReceipts(params: { deliver_to?: string; status?: 
 
 /** 仓库验收（分批可多次）：合格 → 待入库；不合格 → 采购协商换货/退货 */
 export async function inspectPurchase(
-  projectNo: string,
+  projectNo: string | null | undefined,
   requestId: number,
   body: { receipt_date: string; qty: number; result: string; note?: string },
 ) {
+  // 辅料 / 办公用品 / 其他类采购没有项目号（P-02）→ 走不依赖项目号的验收接口
+  const url = projectNo
+    ? `/projects/${projectNo}/purchase-requests/${requestId}/inspect`
+    : `/purchase-requests/${requestId}/inspect`
   const { data } = await api.post<{
     receipt_id: number
     receipt_no: string
     receipt_status: string
     request_status: string
     qty_received: number
-  }>(`/projects/${projectNo}/purchase-requests/${requestId}/inspect`, body)
+  }>(url, body)
   return data
 }
 

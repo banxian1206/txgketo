@@ -194,7 +194,10 @@ class GoodsReceipt(Base, TimestampMixin):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     receipt_no: Mapped[str] = mapped_column(String(32))
-    project_no: Mapped[str] = mapped_column(ForeignKey("project.project_no", ondelete="CASCADE"))
+    # ★ 允许为空：辅料 / 办公用品 / 其他类采购没有项目（P-02）
+    project_no: Mapped[str | None] = mapped_column(
+        ForeignKey("project.project_no", ondelete="CASCADE")
+    )
     request_id: Mapped[int | None] = mapped_column(ForeignKey("purchase_request.id"))
     item_no: Mapped[str | None] = mapped_column(String(32))
     qty: Mapped[float | None] = mapped_column(Numeric(14, 3))
