@@ -1,6 +1,9 @@
 # 同兴高科项目管理系统 · 后端
 
-FastAPI + SQLAlchemy 2.0 + PostgreSQL 17。详细开发指令见 [`AGENTS.md`](./AGENTS.md)。
+FastAPI + SQLAlchemy 2.0 + PostgreSQL 17。
+
+- 开发规范与任务包：见 [`../AGENTS.md`](../AGENTS.md)（每次会话先读）
+- 业务 / 数据模型 / 接口设计：见 [`../docs/`](../docs/)
 
 ## 快速启动
 
@@ -24,6 +27,8 @@ cp .env.example .env
 # → http://127.0.0.1:8208/docs  （自动生成的接口文档）
 ```
 
+> 也可以直接用仓库根的 `./dev.sh` 一键起数据库 + 后端 + 前端。
+
 初始账号：**admin / admin12345**（上线前必须改）。
 
 ## 端口
@@ -33,10 +38,17 @@ cp .env.example .env
 | 后端 API | 8208 |
 | PostgreSQL | 35432（库 `txgk` / 测试库 `txgk_test`） |
 
+端口全景见 `../../PORTS.md`。
+
 ## 测试
 
 ```bash
-.venv/bin/python -m pytest -q     # 发号引擎纯逻辑测试（20 条，不需要数据库）
+.venv/bin/python -m pytest -q          # 单元测试（纯逻辑，不需要数据库）
+
+# 端到端脚本（都走真实 HTTP 接口，需先起后端）
+.venv/bin/python -m scripts.seed_s0_s1          # 清库 + 重建物料 + 只走 S0→S1
+.venv/bin/python -m scripts.e2e_full_test       # S0→S11 基础链路
+.venv/bin/python -m scripts.e2e_complex_test    # S0→S11 高复杂度场景
 ```
 
 ## 目录
@@ -44,33 +56,13 @@ cp .env.example .env
 ```
 app/
   core/       config.py  db.py  security.py
-  models/     base.py  platform.py  numbering.py  project.py
-  services/   numbering.py（发号引擎）  audit.py（操作日志）
-  api/        deps.py  schemas.py  routes/{health,auth,platform,project,numbering}.py
+  models/     12 个业务域（platform / project / purchasing / production / ...）
+  services/   领域服务（numbering 发号引擎、review_flow、change_flow、kitting、...）
+  api/        deps.py  schemas.py  routes/*.py
   main.py
-alembic/      迁移脚本
-scripts/      seed.py
-tests/        测试
+alembic/      数据库迁移（versions/）
+scripts/      初始化 seed + 端到端测试种子脚本
+tests/        pytest 单元测试
+
+../data/uploads/   运行时上传文件（仓库根 data/，已 gitignore，勿手动整理）
 ```
-
-## 已实现接口
-
-| 方法 | 路径 | 说明 |
-|---|---|---|
-| GET | `/api/v1/health` | 健康检查 |
-| POST | `/api/v1/auth/login` | 登录（返回 JWT） |
-| GET | `/api/v1/auth/me` | 当前用户 |
-| GET | `/api/v1/orgs` · `/api/v1/roles` · `/api/v1/users` | 组织 / 角色 / 用户 |
-| POST | `/api/v1/users` | 新建用户 |
-| GET | `/api/v1/projects/next-number` | 试算下一个项目号（不消耗序列） |
-| POST | `/api/v1/projects` | **新建商机**（自动发号 `TX{YY}{NNN}`） |
-| GET | `/api/v1/projects` · `/api/v1/projects/{no}` | 项目列表 / 详情 |
-| GET | `/api/v1/projects/{no}/detail` | **详情抽屉一次拉齐**：基本信息 + 联系人 + 资料包 + 付款节点 |
-| POST | `/api/v1/projects/{no}/attachments` | **上传资料**（分类：客户资料/方案/报价/合同/技术协议） |
-| GET | `/api/v1/projects/{no}/attachments` | 资料列表 |
-| GET | `/api/v1/projects/{no}/attachments/{id}/download` | 下载资料 |
-| GET | `/api/v1/projects/{no}/attachments/{id}/preview` | **在线预览**（图片/PDF/文本 inline，其他返回 octet-stream） |
-| GET | `/api/v1/audit-logs` | **操作记录**（可按 object_type / object_ref 过滤） |
-| GET | `/api/v1/numbering/rules` | 编号规则 |
-| GET | `/api/v1/numbering/drawing/parse` | 图号解析（含层级与父图号） |
-| GET | `/api/v1/numbering/drawing/compose` | 图号组装（4 组层次码） |

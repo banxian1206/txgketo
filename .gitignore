@@ -8,9 +8,8 @@ __pycache__/
 # 配置（含密钥，不入库）
 backend/.env
 
-# 上传文件
-backend/_files/
-_files/
+# 运行时数据（上传文件等）
+data/
 
 # Node
 node_modules/

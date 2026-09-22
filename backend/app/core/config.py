@@ -16,7 +16,7 @@ class Settings(BaseSettings):
     jwt_algorithm: str = "HS256"
     jwt_expire_minutes: int = 720
 
-    upload_dir: str = "./_files"
+    upload_dir: str = "../data/uploads"  # 相对后端工作目录（backend/），即仓库根 data/uploads
     cors_origins: str = "http://127.0.0.1:5207,http://localhost:5207"
 
     @property
