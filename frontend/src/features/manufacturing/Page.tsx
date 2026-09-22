@@ -1,4 +1,4 @@
-import { useMfgBoard } from '../hooks/useMfgBoard'
+import { useMfgBoard } from '../../hooks/useMfgBoard'
 import {
   App,
   Button,
@@ -43,13 +43,13 @@ import {
   transferProdOrder,
   type OutsourceRow,
   type ProdOrderRow,
-} from '../api/client'
-import MfgPhotoPicker from '../components/MfgPhotoPicker'
-import AuthedImage from '../components/AuthedImage'
-import AuthedFileLink from '../components/AuthedFileLink'
-import { PROD_STATUS as STATUS_COLOR } from '../theme/status'
-import { OUTSOURCE_STATUS as OS_COLOR } from '../theme/status'
-import { T } from '../theme/tokens'
+} from '../../api/client'
+import MfgPhotoPicker from '../../components/MfgPhotoPicker'
+import AuthedImage from '../../components/AuthedImage'
+import AuthedFileLink from '../../components/AuthedFileLink'
+import { PROD_STATUS as STATUS_COLOR } from '../../theme/status'
+import { OUTSOURCE_STATUS as OS_COLOR } from '../../theme/status'
+import { T } from '../../theme/tokens'
 
 const TEAMS = ['下料', '机加', '焊接', '钣金', '喷涂']
 

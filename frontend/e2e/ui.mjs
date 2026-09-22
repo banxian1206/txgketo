@@ -174,6 +174,10 @@ try {
   await om.locator('.ant-form-item').filter({ hasText: '收货地点' }).locator('.ant-select-selector').click();
   await page.waitForTimeout(400);
   await page.locator('.ant-select-dropdown:visible .ant-select-item').first().click();
+  // ★ 填单价（表格列内联编辑：数量=nth(0) 单价=nth(1)）：写链造的单必须有金额，
+  // 否则 0 价新单会把有价单挤出列表第一页，P-17「页面含 ¥」断言必挂（脆弱性设计教训）
+  const numInputs = om.locator('.ant-input-number-input');
+  if ((await numInputs.count()) >= 2) await numInputs.nth(1).fill('9.9');
   await om.getByRole('button', { name: /确\s*认\s*合\s*并\s*下\s*单/ }).click();
   await page.waitForTimeout(2200);
   const poNo = ((await body(page)).match(/PO\d{5}/g) || [])[0];

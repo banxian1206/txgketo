@@ -1,4 +1,4 @@
-import { useShipBoard } from '../hooks/useShipBoard'
+import { useShipBoard } from '../../hooks/useShipBoard'
 import {
   App,
   Button,
@@ -41,11 +41,11 @@ import {
   type ShipmentItemRow,
   type ShipmentRow,
   type ToShipRow,
-} from '../api/client'
-import AuthedImage from '../components/AuthedImage'
-import MfgPhotoPicker from '../components/MfgPhotoPicker'
-import { SHIP_STATUS as SHIP_COLOR } from '../theme/status'
-import { T } from '../theme/tokens'
+} from '../../api/client'
+import AuthedImage from '../../components/AuthedImage'
+import MfgPhotoPicker from '../../components/MfgPhotoPicker'
+import { SHIP_STATUS as SHIP_COLOR } from '../../theme/status'
+import { T } from '../../theme/tokens'
 
 export default function Shipping() {
   const { message } = App.useApp()

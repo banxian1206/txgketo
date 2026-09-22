@@ -31,7 +31,6 @@ function grepAll(pattern) {
   return hits;
 }
 
-const has = (file, re) => re.test(fs.readFileSync(path.join(SRC, file), 'utf8'));
 
 // P-12：原生 prompt 全站禁止（交互规范反模式清单）
 const prompts = grepAll(/window\.prompt/);
@@ -44,14 +43,17 @@ const aa = grepAll(/addonAfter/);
 check('P-16b', aa.length === 0, aa.length ? `addonAfter 残留 ${aa.length}: ${aa.slice(0,3).join(', ')}` : 'addonAfter = 0');
 
 // P-19：发运清单抽屉有骨架屏
-check('P-19', has('pages/Shipping.tsx', /Skeleton/), 'Shipping 含 Skeleton');
+// P-19：发运清单骨架屏（路径无关 grepAll —— 静态断言禁止硬编码文件路径，P-20 教训）
+const skel = grepAll(/Skeleton active/);
+check('P-19', skel.length >= 1, skel.length ? `骨架屏在（${skel[0]}）` : '找不到 Skeleton active');
 
 // P-20：生成领料单失败 → 卡片内常驻（genErr 为该功能专属 state，路径无关）
 const p20 = grepAll(/genErr/);
 check('P-20', p20.length >= 2, p20.length ? `genErr 常驻提示在（${p20.length} 处）` : '找不到 genErr 常驻实现');
 
 // P-14：手工申请物料搜索旁有「去标准库新建」出口
-check('P-14', has('components/ManualPurchaseModal.tsx', /去标准库新建/), '手工申请有标准库出口');
+const stdLink = grepAll(/去标准库新建/);
+check('P-14', stdLink.length >= 1, stdLink.length ? '手工申请有标准库出口' : '找不到去标准库新建出口');
 
 // 视觉规范 §8 结构性指标：当前基线防倒退（Phase 1.5 收敛后把基线改成目标值 1）
 const colorMaps = grepAll(/_COLOR\s*:\s*Record/);

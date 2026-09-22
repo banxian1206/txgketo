@@ -1,4 +1,4 @@
-import { useAsmBoard } from '../hooks/useAsmBoard'
+import { useAsmBoard } from '../../hooks/useAsmBoard'
 import {
   App,
   Card,
@@ -30,12 +30,12 @@ import {
   type AssemblyRecordRow,
   type KittingLine,
   type KittingResult,
-} from '../api/client'
-import AuthedImage from '../components/AuthedImage'
-import MfgPhotoPicker from '../components/MfgPhotoPicker'
-import { mfgPhotoUrl } from '../api/client'
-import { ASSEMBLY_STATUS as STATUS_COLOR } from '../theme/status'
-import { T } from '../theme/tokens'
+} from '../../api/client'
+import AuthedImage from '../../components/AuthedImage'
+import MfgPhotoPicker from '../../components/MfgPhotoPicker'
+import { mfgPhotoUrl } from '../../api/client'
+import { ASSEMBLY_STATUS as STATUS_COLOR } from '../../theme/status'
+import { T } from '../../theme/tokens'
 
 const rateColor = (r: number) => (r >= 1 ? T.success : r >= 0.6 ? T.brand : T.warning)
 

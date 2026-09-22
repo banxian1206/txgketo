@@ -1,4 +1,4 @@
-import { useSvcBoard } from '../hooks/useSvcBoard'
+import { useSvcBoard } from '../../hooks/useSvcBoard'
 import {
   App,
   Button,
@@ -35,11 +35,11 @@ import {
   uploadServicePhotos,
   type ServiceOrderRow,
   type SparePartRow,
-} from '../api/client'
-import MfgPhotoPicker from '../components/MfgPhotoPicker'
-import { SelectEquipment, SelectProject } from '../components/fields'
-import { SERVICE_ORDER_STATUS as SO_COLOR } from '../theme/status'
-import { T } from '../theme/tokens'
+} from '../../api/client'
+import MfgPhotoPicker from '../../components/MfgPhotoPicker'
+import { SelectEquipment, SelectProject } from '../../components/fields'
+import { SERVICE_ORDER_STATUS as SO_COLOR } from '../../theme/status'
+import { T } from '../../theme/tokens'
 
 type Kind = 'create' | 'dispatch' | 'fix' | 'sign' | 'part' | 'move'
 
