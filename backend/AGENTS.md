@@ -118,7 +118,7 @@ deploy/          docker-compose.dev.yml
   采购侧不登记到货/发货，状态被仓库推着变
 - **零件归属**：`purchase_request.part_no`（图号）——合并单里能看出「这 10 个方通分别给哪个零件的」
 - 常规件通道：设备设计面「生成采购需求（进池）」= **已冻结（发布过）的** BOM 展开 − 库存 − 在跑需求（幂等，重复点不会重复进池）；草稿/审核中的行不算数（05 卷 §4）
-- **发布 = 采购触发（05 卷 §5，P5）**：评审发布时按这一批冻结内容自动进池 —— 机械/电气发布→标准件/定制件；工艺发布→原材料/外协件；程序不采购。每条带 `source_release_id`（哪次发布冻结）；采购池显示来源/发布批次/归属/申请人；手工申请 `POST /purchase/manual-request` 免审核直入池（归属：项目/辅料/办公用品/其他）
+- **发布 = 采购触发（05 卷 §5，P5）**：评审发布时按这一批冻结内容自动进池 —— 机械/电气发布→标准件/定制件；工艺发布→原材料/外协件/定制件；程序不采购。每条带 `source_release_id`（哪次发布冻结）；采购池显示来源/发布批次/归属/申请人；手工申请 `POST /purchase/manual-request` 免审核直入池（归属：项目/辅料/办公用品/其他）
 - ★ **单据编号**：TK/GR/MI/RV/RL 模板不含项目号 → 一律**全局按年**取号（`scope_key=year_scope_key()`）；修正前按项目取号会跨项目撞号（迁移 `a7c1e3f50b26`）
 - 长周期件立项即下单：状态「在途」+ 自动发号（旧「已下单」中间态已归一，迁移 `e9c06543ffaa`）
 - 合并单 = 一张单（一个 `po_no`）+ 多行需求，**每行带项目/设备归属**；
@@ -155,7 +155,7 @@ deploy/          docker-compose.dev.yml
 | **入口补齐（领料 / 回款 / 日志 / 其他入库·库位 / 价格参考）** | ✅ | ① 仓库待办页「生成领料单（按设备）」（`generateEquipmentIssue`）；② `POST /projects/{p}/payment-terms/{seq}/receive` 登记回款（多次累加、超额拦截）+ 项目详情付款节点「登记回款」（`payment:edit`）；③「用户与权限」加「操作日志」页签（`GET /audit-logs`）；④ 库存页「其他入库」（`POST /warehouse/inbound`，退料回库/盘盈）；⑤ 仓库新增「库位」页签 + 新建库位（`GET/POST /warehouse/locations`）；⑥ 采购工作台「价格参考」页签（物料搜索 + 历史价 + 推荐供应商，需 `purchase:price`，后端同步收紧） |
 | **S5 制造（★只管两头）** | ✅ | 迁移 `g1b3d5f70c29`（`prod_order`/`prod_task`/`prod_acceptance`/`outsource_task`；编号 `PR{YY}{NNN}` 排产单 / `WX{YY}{NNN}` 外协单）；`services/manufacturing.py`（按设备**已发布图纸**展开：自制件→排产单、外协件→外协任务，幂等）；`routes/manufacturing.py`（生成/列表/工作台/下发/开工/验收/转运/外协发出·回厂·验收 + 拍照 `POST /manufacturing/photos` ✓鉴权取回）；`pages/Manufacturing.tsx`（PC）、`pages/m/ProductionM.tsx`（手机批量）、车间台 `GET /workbench/shop`；通知 MFG 角色 + 不合格通知项目团队/设计；**不做工序级报工/工时** |
 | **S6 装配与齐套率** | ✅ | 迁移 `h2c4e6a81d35`（`kitting_snapshot` / `assembly_record`）；`services/kitting.py`（自制件看排产是否已转运、外协看是否合格、采购/库存看是否到货入库 → **齐套率只展示**）；`routes/assembly.py`（齐套率/概览/装配开始·完成/厂内调试/装配台）；`pages/Assembly.tsx`（项目 → 各设备齐套率进度条 + 明细 + 装配记录/调试）；**项目详情新增「齐套率」卡**；车间台计数装配中/待调试；**不设 100% 门槛，随时可开装** |
-| **S7 发运（发货指令）** | ✅ | 迁移 `i3e5a7c92d48`（`shipment`/`shipment_line`/`packing_list`/`site_receipt`；编号 `FH{YY}{NNN}`）；`services/shipping.py`（待发设备=装配完成且不在未完成批次；**PM 勾选设备 → 指令 → 装箱（拆解与否不拆流程）→ 装车（拍照）→ 发运 → 到货 → 现场验收对账**）；`routes/shipping.py`（含 `ship:edit` 写、拍照上传/取回）；`pages/Shipping.tsx`（待发设备勾选 + 批次表 + 装箱/装车/发运/到货/验收弹窗 + 详情抽屉）；`services/photos.py` 抽象出共用拍照上传 |
+| **S7 发运（发货指令）** | ✅ | 迁移 `i3e5a7c92d48`（`shipment`/`shipment_line`/`site_receipt`；编号 `FH{YY}{NNN}`）→ **发运清单部分已按用户反馈重构为 `shipment_item`，见下一行** |
 | **手机端补齐（S5–S7）** | ✅ | 底部入口**按角色/权限显示**（`MobileLayout.tsx`：首页/仓库/领料/制造/装配/发运/我的）；新增 `/m/assembly`（齐套率 + 开始装配/装配完成/厂内调试，拍照）、`/m/shipping`（勾选设备下指令 + 装箱/装车/发运/到货/现场验收，拍照）；`/m/home` 待办加上制造/装配/发运计数；现场到货验收允许 `ship:edit` 或 `site:edit`；演示账号新增 `delivery1`/`site1`/`service1`/`assy1`/`qc1`（密码 `txgk@123`） |
 | **S8 现场安装** | ✅ | 迁移 `j4f6b8d03e59`（`site_survey`/`site_daily`/`site_issue`/`site_commission`/`site_incoming`）；`services/site.py`（勘测→定入场时间、每日汇报勾选+拍照/录像、现场问题→变更、申请调试→通知装配/项目、直发件现场清点）；`routes/site.py`（写 `site:edit` 或 `project:edit`，读登录）；**直发到货改为「现场待验收」（原来直接置“现场已验收”）**，现场清点后反推采购需求状态；`pages/m/SiteM.tsx`（现场主终端）、`pages/Site.tsx`（PC 现场台）；`/m/home` 加现场问题/待派调试计数 |
 | **S9 现场调试 / S10 客户验收与质保** | ✅ | 迁移 `k5a7c9e14f60`（`acceptance`/`acceptance_document`）；现场调试：`site_commission` 加「调试完成」+ 每日汇报 stage（单机调试/联调）；验收：`services/acceptance.py`（调试完成→申请验收→传资料包→客户签字确认→**自动进入质保期**：`warranty_start=验收日`、`warranty_end=+质保月数`、项目阶段→质保）+ 60 天到期提醒（含质保金）；`routes/acceptance.py`（申请/资料包上传·下载·签收/客户确认/验收台）；`pages/Acceptance.tsx`（PC）+ SiteM「客户验收」页签；发运 → 项目自动进入「交付中」阶段 |
@@ -163,7 +163,9 @@ deploy/          docker-compose.dev.yml
 | **全链路演示数据** | ✅ | `scripts/seed_demo_project.py`：用演示账号走**真实 API** 把 S0 商机 → 成交 → 立项 → 设计（评审/发布/进池）→ 采购（合并下单/验收/入库/直发）→ 领料 → 排产（合格转运/在制/返工）→ 外协 → 装配调试 → 发运（装箱/装车/到货/现场验收）→ 现场（勘测/日报/问题/申请调试）→ 客户验收（资料包/签字/**自动质保**）→ 售后工单/备件 → 回款，全部串起来；每次运行新建一个项目（不动已有数据）；跑法：`.venv/bin/python -m scripts.seed_demo_project` |
 | **分段重测（S0→S1）** | ✅ | `scripts/seed_s0_s1.py`：**清空业务数据**（保留账号/组织/角色/标准库类目，序列归零）→ 重建 8 条常用标准库物料 → 走 S0 商机/成交 + S1 立项（团队/设备/节点/长周期件/派任务）；跑法：`DATABASE_URL=... .venv/bin/python -m scripts.seed_s0_s1`；⚠ admin 密码是 `admin12345`，其余演示账号 `txgk@123` |
 | **S0→S11 端到端验收测试** | ✅ | `scripts/e2e_full_test.py`：模拟真实订单，全程 HTTP 接口（不查库、不改系统），每个动作后 GET 回读校验 + 权限抽查（3 项 403）+ 超额回款拦截；跑法：先复位业务数据再 `python -m scripts.e2e_full_test` |
-| **首轮 e2e 问题修复（4+1 项）** | ✅ | ① **总装图不再排产/计入齐套**（`manufacturing.generate_orders` / `kitting.compute` 跳过 `parent_drawing_no is None` 的总装图——它是装配对象不是加工件）；② **直发件需求状态「待现场验收」**（`_recalc_request_status` 全直发时不再误显「待入库」；REQUEST_STATUS/单据汇总/再下单拦截同步）；③ **标准节点生成即带默认计划起止**（按合同周期均分，无周期则按交期天数/120 天兑底）；④ **评审单总监通过后状态「已发布」**（原「已通过」；前端 Reviews/ReviewDetailModal/EquipmentDesign 状态色同步）；⑤ **齐套率口径：已领到车间的料算到位**（库存 + 本项目已领走 ≥ 需求，不再因领料出库误报缺料）；⑥ **商机归属**：`ProjectCreateIn.sales_id` 不填默认=创建人（此前 sales_id 一直为空，商机成交后从商务部台「消失」——商务无法全程跟进；商务部台本身即按 sales_id 展示全周期+待回款）；e2e 增加「部门可见性抽查」：商务/项目经理/工程/仓库/制造/装配/发运/现场/售后 九个角色都能看到该订单；⑧ **必填项治理（用户要求）**：创建商机必填 = 客户/项目名/销售负责人(必选)/项目描述/项目地点/商机截止/联系人≥1(姓名+电话)；成交登记必填 = 签订日/交期/合同金额/质保月数/付款节点≥1；后端 422 强校验 + 前端红色校验双保险（注意：schemas.py 曾出现同名字段重复定义、选填覆盖必填，已清理并用 AST 检查）；其余（项目方式/线索来源/节拍产能/预估金额/竞争对手/风险备注/履约保证金等）保持选填；**S1–S11 动作级必填同步收紧（后端 400/422 + 前端校验）**：下单必填供应商（id或名称）｜仓库验收不合格必填原因｜入库必填库位｜领走必填领料人｜制造不合格/返工必填原因｜发运现场验收缺件/破损必填明细｜勘测必填约定入场时间｜每日汇报必须带照片｜申请调试必填派谁去｜验收通过必填客户签字人｜售后报修必填故障描述｜评审退回必填说明（原有）|⑦ **部门台口径**：商务部台/项目经理台对 **总监/管理员看全部门**，普通角色看自己归属的（此前 admin/总监打开商务部台是空白，被用户当作「订单丢失」） |
+| **首轮 e2e 问题修复（4+1 项）** | ✅ | ① **总装图不再排产/计入齐套**（`manufacturing.generate_orders` / `kitting.compute` 跳过 `parent_drawing_no is None` 的总装图——它是装配对象不是加工件）；② **直发件需求状态「待现场验收」**（`_recalc_request_status` 全直发时不再误显「待入库」；REQUEST_STATUS/单据汇总/再下单拦截同步）；③ **标准节点生成即带默认计划起止**（按合同周期均分，无周期则按交期天数/120 天兑底）；④ **评审单总监通过后状态「已发布」**（原「已通过」；前端 Reviews/ReviewDetailModal/EquipmentDesign 状态色同步）；⑤ **齐套率口径：已领到车间的料算到位**（库存 + 本项目已领走 ≥ 需求，不再因领料出库误报缺料）；⑥ **商机归属**：创建商机**必选「销售负责人」**（`ProjectCreateIn.sales_id` 必填；此前该字段在 schema 里重复定义被选填覆盖，导致 sales_id 为空、商机成交后从商务部台「消失」——商务无法全程跟进；商务部台按 sales_id 展示全周期+待回款）；e2e 增加「部门可见性抽查」：商务/项目经理/工程/仓库/制造/装配/发运/现场/售后 九个角色都能看到该订单；⑧ **必填项治理（用户要求）**：创建商机必填 = 客户/项目名/销售负责人(必选)/项目描述/项目地点/商机截止/联系人≥1(姓名+电话)；成交登记必填 = 签订日/交期/合同金额/质保月数/付款节点≥1；后端 422 强校验 + 前端红色校验双保险（注意：schemas.py 曾出现同名字段重复定义、选填覆盖必填，已清理并用 AST 检查）；其余（项目方式/线索来源/节拍产能/预估金额/竞争对手/风险备注/履约保证金等）保持选填；**S1–S11 动作级必填同步收紧（后端 400/422 + 前端校验）**：下单必填供应商（id或名称）｜仓库验收不合格必填原因｜入库必填库位｜领走必填领料人｜制造不合格/返工必填原因｜发运现场验收缺件/破损必填明细｜勘测必填约定入场时间｜每日汇报必须带照片｜申请调试必填派谁去｜验收通过必填客户签字人｜售后报修必填故障描述｜评审退回必填说明（原有）|⑦ **部门台口径**：商务部台/项目经理台对 **总监/管理员看全部门**，普通角色看自己归属的（此前 admin/总监打开商务部台是空白，被用户当作「订单丢失」） |
+| **S7 发运 / S8 现场 重构（用户反馈）** | ✅ | 迁移 `m8d0f2b47a93`：`packing_list`（手填装箱）→ **`shipment_item` 发运清单**（按设备结构自动生成：组件→子组件→零件 + 标准件/原材料，数量按结构连乘）；**散件发运不装箱**，逐项勾「已发」+ 拍照（勾大组件=整棵子树），结构外补充项（说明书/备件/工具）手动加；现场**按同一份清单逐项清点**「到/缺/损」（漏项 400 拦下，缺/损必须写数量+原因，结论自动判定齐/缺件/破损并通知）；`site`/`shipping` 照片上传对 `ship:edit` 或 `site:edit` 开放；PC `Shipping.tsx` + 手机 `ShippingM.tsx` 同步 |
+| **工艺改判「定制件」自动进池** | ✅ | 缺口：工艺把自制件改判定制件后不进采购池（只有外协件进）。已修：`bom_demand.release_demand` ③ 对「外协件/定制件」同等待遇；`bom_demand.equipment_demand`（设备面手动补跑）也纳入定制件/外协件的图号物料 |
 | 供应商主数据 + 报价 + 能供品类 | ✅ | `models/purchasing.py`、`routes/suppliers.py` |
 | 推荐供应商（多路证据打分） | ✅ | `GET /purchase/recommend/{item_no}` |
 | 价格参考（上次成交/历史区间/各家报价） | ✅ | `GET /purchase/price-reference/{item_no}` |
@@ -264,11 +266,15 @@ GET  /api/v1/assembly/workbench                     装配台（计数 + 概览 
 GET  /api/v1/shipping/to-ship?project_no=            待发设备（装配完成且不在未完成批次）
 POST /api/v1/shipping/instructions                   下达发货指令 {project_no, equip_nos[]}
 GET  /api/v1/shipping/list | /workbench | /{id}      批次列表 / 发运台 / 详情
-POST /api/v1/shipping/{id}/pack                      装箱清单 {items[]}
+GET  /api/v1/shipping/{id}/items                     发运清单（按结构生成的行，含已发/拍照/清点结果）
+POST /api/v1/shipping/{id}/items/generate            按设备结构生成发运清单（组件→零件+标准件/原材料）
+POST /api/v1/shipping/{id}/items/manual              结构外补充项 {name, qty}
+POST /api/v1/shipping/items/ship                     逐项勾「已发」{item_ids[], photos[]}（勾组件=子树全勾）
+POST /api/v1/shipping/items/{item_id}/place          登记摆放位置照片
 POST /api/v1/shipping/{id}/load                      装车 {vehicle, driver, plate_no, photos}
 POST /api/v1/shipping/{id}/depart                    发运（在途）
 POST /api/v1/shipping/{id}/arrive                    登记到货
-POST /api/v1/shipping/{id}/receipt                   现场到货验收 {result: 齐/缺件/破损, shortage_detail[], photos}
+POST /api/v1/shipping/{id}/receipt                   现场逐项清点 {checks:[{item_id,result:到/缺/损,received_qty,reason}], photos}（漏项 400）
 POST/GET /api/v1/shipping/photos                     发运拍照上传 / 取回
 
 移动端（03 卷）—— 底部入口按角色显示；页面均走「清单 + 勾选 + 拍照」
