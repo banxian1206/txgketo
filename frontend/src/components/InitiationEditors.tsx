@@ -20,6 +20,8 @@ import { useNavigate } from 'react-router-dom'
 
 import {
   addEquipment,
+  addMilestone,
+  clearMilestones,
   errMsg,
   listEquipment,
   listMembers,
@@ -371,8 +373,68 @@ export function MilestoneEditor({ projectNo, users, onChanged }: Props) {
     }
   }
 
+  const [addOpen, setAddOpen] = useState(false)
+  const [addSaving, setAddSaving] = useState(false)
+  const [addForm] = Form.useForm()
+
+  const submitAdd = async () => {
+    const v = await addForm.validateFields()
+    setAddSaving(true)
+    try {
+      await addMilestone(projectNo, {
+        name: v.name,
+        plan_start: v.plan_start ? v.plan_start.format('YYYY-MM-DD') : null,
+        plan_end: v.plan_end ? v.plan_end.format('YYYY-MM-DD') : null,
+        owner_id: v.owner_id ?? null,
+        remark: v.remark ?? null,
+      })
+      message.success('已新增节点')
+      setAddOpen(false)
+      await load()
+      onChanged?.()
+    } catch (e) {
+      message.error(errMsg(e))
+    } finally {
+      setAddSaving(false)
+    }
+  }
+
+  const doClear = async () => {
+    try {
+      await clearMilestones(projectNo)
+      message.success('已清空节点计划')
+      await load()
+      onChanged?.()
+    } catch (e) {
+      message.error(errMsg(e))
+    }
+  }
+
   return (
-    <Table<MilestoneItem>
+    <>
+      <Space style={{ marginBottom: 8, width: '100%', justifyContent: 'space-between' }}>
+        <Space>
+          <Button
+            size="small"
+            type="primary"
+            onClick={() => {
+              addForm.resetFields()
+              setAddOpen(true)
+            }}
+          >
+            新增节点
+          </Button>
+          <Popconfirm title="清空全部节点计划？" onConfirm={() => void doClear()}>
+            <Button size="small" danger disabled={!rows.length}>
+              清空
+            </Button>
+          </Popconfirm>
+        </Space>
+        <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+          可手动增删；也可在项目详情「生成节点计划」按标准模板生成
+        </Typography.Text>
+      </Space>
+      <Table<MilestoneItem>
       rowKey="id"
       size="small"
       pagination={false}
@@ -460,7 +522,42 @@ export function MilestoneEditor({ projectNo, users, onChanged }: Props) {
           ),
         },
       ]}
-    />
+      />
+      <Modal
+        title="新增节点"
+        open={addOpen}
+        onCancel={() => setAddOpen(false)}
+        onOk={() => void submitAdd()}
+        confirmLoading={addSaving}
+        okText="新增"
+        destroyOnClose
+      >
+        <Form form={addForm} layout="vertical">
+          <Form.Item name="name" label="节点名称" rules={[{ required: true, message: '请填节点名称' }]}>
+            <Input placeholder="如：设计完成 / 到货 / 装配完成" />
+          </Form.Item>
+          <Space size="middle">
+            <Form.Item name="plan_start" label="计划开始">
+              <DatePicker />
+            </Form.Item>
+            <Form.Item name="plan_end" label="计划结束">
+              <DatePicker />
+            </Form.Item>
+          </Space>
+          <Form.Item name="owner_id" label="负责人">
+            <Select
+              allowClear
+              showSearch
+              optionFilterProp="label"
+              options={users.map((u) => ({ value: u.id, label: u.name }))}
+            />
+          </Form.Item>
+          <Form.Item name="remark" label="说明">
+            <Input />
+          </Form.Item>
+        </Form>
+      </Modal>
+    </>
   )
 }
 

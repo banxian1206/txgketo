@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
 import { api, errMsg, storeReceipt } from '../../api/client'
+import AuthedImage from '../../components/AuthedImage'
 
 interface Incoming {
   id: number
@@ -38,6 +39,7 @@ interface PendingStorage {
   qty: number
   unit?: string | null
   receipt_date?: string | null
+  photos?: { filename?: string | null; url: string }[]
 }
 
 interface PendingIssue {
@@ -155,6 +157,13 @@ export default function WarehouseM() {
                     <Typography.Text type="secondary" style={{ fontSize: 12 }}>
                       {g.project_no} {g.equip_no ?? ''} · 验收 {g.receipt_date ?? '—'}
                     </Typography.Text>
+                    {!!g.photos?.length && (
+                      <Space wrap size={4}>
+                        {g.photos.map((p, i) => (
+                          <AuthedImage key={i} path={p.url} size={44} />
+                        ))}
+                      </Space>
+                    )}
                     <Button type="primary" size="small" onClick={() => setStoreFor(g)}>
                       选库位入库
                     </Button>
