@@ -1,44 +1,56 @@
+import { lazy, Suspense } from 'react'
+
+import { Spin } from 'antd'
 import { Navigate, Route, Routes } from 'react-router-dom'
 
 import AppLayout from './layouts/AppLayout'
 import MobileLayout from './layouts/MobileLayout'
-import Changes from './features/change/Page'
+const Changes = lazy(() => import('./features/change/Page'))
 import Login from './features/auth/Page'
-import AcceptM from './features/acceptance/MobilePage'
-import HomeM from './features/home/MobilePage'
-import IssuesM from './features/warehouse/IssuesPage'
-import MeM from './features/home/MePage'
-import WarehouseM from './features/warehouse/MobilePage'
-import NumberRules from './features/admin/NumberRulesPage'
-import ProjectCreate from './features/project/CreatePage'
-import ProjectDetailPage from './features/project/DetailPage'
-import ProjectInitiate from './features/project/InitiatePage'
-import Library from './features/admin/LibraryPage'
-import EquipmentDesign from './features/design/Page'
-import MyTasks from './features/task/Page'
-import Projects from './features/project/Page'
-import PurchaseWorkbench from './features/purchase/Page'
-import Reviews from './features/review/Page'
-import Suppliers from './features/purchase/SuppliersPage'
-import Users from './features/admin/Page'
-import Warehouse from './features/warehouse/Page'
-import Manufacturing from './features/manufacturing/Page'
-import Assembly from './features/assembly/Page'
-import Shipping from './features/shipping/Page'
-import Site from './features/site/Page'
-import AcceptancePage from './features/acceptance/Page'
-import Service from './features/service/Page'
-import ProductionM from './features/manufacturing/MobilePage'
-import AssemblyM from './features/assembly/MobilePage'
-import ShippingM from './features/shipping/MobilePage'
-import SiteM from './features/site/MobilePage'
-import ServiceM from './features/service/MobilePage'
-import Workbench from './features/workbench/Page'
-import DeptWorkbench from './features/workbench/DeptWorkbench'
-import EngWorkbench from './features/workbench/EngWorkbench'
-import PmWorkbench from './features/workbench/PmWorkbench'
-import SalesWorkbench from './features/workbench/SalesWorkbench'
+const AcceptM = lazy(() => import('./features/acceptance/MobilePage'))
+const HomeM = lazy(() => import('./features/home/MobilePage'))
+const IssuesM = lazy(() => import('./features/warehouse/IssuesPage'))
+const MeM = lazy(() => import('./features/home/MePage'))
+const WarehouseM = lazy(() => import('./features/warehouse/MobilePage'))
+const NumberRules = lazy(() => import('./features/admin/NumberRulesPage'))
+const ProjectCreate = lazy(() => import('./features/project/CreatePage'))
+const ProjectDetailPage = lazy(() => import('./features/project/DetailPage'))
+const ProjectInitiate = lazy(() => import('./features/project/InitiatePage'))
+const Library = lazy(() => import('./features/admin/LibraryPage'))
+const EquipmentDesign = lazy(() => import('./features/design/Page'))
+const MyTasks = lazy(() => import('./features/task/Page'))
+const Projects = lazy(() => import('./features/project/Page'))
+const PurchaseWorkbench = lazy(() => import('./features/purchase/Page'))
+const Reviews = lazy(() => import('./features/review/Page'))
+const Suppliers = lazy(() => import('./features/purchase/SuppliersPage'))
+const Users = lazy(() => import('./features/admin/Page'))
+const Warehouse = lazy(() => import('./features/warehouse/Page'))
+const Manufacturing = lazy(() => import('./features/manufacturing/Page'))
+const Assembly = lazy(() => import('./features/assembly/Page'))
+const Shipping = lazy(() => import('./features/shipping/Page'))
+const Site = lazy(() => import('./features/site/Page'))
+const AcceptancePage = lazy(() => import('./features/acceptance/Page'))
+const Service = lazy(() => import('./features/service/Page'))
+const ProductionM = lazy(() => import('./features/manufacturing/MobilePage'))
+const AssemblyM = lazy(() => import('./features/assembly/MobilePage'))
+const ShippingM = lazy(() => import('./features/shipping/MobilePage'))
+const SiteM = lazy(() => import('./features/site/MobilePage'))
+const ServiceM = lazy(() => import('./features/service/MobilePage'))
+const Workbench = lazy(() => import('./features/workbench/Page'))
+const DeptWorkbench = lazy(() => import('./features/workbench/DeptWorkbench'))
+const EngWorkbench = lazy(() => import('./features/workbench/EngWorkbench'))
+const PmWorkbench = lazy(() => import('./features/workbench/PmWorkbench'))
+const SalesWorkbench = lazy(() => import('./features/workbench/SalesWorkbench'))
 import { useAuth } from './contexts/AuthContext'
+
+/** 路由懒加载占位（重构 3.1 · 按 feature 分包） */
+function RouteLoading() {
+  return (
+    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
+      <Spin />
+    </div>
+  )
+}
 
 function RequireAuth({ children }: { children: JSX.Element }) {
   const { token } = useAuth()
@@ -47,7 +59,8 @@ function RequireAuth({ children }: { children: JSX.Element }) {
 
 export default function App() {
   return (
-    <Routes>
+    <Suspense fallback={<RouteLoading />}>
+      <Routes>
       <Route path="/login" element={<Login />} />
       <Route
         path="/m"
@@ -105,5 +118,6 @@ export default function App() {
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
+    </Suspense>
   )
 }

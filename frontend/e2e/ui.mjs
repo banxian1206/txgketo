@@ -4,7 +4,7 @@
  *  Part 2 交互：P-09 · P-01 · P-03 · P-02 · P-11 · P-13 · P-05 · P-10 · P-04 · P-08 · P-18 · P-21 · P-22
  *  注意：本脚本会创建 1 个测试商机（E2E回归-*）并走完 建图/下单/验收，属护栏正常代价
  */
-import { newCtx, login, body, shot, check, summary, exitWith, results, BASE, FILES } from './lib.mjs';
+import { newCtx, login, body, shot, check, summary, exitWith, results, BASE, FILES, apiLogin, apiGet } from './lib.mjs';
 import path from 'node:path';
 
 const PHOTO = path.join(FILES, 'photo.png');
@@ -278,32 +278,37 @@ try {
     await page.keyboard.press('Escape');
   } else check('P-18', false, '无铃铛');
 
-  // —— P-08：有「发货中/已指令」批次则验软提示，否则 SKIP ——
+  // —— P-08：API 预查有批次的项目 → UI 精准选择（不遍历下拉：antd 虚拟滚动下 nth(i) 随数据规模失效）——
   await page.goto(BASE + '/shipping', { waitUntil: 'networkidle' });
   await page.waitForTimeout(900);
   let p08 = 'SKIP', p08note = '当前无待发运批次（新批次下次跑验证）';
-  const projSel = page.locator('.ant-select-selector').first();
-  await projSel.click(); await page.waitForTimeout(400);
-  const popts = page.locator('.ant-select-dropdown:visible .ant-select-item');
-  const pcount = await popts.count();
-  for (let i = 0; i < pcount; i++) {
-    await popts.nth(i).click(); await page.waitForTimeout(900);
-    const dep = page.locator('.ant-table-row').filter({ hasText: /已指令|发货中/ })
-      .first().locator('a', { hasText: /^发\s*运$/ });
-    if (await dep.count()) {
-      await dep.click(); await page.waitForTimeout(900);
-      const conf = page.locator('.ant-popconfirm:visible, .ant-modal:visible');
-      if (await conf.count()) {
-        const txt = (await conf.first().innerText()).replace(/\n/g, '|');
-        if (/未勾|清单|已发|还有/.test(txt)) { p08 = 'PASS'; p08note = '软提示: ' + txt.slice(0, 100); }
-        else { p08 = 'FAIL'; p08note = '有确认框但无清单提示: ' + txt.slice(0, 80); }
-        await page.keyboard.press('Escape');
-      }
-      break;
+  {
+    const tok = await apiLogin('admin', 'admin12345');
+    const all = await (await apiGet('/shipping/list', tok)).json();
+    const open = (Array.isArray(all) ? all : []).find((x) =>
+      ['已指令', '发货中', '已装车'].includes(x.status));
+    if (open && open.project_no) {
+      const projSel = page.locator('.ant-select-selector').first();
+      await projSel.click(); await page.waitForTimeout(400);
+      await page.keyboard.type(open.project_no); await page.waitForTimeout(700);
+      const opt = page.locator('.ant-select-dropdown:visible .ant-select-item').first();
+      if (await opt.count()) await opt.click();
+      await page.waitForTimeout(900);
+      const row = page.locator('.ant-table-row', { hasText: open.shipment_no }).first();
+      const dep = row.locator('a', { hasText: /^发\s*运$/ });
+      if (await dep.count()) {
+        await dep.click(); await page.waitForTimeout(900);
+        const conf = page.locator('.ant-popconfirm:visible, .ant-modal:visible');
+        if (await conf.count()) {
+          const txt = (await conf.first().innerText()).replace(/\n/g, '|');
+          if (/未勾|清单|已发|还有/.test(txt)) { p08 = 'PASS'; p08note = '软提示: ' + txt.slice(0, 100); }
+          else { p08 = 'FAIL'; p08note = '有确认框但无清单提示: ' + txt.slice(0, 80); }
+          await page.keyboard.press('Escape');
+        }
+      } else { p08note = `批次 ${open.shipment_no}(${open.status}) 行内无发运链接`; }
     }
-    await projSel.click(); await page.waitForTimeout(300);
   }
-  check('P-08', p08 === 'PASS', p08note, p08);
+    check('P-08', p08 === 'PASS', p08note, p08);
 
   // —— 1.3 Auth：伪装进入 → 横幅 → 退出查看（本步改造的功能面）——
   await page.goto(BASE + '/users', { waitUntil: 'networkidle' });
