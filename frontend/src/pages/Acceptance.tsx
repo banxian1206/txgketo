@@ -35,6 +35,7 @@ import {
   type AcceptanceWorkbench,
 } from '../api/client'
 import { acceptanceDocUrl } from '../api/client'
+import { readSession } from '../contexts/session'
 
 const DOC_TYPES = ['技术协议', '图纸清单', '检验报告', '调试记录', '操作手册', '备件清单', '培训记录', '验收单', '其他']
 const ACC_COLOR: Record<string, string> = { 待验收: 'gold', 已通过: 'success', 未通过: 'error' }
@@ -131,7 +132,8 @@ export default function AcceptancePage() {
   /** 直接下载（带鉴权）：fetch → blob 另存 */
   const openDoc = async (docId: number, filename: string) => {
     try {
-      const token = localStorage.getItem('txgk_token')
+      // 重构 1.3：token 从单一 session 读（原散读 'txgk_token'）
+      const token = readSession()?.token
       const res = await fetch(`${API}${acceptanceDocUrl(docId)}`, {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       })

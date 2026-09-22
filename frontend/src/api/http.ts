@@ -1,20 +1,15 @@
-// api/http.ts —— 基础设施：axios 实例 + 拦截器 + 常量（重构 1.1）
+// api/http.ts —— 基础设施：axios 实例 + 拦截器（重构 1.1/1.3）
+// 登录态唯一存储在 contexts/session.ts，这里只同步读（拦截器非组件场景）
 import axios from 'axios'
 
-export const TOKEN_KEY = 'txgk_token'
-// 管理员「以某人身份查看」（只读，06 卷 §4）
-
-export const IMPERSONATE_KEY = 'txgk_impersonate'
-
-export const IMPERSONATE_NAME_KEY = 'txgk_impersonate_name'
+import { clearSession, readSession } from '../contexts/session'
 
 export const api = axios.create({ baseURL: '/api/v1', timeout: 20000 })
 
 api.interceptors.request.use((config) => {
-  const token = localStorage.getItem(TOKEN_KEY)
-  if (token) config.headers.Authorization = `Bearer ${token}`
-  const imp = localStorage.getItem(IMPERSONATE_KEY)
-  if (imp) config.headers['X-Impersonate'] = imp
+  const s = readSession()
+  if (s?.token) config.headers.Authorization = `Bearer ${s.token}`
+  if (s?.impersonateId) config.headers['X-Impersonate'] = String(s.impersonateId)
   return config
 })
 
@@ -22,7 +17,7 @@ api.interceptors.response.use(
   (res) => res,
   (err) => {
     if (err.response?.status === 401) {
-      localStorage.removeItem(TOKEN_KEY)
+      clearSession()
       if (window.location.pathname !== '/login') window.location.href = '/login'
     }
     return Promise.reject(err)

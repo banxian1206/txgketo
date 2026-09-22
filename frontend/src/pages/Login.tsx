@@ -2,12 +2,14 @@ import { App, Button, Card, Form, Input, Typography } from 'antd'
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
-import { IMPERSONATE_KEY, IMPERSONATE_NAME_KEY, TOKEN_KEY, errMsg, login } from '../api/client'
+import { errMsg } from '../api/client'
+import { useAuth } from '../contexts/AuthContext'
 
 export default function Login() {
   const [loading, setLoading] = useState(false)
   const nav = useNavigate()
   const { message } = App.useApp()
+  const { login } = useAuth()
 
   return (
     <div
@@ -31,13 +33,8 @@ export default function Login() {
           onFinish={async (v) => {
             setLoading(true)
             try {
-              const data = await login(v.username, v.password)
-              localStorage.setItem(TOKEN_KEY, data.access_token)
-              localStorage.setItem('txgk_name', data.user.name)
-              localStorage.setItem('txgk_user', JSON.stringify(data.user))
-              // 新登录清掉“以他人身份查看”
-              localStorage.removeItem(IMPERSONATE_KEY)
-              localStorage.removeItem(IMPERSONATE_NAME_KEY)
+              // 重构 1.3：登录写入统一走 AuthContext（单一 session，新登录天然清伪装）
+              await login(v.username, v.password)
               // 手机（窄屏）默认进移动端；电脑进项目列表（03 卷：手机端是主要终端）
               const isPhone = window.matchMedia('(max-width: 820px)').matches
               nav(isPhone ? '/m' : '/workbench')

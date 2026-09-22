@@ -65,5 +65,15 @@ const EMOJI_BASELINE = 9;
 check('VIS-emoji图标', emoji.length <= EMOJI_BASELINE,
   emoji.length ? `残留 ${emoji.length}（基线 ${EMOJI_BASELINE}，均在 MobileLayout，Phase1.5 处理）` : 'icon 无 emoji = 0');
 
+// 1.3 Auth 收口：登录态 localStorage 只允许 contexts/session.ts 碰（grepAll 已跳过注释行）
+const strayStorage = grepAll(/localStorage\.(getItem|setItem|removeItem)\(['"]txgk_/)
+  .filter((h) => !h.includes('contexts/session.ts'));
+check('AUTH-单一存储', strayStorage.length === 0,
+  strayStorage.length ? `散点残留: ${strayStorage.slice(0, 4).join(', ')}` : '登录态读写只在 session.ts');
+const strayParse = grepAll(/JSON\.parse\(localStorage/)
+  .filter((h) => !h.includes('contexts/session.ts'));
+check('AUTH-无散读', strayParse.length === 0,
+  strayParse.length ? `JSON.parse(localStorage 散读: ${strayParse.slice(0, 4).join(', ')}` : '无散读（仅迁移器合法）');
+
 const fails = summary('静态回归');
 exitWith(fails);

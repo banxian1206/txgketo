@@ -1,4 +1,6 @@
 // api/user.ts —— 由 client.ts 按域拆分（重构 1.1），导出名不变
+import { readSession } from '../contexts/session'
+
 import { api } from './http'
 
 export interface User {
@@ -6,6 +8,8 @@ export interface User {
   username: string
   name: string
   is_superuser: boolean
+  /** 登录响应携带的权限码列表（hasPerm/usePerm 依据；此前接口未声明，靠 cast 绕过） */
+  permissions?: string[]
   profession?: string | null
   position?: string | null
   title?: string | null
@@ -68,18 +72,12 @@ export async function getMyScope() {
   return data
 }
 
-/** 前端权限判断（06 卷 §4）：读登录时存的 permissions */
-
+/** 前端权限判断（06 卷 §4）：读单一 session（重构 1.3，原散读 txgk_user）
+ * 组件渲染体里用；组件顶部更推荐 usePerm()（随 Context state 即时刷新） */
 export function hasPerm(code: string): boolean {
-  try {
-    const u = JSON.parse(localStorage.getItem('txgk_user') ?? '{}') as {
-      is_superuser?: boolean
-      permissions?: string[]
-    }
-    return u.is_superuser === true || (u.permissions ?? []).includes(code)
-  } catch {
-    return false
-  }
+  const u = readSession()?.user
+  if (!u) return false
+  return u.is_superuser === true || (u.permissions ?? []).includes(code)
 }
 
 /** 离职/停用一键转交（06 卷 §10） */

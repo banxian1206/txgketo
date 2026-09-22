@@ -3,7 +3,8 @@ import { useCallback, useEffect, useState } from 'react'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 
 import NotificationsDrawer from '../components/NotificationsDrawer'
-import { TOKEN_KEY, hasPerm, unreadNotificationCount } from '../api/client'
+import { useAuth } from '../contexts/AuthContext'
+import { hasPerm, unreadNotificationCount } from '../api/client'
 
 // 底部入口按角色/权限显示（03 卷）：仓库看仓库、车间看制造/装配、交付/现场看发运
 const ALL_TABS: { key: string; label: string; icon: string; show: () => boolean }[] = [
@@ -42,7 +43,9 @@ const ALL_TABS: { key: string; label: string; icon: string; show: () => boolean 
 export default function MobileLayout() {
   const loc = useLocation()
   const nav = useNavigate()
-  const name = localStorage.getItem('txgk_name') ?? '用户'
+  // 重构 1.3：用户名/登出走 AuthContext（登出顺带清伪装 —— 原实现漏清了两个 impersonate key）
+  const { user, logout } = useAuth()
+  const name = user?.name ?? '用户'
   const [unread, setUnread] = useState(0)
   const [notifOpen, setNotifOpen] = useState(false)
   const TABS = ALL_TABS.filter((t) => t.show())
@@ -85,12 +88,7 @@ export default function MobileLayout() {
         </a>
         <a
           style={{ color: '#fff', fontSize: 13 }}
-          onClick={() => {
-            localStorage.removeItem(TOKEN_KEY)
-            localStorage.removeItem('txgk_name')
-            localStorage.removeItem('txgk_user')
-            nav('/login')
-          }}
+          onClick={() => logout()}
         >
           {name} · 退出
         </a>

@@ -19,9 +19,9 @@ import {
 import type { ColumnsType } from 'antd/es/table'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
+import { useAuth } from '../contexts/AuthContext'
+
 import {
-  IMPERSONATE_KEY,
-  IMPERSONATE_NAME_KEY,
   POSITIONS,
   PROFESSIONS,
   createOrg,
@@ -122,6 +122,8 @@ function subtreeIds(rows: OrgRow[], rootId: number): Set<number> {
 /** 用户与权限（06 卷）：组织维护 + 用户管理（管理员 / 总监管本部门）+ 角色说明 */
 export default function Users() {
   const { message } = App.useApp()
+  // 重构 1.3：伪装入口走 AuthContext
+  const { startImpersonate } = useAuth()
   const [scope, setScope] = useState<MyScope | null>(null)
   const [orgs, setOrgs] = useState<OrgRow[]>([])
   const [roles, setRoles] = useState<RoleRow[]>([])
@@ -382,9 +384,8 @@ export default function Users() {
   }
 
   const impersonate = (r: UserRow) => {
-    localStorage.setItem(IMPERSONATE_KEY, String(r.id))
-    localStorage.setItem(IMPERSONATE_NAME_KEY, r.name)
-    window.location.href = '/workbench'
+    // 重构 1.3：伪装写入统一走 AuthContext（单一 session + 整页刷新重取数据）
+    startImpersonate(r.id, r.name)
   }
 
   const doHandover = async () => {

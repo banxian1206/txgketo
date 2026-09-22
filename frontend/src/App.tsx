@@ -38,10 +38,11 @@ import DeptWorkbench from './pages/workbench/DeptWorkbench'
 import EngWorkbench from './pages/workbench/EngWorkbench'
 import PmWorkbench from './pages/workbench/PmWorkbench'
 import SalesWorkbench from './pages/workbench/SalesWorkbench'
-import { TOKEN_KEY } from './api/client'
+import { useAuth } from './contexts/AuthContext'
 
 function RequireAuth({ children }: { children: JSX.Element }) {
-  return localStorage.getItem(TOKEN_KEY) ? children : <Navigate to="/login" replace />
+  const { token } = useAuth()
+  return token ? children : <Navigate to="/login" replace />
 }
 
 export default function App() {

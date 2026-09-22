@@ -1,28 +1,18 @@
 import { Button, Card, Space, Typography } from 'antd'
-import { useEffect, useState } from 'react'
+import { useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 
-import { IMPERSONATE_KEY, IMPERSONATE_NAME_KEY, TOKEN_KEY, me as fetchMe, type User } from '../../api/client'
+import { useAuth } from '../../contexts/AuthContext'
 
 /** 我的：账号信息 + 常用入口 + 回电脑版 */
 export default function MeM() {
   const nav = useNavigate()
-  const [profile, setProfile] = useState<User | null>(() => {
-    try {
-      return JSON.parse(localStorage.getItem('txgk_user') ?? 'null') as User | null
-    } catch {
-      return null
-    }
-  })
+  // 重构 1.3：用户信息/登出走 AuthContext（原散读 localStorage + 自己 fetchMe 刷缓存）
+  const { user: profile, logout, refreshMe } = useAuth()
 
   useEffect(() => {
-    fetchMe()
-      .then((u) => {
-        setProfile(u)
-        localStorage.setItem('txgk_user', JSON.stringify(u))
-      })
-      .catch(() => undefined)
-  }, [])
+    void refreshMe()
+  }, [refreshMe])
 
   const canManageUsers = profile?.is_superuser === true || profile?.position === '总监'
 
@@ -63,14 +53,7 @@ export default function MeM() {
         <Button
           block
           danger
-          onClick={() => {
-            localStorage.removeItem(TOKEN_KEY)
-            localStorage.removeItem('txgk_name')
-            localStorage.removeItem('txgk_user')
-            localStorage.removeItem(IMPERSONATE_KEY)
-            localStorage.removeItem(IMPERSONATE_NAME_KEY)
-            nav('/login')
-          }}
+          onClick={() => logout()}
         >
           退出登录
         </Button>

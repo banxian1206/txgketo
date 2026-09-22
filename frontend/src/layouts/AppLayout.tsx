@@ -1,37 +1,26 @@
 import { Avatar, Badge, Button, Layout, Menu, Space, Tooltip, Typography } from 'antd'
 import { BellOutlined, SettingOutlined } from '@ant-design/icons'
 import { useCallback, useEffect, useState } from 'react'
-import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom'
+import { Link, Outlet, useLocation } from 'react-router-dom'
 
 import NotificationsDrawer from '../components/NotificationsDrawer'
+import { useAuth } from '../contexts/AuthContext'
 import {
-  IMPERSONATE_KEY,
-  IMPERSONATE_NAME_KEY,
-  TOKEN_KEY,
   hasPerm,
-  me as fetchMe,
   unreadNotificationCount,
   workbenchMe,
-  type User,
   type WorkbenchItem,
 } from '../api/client'
 
 const { Header, Sider, Content } = Layout
 
 export default function AppLayout() {
-  const nav = useNavigate()
   const loc = useLocation()
-  const name = localStorage.getItem('txgk_name') ?? '用户'
-  const [profile, setProfile] = useState<User | null>(() => {
-    try {
-      return JSON.parse(localStorage.getItem('txgk_user') ?? 'null') as User | null
-    } catch {
-      return null
-    }
-  })
+  // 重构 1.3：登录态/用户名/伪装横幅全部来自 AuthContext（单一 session，不再散读 localStorage）
+  const { user: profile, impersonateName, logout, refreshMe, stopImpersonate } = useAuth()
+  const name = profile?.name ?? '用户'
   // 用户与权限：系统管理员 + 总监（06 卷 §4）
   const canManageUsers = profile?.is_superuser === true || profile?.position === '总监'
-  const impersonateName = localStorage.getItem(IMPERSONATE_NAME_KEY)
   const [workbenches, setWorkbenches] = useState<WorkbenchItem[]>([
     { key: 'mine', name: '我的工作台', route: '/workbench', visible: true },
   ])
@@ -51,16 +40,10 @@ export default function AppLayout() {
     return () => clearInterval(t)
   }, [refreshUnread])
 
-  // 每次进后台刷新一次用户信息（岗位/角色/权限），避免用旧的缓存看不到入口
+  // 每次进后台刷新一次用户信息（岗位/角色/权限），避免用旧的缓存看不到入口（重构 1.3：走 Context）
   useEffect(() => {
-    fetchMe()
-      .then((u) => {
-        setProfile(u)
-        localStorage.setItem('txgk_user', JSON.stringify(u))
-        localStorage.setItem('txgk_name', u.name)
-      })
-      .catch(() => undefined)
-  }, [])
+    void refreshMe()
+  }, [refreshMe])
 
   useEffect(() => {
     workbenchMe()
@@ -69,14 +52,6 @@ export default function AppLayout() {
   }, [])
 
   const selected = loc.pathname === '/' ? '/workbench' : loc.pathname
-  const logout = () => {
-    localStorage.removeItem(TOKEN_KEY)
-    localStorage.removeItem('txgk_name')
-    localStorage.removeItem('txgk_user')
-    localStorage.removeItem(IMPERSONATE_KEY)
-    localStorage.removeItem(IMPERSONATE_NAME_KEY)
-    nav('/login')
-  }
 
   return (
     <Layout style={{ minHeight: '100%' }}>
@@ -162,11 +137,7 @@ export default function AppLayout() {
             <span>正在以「{impersonateName}」身份查看（只读，不能提交/审批/下单）</span>
             <a
               style={{ color: '#fff', textDecoration: 'underline' }}
-              onClick={() => {
-                localStorage.removeItem(IMPERSONATE_KEY)
-                localStorage.removeItem(IMPERSONATE_NAME_KEY)
-                window.location.href = '/users'
-              }}
+              onClick={() => stopImpersonate()}
             >
               退出查看
             </a>

@@ -300,6 +300,38 @@ try {
     await projSel.click(); await page.waitForTimeout(300);
   }
   check('P-08', p08 === 'PASS', p08note, p08);
+
+  // —— 1.3 Auth：伪装进入 → 横幅 → 退出查看（本步改造的功能面）——
+  await page.goto(BASE + '/users', { waitUntil: 'networkidle' });
+  await page.waitForTimeout(900);
+  const impLink = page.locator('a[title="以他的身份查看（只读）"]').first();
+  if (await impLink.count()) {
+    await impLink.click();
+    await page.waitForURL(/\/workbench/, { timeout: 8000 }).catch(() => {});
+    await page.waitForTimeout(1200);
+    const banner = await body(page);
+    const on = banner.includes('正在以「') && banner.includes('只读');
+    check('AUTH-伪装进入', on, on ? '橙色横幅出现' : '未见伪装横幅: ' + banner.slice(0, 80).replace(/\n/g, '|'));
+    const stop = page.getByText('退出查看').first();
+    if (await stop.count()) {
+      await stop.click();
+      await page.waitForURL(/\/users/, { timeout: 8000 }).catch(() => {});
+      await page.waitForTimeout(1000);
+      const t = await body(page);
+      const off = !t.includes('正在以「');
+      check('AUTH-退出查看', off, off ? '横幅消失，回到 /users' : '横幅仍在');
+    } else check('AUTH-退出查看', false, '无「退出查看」入口');
+  } else check('AUTH-伪装进入', false, 'Users 页无伪装入口（权限？admin 应可见）');
+
+  // —— 登出冒烟（session 清空 → 回登录页）——
+  const logoutLink = page.getByText('退出', { exact: false }).last();
+  if (await logoutLink.count()) {
+    await logoutLink.click();
+    await page.waitForURL(/\/login/, { timeout: 8000 }).catch(() => {});
+    const onLogin = page.url().includes('/login');
+    check('AUTH-登出', onLogin, onLogin ? '登出回登录页' : 'URL=' + page.url());
+  } else check('AUTH-登出', false, '顶栏无退出入口');
+
 } catch (e) {
   check('UI-写链', false, '异常中断: ' + String(e).slice(0, 250));
   await shot(page, 'ui-regress-crash');
