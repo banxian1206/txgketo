@@ -2,7 +2,7 @@ import { App, Button, Card, Col, List, Row, Space, Statistic, Table, Tag, Typogr
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
-import NotificationsDrawer from '../components/NotificationsDrawer'
+import NotificationsDrawer from '../../components/NotificationsDrawer'
 import {
   errMsg,
   listNotifications,
@@ -11,10 +11,10 @@ import {
   workbenchMe,
   type NotificationRow,
   type WorkbenchMe,
-} from '../api/client'
-import { WB_TYPE as TYPE_COLOR } from '../theme/status'
-import { PROJECT_STAGE as STAGE_COLOR } from '../theme/status'
-import { T } from '../theme/tokens'
+} from '../../api/client'
+import { WB_TYPE as TYPE_COLOR } from '../../theme/status'
+import { PROJECT_STAGE as STAGE_COLOR } from '../../theme/status'
+import { T } from '../../theme/tokens'
 
 interface TodoCard {
   label: string

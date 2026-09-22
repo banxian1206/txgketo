@@ -2,9 +2,9 @@ import { App, Button, Card, Form, Input, Typography } from 'antd'
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
-import { errMsg } from '../api/client'
-import { useAuth } from '../contexts/AuthContext'
-import { T } from '../theme/tokens'
+import { errMsg } from '../../api/client'
+import { useAuth } from '../../contexts/AuthContext'
+import { T } from '../../theme/tokens'
 
 export default function Login() {
   const [loading, setLoading] = useState(false)
