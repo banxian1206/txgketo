@@ -21,3 +21,6 @@ dist/
 
 # 导出/临时
 *.log
+
+# E2E 护栏运行产物（截图 / 结果快照，不入库）
+frontend/e2e/shots/
