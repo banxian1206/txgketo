@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 from app.models.acceptance import ACC_APPLIED, ACC_PASSED, ACC_REJECTED, Acceptance, AcceptanceDocument
 from app.models.initiation import ProjectMember
 from app.models.project import Project
+from app.models.site import COMMISSION_DONE, SiteCommission
 from app.services import notify
 from app.services import project_stage
 
@@ -57,6 +58,14 @@ def apply_acceptance(
     project = session.get(Project, project_no)
     if project is None:
         raise AcceptanceError(f"项目不存在：{project_no}")
+    # ★ 前置门禁（S9→S10）：必须已有「调试完成」的现场调试记录（P-05）
+    done = session.scalar(
+        select(SiteCommission.id)
+        .where(SiteCommission.project_no == project_no, SiteCommission.status == COMMISSION_DONE)
+        .limit(1)
+    )
+    if done is None:
+        raise AcceptanceError("现场调试还没完成（S9）—— 先在现场台「申请调试」走到「调试完成」，再申请客户验收")
     row = Acceptance(
         project_no=project_no,
         applied_by=actor_id,

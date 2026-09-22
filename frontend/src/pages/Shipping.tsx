@@ -197,7 +197,7 @@ export default function Shipping() {
     }
   }
 
-  const doDepart = async (s: ShipmentRow) => {
+  const doDepartConfirmed = async (s: ShipmentRow) => {
     try {
       await departShipment(s.id, {})
       message.success('已发运（在途）')
@@ -206,6 +206,24 @@ export default function Shipping() {
       message.error(errMsg(e))
     }
   }
+
+  // P-08：分批发运是正常业务 → 不硬拦，只提示未勾项并请确认
+  const confirmUnshipped = (s: ShipmentRow, action: string, onOk: () => void | Promise<void>) => {
+    const pending = s.items.filter((i) => !i.shipped).length
+    if (pending === 0) {
+      void onOk()
+      return
+    }
+    Modal.confirm({
+      title: `还有 ${pending} 项未勾「已发」`,
+      content: `这批清单共 ${s.items.length} 项，还有 ${pending} 项没勾「已发」。分批发运是正常的，确认无误再${action}。`,
+      okText: `确认${action}`,
+      cancelText: '再检查一下',
+      onOk: () => onOk(),
+    })
+  }
+
+  const doDepart = (s: ShipmentRow) => confirmUnshipped(s, '发运', () => doDepartConfirmed(s))
 
   const doArrive = async (s: ShipmentRow) => {
     try {
@@ -418,14 +436,16 @@ export default function Shipping() {
         onOk={() => {
           if (!loadTarget) return
           if (!loadPhotos.length) { message.warning('装车要拍照'); return }
-          loadForm.validateFields().then(async (v) => {
-            try {
-              await loadShipment(loadTarget.id, { vehicle: v.vehicle, driver: v.driver, plate_no: v.plate_no, photos: loadPhotos })
-              message.success('已装车')
-              setLoadTarget(null)
-              await load(projectNo)
-            } catch (e) { message.error(errMsg(e)) }
-          })
+          confirmUnshipped(loadTarget, '装车', () =>
+            loadForm.validateFields().then(async (v) => {
+              try {
+                await loadShipment(loadTarget.id, { vehicle: v.vehicle, driver: v.driver, plate_no: v.plate_no, photos: loadPhotos })
+                message.success('已装车')
+                setLoadTarget(null)
+                await load(projectNo)
+              } catch (e) { message.error(errMsg(e)) }
+            }),
+          )
         }}
         confirmLoading={saving}
         okText="确认装车"
