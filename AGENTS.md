@@ -344,5 +344,20 @@ POST /api/v1/warehouse/inbound                    其他入库（退料回库/�
 ### 8.6 当前环境
 
 - 后端 :8208 · 前端 :5207 · PG 35432（`docker compose -f deploy/docker-compose.dev.yml up -d`，compose 顶层写死了 `name: txgketo`）
-- 测试：`.venv/bin/python -m pytest -q` → **27 passed**
+- 测试：`.venv/bin/python -m pytest -q` → **31 passed**
 - 账号：admin / admin12345
+
+### 8.7 产品决策（2026-09-22，客户确认）
+
+| # | 决策 | 落地位置 |
+|---|---|---|
+| 1 | **附件必填**：图纸/程序没有上传文件，不允许提交评审 | `review_flow.submit_round`（DRAWING / PROGRAM 分支校验 `ver.file_path`） |
+| 2 | **总装图强制随批发布**：总装图是设备的父级，本批任何内容发布时它必须同时发布（或已发布） | `review_flow.submit_round`（校验 `{p}-{equip}-00-00-00-00` 在勾选内或已发布） |
+| 3 | **超额验收硬拦**：到货数量不得超过「订购 − 有效到货」（多送的走换货/退货或先改需求） | `initiation.inspect_purchase_request` |
+| 4 | **同型设备复制设计**：立项时同型第二台（01B…）在设计发布后自动继承母机图纸/BOM/程序（图号换成本设备、附件复制、BOM 直接冻结、生成自己的采购需求、设计任务置为已完成） | `services/equipment_clone.py`（`_publish_round` 发布后 + 建设备时触发） |
+
+- 同型判定：同项目、同 `seq_no`、不同 `letter`（01A/01B/01C…）。
+- 同型复制**幂等**：按图号/父件+子件/程序名去重，重复发布不重复进池；`equipment_demand` 依赖物料行 `source_type`，复制时必须同步生成/校正 Item（图号即物料号）。
+- **待办**：母机改版（ECN）自动同步到同型设备尚未实现，留待后续。
+- 自查脚本：`backend/scripts/multiproj_walkthrough.py`（4 项目并发 S0→S11 + 深度功能点，跑前会复位业务数据）。
+- 旧脚本：`seed_s0_s1.py` 已修表清单；`e2e_full_test.py` / `e2e_complex_test.py` 仍需补齐「附件必填 / 总装图强制」两步（否则会被新规则 400 拦下）。

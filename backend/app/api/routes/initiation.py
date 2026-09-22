@@ -260,6 +260,11 @@ def add_equipment(
         + (f"，与 {body.same_as} 同型" if body.same_as else ""),
         ip=client_ip(request),
     )
+    # ★ 同型设备：若母机已有设计，立即复制一份（2026-09-22 产品决策·确认1）
+    if body.same_as:
+        from app.services import equipment_clone
+
+        equipment_clone.clone_same_type_design(session, project_no, body.same_as, None, current.id)
     session.commit()
     return _equipment_dict(row)
 
@@ -1071,6 +1076,22 @@ def inspect_purchase_request(
         raise HTTPException(status.HTTP_400_BAD_REQUEST, f"这一行已经结束了（{row.status}），不能再验收")
     if row.status not in ("在途", "部分到货", "待入库", "不合格", "已下单"):
         raise HTTPException(status.HTTP_400_BAD_REQUEST, f"当前状态是「{row.status}」，不能验收")
+
+    # ★ 超额验收硬拦（2026-09-22 产品决策）：到货数量不得超过「订购 − 有效到货」
+    receipts = _request_receipts(session, row.id)
+    received = sum(
+        float(g.qty or 0)
+        for g in receipts
+        if g.status in ("已入库", "现场已验收", "待入库", "现场待验收")
+    )
+    remaining = float(row.qty or 0) - received
+    if float(body.qty) > remaining + 1e-6:
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            f"到货数量 {body.qty:g} 超过未到数量 {remaining:g}"
+            f"（订购 {float(row.qty or 0):g}，有效到货 {received:g}）——"
+            "多送的请走换货/退货，或先改采购需求数量",
+        )
 
     to = row.deliver_to or "公司仓库"
     item = session.get(Item, row.item_no)

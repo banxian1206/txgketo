@@ -519,8 +519,11 @@ def s2(pj: dict) -> None:
             json={"items": [{"item_type": "PROGRAM", "item_ref": str(pg["id"])}], "note": "程序首版"})
     _review_pass(p, tprog, "程序")
 
-    # ---- 其余设备：各 1 图 + 1 标准件 BOM ----
+    # ---- 其余设备：各 1 图 + 1 标准件 BOM（含总装图）----
     for eq in prof["extra_devices"]:
+        root_eq = api.req("get", f"/projects/{p}/equipment/{eq}/design", "mech_manager")["root"]["drawing_no"]
+        api.req("post", f"/drawings/{root_eq}/draft", "mech_manager", (200,),
+                data={"change_reason": "总装图初稿"}, files={"file": (f"{eq}_root.pdf", PDF, "application/pdf")})
         dr = api.req("post", f"/projects/{p}/equipment/{eq}/drawings", "mech_manager", (201,),
                      json={"title": f"{eq} 主体", "source_type": "自制件"})
         pj["draw"][f"{eq}_main"] = dr["drawing_no"]
@@ -530,7 +533,8 @@ def s2(pj: dict) -> None:
                     json={"parent_ref": dr["drawing_no"], "child_item_no": LIB["zct"]["item_no"], "qty": 8})
         t = _my_task(p, eq, "机械", "mech_manager")
         api.req("post", f"/tasks/{t}/submit-review", "mech_manager", (201,),
-                json={"items": [{"item_type": "DRAWING", "item_ref": dr["drawing_no"]},
+                json={"items": [{"item_type": "DRAWING", "item_ref": root_eq},
+                                {"item_type": "DRAWING", "item_ref": dr["drawing_no"]},
                                 {"item_type": "BOM_DESIGN", "item_ref": str(b["id"])}], "note": f"{eq} 首版"})
         _review_pass(p, t, eq)
 
@@ -547,6 +551,16 @@ def s2(pj: dict) -> None:
     for _, key, _ in prof["std"]:
         flag(LIB[key]["item_no"] in mine, f"标准件 {LIB[key]['item_no']} 应进采购池")
     print(f"  图纸 {len(pj['draw'])} 张发布；采购池本项目 {len(mine)} 条")
+    # 同型设备（01B…）应已自动继承设计并生成自己的采购需求（确认1）
+    sibs = [e for e in pj["equips"] if e not in ([prof["deep"]] + prof["extra_devices"])]
+    for sib in sibs:
+        d = api.req("get", f"/projects/{p}/equipment/{sib}/design", "mech_manager")
+        pub = [n for n in d["tree"] if n["drawing_no"] != d["root"]["drawing_no"] and n["status"] == "已发布"]
+        sib_reqs = [r for r in api.req("get", f"/projects/{p}/purchase-requests", "buyer1")
+                    if r.get("equip_no") == sib]
+        flag(len(pub) >= 1, f"同型设备 {sib} 应继承已发布图纸，实际 {len(pub)} 张")
+        flag(len(sib_reqs) >= 1, f"同型设备 {sib} 应生成自己的采购需求，实际 {len(sib_reqs)}")
+        note(f"同型 {sib}：继承已发布图纸 {len(pub)} 张、自有采购需求 {len(sib_reqs)} 条")
     log_stage(f"深层设备 {deep} {len(prof['tree'])} 图 + 程序发布；其余设备各 1 图；池 {len(mine)} 条")
 
 
@@ -630,7 +644,7 @@ def s3(pj: dict) -> None:
         flag(st in ("部分到货", "待入库"), f"分批首到后应部分到货，实际 {st}")
         note(f"分批到货：{LIB[prof['partial']]['item_no']} 首到 {half}/{r['qty']}，状态={st}")
         r2 = find(LIB[prof["partial"]]["item_no"], prof["deep"])
-        _inspect_store(pj, r2, float(r2["qty"]))
+        _inspect_store(pj, r2, float(r2["qty"]) - half)  # 只补未到的那一半（超额验收现在会硬拦）
 
     # 不合格 → 换货
     if prof["nonconform"]:
@@ -691,7 +705,7 @@ def s3(pj: dict) -> None:
 
 def s4(pj: dict) -> None:
     prof, p = pj["prof"], pj["p"]
-    for eq in [prof["deep"]] + prof["extra_devices"]:
+    for eq in pj["equips"]:
         res = api.req("post", f"/warehouse/projects/{p}/equipment/{eq}/generate-issue", "shop1", (201,))
         issue = [i for i in api.req("get", "/warehouse/issues", "wh1") if i["issue_no"] == res["issue_no"]][0]
         api.req("post", f"/warehouse/issues/{issue['id']}/pick", "wh1", json={})
@@ -709,7 +723,7 @@ def s5(pj: dict) -> None:
         "post", "/manufacturing/photos", "shop1", (201,),
         params={"project_no": p, "ref": "walk"},
         files=[("files", ("m0.png", PNG, "image/png")), ("files", ("m1.png", PNG, "image/png"))])]
-    for eq in [prof["deep"]] + prof["extra_devices"]:
+    for eq in pj["equips"]:
         api.req("post", f"/manufacturing/projects/{p}/equipment/{eq}/generate-orders", "shop1", (201,), json={})
     orders = api.req("get", "/manufacturing/orders", "shop1", params={"project_no": p})
     order_by_item = {o["item_no"]: o for o in orders}
@@ -762,7 +776,7 @@ def s6(pj: dict) -> None:
     pj["assembled"] = []
     ov = api.req("get", "/assembly/kitting/overview", "assy1", params={"project_no": p})
     rates = {o["equip_no"]: round(o["kitting_rate"] * 100) for o in ov}
-    for eq in [prof["deep"]] + prof["extra_devices"]:
+    for eq in pj["equips"]:
         rec = api.req("post", "/assembly/records", "assy1", (201,),
                       json={"project_no": p, "equip_no": eq, "sub_assembly": "整机装配", "photos": ph})
         api.req("post", f"/assembly/records/{rec['id']}/finish", "assy1", json={})
@@ -1325,6 +1339,8 @@ def deep_coverage2(pjs: list[dict]) -> None:
     # ---- 审核越权 / 空提交 ----
     tmp_dr2 = api.req("post", f"/projects/{p2no}/equipment/{deep2}/drawings", "mech_manager", (201,),
                       json={"title": "越权测试图", "source_type": "自制件"})
+    api.req("post", f"/drawings/{tmp_dr2['drawing_no']}/draft", "mech_manager", (200,),
+            data={"change_reason": "越权测试"}, files={"file": ("auth.pdf", PDF, "application/pdf")})
     tid = _my_task(p2no, deep2, "机械", "mech_manager")
     code, _ = probe("空内容提交评审应拦", "post", f"/tasks/{tid}/submit-review", "mech_manager", (400, 422),
                     json={"items": [], "note": "空"})
@@ -1414,10 +1430,11 @@ def deep_coverage2(pjs: list[dict]) -> None:
     api.req("post", "/purchase/merge-order", "buyer1", (200, 201), json={
         "supplier_id": SUP["华南标准件"]["id"], "ordered_at": d(0), "deliver_to": "公司仓库",
         "lines": [{"request_id": big["id"]}]})
-    code, res = probe("超额验收（订 2 验 5）", "post",
+    code, res = probe("超额验收（订 2 验 5，应硬拦）", "post",
                       f"/projects/{p2no}/purchase-requests/{big['id']}/inspect", "wh1",
-                      (200, 201, 400), json={"qty": 5, "result": "合格", "receipt_date": d(0)})
-    note(f"超额验收返回 {code}" + (f"，生成的到货单：{res.get('receipt_id') if isinstance(res, dict) else ''}"))
+                      (400,), json={"qty": 5, "result": "合格", "receipt_date": d(0)})
+    flag(code == 400, f"超额验收未被拦：{code}")
+    note("超额验收已硬拦（400）—— 订 2 不能验 5")
 
     # ---- 离职/停用一键转交 ----
     code, moved = probe("离职一键转交", "post", f"/users/{USERS['mech1']}/handover", "admin",
@@ -1428,18 +1445,14 @@ def deep_coverage2(pjs: list[dict]) -> None:
     org = api.req("post", "/orgs", "admin", (201,), json={"name": "测试临时部门"})
     probe("部门停用", "patch", f"/orgs/{org['id']}", "admin", json={"is_active": False})
 
-    # ---- 控制点：程序未上传文件能否评审发布 ----
+    # ---- 控制点：无文件不能提交评审（附件必填）----
     pg2 = api.req("post", f"/projects/{p2no}/equipment/{deep2}/programs", "prog_manager", (201,),
                   json={"name": "无文件程序"})
     tprog = _my_task(p2no, deep2, "程序", "prog_manager")
-    api.req("post", f"/tasks/{tprog}/submit-review", "prog_manager", (201,),
-            json={"items": [{"item_type": "PROGRAM", "item_ref": str(pg2["id"])}], "note": "无文件"})
-    tk2 = api.req("get", f"/tasks/{tprog}/review-ticket", "eng_director")
-    api.req("post", f"/review-tickets/{tk2['id']}/review", "eng_director",
-            json={"action": "通过", "note": "OK"})
-    code, _ = probe("无文件程序发布后取文件", "get", f"/programs/{pg2['id']}/file", "prog_manager", (200, 404))
-    if code == 404:
-        note("⚠ 程序未上传任何文件即可完成评审并发布（取了文件 404）—— 是否应强制要求附件？")
+    code, _ = probe("无文件程序提交评审应拦", "post", f"/tasks/{tprog}/submit-review", "prog_manager",
+                    (400,), json={"items": [{"item_type": "PROGRAM", "item_ref": str(pg2["id"])}], "note": "无文件"})
+    flag(code == 400, f"无文件程序提交评审未被拦：{code}")
+    note("附件必填已生效：无文件提交评审 400")
 
     # ---- 到货单列表 / 照片 ----
     probe("到货单列表(已入库)", "get", "/goods-receipts", "wh1", params={"status": "已入库"})

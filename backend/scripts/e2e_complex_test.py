@@ -66,6 +66,15 @@ def main() -> None:
         return [x["token"] for x in req("post", f"/api/v1/{area}/photos", who, (201,),
                                         params={"project_no": pno, "ref": ref}, files=files)]
 
+    def draft(who: str, ref, kind: str = "drawing") -> None:
+        """附件必填（2026-09-22）：图纸/程序提交评审前必须先上传文件。"""
+        if kind == "drawing":
+            req("post", f"/api/v1/drawings/{ref}/draft", who, (200,),
+                data={"change_reason": "初稿"}, files={"file": ("d.pdf", PDF, "application/pdf")})
+        else:
+            req("post", f"/api/v1/programs/{ref}/draft", who, (200,),
+                data={"change_reason": "初稿"}, files={"file": ("p.st", b"LD M0\n", "text/plain")})
+
     users = {u["username"]: u["id"] for u in req("get", "/api/v1/users", "admin")}
 
     # 标准库物料（接口建档，重复容错）
@@ -165,6 +174,9 @@ def main() -> None:
                   json={"title": "防护罩", "source_type": "自制件"})
     d_beam = req("post", f"/api/v1/projects/{p}/equipment/{A}/drawings", "mech_manager", (201,),
                  json={"title": "支撑梁（先按自制出图）", "source_type": "自制件"})
+    for _no in [f"{p}-{A}-00-00-00-00", d_body["drawing_no"], frame_no,
+                d_side["drawing_no"], d_cover["drawing_no"], d_beam["drawing_no"]]:
+        draft("mech_manager", _no)
     zct = req("get", "/api/v1/library/items", "mech_manager", params={"q": "轴承"})[0]
     qg = req("get", "/api/v1/library/items", "mech_manager", params={"q": "气缸"})[0]
     dj = req("get", "/api/v1/library/items", "mech_manager", params={"q": "电机"})[0]
@@ -216,6 +228,7 @@ def main() -> None:
     director_pass(t_craft)
     prog = req("post", f"/api/v1/projects/{p}/equipment/{A}/programs", "prog_manager", (201,),
                json={"name": f"{p}-{A} 主控程序"})
+    draft("prog_manager", prog["id"], "program")
     t_prog = next(t["task_id"] for t in req(
         "get", f"/api/v1/projects/{p}/equipment/{A}/my-design-tasks", "prog_manager")
         if t["profession"] == "程序")
@@ -225,16 +238,24 @@ def main() -> None:
 
     d2_body = req("post", f"/api/v1/projects/{p}/equipment/02A/drawings", "mech_manager", (201,),
                   json={"title": "输送段主体", "source_type": "自制件"})
+    d2_root = f"{p}-02A-00-00-00-00"
+    draft("mech_manager", d2_root)
+    draft("mech_manager", d2_body["drawing_no"])
     b3 = req("post", f"/api/v1/projects/{p}/bom/std", "mech_manager", (201,),
              json={"parent_ref": d2_body["drawing_no"], "child_item_no": zct["item_no"], "qty": 8})
-    director_pass(mech_submit("02A", [d2_body["drawing_no"]], [b3["id"]], "02A 线体首版"))
+    director_pass(mech_submit("02A", [d2_root, d2_body["drawing_no"]], [b3["id"]], "02A 线体首版"))
     d3_col = req("post", f"/api/v1/projects/{p}/equipment/03A/drawings", "mech_manager", (201,),
                  json={"title": "码垛立柱", "source_type": "自制件"})
-    director_pass(mech_submit("03A", [d3_col["drawing_no"]], [], "03A 立柱首版"))
+    d3_root = f"{p}-03A-00-00-00-00"
+    draft("mech_manager", d3_root)
+    draft("mech_manager", d3_col["drawing_no"])
+    director_pass(mech_submit("03A", [d3_root, d3_col["drawing_no"]], [], "03A 立柱首版"))
 
     pool = req("get", "/api/v1/purchase/pool", "buyer1")
     prs_pool = [{**r, "item_no": g["item_no"]} for g in pool for r in g["requests"] if r["project_no"] == p]
-    print(f"  01A 图纸 6 张 + 程序 1 个发布；02A/03A 各 1 张发布；采购池 {len(prs_pool)} 条")
+    # 同型 01B 现在由系统自动复制设计并进池（2026-09-22）；本脚本仍只走 01A/02A/03A
+    prs_pool = [x for x in prs_pool if (x.get("equip_no") or "") != "01B"]
+    print(f"  01A 图纸 6 张 + 程序 1 个发布；02A/03A 各 1 张发布；采购池(01A/02A/03A) {len(prs_pool)} 条")
     # 预期 8 条：轴承(01A)+轴承(02A)+气缸+电机+方通+板材+防护罩(外协)+支撑梁(定制)
     flag("S2", d_beam["drawing_no"] in {x["item_no"] for x in prs_pool},
          "工艺改判「定制件」的支撑梁应自动进采购池（与外协件同等待遇）")

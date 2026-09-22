@@ -176,6 +176,10 @@ def main() -> None:
     dr3 = req("post", f"/api/v1/projects/{p}/equipment/01A/drawings", "mech_manager", (201,),
               json={"title": "防护罩", "source_type": "自制件"})
     frame_no = dr2["drawing_no"]
+    # 附件必填（2026-09-22）：图纸提交评审前先上传文件
+    for _no in (f"{p}-01A-00-00-00-00", dr1["drawing_no"], frame_no, dr3["drawing_no"]):
+        req("post", f"/api/v1/drawings/{_no}/draft", "mech_manager", (200,),
+            data={"change_reason": "首版"}, files={"file": ("d.pdf", PDF, "application/pdf")})
     zct = req("get", "/api/v1/library/items", "mech_manager", params={"q": "轴承"})[0]
     bom = req("post", f"/api/v1/projects/{p}/bom/std", "mech_manager", (201,),
               json={"parent_ref": frame_no, "child_item_no": zct["item_no"], "qty": 4})
@@ -327,17 +331,23 @@ def main() -> None:
     sh = req("post", "/api/v1/shipping/instructions", "pm1", (201,),
              json={"project_no": p, "equip_nos": ["01A"], "remark": "先发 01A"})
     sph = photos("pm1", "shipping", p, sh["shipment_no"])
-    req("post", f"/api/v1/shipping/{sh['id']}/pack", "delivery1",
-        json={"items": [{"equip_no": "01A", "part_item_no": frame_no, "part_name": "机架", "qty": 1,
-                         "package_no": "P1", "weight": 320, "size": "2400x1200x900", "disassembled": True}]})
+    # 发运清单（S7 重构后：按结构生成 → 逐项勾「已发」→ 装车/发运/到货/现场逐项清点）
+    req("post", f"/api/v1/shipping/{sh['id']}/items/generate", "pm1", (201,))
+    sh = next(x for x in req("get", "/api/v1/shipping/list", "pm1", params={"project_no": p})
+              if x["id"] == sh["id"])
+    req("post", "/api/v1/shipping/items/ship", "delivery1",
+        json={"item_ids": [i["id"] for i in sh["items"]], "photos": sph[:1]})
     req("post", f"/api/v1/shipping/{sh['id']}/load", "delivery1",
         json={"vehicle": "17.5 米平板", "plate_no": "粤B88888", "driver": "张师傅", "photos": sph[:1]})
     req("post", f"/api/v1/shipping/{sh['id']}/depart", "delivery1", json={})
     pj = req("get", f"/api/v1/projects/{p}", "pm1")
     flag("S7", pj["stage"] == "交付中", f"发运后项目阶段应自动「交付中」，实际 {pj['stage']}")
     req("post", f"/api/v1/shipping/{sh['id']}/arrive", "delivery1")
+    sh = next(x for x in req("get", "/api/v1/shipping/list", "pm1", params={"project_no": p})
+              if x["id"] == sh["id"])
+    checks = [{"item_id": i["id"], "result": "到"} for i in sh["items"]]
     sh = req("post", f"/api/v1/shipping/{sh['id']}/receipt", "site1",
-             json={"result": "齐", "photos": sph[:1]})
+             json={"checks": checks, "photos": sph[:1]})
     flag("S7", sh["status"] == "已签收", f"现场验收后应「已签收」，实际 {sh['status']}")
     print(f"  {sh['shipment_no']}：指令→装箱→装车→在途→到货→现场验收齐（阶段已到 交付中）")
     STAGES.append(("S7 发运", "PM 勾选发 01A → 装箱/装车/发运/到货/现场对账「齐」；项目阶段→交付中"))

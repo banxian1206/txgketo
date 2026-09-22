@@ -127,6 +127,22 @@ class SupplierIn(BaseModel):
     remark: str | None = None
 
 
+class SupplierPatch(BaseModel):
+    """编辑供应商：真正的部分更新（只改传上来的字段，未传的保持原样）。"""
+
+    name: str | None = None
+    short_name: str | None = None
+    kind: str | None = None
+    contact_name: str | None = None
+    phone: str | None = None
+    email: str | None = None
+    address: str | None = None
+    payment_terms: str | None = None
+    tax_rate: float | None = None
+    rating: int | None = Field(default=None, ge=1, le=5)
+    remark: str | None = None
+
+
 @router.post("/suppliers", status_code=status.HTTP_201_CREATED)
 def create_supplier(
     body: SupplierIn,
@@ -160,7 +176,7 @@ def create_supplier(
 @router.patch("/suppliers/{supplier_id}")
 def update_supplier(
     supplier_id: int,
-    body: SupplierIn,
+    body: SupplierPatch,
     request: Request,
     session: Session = Depends(get_session),
     current: User = Depends(get_current_user),
@@ -168,6 +184,8 @@ def update_supplier(
     row = session.get(Supplier, supplier_id)
     if row is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "供应商不存在")
+    if body.kind is not None and body.kind not in SUPPLIER_KINDS:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, f"主营类别只能是：{'/'.join(SUPPLIER_KINDS)}")
     labels = {
         "name": "名称",
         "short_name": "简称",
@@ -182,7 +200,8 @@ def update_supplier(
         "remark": "备注",
     }
     changes = []
-    for field, new_value in body.model_dump().items():
+    # ★ 部分更新：只处理请求里显式传了的字段（exclude_unset），未传的保持原样（防止清空）
+    for field, new_value in body.model_dump(exclude_unset=True).items():
         old = getattr(row, field)
         if old == new_value:
             continue

@@ -50,8 +50,8 @@ from app.models.review import (
     ReviewTicketItem,
 )
 from app.models.task import Task
-from app.services import audit, notify, bom_demand, change_flow
-from app.services.numbering import next_number, year_scope_key
+from app.services import audit, notify, bom_demand, change_flow, equipment_clone
+from app.services.numbering import EMPTY, compose_mech_drawing_no, next_number, year_scope_key
 from app.services.reviewers import chain_levels, director, director_for, team_lead_for
 
 LEVEL_LABEL = {1: "经理", 2: "总监"}
@@ -208,6 +208,9 @@ def _lock_and_snapshot(
             ver = DrawingVersion(drawing_no=d.drawing_no, version=d.current_version, is_current=True)
             session.add(ver)
             session.flush()
+        # ★ 附件必填（2026-09-22 产品决策）：没有图纸文件不能提交评审
+        if not ver.file_path:
+            raise ReviewFlowError(f"图纸 {item_ref} 还没有上传文件，不能提交评审（附件必填）")
         ver.submitted_by = user.id
         ver.submitted_at = now
         d.status = "审核中"
@@ -279,6 +282,9 @@ def _lock_and_snapshot(
             ver = EquipmentProgramVersion(program_id=p.id, version=p.current_version, is_current=True)
             session.add(ver)
             session.flush()
+        # ★ 附件必填（2026-09-22 产品决策）：没有程序文件不能提交评审
+        if not ver.file_path:
+            raise ReviewFlowError(f"程序「{p.name}」还没有上传文件，不能提交评审（附件必填）")
         ver.submitted_by = user.id
         ver.submitted_at = now
         p.status = "审核中"
@@ -346,6 +352,19 @@ def submit_round(
                 submitted_at=now,
             )
         )
+
+    # ★ 总装图是设备的父级，必须随本批一起发布（2026-09-22 产品决策·确认3）
+    if task.equip_no:
+        root_no = compose_mech_drawing_no(task.project_no, task.equip_no, [EMPTY] * 4)
+        root = session.get(Drawing, root_no)
+        if (
+            root is not None
+            and root.status != "已发布"
+            and (ITEM_DRAWING, root_no) not in seen
+        ):
+            raise ReviewFlowError(
+                f"总装图 {root_no} 是这台设备的父级，必须与本批内容一起提交发布"
+            )
 
     # 审核链（06 卷 §2/#2）：经理空缺自动跳级；总监必须有，否则不让提交
     need_lead, _ = chain_levels(user.position)
@@ -759,6 +778,12 @@ def _publish_round(
     # ★ 发布 = 采购触发（05 卷 §5）：这一批冻结的内容净需求自动进采购池
     created = bom_demand.create_release_demands(session, release)
     summary["purchase_requests"] = [r.id for r in created]
+    # ★ 同型设备（01B…）：把本次发布的设计复制一份过去（2026-09-22 产品决策·确认1）
+    cloned = equipment_clone.clone_same_type_design(
+        session, ticket.project_no, ticket.equip_no, release.id, director_user.id
+    )
+    if cloned:
+        summary["cloned_to"] = cloned
     release.summary = summary
     # 改版任务发布 → 改版申请完成（05 卷 §7⑥）
     change_flow.complete_for_release(session, ticket.task_id, release, now)

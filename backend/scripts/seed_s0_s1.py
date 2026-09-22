@@ -21,7 +21,7 @@ d = lambda n: (today + timedelta(days=n)).isoformat()  # noqa: E731
 TABLES = [
     "acceptance_document", "acceptance", "spare_part_move", "spare_part", "service_order",
     "site_incoming", "site_commission", "site_issue", "site_daily", "site_survey", "site_receipt",
-    "packing_list", "shipment_line", "shipment", "kitting_snapshot", "assembly_record",
+    "shipment_item", "shipment_line", "shipment", "kitting_snapshot", "assembly_record",
     "prod_acceptance", "prod_task", "prod_order", "outsource_task", "material_issue_line",
     "material_issue", "stock_move", "stock_item", "warehouse_location", "goods_receipt",
     "purchase_request", "supplier_quote", "supplier_catalog", "supplier", "task",
