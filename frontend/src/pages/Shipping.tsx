@@ -12,6 +12,7 @@ import {
   Modal,
   Row,
   Select,
+  Skeleton,
   Space,
   Statistic,
   Table,
@@ -66,6 +67,7 @@ export default function Shipping() {
 
   // 发运清单勾选
   const [itemsShip, setItemsShip] = useState<ShipmentRow | null>(null)
+  const [itemsLoading, setItemsLoading] = useState(false)
   const [shipPhotos, setShipPhotos] = useState<string[]>([])
   const [manualName, setManualName] = useState('')
 
@@ -136,12 +138,15 @@ export default function Shipping() {
     setShipPhotos([])
     setItemsShip(ship)
     if (ship.items.length === 0 && canEdit) {
+      setItemsLoading(true)  // P-19：生成清单期间显示骨架屏，不再先空壳
       try {
         const updated = await generateShipItems(ship.id)
         setShipments((prev) => prev.map((x) => (x.id === ship.id ? updated : x)))
         setItemsShip(updated)
       } catch (e) {
         message.error(errMsg(e))
+      } finally {
+        setItemsLoading(false)
       }
     }
   }
@@ -404,21 +409,27 @@ export default function Shipping() {
           </Typography.Text>
         </Space>
         <div style={{ maxHeight: 420, overflowY: 'auto' }}>
-          {(itemsShip?.items ?? []).length === 0 && <Empty description="清单为空" />}
-          {(itemsShip?.items ?? []).map((it) => (
-            <div key={it.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 0', borderBottom: '1px solid #f0f0f0' }}>
-              <Checkbox
-                checked={it.shipped}
-                onChange={() => void toggleShipped(it)}
-              >
-                <Typography.Text strong={it.kind === '组件'}>{it.ref}</Typography.Text>
-                <Typography.Text type="secondary" style={{ fontSize: 12, marginLeft: 6 }}>
-                  {it.name ?? ''} · {it.qty} {it.kind}
-                </Typography.Text>
-                {it.shipped && <Tag color="success" style={{ marginLeft: 6 }}>已发</Tag>}
-              </Checkbox>
-            </div>
-          ))}
+          {itemsLoading ? (
+            <Skeleton active paragraph={{ rows: 4 }} />
+          ) : (
+            <>
+              {(itemsShip?.items ?? []).length === 0 && <Empty description="清单为空" />}
+              {(itemsShip?.items ?? []).map((it) => (
+                <div key={it.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 0', borderBottom: '1px solid #f0f0f0' }}>
+                  <Checkbox
+                    checked={it.shipped}
+                    onChange={() => void toggleShipped(it)}
+                  >
+                    <Typography.Text strong={it.kind === '组件'}>{it.ref}</Typography.Text>
+                    <Typography.Text type="secondary" style={{ fontSize: 12, marginLeft: 6 }}>
+                      {it.name ?? ''} · {it.qty} {it.kind}
+                    </Typography.Text>
+                    {it.shipped && <Tag color="success" style={{ marginLeft: 6 }}>已发</Tag>}
+                  </Checkbox>
+                </div>
+              ))}
+            </>
+          )}
         </div>
         {canEdit && (
           <Space style={{ marginTop: 10 }} wrap>

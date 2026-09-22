@@ -1,5 +1,6 @@
 import {
   App,
+  Alert,
   Button,
   Card,
   Col,
@@ -88,6 +89,7 @@ export default function Warehouse() {
   const [genProjects, setGenProjects] = useState<{ project_no: string; project_name: string }[]>([])
   const [genEquips, setGenEquips] = useState<{ equip_no: string; equip_name: string }[]>([])
   const [genLoading, setGenLoading] = useState(false)
+  const [genErr, setGenErr] = useState<string | null>(null)
   // 其他入库（退料回库 / 盘盈）
   const [inboundOpen, setInboundOpen] = useState(false)
   const [itemOptions, setItemOptions] = useState<ItemLite[]>([])
@@ -200,6 +202,7 @@ export default function Warehouse() {
   const doGenerateIssue = async () => {
     if (!genProject || !genEquip) return
     setGenLoading(true)
+    setGenErr(null)
     try {
       const r = await generateEquipmentIssue(genProject, genEquip)
       message.success(
@@ -207,6 +210,8 @@ export default function Warehouse() {
       )
       await load()
     } catch (e) {
+      // P-20：错误常驻在卡片上，不只一闪而过的 toast
+      setGenErr(errMsg(e))
       message.error(errMsg(e))
     } finally {
       setGenLoading(false)
@@ -372,6 +377,17 @@ export default function Warehouse() {
                       按设备展开：自制件的原材料 + 整台设备的标准件；缺料会标出来，生成后到下面「领料」里备料 → 车间领走。
                     </Typography.Text>
                   </Space>
+                  {genErr && (
+                    <Alert
+                      type="warning"
+                      showIcon
+                      closable
+                      style={{ marginTop: 10 }}
+                      message="生成领料单失败"
+                      description={genErr}
+                      onClose={() => setGenErr(null)}
+                    />
+                  )}
                 </Card>
                 <Typography.Title level={5}>① 验收（货到了就验：合格 / 不合格）</Typography.Title>
                 <Typography.Paragraph type="secondary" style={{ fontSize: 12 }}>

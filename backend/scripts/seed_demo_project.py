@@ -33,6 +33,27 @@ today = date.today()
 d = lambda n: (today + timedelta(days=n)).isoformat()  # noqa: E731
 
 
+def price_of(item_no: str) -> float:
+    """演示用单价（P-17）：让价格参考 / 金额分档有数据可看。"""
+    if item_no.startswith("ZC"):
+        return 45.0
+    if item_no.startswith("QD"):
+        return 120.0
+    if item_no.startswith("BZ-DJ"):
+        return 1800.0
+    if item_no.startswith("BZ-JSJ"):
+        return 3200.0
+    if item_no.startswith("DQ-PLC"):
+        return 2600.0
+    if item_no.startswith("DQ-SF"):
+        return 1500.0
+    if item_no.startswith("YL-FT"):
+        return 35.0
+    if item_no.startswith("YL-BC"):
+        return 210.0
+    return 500.0
+
+
 def main() -> None:
     with TestClient(app) as c:
         # ---------- 登录 ----------
@@ -135,7 +156,7 @@ def main() -> None:
         call("post", f"/api/v1/projects/{p}/purchase-requests", who="pm1", ok=(201,),
              label=f"长周期件 {it1['item_no']}（60 天，立项即下单）",
              json={"item_no": it1["item_no"], "qty": 2, "lead_days": 60, "need_date": d(90),
-                   "ordered_at": d(0), "supplier_name": "华信传动", "equip_no": "01A"})
+                   "ordered_at": d(0), "supplier_name": "华信传动", "unit_price": price_of(it1["item_no"]), "equip_no": "01A"})
         call("post", f"/api/v1/projects/{p}/generate-tasks", who="pm1", ok=(200,),
              label="生成任务：01A × 机械/电气/程序/工艺 + 采购",
              json={"professions": ["机械", "电气", "程序", "工艺"], "with_purchase": True})
@@ -196,12 +217,12 @@ def main() -> None:
         call("post", "/api/v1/purchase/merge-order", who="buyer1", ok=(200, 201),
              label=f"合并下单 {len(rest)} 条 → 采购单（到公司仓库）",
              json={"supplier_id": sup["id"], "ordered_at": d(0), "expected_date": d(15),
-                   "deliver_to": "公司仓库", "lines": [{"request_id": r["id"]} for r in rest]})
+                   "deliver_to": "公司仓库", "lines": [{"request_id": r["id"], "unit_price": price_of(r["item_no"])} for r in rest]})
         call("post", "/api/v1/purchase/merge-order", who="buyer1", ok=(200, 201),
              label="外协防护罩：直发客户现场",
              json={"supplier_id": sup["id"], "ordered_at": d(0), "deliver_to": "直发客户现场",
                    "deliver_address": "深圳龙华 创维工业园 3 号厂房",
-                   "lines": [{"request_id": cover_req["id"]}]})
+                   "lines": [{"request_id": cover_req["id"], "unit_price": price_of(cover_req["item_no"])}]})
         reqs = {r["id"]: r for r in c.get(f"/api/v1/projects/{p}/purchase-requests", headers=login("buyer1")).json()}
         for rid, r in reqs.items():
             ins = call("post", f"/api/v1/projects/{p}/purchase-requests/{rid}/inspect", who="wh1", ok=(200,),

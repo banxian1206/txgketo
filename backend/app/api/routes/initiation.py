@@ -540,6 +540,7 @@ class LongLeadIn(BaseModel):
     need_date: date = Field(..., description="需要到货日期（必填）")
     ordered_at: date = Field(..., description="下单日期（必填：长周期件立项即下单）")
     supplier_name: str | None = None
+    unit_price: float | None = Field(default=None, ge=0, description="单价（选填，填了就能算金额）")
     equip_no: str | None = None
     remark: str | None = None
 
@@ -634,6 +635,8 @@ def add_purchase_request(
         expected_date=expected,
         ordered_at=ordered_at,
         po_no=next_number(session, "PURCHASE_ORDER"),
+        unit_price=body.unit_price,
+        amount=(float(body.unit_price) * float(body.qty)) if body.unit_price else None,
         status="在途",  # 立项即下单：下完单就在途（旧「已下单」中间态已废弃）
         is_long_lead=True,
         remark=body.remark,
