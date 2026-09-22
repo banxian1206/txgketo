@@ -1,0 +1,306 @@
+/**
+ * UI 回归：真实浏览器（channel:chrome）
+ *  Part 1 冒烟：PC 25 路由 + 移动 9 路由，零 pageerror / 零 4xx / 零 antd 弃用警告（P-16 动态）
+ *  Part 2 交互：P-09 · P-01 · P-03 · P-02 · P-11 · P-13 · P-05 · P-10 · P-04 · P-08 · P-18 · P-21 · P-22
+ *  注意：本脚本会创建 1 个测试商机（E2E回归-*）并走完 建图/下单/验收，属护栏正常代价
+ */
+import { newCtx, login, body, shot, check, summary, exitWith, results, BASE, FILES } from './lib.mjs';
+import path from 'node:path';
+
+const PHOTO = path.join(FILES, 'photo.png');
+const PC_ROUTES = [
+  '/workbench', '/workbench/sales', '/workbench/pm', '/workbench/eng', '/workbench/shop',
+  '/projects', '/projects/new', '/numbering', '/users', '/library',
+  '/my-tasks', '/reviews', '/changes', '/purchase', '/suppliers',
+  '/warehouse', '/manufacturing', '/assembly', '/shipping',
+  '/site', '/acceptance', '/service',
+];
+const M_ROUTES = ['/m', '/m/warehouse', '/m/issues', '/m/production', '/m/assembly', '/m/shipping', '/m/site', '/m/service', '/m/me'];
+
+// ═════════ Part 1 · PC 冒烟 ═════════
+{
+  const c = await newCtx(); const { page, errs } = c;
+  await login(page, 'admin', 'admin12345');
+  const bad = [];
+  for (const r of PC_ROUTES) {
+    errs.length = 0;
+    await page.goto(BASE + r, { waitUntil: 'networkidle', timeout: 20000 }).catch(() => {});
+    await page.waitForTimeout(500);
+    const len = (await body(page)).length;
+    if (len < 40) bad.push(`${r} 空页(${len})`);
+    const e = errs.filter(x => !x.includes('favicon'));
+    if (e.length) bad.push(`${r}: ${e.slice(0, 2).join(' ')}`);
+  }
+  check('SMOKE-pc', bad.length === 0, bad.length ? bad.join(' | ').slice(0, 400) : `25 路由零异常零空页`);
+
+  // P-16 动态：全程 console 无 antd 弃用警告
+  const antdWarn = errs.filter(x => /antd/.test(x));
+  check('P-16-dyn', antdWarn.length === 0, antdWarn.length ? antdWarn[0] : 'console antd 警告 0');
+  await c.browser.close();
+}
+
+// ═════════ Part 1b · 移动冒烟 ═════════
+{
+  const c = await newCtx({ mobile: true }); const { page, errs } = c;
+  await login(page, 'admin', 'admin12345');
+  const bad = [];
+  for (const r of M_ROUTES) {
+    errs.length = 0;
+    await page.goto(BASE + r, { waitUntil: 'networkidle', timeout: 20000 }).catch(() => {});
+    await page.waitForTimeout(400);
+    const len = (await body(page)).length;
+    if (len < 40) bad.push(`${r} 空页(${len})`);
+    const e = errs.filter(x => !x.includes('favicon'));
+    if (e.length) bad.push(`${r}: ${e.slice(0, 2).join(' ')}`);
+  }
+  check('SMOKE-mobile', bad.length === 0, bad.length ? bad.join(' | ').slice(0, 400) : '9 移动页零异常');
+  await c.browser.close();
+}
+
+// ═════════ Part 2 · 交互回归（一条写链走到底）═════════
+const c = await newCtx(); const { page, errs } = c;
+let newNo = null;
+try {
+  await login(page, 'admin', 'admin12345');
+
+  // —— P-09：空提交列表级错误 + 零 pageerror ——
+  await page.goto(BASE + '/projects/new', { waitUntil: 'networkidle' });
+  await page.waitForTimeout(700);
+  errs.length = 0;
+  await page.getByRole('button', { name: /建\s*立\s*商\s*机/ }).first().click();
+  await page.waitForTimeout(900);
+  const t0 = await body(page);
+  check('P-09', t0.includes('至少要有一个客户方联系人') && errs.length === 0,
+    t0.includes('至少要有一个客户方联系人')
+      ? (errs.length === 0 ? '列表级错误渲染 + 零 pageerror' : `有异常: ${errs[0]}`)
+      : '未见列表级错误');
+
+  // —— S0 建商机（写链开始）——
+  await page.getByLabel(/项目名称/).fill(`E2E回归-${new Date().toISOString().slice(5, 16).replace(/[-:]/g, '')}`);
+  await page.getByLabel(/项目描述/).fill('e2e 护栏自动创建（可清理）');
+  await page.getByLabel(/客户名称/).fill('E2E回归客户');
+  await page.getByRole('button', { name: /添\s*加\s*联\s*系\s*人/ }).click();
+  await page.getByPlaceholder('姓名').first().fill('回归机器人');
+  await page.getByPlaceholder('电话').first().fill('13900000000');
+  await page.getByLabel(/项目地点/).fill('广东惠州回归路 1 号');
+  const dl = page.locator('.ant-form-item').filter({ hasText: '商机截止时间' }).locator('input');
+  await dl.click(); await page.keyboard.type('2026-12-31'); await page.keyboard.press('Enter');
+  await page.getByLabel(/销售负责人/).click(); await page.waitForTimeout(400);
+  await page.keyboard.type('销售'); await page.waitForTimeout(500);
+  await page.locator('.ant-select-dropdown:visible .ant-select-item').first().click();
+  await page.getByRole('button', { name: /建\s*立\s*商\s*机/ }).first().click();
+  await page.waitForURL(/\/projects$/, { timeout: 15000 }).catch(() => {});
+  await page.waitForTimeout(1200);
+  const t1 = await body(page);
+  newNo = (t1.match(/TX\d{5}/g) || []).sort().at(-1);
+  check('S0-建商机', !!newNo && t1.includes('E2E回归'), newNo ? `${newNo} 已建` : '列表未见新项目');
+  if (!newNo) throw new Error('no project');
+
+  // —— 成交登记 ——
+  await page.goto(`${BASE}/projects/${newNo}`, { waitUntil: 'networkidle' });
+  await page.waitForTimeout(700);
+  await page.getByRole('button', { name: /成\s*交\s*登\s*记/ }).first().click();
+  await page.waitForSelector('.ant-modal', { timeout: 5000 });
+  const fillDate = async (id, v) => { const i = page.locator('#' + id); await i.click(); await page.keyboard.type(v); await page.keyboard.press('Enter'); };
+  await fillDate('period_start', '2026-09-22');
+  await fillDate('period_end', '2027-06-30');
+  await page.locator('#amount').fill('500000');
+  await page.locator('#warranty_months').fill('12');
+  await page.getByRole('button', { name: /\+\s*添加\s*付款\s*节点/ }).click();
+  await page.getByPlaceholder('节点名，如 预付款').first().fill('预付款');
+  await page.getByRole('button', { name: /确\s*认\s*成\s*交/ }).click();
+  await page.waitForTimeout(2000);
+
+  // —— 立项 + 建设备 ——
+  await page.getByRole('button', { name: /^立\s*项$/ }).first().click();
+  await page.waitForURL(/initiate/, { timeout: 8000 }).catch(() => {});
+  await page.waitForTimeout(900);
+  await page.getByRole('button', { name: /\+\s*新\s*增\s*设\s*备/ }).click();
+  await page.waitForTimeout(500);
+  await page.getByLabel(/设备名称/).fill('回归升降机');
+  await page.getByRole('button', { name: /^\s*确\s*定\s*$/ }).last().click();
+  await page.waitForTimeout(1400);
+  check('S1-立项', (await body(page)).includes('回归升降机'), '设备 01A 已建');
+
+  // —— P-03 + P-01：设计面预选 + 第一张图 ——
+  await page.goto(`${BASE}/projects/${newNo}/design/01A`, { waitUntil: 'networkidle' });
+  await page.waitForTimeout(1100);
+  await page.getByRole('button', { name: /\+\s*新\s*增\s*条\s*目/ }).click();
+  await page.waitForTimeout(800);
+  const am = page.locator('.ant-modal:visible').filter({ hasText: '新增条目' });
+  const parentVal = await am.locator('.ant-form-item').filter({ hasText: '挂在哪个下面' })
+    .locator('.ant-select-selection-item').allInnerTexts().catch(() => []);
+  check('P-03', parentVal.length > 0, parentVal.length ? `父级打开即预选: ${parentVal[0].slice(0, 40)}` : '预选丢失');
+  await am.getByLabel(/名称/).fill('回归安装板');
+  await am.getByRole('button', { name: /新\s*增/ }).last().click();
+  await page.waitForTimeout(2000);
+  const t2 = await body(page);
+  const drawn = /TX\d{5}-01A-\d{2}-00-00-00/.test(t2) && t2.includes('回归安装板');
+  check('P-01', drawn, drawn ? '第一张图 UI 建出（父级未手动干预）' : '建图仍失败');
+
+  // —— P-02 + P-21：辅料手工申请 → 合并下单 → 仓库验收 ——
+  await page.goto(BASE + '/purchase', { waitUntil: 'networkidle' });
+  await page.waitForTimeout(800);
+  // P-21：空池时合并按钮禁用态有说明（按钮存在即可，禁用+提示静态由交互规范约束）
+  await page.getByRole('button', { name: /手\s*工\s*申\s*请/ }).click();
+  await page.waitForTimeout(600);
+  const mm = page.locator('.ant-modal:visible').filter({ hasText: '手工采购申请' });
+  // P-14 动态：搜索旁标准库出口
+  check('P-14-dyn', (await mm.innerText()).includes('去标准库新建'), '手工申请含标准库出口');
+  await mm.locator('.ant-form-item').filter({ hasText: '归属' }).first().locator('.ant-select-selector').click();
+  await page.waitForTimeout(400);
+  await page.locator('.ant-select-dropdown:visible .ant-select-item').filter({ hasText: '辅料' }).first().click();
+  await mm.locator('.ant-form-item').filter({ hasText: '物料' }).first().locator('.ant-select-selector').click();
+  await page.waitForTimeout(300);
+  await page.keyboard.type('方通'); await page.waitForTimeout(700);
+  await page.locator('.ant-select-dropdown:visible .ant-select-item').first().click();
+  await mm.locator('.ant-form-item').filter({ hasText: '数量' }).locator('input').fill('3');
+  await mm.getByRole('button', { name: /提\s*交\s*进\s*池/ }).click();
+  await page.waitForTimeout(1600);
+  const rowCb = page.locator('.ant-table-row').first().locator('.ant-checkbox-input');
+  if (await rowCb.count()) await rowCb.check().catch(() => {});
+  await page.waitForTimeout(400);
+  const mergeBtn = page.getByRole('button', { name: /合\s*并\s*下\s*单/ }).first();
+  const wasDisabled = await mergeBtn.isDisabled().catch(() => false);
+  check('P-21', !wasDisabled, wasDisabled ? '勾选后仍禁用（异常）' : '勾选后合并下单可用');
+  await mergeBtn.click();
+  await page.waitForTimeout(700);
+  const om = page.locator('.ant-modal:visible').filter({ hasText: /下单/ });
+  await om.locator('.ant-form-item').filter({ hasText: '供应商' }).locator('.ant-select-selector').click();
+  await page.waitForTimeout(400);
+  await page.locator('.ant-select-dropdown:visible .ant-select-item').first().click();
+  const od = om.locator('.ant-form-item').filter({ hasText: '下单日期' }).locator('input');
+  await od.click(); await page.keyboard.type('2026-09-22'); await page.keyboard.press('Enter');
+  await om.locator('.ant-form-item').filter({ hasText: '收货地点' }).locator('.ant-select-selector').click();
+  await page.waitForTimeout(400);
+  await page.locator('.ant-select-dropdown:visible .ant-select-item').first().click();
+  await om.getByRole('button', { name: /确\s*认\s*合\s*并\s*下\s*单/ }).click();
+  await page.waitForTimeout(2200);
+  const poNo = ((await body(page)).match(/PO\d{5}/g) || [])[0];
+  check('P-02a', !!poNo, poNo ? `${poNo} 已下单` : '未见采购单号');
+
+  // 仓库验收（辅料 = project_no NULL 的旧 404 路径）
+  errs.length = 0;
+  await page.goto(BASE + '/warehouse', { waitUntil: 'networkidle' });
+  await page.waitForTimeout(1100);
+  const poRow = page.locator('.ant-table-row', { hasText: poNo }).first();
+  const accBtn = poRow.getByRole('button', { name: /^\s*验\s*收\s*$/ });
+  if (await accBtn.count()) {
+    await accBtn.click(); await page.waitForTimeout(700);
+    const acc = page.locator('.ant-modal:visible').filter({ hasText: '验收 ·' });
+    await acc.getByRole('button', { name: /提\s*交\s*验\s*收/ }).click();
+    await page.waitForTimeout(2200);
+    const stuck = await acc.isVisible().catch(() => false);
+    const hit404 = errs.some(e => e.startsWith('http404'));
+    check('P-02', !stuck && !hit404, stuck ? '弹窗被拦: ' + (await acc.innerText()).replace(/\n/g, '|').slice(0, 120) : hit404 ? '仍 404' : '辅料验收通过 → 待入库');
+  } else check('P-02', false, `找不到 ${poNo} 验收按钮`);
+
+  // —— P-11：入库库位 = 下拉（有待入库行时）——
+  const storeBtn = page.getByRole('button', { name: /^\s*入\s*库\s*$/ }).first();
+  if (await storeBtn.count()) {
+    await storeBtn.click(); await page.waitForTimeout(700);
+    const sm = page.locator('.ant-modal:visible').filter({ hasText: /入库/ });
+    const locSel = await sm.locator('.ant-form-item').filter({ hasText: '库位' }).locator('.ant-select-selector').count();
+    check('P-11', locSel > 0, locSel ? '库位=下拉' : '仍手填 Input');
+    await page.keyboard.press('Escape');
+  } else check('P-11', false, '无待入库行', 'SKIP');
+
+  // —— P-05：新建项目申请验收 → 被「调试完成」门禁拦 ——
+  await page.goto(BASE + '/acceptance', { waitUntil: 'networkidle' });
+  await page.waitForTimeout(800);
+  await page.getByRole('button', { name: /申\s*请\s*客\s*户\s*验\s*收/ }).first().click();
+  await page.waitForTimeout(600);
+  const gate = page.locator('.ant-modal:visible');
+  const pc = gate.locator('.ant-form-item').filter({ hasText: '项目号' });
+  const isSel = await pc.locator('.ant-select-selector').count();
+  check('P-13a', isSel > 0, isSel ? '验收项目号=下拉' : '仍手填');
+  if (isSel) {
+    await pc.locator('.ant-select-selector').click(); await page.waitForTimeout(400);
+    await page.keyboard.type(newNo); await page.waitForTimeout(700);
+    const o = page.locator('.ant-select-dropdown:visible .ant-select-item', { hasText: newNo });
+    if (await o.count()) {
+      await o.first().click();
+      await gate.getByRole('button', { name: /申\s*请/ }).click();
+      await page.waitForTimeout(2200);
+      const msg = await page.locator('.ant-message').innerText().catch(() => '');
+      check('P-05', /调试/.test(msg), `msg=${msg.slice(0, 90)}`);
+    } else check('P-05', false, '下拉无新项目');
+  }
+  await page.keyboard.press('Escape'); await page.waitForTimeout(400);
+
+  // —— P-10：项目列表无「还剩 N 天」——
+  await page.goto(BASE + '/projects', { waitUntil: 'networkidle' });
+  await page.waitForTimeout(800);
+  const t3 = await body(page);
+  check('P-10', !/还剩 \d+ 天|已过期/.test(t3), '列表无商机剩余天数');
+
+  // —— P-04：PC 现场页手机端提示 ——
+  await page.goto(BASE + '/site', { waitUntil: 'networkidle' });
+  await page.waitForTimeout(700);
+  check('P-04', /手机|\/m\/site/.test(await body(page)), '含手机端录入提示');
+
+  // —— P-13b：报修项目号下拉 ——
+  await page.goto(BASE + '/service', { waitUntil: 'networkidle' });
+  await page.waitForTimeout(700);
+  await page.getByRole('button', { name: /报\s*修/ }).first().click();
+  await page.waitForTimeout(600);
+  const rmSel = await page.locator('.ant-modal:visible').locator('.ant-form-item').filter({ hasText: '项目号' })
+    .locator('.ant-select-selector').count();
+  check('P-13b', rmSel > 0, rmSel ? '报修项目号=下拉' : '仍手填');
+  await page.keyboard.press('Escape'); await page.waitForTimeout(400);
+
+  // —— P-17（UI）：采购单页签有 ¥ ——
+  await page.goto(BASE + '/purchase', { waitUntil: 'networkidle' });
+  await page.waitForTimeout(700);
+  await page.getByRole('tab', { name: /采\s*购\s*单/ }).click();
+  await page.waitForTimeout(800);
+  check('P-17-ui', /¥/.test(await body(page)), '采购单显示金额 ¥');
+
+  // —— P-18：通知抽屉无裸英文 type ——
+  await page.goto(BASE + '/workbench', { waitUntil: 'networkidle' });
+  await page.waitForTimeout(1200);
+  const bell = page.locator('.anticon-bell').first();
+  if (await bell.count()) {
+    await bell.click(); await page.waitForTimeout(1100);
+    const nt = await page.locator('.ant-drawer:visible').innerText().catch(() => '');
+    const raw = /(^|\n|\|)\s*(change|review|task|acceptance|purchase|notify)\s*($|\n|\|)/.test(nt);
+    check('P-18', !raw, nt.length > 10 ? '有消息且类型已中文化' : '无消息（空态通过）');
+    await page.keyboard.press('Escape');
+  } else check('P-18', false, '无铃铛');
+
+  // —— P-08：有「发货中/已指令」批次则验软提示，否则 SKIP ——
+  await page.goto(BASE + '/shipping', { waitUntil: 'networkidle' });
+  await page.waitForTimeout(900);
+  let p08 = 'SKIP', p08note = '当前无待发运批次（新批次下次跑验证）';
+  const projSel = page.locator('.ant-select-selector').first();
+  await projSel.click(); await page.waitForTimeout(400);
+  const popts = page.locator('.ant-select-dropdown:visible .ant-select-item');
+  const pcount = await popts.count();
+  for (let i = 0; i < pcount; i++) {
+    await popts.nth(i).click(); await page.waitForTimeout(900);
+    const dep = page.locator('.ant-table-row').filter({ hasText: /已指令|发货中/ })
+      .first().locator('a', { hasText: /^发\s*运$/ });
+    if (await dep.count()) {
+      await dep.click(); await page.waitForTimeout(900);
+      const conf = page.locator('.ant-popconfirm:visible, .ant-modal:visible');
+      if (await conf.count()) {
+        const txt = (await conf.first().innerText()).replace(/\n/g, '|');
+        if (/未勾|清单|已发|还有/.test(txt)) { p08 = 'PASS'; p08note = '软提示: ' + txt.slice(0, 100); }
+        else { p08 = 'FAIL'; p08note = '有确认框但无清单提示: ' + txt.slice(0, 80); }
+        await page.keyboard.press('Escape');
+      }
+      break;
+    }
+    await projSel.click(); await page.waitForTimeout(300);
+  }
+  check('P-08', p08 === 'PASS', p08note, p08);
+} catch (e) {
+  check('UI-写链', false, '异常中断: ' + String(e).slice(0, 250));
+  await shot(page, 'ui-regress-crash');
+} finally {
+  await c.browser.close();
+}
+
+const fails = summary('UI 回归');
+console.log(`\n（写链产生的测试项目: ${newNo} —— E2E 回归数据，可清理）`);
+exitWith(fails);

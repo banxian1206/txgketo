@@ -7,6 +7,10 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "tsc": "tsc --noEmit",
+    "e2e": "node e2e/run.mjs",
+    "e2e:static": "node e2e/run.mjs static",
+    "e2e:api": "node e2e/run.mjs api",
+    "e2e:ui": "node e2e/run.mjs ui",
     "preview": "vite preview"
   },
   "dependencies": {
@@ -21,6 +25,7 @@
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
     "@vitejs/plugin-react": "^4.3.3",
+    "playwright-core": "^1.63.0",
     "typescript": "^5.6.3",
     "vite": "^5.4.10"
   }
