@@ -40,14 +40,7 @@ import {
 } from '../api/client'
 import MfgPhotoPicker from '../components/MfgPhotoPicker'
 import { SelectEquipment, SelectProject } from '../components/fields'
-
-const SO_COLOR: Record<string, string> = {
-  待受理: 'error',
-  已派工: 'processing',
-  已到场: 'gold',
-  待客户签字: 'cyan',
-  已关闭: 'success',
-}
+import { SERVICE_ORDER_STATUS as SO_COLOR } from '../theme/status'
 
 type Kind = 'create' | 'dispatch' | 'fix' | 'sign' | 'part' | 'move'
 

@@ -9,17 +9,7 @@ import {
   markNotificationRead,
   type NotificationRow,
 } from '../api/client'
-
-const TYPE_COLOR: Record<string, string> = {
-  task: 'blue',
-  review: 'gold',
-  change: 'purple',
-  release: 'green',
-  warehouse: 'cyan',
-  purchase: 'orange',
-  acceptance: 'geekblue',
-  service: 'magenta',
-}
+import { NOTIF_TYPE as TYPE_COLOR } from '../theme/status'
 
 // 通知类型中文名（P-18：不再裸露英文 type）
 const TYPE_LABEL: Record<string, string> = {

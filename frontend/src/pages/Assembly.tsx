@@ -36,13 +36,7 @@ import {
 import AuthedImage from '../components/AuthedImage'
 import MfgPhotoPicker from '../components/MfgPhotoPicker'
 import { mfgPhotoUrl } from '../api/client'
-
-const STATUS_COLOR: Record<string, string> = {
-  装配中: 'processing',
-  已装配: 'gold',
-  调试中: 'gold',
-  调试完成: 'success',
-}
+import { ASSEMBLY_STATUS as STATUS_COLOR } from '../theme/status'
 
 const rateColor = (r: number) => (r >= 1 ? '#52c41a' : r >= 0.6 ? '#1677ff' : '#faad14')
 

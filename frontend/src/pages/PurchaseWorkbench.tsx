@@ -19,26 +19,8 @@ import {
   type PurchasePoolDemand,
   type PurchasePoolGroup,
 } from '../api/client'
-
-const ORDER_STATUS_COLOR: Record<string, string> = {
-  现场待验收: 'gold',
-  在途: 'gold',
-  待入库: 'processing',
-  部分到货: 'cyan',
-  已完成: 'success',
-  不合格: 'error',
-  已退货: 'default',
-  已取消: 'default',
-}
-
-const RECEIPT_STATUS_COLOR: Record<string, string> = {
-  待入库: 'processing',
-  已入库: 'success',
-  现场已验收: 'purple',
-  不合格: 'error',
-  已换货: 'orange',
-  已退货: 'default',
-}
+import { ORDER_STATUS as ORDER_STATUS_COLOR } from '../theme/status'
+import { RECEIPT_STATUS as RECEIPT_STATUS_COLOR } from '../theme/status'
 
 const today = () => dayjs().format('YYYY-MM-DD')
 

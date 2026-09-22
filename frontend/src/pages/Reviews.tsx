@@ -4,15 +4,7 @@ import { useCallback, useEffect, useState } from 'react'
 
 import ReviewDetailModal from '../components/ReviewDetailModal'
 import { errMsg, listReviewTickets, me, type ReviewTicketBrief, type User } from '../api/client'
-
-const STATUS_COLOR: Record<string, string> = {
-  待经理审: 'processing',
-  待总监审: 'gold',
-  已退回: 'error',
-  已撤回: 'default',
-  已发布: 'success',
-  已通过: 'success',
-}
+import { REVIEW_STATUS as STATUS_COLOR } from '../theme/status'
 
 /** 设计评审：待我审核 / 我提交的 / 全部（05 卷 §3、§9 评审工作台） */
 export default function Reviews() {

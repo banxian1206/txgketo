@@ -30,8 +30,7 @@ import { useRequest } from '../hooks/useRequest'
 import { useSubmit } from '../hooks/useSubmit'
 
 import { api, createLocation, errMsg, generateEquipmentIssue, hasPerm, inspectPurchase, listEquipment, listLocations, listProjects, manualInbound, searchItems, storeReceipt, type GoodsReceiptRow, type ItemLite, type LocationRow } from '../api/client'
-
-const ISSUE_COLOR: Record<string, string> = { 待备料: 'gold', 已备料: 'processing', 已领走: 'success' }
+import { WH_ISSUE_STATUS as ISSUE_COLOR } from '../theme/status'
 
 /** 在路上 / 部分到货：货到了就在这行上验收 */
 interface IncomingRow {

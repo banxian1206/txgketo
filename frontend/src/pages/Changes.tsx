@@ -4,15 +4,7 @@ import { useCallback, useEffect, useState } from 'react'
 
 import ChangeDetailModal from '../components/ChangeDetailModal'
 import { errMsg, listChangeRequests, type ChangeRequestRow } from '../api/client'
-
-const STATUS_COLOR: Record<string, string> = {
-  待裁决: 'processing',
-  已批准: 'blue',
-  已否决: 'error',
-  已下发: 'gold',
-  已完成: 'success',
-  已归档: 'default',
-}
+import { CHANGE_STATUS as STATUS_COLOR } from '../theme/status'
 
 /** 改版（ECN）工作台（05 卷 §7、§9）：提申请 → 总监裁决 → 下发 → 修订 → 重审发布 */
 export default function Changes() {

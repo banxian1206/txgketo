@@ -10,15 +10,7 @@ import {
   type ReviewTicketDetail,
   type User,
 } from '../api/client'
-
-const STATUS_COLOR: Record<string, string> = {
-  待经理审: 'processing',
-  待总监审: 'gold',
-  已退回: 'error',
-  已撤回: 'default',
-  已发布: 'success',
-  已通过: 'success',
-}
+import { REVIEW_STATUS as STATUS_COLOR } from '../theme/status'
 
 interface Props {
   ticketId: number | null

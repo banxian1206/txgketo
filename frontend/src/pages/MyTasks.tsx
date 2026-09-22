@@ -31,22 +31,8 @@ import {
   type User,
   type UserRow,
 } from '../api/client'
-
-const STATUS_COLOR: Record<string, string> = {
-  待开始: 'default',
-  进行中: 'processing',
-  已完成: 'success',
-  已取消: 'default',
-}
-
-const TYPE_COLOR: Record<string, string> = {
-  设计: 'blue',
-  采购: 'gold',
-  制造: 'purple',
-  装配: 'cyan',
-  调试: 'orange',
-  现场: 'magenta',
-}
+import { TASK_STATUS as STATUS_COLOR } from '../theme/status'
+import { TASK_TYPE as TYPE_COLOR } from '../theme/status'
 
 /** 我的任务（工作台）：我的任务 / 我组任务（经理，05 卷 §2.2） */
 export default function MyTasks() {

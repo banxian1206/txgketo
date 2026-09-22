@@ -30,28 +30,9 @@ import {
   type PurchaseOrderLine,
   type SupplierRow,
 } from '../api/client'
-
-const STATUS_COLOR: Record<string, string> = {
-  待采购: 'default',
-  已下单: 'blue',
-  在途: 'gold',
-  待入库: 'processing',
-  部分到货: 'cyan',
-  已入库: 'success',
-  现场已验收: 'purple',
-  不合格: 'error',
-  已退货: 'default',
-  已取消: 'default',
-}
-
-const RECEIPT_COLOR: Record<string, string> = {
-  待入库: 'processing',
-  已入库: 'success',
-  现场已验收: 'purple',
-  不合格: 'error',
-  已换货: 'orange',
-  已退货: 'default',
-}
+import { PURCHASE_LINE_STATUS as STATUS_COLOR } from '../theme/status'
+import { RECEIPT_STATUS as RECEIPT_COLOR } from '../theme/status'
+import { ORDER_STATUS as ORDER_STATUS_COLOR } from '../theme/status'
 
 /** 到货单状态在行内标签上的短文案 */
 const RECEIPT_LABEL: Record<string, string> = {
@@ -61,16 +42,6 @@ const RECEIPT_LABEL: Record<string, string> = {
   不合格: '不合格',
   已换货: '换货',
   已退货: '退货',
-}
-
-const ORDER_STATUS_COLOR: Record<string, string> = {
-  在途: 'gold',
-  待入库: 'processing',
-  部分到货: 'cyan',
-  已完成: 'success',
-  不合格: 'error',
-  已退货: 'default',
-  已取消: 'default',
 }
 
 /** 还能取消的行（没落地）；待入库/已入库要走入库，不合格要走换货/退货 */

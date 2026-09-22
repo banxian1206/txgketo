@@ -43,9 +43,8 @@ import {
 } from '../api/client'
 import AuthedImage from '../components/AuthedImage'
 import MfgPhotoPicker from '../components/MfgPhotoPicker'
-
-const ISSUE_COLOR: Record<string, string> = { 待处理: 'error', 已转变更: 'processing', 已闭环: 'success' }
-const COMMISSION_COLOR: Record<string, string> = { 已申请: 'gold', 已到现场: 'processing', 已开始调试: 'success' }
+import { SITE_ISSUE_STATUS as ISSUE_COLOR } from '../theme/status'
+import { SITE_COMMISSION_STATUS as COMMISSION_COLOR } from '../theme/status'
 
 /** 现场台（PC，S8）：给项目经理/现场负责人看整体 —— 手机端是现场的主终端。 */
 export default function Site() {

@@ -17,9 +17,9 @@ import {
   type KittingResult,
 } from '../../api/client'
 import MfgPhotoPicker from '../../components/MfgPhotoPicker'
+import { ASSEMBLY_STATUS as STATUS_COLOR } from '../../theme/status'
 
 const rateColor = (r: number) => (r >= 1 ? '#52c41a' : r >= 0.6 ? '#1677ff' : '#faad14')
-const STATUS_COLOR: Record<string, string> = { 装配中: 'processing', 已装配: 'gold', 调试中: 'gold', 调试完成: 'success' }
 
 /** 车间手机端 · 装配与齐套率（S6）：齐套率只展示，随时可开装（勾选 + 拍照）。 */
 export default function AssemblyM() {

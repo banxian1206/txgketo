@@ -43,6 +43,7 @@ import {
   type ProjectMember,
   type PurchaseRequestItem,
 } from '../api/client'
+import { LONGLEAD_STATUS as STATUS_COLOR } from '../theme/status'
 
 const PROJECT_ROLES = [
   '项目经理',
@@ -61,18 +62,6 @@ const PROJECT_ROLES = [
 
 const EQUIPMENT_KINDS = ['单机', '工位', '线体']
 const MILESTONE_STATUS = ['未开始', '进行中', '已完成', '延期']
-
-const STATUS_COLOR: Record<string, string> = {
-  未开始: 'default',
-  进行中: 'processing',
-  已完成: 'success',
-  延期: 'error',
-  待采购: 'default',
-  已下单: 'blue',
-  在途: 'gold',
-  已到货: 'success',
-  已取消: 'default',
-}
 
 interface Props {
   projectNo: string

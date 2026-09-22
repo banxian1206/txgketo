@@ -5,15 +5,7 @@ import { useNavigate } from 'react-router-dom'
 
 import AttachmentPreviewModal, { type PreviewState } from '../components/AttachmentPreviewModal'
 import { errMsg, listProjects, previewAttachment, type Project } from '../api/client'
-
-const STAGE_COLOR: Record<string, string> = {
-  线索: 'blue',
-  成交待立项: 'gold',
-  执行中: 'processing',
-  交付中: 'cyan',
-  质保: 'purple',
-  已关闭: 'default',
-}
+import { PROJECT_STAGE as STAGE_COLOR } from '../theme/status'
 
 function isImage(name: string) {
   return ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'svg'].includes(

@@ -31,10 +31,10 @@ import {
   type SiteWorkbench,
 } from '../../api/client'
 import MfgPhotoPicker from '../../components/MfgPhotoPicker'
+import { SITE_ISSUE_STATUS as ISSUE_COLOR } from '../../theme/status'
+import { SITE_COMMISSION_STATUS as COMMISSION_COLOR } from '../../theme/status'
 
 type Kind = 'survey' | 'daily' | 'issue' | 'commission' | 'incoming' | 'acc-apply' | 'acc-confirm'
-const ISSUE_COLOR: Record<string, string> = { 待处理: 'error', 已转变更: 'processing', 已闭环: 'success' }
-const COMMISSION_COLOR: Record<string, string> = { 已申请: 'gold', 已到现场: 'processing', 已开始调试: 'success' }
 
 /** 现场手机端（S8）：现场以手机为唯一终端 —— 勘测 / 来货清点 / 每日汇报 / 问题 / 申请调试。 */
 export default function SiteM() {

@@ -17,22 +17,8 @@ import {
   type TaskItem,
   type WorkbenchMe,
 } from '../../api/client'
-
-const STATE_COLOR: Record<string, string> = {
-  已发布: 'success',
-  审核中: 'processing',
-  已退回: 'error',
-  进行中: 'blue',
-  待开始: 'default',
-  未派: 'default',
-}
-
-const TASK_STATUS_COLOR: Record<string, string> = {
-  待开始: 'default',
-  进行中: 'processing',
-  已完成: 'success',
-  已取消: 'default',
-}
+import { ENG_BOARD_STATE as STATE_COLOR } from '../../theme/status'
+import { TASK_STATUS as TASK_STATUS_COLOR } from '../../theme/status'
 
 const PROFS = ['机械', '电气', '程序', '工艺']
 

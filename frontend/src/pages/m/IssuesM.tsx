@@ -2,8 +2,7 @@ import { App, Button, Card, Empty, Input, Modal, Space, Tag, Typography } from '
 import { useCallback, useEffect, useState } from 'react'
 
 import { api, errMsg } from '../../api/client'
-
-const STATUS_COLOR: Record<string, string> = { 待备料: 'gold', 已备料: 'processing', 已领走: 'success' }
+import { WH_ISSUE_STATUS as STATUS_COLOR } from '../../theme/status'
 
 interface IssueLine {
   id: number

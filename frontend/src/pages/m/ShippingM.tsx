@@ -19,8 +19,7 @@ import {
 } from '../../api/client'
 import AuthedImage from '../../components/AuthedImage'
 import MfgPhotoPicker from '../../components/MfgPhotoPicker'
-
-const SHIP_COLOR: Record<string, string> = { 已指令: 'default', 发货中: 'processing', 已装车: 'cyan', 在途: 'gold', 已到货: 'blue', 已签收: 'success' }
+import { SHIP_STATUS as SHIP_COLOR } from '../../theme/status'
 
 /** 手机端 · 发运（S7）：散件发运，逐项勾「已发」+ 拍照；现场按清单清点。 */
 export default function ShippingM() {

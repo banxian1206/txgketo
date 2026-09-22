@@ -36,9 +36,10 @@ import {
 import { SelectProject } from '../components/fields'
 import { acceptanceDocUrl } from '../api/client'
 import { readSession } from '../contexts/session'
+import { ACCEPTANCE_STATUS as ACC_COLOR } from '../theme/status'
 
 const DOC_TYPES = ['技术协议', '图纸清单', '检验报告', '调试记录', '操作手册', '备件清单', '培训记录', '验收单', '其他']
-const ACC_COLOR: Record<string, string> = { 待验收: 'gold', 已通过: 'success', 未通过: 'error' }
+
 const API = import.meta.env.VITE_API_BASE ?? '/api/v1'
 
 /** 验收与质保（S10）：调试完成 → 申请验收 → 资料包 → 客户确认 → 自动质保。 */

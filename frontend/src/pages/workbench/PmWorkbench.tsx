@@ -4,15 +4,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
 import { errMsg, pmBoard, workbenchMe, type PmBoard, type PmProjectRow, type WorkbenchMe } from '../../api/client'
-
-const STAGE_COLOR: Record<string, string> = {
-  线索: 'default',
-  成交待立项: 'gold',
-  执行中: 'processing',
-  交付中: 'cyan',
-  质保: 'purple',
-  已关闭: 'default',
-}
+import { PROJECT_STAGE as STAGE_COLOR } from '../../theme/status'
 
 /** 项目经理台（06 卷 §3）：我项目的全链进度（设计 → 采购 → 到货/入库）+ 风险/待办 */
 export default function PmWorkbench() {

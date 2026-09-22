@@ -3,15 +3,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
 import { errMsg, salesBoard, workbenchMe, type SalesBoard, type WorkbenchMe } from '../../api/client'
-
-const STAGE_COLOR: Record<string, string> = {
-  线索: 'default',
-  成交待立项: 'gold',
-  执行中: 'processing',
-  交付中: 'cyan',
-  质保: 'purple',
-  已关闭: 'default',
-}
+import { PROJECT_STAGE as STAGE_COLOR } from '../../theme/status'
 
 /** 商务部工作台（06 卷 §3）：我的商机 → 成交待立项 → 执行中 + 回款 */
 export default function SalesWorkbench() {

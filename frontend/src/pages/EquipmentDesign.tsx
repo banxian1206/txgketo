@@ -65,43 +65,11 @@ import {
   type User,
   type VersionRow,
 } from '../api/client'
-
-const STATUS_COLOR: Record<string, string> = {
-  草稿: 'default',
-  审核中: 'processing',
-  已发布: 'success',
-  已作废: 'default',
-}
-
-const STATE_COLOR: Record<string, string> = {
-  未开始: 'default',
-  设计中: 'processing',
-  设计BOM已提交: 'gold',
-  BOM完整: 'success',
-}
-
-const REVIEW_STATUS_COLOR: Record<string, string> = {
-  待经理审: 'processing',
-  待总监审: 'gold',
-  已退回: 'error',
-  已撤回: 'default',
-  已通过: 'success',
-}
-
-const CHANGE_STATUS_COLOR: Record<string, string> = {
-  待裁决: 'processing',
-  已批准: 'blue',
-  已否决: 'error',
-  已下发: 'gold',
-  已完成: 'success',
-  已归档: 'default',
-}
-
-const BOM_STATUS_COLOR: Record<string, string> = {
-  草稿: 'default',
-  审核中: 'processing',
-  已冻结: 'success',
-}
+import { DRAWING_STATUS as STATUS_COLOR } from '../theme/status'
+import { DESIGN_STATE as STATE_COLOR } from '../theme/status'
+import { REVIEW_STATUS as REVIEW_STATUS_COLOR } from '../theme/status'
+import { CHANGE_STATUS as CHANGE_STATUS_COLOR } from '../theme/status'
+import { BOM_STATUS as BOM_STATUS_COLOR } from '../theme/status'
 
 interface TreeNode {
   drawing_no: string

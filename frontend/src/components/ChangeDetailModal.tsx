@@ -30,15 +30,7 @@ import {
   type User,
   type UserRow,
 } from '../api/client'
-
-const STATUS_COLOR: Record<string, string> = {
-  待裁决: 'processing',
-  已批准: 'blue',
-  已否决: 'error',
-  已下发: 'gold',
-  已完成: 'success',
-  已归档: 'default',
-}
+import { CHANGE_STATUS as STATUS_COLOR } from '../theme/status'
 
 interface Props {
   crId: number | null

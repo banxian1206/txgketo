@@ -48,22 +48,9 @@ import {
 import MfgPhotoPicker from '../components/MfgPhotoPicker'
 import AuthedImage from '../components/AuthedImage'
 import AuthedFileLink from '../components/AuthedFileLink'
+import { PROD_STATUS as STATUS_COLOR } from '../theme/status'
+import { OUTSOURCE_STATUS as OS_COLOR } from '../theme/status'
 
-const STATUS_COLOR: Record<string, string> = {
-  待领料: 'default',
-  已派工: 'processing',
-  制造中: 'processing',
-  完工待验收: 'gold',
-  已转运: 'success',
-  返工: 'error',
-}
-const OS_COLOR: Record<string, string> = {
-  待发出: 'default',
-  外协中: 'processing',
-  回厂待检: 'gold',
-  合格: 'success',
-  已取消: 'default',
-}
 const TEAMS = ['下料', '机加', '焊接', '钣金', '喷涂']
 
 type ActionKind = 'dispatch' | 'accept' | 'transfer' | 'os-send' | 'os-accept'

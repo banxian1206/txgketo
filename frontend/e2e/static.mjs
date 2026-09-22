@@ -55,9 +55,9 @@ check('P-14', has('components/ManualPurchaseModal.tsx', /去标准库新建/), '
 
 // 视觉规范 §8 结构性指标：当前基线防倒退（Phase 1.5 收敛后把基线改成目标值 1）
 const colorMaps = grepAll(/_COLOR\s*:\s*Record/);
-const COLOR_BASELINE = 43; // 2026-09-22 实测；Phase1.5 目标 =1，届时收紧
-check('VIS-状态色Map', colorMaps.length <= COLOR_BASELINE,
-  `${colorMaps.length} 个（基线 ${COLOR_BASELINE}；Phase1.5 目标 =1，届时收紧此断言）`);
+// 1.5 已收敛：43 张散落 Map → theme/status.ts（24 张域表），业务文件禁止再定义
+check('VIS-状态色Map', colorMaps.length === 0,
+  colorMaps.length ? `业务文件又冒出自定义状态色 Map: ${colorMaps.slice(0, 4).join(', ')}` : '0（全部收敛在 theme/status.ts）');
 
 // 图标：emoji 不进 UI chrome（视觉规范 §4）—— 基线 9（全在 MobileLayout，Phase1.5 换 antd icons 后收紧为 0）
 const emoji = grepAll(/icon:\s*'[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/u);

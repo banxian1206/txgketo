@@ -31,13 +31,7 @@ import {
   type MobileMaterial,
 } from '../../api/client'
 import { compressImage } from '../../utils/image'
-
-const RECEIPT_COLOR: Record<string, string> = {
-  待入库: 'processing',
-  已入库: 'success',
-  不合格: 'error',
-  现场已验收: 'purple',
-}
+import { RECEIPT_STATUS as RECEIPT_COLOR } from '../../theme/status'
 
 /** 手机端到货验收动线（03 卷）：看电子图纸 → 拍照 → 合格/不合格 → 入库 */
 export default function AcceptM() {

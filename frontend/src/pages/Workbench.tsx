@@ -12,24 +12,8 @@ import {
   type NotificationRow,
   type WorkbenchMe,
 } from '../api/client'
-
-const TYPE_COLOR: Record<string, string> = {
-  task: 'blue',
-  review: 'gold',
-  change: 'purple',
-  release: 'green',
-  warehouse: 'cyan',
-  purchase: 'orange',
-}
-
-const STAGE_COLOR: Record<string, string> = {
-  线索: 'default',
-  成交待立项: 'gold',
-  执行中: 'processing',
-  交付中: 'cyan',
-  质保: 'purple',
-  已关闭: 'default',
-}
+import { WB_TYPE as TYPE_COLOR } from '../theme/status'
+import { PROJECT_STAGE as STAGE_COLOR } from '../theme/status'
 
 interface TodoCard {
   label: string
