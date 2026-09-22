@@ -754,7 +754,7 @@ export default function Warehouse() {
                 style={{ width: '100%' }}
                 min={0.001}
                 max={acceptTarget ? Math.max(0.001, acceptTarget.qty - acceptTarget.qty_received) : undefined}
-                addonAfter={acceptTarget?.unit ?? undefined}
+                suffix={acceptTarget?.unit ?? undefined}
               />
             </Form.Item>
           </Space>

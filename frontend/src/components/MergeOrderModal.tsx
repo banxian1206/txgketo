@@ -324,7 +324,7 @@ export default function MergeOrderModal({
                 style={{ width: '100%' }}
                 min={0.001}
                 value={v}
-                addonAfter={l.unit ?? undefined}
+                suffix={l.unit ?? undefined}
                 onChange={(x) => setLine(l.request_id, { qty: Number(x) || 0 })}
               />
             ),

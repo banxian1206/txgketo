@@ -325,7 +325,7 @@ export default function ProjectFormFields({
               label="项目交期（天）"
               tooltip="从签订合同之后开始算，整个项目干多少天（如 90 天）"
             >
-              <InputNumber style={{ width: '100%' }} min={1} max={3650} addonAfter="天" />
+              <InputNumber style={{ width: '100%' }} min={1} max={3650} suffix="天" />
             </Form.Item>
           </Col>
           <Col span={5}>
@@ -452,7 +452,7 @@ export default function ProjectFormFields({
             </Col>
             <Col span={4}>
               <Form.Item name="warranty_months" label="质保期（月）">
-                <InputNumber style={{ width: '100%' }} min={0} addonAfter="月" />
+                <InputNumber style={{ width: '100%' }} min={0} suffix="月" />
               </Form.Item>
             </Col>
             <Col span={8}>

@@ -749,7 +749,7 @@ export function LongLeadEditor({ projectNo, onChanged }: Omit<Props, 'users'>) {
               style={{ minWidth: 140 }}
               rules={[{ required: true, message: '填周期' }]}
             >
-              <InputNumber style={{ width: '100%' }} min={0} addonAfter="天" />
+              <InputNumber style={{ width: '100%' }} min={0} suffix="天" />
             </Form.Item>
           </Space>
           <Space style={{ display: 'flex' }} size="middle">

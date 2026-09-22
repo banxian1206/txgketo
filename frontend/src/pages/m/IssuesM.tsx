@@ -1,4 +1,4 @@
-import { App, Button, Card, Empty, Space, Tag, Typography } from 'antd'
+import { App, Button, Card, Empty, Input, Modal, Space, Tag, Typography } from 'antd'
 import { useCallback, useEffect, useState } from 'react'
 
 import { api, errMsg } from '../../api/client'
@@ -33,6 +33,8 @@ export default function IssuesM() {
   const [rows, setRows] = useState<IssueRow[]>([])
   const [loading, setLoading] = useState(true)
   const [busyId, setBusyId] = useState<number | null>(null)
+  const [handOverId, setHandOverId] = useState<number | null>(null)
+  const [handOverTo, setHandOverTo] = useState('')
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -51,16 +53,36 @@ export default function IssuesM() {
   }, [load])
 
   const act = async (id: number, action: 'pick' | 'hand-over') => {
-    const body: Record<string, unknown> = {}
     if (action === 'hand-over') {
-      const who = window.prompt('领料人（车间）')
-      if (!who) return
-      body.issued_to = who
+      // 领料人用弹窗录入（P-12：不再用浏览器原生 prompt）
+      setHandOverId(id)
+      setHandOverTo('')
+      return
     }
     setBusyId(id)
     try {
-      await api.post(`/warehouse/issues/${id}/${action}`, body)
-      message.success(action === 'pick' ? '已备料' : '已领走')
+      await api.post(`/warehouse/issues/${id}/pick`, {})
+      message.success('已备料')
+      await load()
+    } catch (e) {
+      message.error(errMsg(e))
+    } finally {
+      setBusyId(null)
+    }
+  }
+
+  const doHandOver = async () => {
+    if (!handOverId) return
+    if (!handOverTo.trim()) {
+      message.warning('请填领料人（谁领走的）')
+      return
+    }
+    const id = handOverId
+    setBusyId(id)
+    try {
+      await api.post(`/warehouse/issues/${id}/hand-over`, { issued_to: handOverTo.trim() })
+      message.success('已领走')
+      setHandOverId(null)
       await load()
     } catch (e) {
       message.error(errMsg(e))
@@ -109,6 +131,22 @@ export default function IssuesM() {
           </Space>
         </Card>
       ))}
+
+      <Modal
+        title="车间领走"
+        open={handOverId !== null}
+        onCancel={() => setHandOverId(null)}
+        onOk={() => void doHandOver()}
+        confirmLoading={busyId !== null}
+        okText="确认领走"
+        destroyOnHidden
+      >
+        <Input
+          value={handOverTo}
+          onChange={(e) => setHandOverTo(e.target.value)}
+          placeholder="领料人（车间），如：李四"
+        />
+      </Modal>
     </>
   )
 }

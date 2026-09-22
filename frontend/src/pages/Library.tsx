@@ -156,7 +156,7 @@ export default function Library() {
     if (f.type === 'number') {
       return (
         <Form.Item key={f.code} name={`spec_${f.code}`} label={f.name} rules={rules}>
-          <InputNumber style={{ width: '100%' }} addonAfter={f.unit} />
+          <InputNumber style={{ width: '100%' }} suffix={f.unit} />
         </Form.Item>
       )
     }

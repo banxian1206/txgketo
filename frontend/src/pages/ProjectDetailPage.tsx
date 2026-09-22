@@ -1176,7 +1176,7 @@ export default function ProjectDetailPage() {
             </Col>
             <Col span={6}>
               <Form.Item name="warranty_months" label="质保期（月）" rules={[{ required: true, message: '必填' }]}>
-                <InputNumber style={{ width: '100%' }} min={0} addonAfter="月" />
+                <InputNumber style={{ width: '100%' }} min={0} suffix="月" />
               </Form.Item>
             </Col>
             <Col span={8}>
@@ -1243,7 +1243,7 @@ export default function ProjectDetailPage() {
                     </Col>
                     <Col span={4}>
                       <Form.Item name={[field.name, 'percent']}>
-                        <InputNumber style={{ width: '100%' }} min={0} max={100} addonAfter="%" />
+                        <InputNumber style={{ width: '100%' }} min={0} max={100} suffix="%" />
                       </Form.Item>
                     </Col>
                     <Col span={12}>
