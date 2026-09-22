@@ -170,6 +170,7 @@ export default function PurchaseWorkbench() {
                   <Button
                     type="primary"
                     disabled={selected.length === 0 || !canBuy}
+                    title={selected.length === 0 ? '先在下面勾选要合并下单的物料行' : '把勾选的物料合并成一张采购单'}
                     onClick={() => setMergeOpen(true)}
                   >
                     合并下单

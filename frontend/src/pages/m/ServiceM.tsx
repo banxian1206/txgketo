@@ -129,7 +129,7 @@ export default function ServiceM() {
         onOk={() => void submit()}
         confirmLoading={saving}
         okText="提交"
-        destroyOnClose
+        destroyOnHidden
       >
         <Form form={form} layout="vertical" preserve={false}>
           {modal?.kind === 'create' && (

@@ -103,7 +103,7 @@ export default function Projects() {
         (a.opportunity_days_left ?? Number.MAX_SAFE_INTEGER) -
         (b.opportunity_days_left ?? Number.MAX_SAFE_INTEGER),
       render: (v: number | null, r: Project) => {
-        if (r.stage === '已关闭') return <Typography.Text type="secondary">已关闭</Typography.Text>
+        if (r.stage !== '线索') return <Typography.Text type="secondary">—</Typography.Text>
         if (v === null || v === undefined) return '—'
         const label = v < 0 ? `已过期 ${-v} 天` : v === 0 ? '今天到期' : `还剩 ${v} 天`
         const color =

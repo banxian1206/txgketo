@@ -266,7 +266,7 @@ export default function Library() {
         onOk={() => void submit()}
         confirmLoading={saving}
         okText={editing ? '保存' : '建码'}
-        destroyOnClose
+        destroyOnHidden
       >
         <Typography.Paragraph type="secondary" style={{ fontSize: 12 }}>
           {editing

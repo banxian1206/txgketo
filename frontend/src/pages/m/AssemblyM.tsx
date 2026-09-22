@@ -185,7 +185,7 @@ export default function AssemblyM() {
           </Card>
         ))}
 
-      <Modal open={!!startTarget} title={`开始装配 · ${startTarget?.equip_no ?? ''}`} onCancel={() => setStartTarget(null)} onOk={() => void doStart()} confirmLoading={saving} okText="开始装配" destroyOnClose>
+      <Modal open={!!startTarget} title={`开始装配 · ${startTarget?.equip_no ?? ''}`} onCancel={() => setStartTarget(null)} onOk={() => void doStart()} confirmLoading={saving} okText="开始装配" destroyOnHidden>
         <Typography.Paragraph type="secondary" style={{ fontSize: 12 }}>
           当前齐套率 <b>{Math.round((startTarget?.kitting_rate ?? 0) * 100)}%</b> —— 不看齐套率，到了多少都能开工（会记录在履历里）。
         </Typography.Paragraph>
@@ -205,7 +205,7 @@ export default function AssemblyM() {
         </Form>
       </Modal>
 
-      <Modal open={!!debugTarget} title={`厂内调试 · ${debugTarget?.equip_no ?? ''}`} onCancel={() => setDebugTarget(null)} onOk={() => void doDebug()} confirmLoading={saving} okText="记录" destroyOnClose>
+      <Modal open={!!debugTarget} title={`厂内调试 · ${debugTarget?.equip_no ?? ''}`} onCancel={() => setDebugTarget(null)} onOk={() => void doDebug()} confirmLoading={saving} okText="记录" destroyOnHidden>
         <Form form={form} layout="vertical" preserve={false}>
           <Form.Item name="result" label="调试结果" rules={[{ required: true }]}>
             <Radio.Group optionType="button" buttonStyle="solid">

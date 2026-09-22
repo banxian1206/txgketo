@@ -120,7 +120,7 @@ export default function SubmitReviewModal({ task, open, onClose, onDone }: Props
       onOk={() => void submit()}
       confirmLoading={saving || loading}
       okText={`提交（已勾 ${selections.length} 项）`}
-      destroyOnClose
+      destroyOnHidden
     >
       <Alert
         type="info"

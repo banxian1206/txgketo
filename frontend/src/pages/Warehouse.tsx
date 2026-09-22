@@ -94,6 +94,8 @@ export default function Warehouse() {
   const [inboundForm] = Form.useForm()
   // 库位管理
   const [locs, setLocs] = useState<LocationRow[]>([])
+  const [handOverId, setHandOverId] = useState<number | null>(null)
+  const [handOverTo, setHandOverTo] = useState('')
   const [locOpen, setLocOpen] = useState(false)
   const [locForm] = Form.useForm()
   const itemSearchTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -264,17 +266,35 @@ export default function Warehouse() {
   }
 
   const issueAction = async (id: number, action: 'pick' | 'hand-over') => {
-    const body: Record<string, unknown> = {}
     if (action === 'hand-over') {
-      const who = window.prompt('领料人（车间）——必填：谁领走的')
-      if (!who || !who.trim()) return
-      body.issued_to = who.trim()
+      // 领料人用弹窗录入（P-12：不再用浏览器原生 prompt）
+      setHandOverId(id)
+      setHandOverTo('')
+      return
     }
     try {
-      await api.post(`/warehouse/issues/${id}/${action}`, body)
-      message.success(action === 'pick' ? '备料完成' : '已领走（库存已扣）')
+      await api.post(`/warehouse/issues/${id}/pick`, {})
+      message.success('备料完成')
       await load()
-    } catch (e) { message.error(errMsg(e)) }
+    } catch (e) {
+      message.error(errMsg(e))
+    }
+  }
+
+  const doHandOver = async () => {
+    if (!handOverId) return
+    if (!handOverTo.trim()) {
+      message.warning('请填领料人（谁领走的）')
+      return
+    }
+    try {
+      await api.post(`/warehouse/issues/${handOverId}/hand-over`, { issued_to: handOverTo.trim() })
+      message.success('已领走（库存已扣）')
+      setHandOverId(null)
+      await load()
+    } catch (e) {
+      message.error(errMsg(e))
+    }
   }
 
   return (
@@ -603,7 +623,7 @@ export default function Warehouse() {
         onOk={() => void doInbound()}
         confirmLoading={saving}
         okText="入库"
-        destroyOnClose
+        destroyOnHidden
       >
         <Typography.Paragraph type="secondary" style={{ fontSize: 12, marginTop: 0 }}>
           没走采购流程的东西：退料回库、盘盈、其他来源。正常采购到货请用「待办 → 验收 → 入库」。
@@ -657,7 +677,7 @@ export default function Warehouse() {
         onOk={() => void doCreateLocation()}
         confirmLoading={saving}
         okText="创建"
-        destroyOnClose
+        destroyOnHidden
       >
         <Form form={locForm} layout="vertical" preserve={false}>
           <Form.Item name="warehouse" label="仓库" rules={[{ required: true, message: '填仓库名' }]}>
@@ -750,10 +770,36 @@ export default function Warehouse() {
         </Typography.Paragraph>
         <Form form={storeForm} layout="vertical">
           <Form.Item name="location" label="入库库位" rules={[{ required: true, message: '入库必须定库位' }]}>
-            <Input placeholder="如 深圳仓 A-01-01" />
+            <Select
+              showSearch
+              placeholder="选库位（没有就先到「库位」页签新建）"
+              options={locs
+                .filter((l) => l.is_active)
+                .map((l) => ({ value: `${l.warehouse} ${l.code}`, label: `${l.warehouse} ${l.code}${l.name ? ` ${l.name}` : ''}` }))}
+            />
           </Form.Item>
           <Form.Item name="note" label="备注" style={{ marginBottom: 0 }}>
             <Input placeholder="可不填" />
+          </Form.Item>
+        </Form>
+      </Modal>
+
+      {/* 车间领走：录领料人（P-12） */}
+      <Modal
+        title="车间领走"
+        open={handOverId !== null}
+        onCancel={() => setHandOverId(null)}
+        onOk={() => void doHandOver()}
+        okText="确认领走"
+        destroyOnHidden
+      >
+        <Form layout="vertical">
+          <Form.Item label="领料人" required>
+            <Input
+              value={handOverTo}
+              onChange={(e) => setHandOverTo(e.target.value)}
+              placeholder="如：车间 李四"
+            />
           </Form.Item>
         </Form>
       </Modal>

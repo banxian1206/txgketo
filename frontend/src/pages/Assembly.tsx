@@ -340,7 +340,7 @@ export default function Assembly() {
         onOk={() => void doStart()}
         confirmLoading={saving}
         okText="开始装配"
-        destroyOnClose
+        destroyOnHidden
       >
         <Typography.Paragraph type="secondary" style={{ fontSize: 12 }}>
           当前齐套率 <b>{Math.round((startTarget?.rate ?? 0) * 100)}%</b> —— 系统**不看齐套率**，到了多少都能开工，
@@ -376,7 +376,7 @@ export default function Assembly() {
         onOk={() => void doDebug()}
         confirmLoading={saving}
         okText="记录"
-        destroyOnClose
+        destroyOnHidden
       >
         <Form form={form} layout="vertical" preserve={false}>
           <Form.Item name="result" label="调试结果" rules={[{ required: true }]}>

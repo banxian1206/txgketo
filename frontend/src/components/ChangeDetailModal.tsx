@@ -301,7 +301,7 @@ export default function ChangeDetailModal({ crId, open, onClose, onChanged }: Pr
         onOk={() => void doRevise()}
         confirmLoading={busy}
         okText="生成替代行"
-        destroyOnClose
+        destroyOnHidden
       >
         <Form form={reviseForm} layout="vertical" preserve={false}>
           <Form.Item name="qty" label="新用量" rules={[{ required: true, message: '填新用量' }]}>

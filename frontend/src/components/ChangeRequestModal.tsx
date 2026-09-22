@@ -59,7 +59,7 @@ export default function ChangeRequestModal({
       onOk={() => void submit()}
       confirmLoading={saving}
       okText="提交申请"
-      destroyOnClose
+      destroyOnHidden
     >
       <Typography.Paragraph type="secondary" style={{ fontSize: 12 }}>
         对象：{targetTitle ?? targetRef} —— 冻结后要动，必须走改版申请：总监裁决 → 下发改版任务 →

@@ -219,7 +219,7 @@ export default function Suppliers() {
         onOk={() => void submit()}
         confirmLoading={saving}
         okText="保存"
-        destroyOnClose
+        destroyOnHidden
       >
         <Form form={form} layout="vertical" preserve={false}>
           <Space style={{ display: 'flex' }} size="middle">
@@ -267,7 +267,7 @@ export default function Suppliers() {
         width={860}
         open={!!quoteFor}
         onClose={() => setQuoteFor(null)}
-        destroyOnClose
+        destroyOnHidden
       >
         <Card
           size="small"

@@ -842,7 +842,7 @@ export default function ProjectDetailPage() {
                   onOk={() => void doReceive()}
                   confirmLoading={saving}
                   okText="登记"
-                  destroyOnClose
+                  destroyOnHidden
                 >
                   <Typography.Paragraph type="secondary" style={{ fontSize: 12 }}>
                     这个节点还有未收 ¥{Number(receiveTarget?.unpaid ?? 0).toLocaleString()}；可多次登记，未收不超总额。
@@ -1151,7 +1151,7 @@ export default function ProjectDetailPage() {
         onOk={() => void submitDeal()}
         confirmLoading={saving}
         okText="确认成交"
-        destroyOnClose
+        destroyOnHidden
         styles={{ body: { maxHeight: '68vh', overflowY: 'auto', paddingRight: 8 } }}
       >
         <Typography.Paragraph type="secondary" style={{ fontSize: 12 }}>
@@ -1276,7 +1276,7 @@ export default function ProjectDetailPage() {
         confirmLoading={saving}
         okText="确认关闭"
         okButtonProps={{ danger: true }}
-        destroyOnClose
+        destroyOnHidden
       >
         <Typography.Paragraph type="secondary" style={{ fontSize: 12 }}>
           关闭后阶段变为「已关闭」，不可再推进
@@ -1304,7 +1304,7 @@ export default function ProjectDetailPage() {
         onOk={() => void submitContact()}
         confirmLoading={saving}
         okText="保存"
-        destroyOnClose
+        destroyOnHidden
       >
         <Form form={contactForm} layout="vertical" preserve={false}>
           <Row gutter={12}>

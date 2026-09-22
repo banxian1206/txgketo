@@ -1228,7 +1228,7 @@ export default function EquipmentDesign({ projectNo: p0, equipNo: e0, embedded }
         }}
         confirmLoading={saving}
         okText="上传"
-        destroyOnClose
+        destroyOnHidden
       >
         <Form form={submitForm} layout="vertical" preserve={false}>
           <Form.Item name="file" label="图纸文件" valuePropName="fileList" getValueFromEvent={(e) => e?.fileList}>
@@ -1251,7 +1251,7 @@ export default function EquipmentDesign({ projectNo: p0, equipNo: e0, embedded }
           onOk={() => void doAddMaterial()}
           confirmLoading={saving}
           okText="挂上"
-          destroyOnClose
+          destroyOnHidden
         >
           <Typography.Paragraph type="secondary" style={{ fontSize: 12 }}>
             都从标准库里选，选不到就去
@@ -1344,7 +1344,7 @@ export default function EquipmentDesign({ projectNo: p0, equipNo: e0, embedded }
         onOk={() => void doCreateProgram()}
         confirmLoading={saving}
         okText="创建"
-        destroyOnClose
+        destroyOnHidden
       >
         <Form form={progForm} layout="vertical" preserve={false}>
           <Form.Item name="name" label="程序名称" rules={[{ required: true, message: '请填程序名称' }]}>
@@ -1364,7 +1364,7 @@ export default function EquipmentDesign({ projectNo: p0, equipNo: e0, embedded }
         onOk={() => void doUploadProgram()}
         confirmLoading={saving}
         okText="上传"
-        destroyOnClose
+        destroyOnHidden
       >
         <Form form={progUploadForm} layout="vertical" preserve={false}>
           <Form.Item

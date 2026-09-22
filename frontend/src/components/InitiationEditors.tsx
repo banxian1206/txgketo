@@ -321,7 +321,7 @@ export function EquipmentEditor({ projectNo, onChanged }: Omit<Props, 'users'>) 
         onOk={() => void submit()}
         confirmLoading={saving}
         okText="确定"
-        destroyOnClose
+        destroyOnHidden
       >
         <Form form={form} layout="vertical" preserve={false}>
           <Form.Item
@@ -530,7 +530,7 @@ export function MilestoneEditor({ projectNo, users, onChanged }: Props) {
         onOk={() => void submitAdd()}
         confirmLoading={addSaving}
         okText="新增"
-        destroyOnClose
+        destroyOnHidden
       >
         <Form form={addForm} layout="vertical">
           <Form.Item name="name" label="节点名称" rules={[{ required: true, message: '请填节点名称' }]}>
@@ -718,7 +718,7 @@ export function LongLeadEditor({ projectNo, onChanged }: Omit<Props, 'users'>) {
         onOk={() => void submit()}
         confirmLoading={saving}
         okText="保存"
-        destroyOnClose
+        destroyOnHidden
       >
         <Form form={form} layout="vertical" preserve={false}>
           <Form.Item

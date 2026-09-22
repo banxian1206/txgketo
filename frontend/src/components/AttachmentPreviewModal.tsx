@@ -30,7 +30,7 @@ export default function AttachmentPreviewModal({
       width={state?.kind === 'pdf' ? 1000 : 760}
       footer={null}
       onCancel={close}
-      destroyOnClose
+      destroyOnHidden
     >
       {state?.kind === 'image' && <Image src={state.url} style={{ maxWidth: '100%' }} />}
       {state?.kind === 'pdf' && (

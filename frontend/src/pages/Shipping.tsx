@@ -391,7 +391,7 @@ export default function Shipping() {
         onCancel={() => setItemsShip(null)}
         width={720}
         footer={<Button onClick={() => setItemsShip(null)}>完成</Button>}
-        destroyOnClose
+        destroyOnHidden
       >
         <Space style={{ marginBottom: 10 }} wrap>
           <MfgPhotoPicker
@@ -449,7 +449,7 @@ export default function Shipping() {
         }}
         confirmLoading={saving}
         okText="确认装车"
-        destroyOnClose
+        destroyOnHidden
       >
         <Form form={loadForm} layout="vertical" preserve={false}>
           <Space style={{ display: 'flex' }} size="middle" align="start">
@@ -476,7 +476,7 @@ export default function Shipping() {
         confirmLoading={saving}
         okText="提交清点"
         width={720}
-        destroyOnClose
+        destroyOnHidden
       >
         <Typography.Paragraph type="secondary" style={{ fontSize: 12 }}>
           按发运清单逐项勾「到 / 缺 / 损」；全到=齐，有缺=缺件，有损=破损，系统自动判定并通知。
@@ -607,7 +607,7 @@ export default function Shipping() {
         onOk={() => void savePlacePhotos()}
         confirmLoading={saving}
         okText="保存"
-        destroyOnClose
+        destroyOnHidden
       >
         <MfgPhotoPicker
           projectNo={detail?.project_no ?? ''}

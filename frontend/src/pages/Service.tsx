@@ -29,6 +29,7 @@ import {
   hasPerm,
   listSparePartMoves,
   listSpareParts,
+  listProjects,
   moveSparePart,
   servicePhotoUrl,
   serviceWorkbench,
@@ -64,6 +65,13 @@ export default function Service() {
   const [photos, setPhotos] = useState<string[]>([])
   const [saving, setSaving] = useState(false)
   const [form] = Form.useForm()
+  const [projects, setProjects] = useState<{ project_no: string; project_name: string }[]>([])
+
+  useEffect(() => {
+    listProjects()
+      .then((ps) => setProjects(ps.map((p) => ({ project_no: p.project_no, project_name: p.project_name }))))
+      .catch(() => undefined)
+  }, [])
 
   const load = useCallback(async () => {
     try {
@@ -278,12 +286,19 @@ export default function Service() {
         onOk={() => void submit()}
         confirmLoading={saving}
         okText="提交"
-        destroyOnClose
+        destroyOnHidden
       >
         <Form form={form} layout="vertical" preserve={false}>
           {modal?.kind === 'create' && (
             <>
-              <Form.Item name="project_no" label="项目号" rules={[{ required: true }]}><Input placeholder="如 TX26001" /></Form.Item>
+              <Form.Item name="project_no" label="项目号" rules={[{ required: true, message: '选项目' }]}>
+                <Select
+                  showSearch
+                  optionFilterProp="label"
+                  placeholder="选项目"
+                  options={projects.map((p) => ({ value: p.project_no, label: `${p.project_no} ${p.project_name}` }))}
+                />
+              </Form.Item>
               <Form.Item name="equip_no" label="设备号（可选）"><Input placeholder="如 01A" /></Form.Item>
               <Form.Item name="fault" label="故障描述" rules={[{ required: true, message: '必填：出了什么问题' }]}><Input.TextArea rows={2} /></Form.Item>
             </>

@@ -1,5 +1,6 @@
 import {
   App,
+  Alert,
   Button,
   Card,
   Col,
@@ -136,7 +137,14 @@ export default function Site() {
 
       {projectNo && (
         <>
-          <Row gutter={12} style={{ marginBottom: 12 }}>
+          <Alert
+          type="info"
+          showIcon
+          style={{ marginBottom: 12 }}
+          message="现场录入请用手机端"
+          description="勘测 / 每日汇报 / 现场问题 / 申请调试 都在手机端「现场」页录入（打开 /m/site，或手机浏览器加主屏）；本页用于查看进度与推进状态。"
+        />
+        <Row gutter={12} style={{ marginBottom: 12 }}>
             <Col span={4}><Statistic title="已勘测" value={c?.surveyed ?? 0} /></Col>
             <Col span={4}><Statistic title="今日汇报" value={c?.daily_today ?? 0} /></Col>
             <Col span={4}><Statistic title="待处理问题" value={c?.open_issues ?? 0} valueStyle={{ color: c?.open_issues ? '#cf1322' : undefined }} /></Col>
@@ -305,7 +313,7 @@ export default function Site() {
         onOk={() => void doIncoming()}
         confirmLoading={saving}
         okText="提交"
-        destroyOnClose
+        destroyOnHidden
       >
         <Form form={form} layout="vertical" preserve={false}>
           <Form.Item name="result" label="清点结论" rules={[{ required: true }]}>

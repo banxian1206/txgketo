@@ -28,6 +28,7 @@ import {
   confirmAcceptance,
   errMsg,
   hasPerm,
+  listProjects,
   signAcceptanceDoc,
   uploadAcceptanceDocs,
   type AcceptanceRow,
@@ -52,6 +53,13 @@ export default function AcceptancePage() {
   const [files, setFiles] = useState<File[]>([])
   const [saving, setSaving] = useState(false)
   const [form] = Form.useForm()
+  const [projects, setProjects] = useState<{ project_no: string; project_name: string }[]>([])
+
+  useEffect(() => {
+    listProjects()
+      .then((ps) => setProjects(ps.map((p) => ({ project_no: p.project_no, project_name: p.project_name }))))
+      .catch(() => undefined)
+  }, [])
 
   const load = useCallback(async () => {
     try {
@@ -228,17 +236,22 @@ export default function AcceptancePage() {
       />
 
       {/* 申请验收 */}
-      <Modal open={applyOpen} title="申请客户验收" onCancel={() => setApplyOpen(false)} onOk={() => void doApply()} confirmLoading={saving} okText="申请" destroyOnClose>
+      <Modal open={applyOpen} title="申请客户验收" onCancel={() => setApplyOpen(false)} onOk={() => void doApply()} confirmLoading={saving} okText="申请" destroyOnHidden>
         <Form form={form} layout="vertical" preserve={false}>
-          <Form.Item name="project_no" label="项目号" rules={[{ required: true }]}>
-            <Input placeholder="如 TX26001" />
+          <Form.Item name="project_no" label="项目号" rules={[{ required: true, message: '选项目' }]}>
+            <Select
+              showSearch
+              optionFilterProp="label"
+              placeholder="选项目"
+              options={projects.map((p) => ({ value: p.project_no, label: `${p.project_no} ${p.project_name}` }))}
+            />
           </Form.Item>
           <Form.Item name="remark" label="说明"><Input placeholder="现场调试完成，具备验收条件" /></Form.Item>
         </Form>
       </Modal>
 
       {/* 客户确认 */}
-      <Modal open={!!confirmTarget} title={`客户确认验收 · ${confirmTarget?.project_no ?? ''}`} onCancel={() => setConfirmTarget(null)} onOk={() => void doConfirm()} confirmLoading={saving} okText="确认" destroyOnClose>
+      <Modal open={!!confirmTarget} title={`客户确认验收 · ${confirmTarget?.project_no ?? ''}`} onCancel={() => setConfirmTarget(null)} onOk={() => void doConfirm()} confirmLoading={saving} okText="确认" destroyOnHidden>
         <Form form={form} layout="vertical" preserve={false}>
           <Form.Item name="result" label="验收结论" rules={[{ required: true }]}>
             <Radio.Group optionType="button" buttonStyle="solid">
@@ -256,7 +269,7 @@ export default function AcceptancePage() {
       </Modal>
 
       {/* 资料包 */}
-      <Modal open={!!docTarget} title={`验收资料包 · ${docTarget?.project_no ?? ''}`} onCancel={() => setDocTarget(null)} footer={null} width={640} destroyOnClose>
+      <Modal open={!!docTarget} title={`验收资料包 · ${docTarget?.project_no ?? ''}`} onCancel={() => setDocTarget(null)} footer={null} width={640} destroyOnHidden>
         <Space style={{ marginBottom: 10 }}>
           <Select style={{ width: 140 }} value={docType} onChange={setDocType} options={DOC_TYPES.map((d) => ({ value: d, label: d }))} />
           <Upload multiple beforeUpload={() => false} fileList={files.map((f, i) => ({ uid: String(i), name: f.name }))} onChange={(info) => setFiles(info.fileList.map((f) => f.originFileObj as File).filter(Boolean))}>

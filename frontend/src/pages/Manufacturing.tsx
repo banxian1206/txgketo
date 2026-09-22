@@ -140,7 +140,7 @@ export default function Manufacturing() {
     }
   }
 
-  // ★ 预填必须在弹窗打开、表单项挂载之后（P-03）：destroyOnClose+preserve=false 时
+  // ★ 预填必须在弹窗打开、表单项挂载之后（P-03）：destroyOnHidden+preserve=false 时
   //   在 setAction 之前 setFieldsValue 会丢失，改在 action 变化后统一预填。
   useEffect(() => {
     if (!action) return
@@ -456,7 +456,7 @@ export default function Manufacturing() {
         onOk={() => void submitAction()}
         confirmLoading={saving}
         okText="提交"
-        destroyOnClose
+        destroyOnHidden
       >
         <Form form={form} layout="vertical" preserve={false}>
           {action?.kind === 'dispatch' && (

@@ -137,7 +137,7 @@ export default function PurchaseActions({
         onOk={() => void submitOrder()}
         confirmLoading={saving}
         okText="确认下单"
-        destroyOnClose
+        destroyOnHidden
       >
         <Form
           form={orderForm}

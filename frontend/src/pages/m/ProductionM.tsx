@@ -184,7 +184,7 @@ export default function ProductionM() {
         onOk={() => void submit()}
         confirmLoading={saving}
         okText="提交"
-        destroyOnClose
+        destroyOnHidden
       >
         <Form form={form} layout="vertical" preserve={false}>
           {action?.kind === 'dispatch' && (

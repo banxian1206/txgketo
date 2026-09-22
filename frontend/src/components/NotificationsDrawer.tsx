@@ -17,6 +17,20 @@ const TYPE_COLOR: Record<string, string> = {
   release: 'green',
   warehouse: 'cyan',
   purchase: 'orange',
+  acceptance: 'geekblue',
+  service: 'magenta',
+}
+
+// 通知类型中文名（P-18：不再裸露英文 type）
+const TYPE_LABEL: Record<string, string> = {
+  task: '任务',
+  review: '评审',
+  change: '改版',
+  release: '发布',
+  warehouse: '仓库',
+  purchase: '采购',
+  acceptance: '验收',
+  service: '售后',
 }
 
 // 移动端（/m）里点击消息：把 PC 路由映射到移动页
@@ -117,7 +131,7 @@ export default function NotificationsDrawer({ open, onClose, onReadChange }: Pro
             <List.Item.Meta
               title={
                 <Space size={6}>
-                  <Tag color={TYPE_COLOR[n.type] ?? 'default'}>{n.type}</Tag>
+                  <Tag color={TYPE_COLOR[n.type] ?? 'default'}>{TYPE_LABEL[n.type] ?? n.type}</Tag>
                   <span style={{ fontWeight: n.is_read ? 400 : 600 }}>{n.title}</span>
                 </Space>
               }

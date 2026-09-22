@@ -1,4 +1,4 @@
-import { App, Card, Col, Empty, Row, Select, Space, Statistic, Table, Tag, Typography } from 'antd'
+import { App, Alert, Card, Col, Empty, Row, Select, Space, Statistic, Table, Tag, Typography } from 'antd'
 import { useState } from 'react'
 
 import {
@@ -22,6 +22,7 @@ export default function PriceReferencePanel() {
   const [itemNo, setItemNo] = useState<string | undefined>()
   const [price, setPrice] = useState<PriceReference | null>(null)
   const [reco, setReco] = useState<RecommendResult | null>(null)
+  const [err, setErr] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 
   const onSearch = (q: string) => {
@@ -34,6 +35,7 @@ export default function PriceReferencePanel() {
     setItemNo(no)
     setPrice(null)
     setReco(null)
+    setErr(null)
     if (!no) return
     setLoading(true)
     try {
@@ -44,6 +46,7 @@ export default function PriceReferencePanel() {
       setPrice(p)
       setReco(r)
     } catch (e) {
+      setErr(errMsg(e))
       message.error(errMsg(e))
     } finally {
       setLoading(false)
@@ -52,6 +55,15 @@ export default function PriceReferencePanel() {
 
   return (
     <>
+      {err && (
+        <Alert
+          type="warning"
+          showIcon
+          style={{ marginBottom: 12 }}
+          message="看不了价格参考"
+          description={err}
+        />
+      )}
       <Space wrap style={{ marginBottom: 12 }}>
         <Select
           showSearch

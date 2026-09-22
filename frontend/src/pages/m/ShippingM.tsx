@@ -201,7 +201,7 @@ export default function ShippingM() {
           .then(() => { message.success('已装车'); setLoadTarget(null); return load(projectNo) })
           .catch((e) => message.error(errMsg(e)))
           .finally(() => setSaving(false))
-      }} confirmLoading={saving} okText="确认装车" destroyOnClose>
+      }} confirmLoading={saving} okText="确认装车" destroyOnHidden>
         <Form layout="vertical">
           <Form.Item label="装车照片（必须）" required>
             <MfgPhotoPicker projectNo={loadTarget?.project_no ?? ''} refNo={loadTarget?.shipment_no ?? ''} value={loadPhotos} onChange={setLoadPhotos} upload={uploadShipPhotos} photoUrl={shipPhotoUrl} label="拍照" />
@@ -217,7 +217,7 @@ export default function ShippingM() {
         onOk={() => void doReceipt()}
         confirmLoading={saving}
         okText="提交清点"
-        destroyOnClose
+        destroyOnHidden
       >
         <div style={{ maxHeight: 380, overflowY: 'auto' }}>
           {(receiptTarget?.items ?? []).map((it) => {

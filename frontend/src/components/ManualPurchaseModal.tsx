@@ -90,7 +90,7 @@ export default function ManualPurchaseModal({ open, onClose, onDone }: Props) {
       onOk={() => void submit()}
       confirmLoading={saving}
       okText="提交进池"
-      destroyOnClose
+      destroyOnHidden
     >
       <Typography.Paragraph type="secondary" style={{ fontSize: 12 }}>
         车间耗品、现场缺件、辅料、办公用品都能提。每条需求有归属；不挂项目的（辅料/办公用品）
@@ -128,7 +128,17 @@ export default function ManualPurchaseModal({ open, onClose, onDone }: Props) {
             </Form.Item>
           </>
         )}
-        <Form.Item name="item_no" label="物料" rules={[{ required: true, message: '选物料' }]}>
+        <Form.Item
+          name="item_no"
+          label="物料"
+          rules={[{ required: true, message: '选物料' }]}
+          extra={
+            <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+              库里没有？
+              <a onClick={() => window.open('/library', '_blank')}> 去标准库新建</a>
+            </Typography.Text>
+          }
+        >
           <Select
             showSearch
             filterOption={false}

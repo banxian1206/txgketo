@@ -732,7 +732,7 @@ export default function Users() {
         onOk={() => void saveUser()}
         confirmLoading={saving}
         okText="保存"
-        destroyOnClose
+        destroyOnHidden
       >
         <Form form={userForm} layout="vertical" preserve={false}>
           <Form.Item
@@ -797,7 +797,7 @@ export default function Users() {
         confirmLoading={handoverSaving}
         okButtonProps={{ disabled: !handoverTo }}
         okText="转交"
-        destroyOnClose
+        destroyOnHidden
       >
         <Typography.Paragraph type="secondary" style={{ fontSize: 12 }}>
           把 TA 手上<strong>未完成的任务、待审的评审单、项目角色、图纸/程序/BOM 归属</strong>
@@ -862,7 +862,7 @@ export default function Users() {
         onOk={() => void saveOrg()}
         confirmLoading={saving}
         okText="保存"
-        destroyOnClose
+        destroyOnHidden
       >
         <Form form={orgForm} layout="vertical" preserve={false}>
           <Form.Item name="name" label="名称" rules={[{ required: true, message: '请输入名称' }]}>
