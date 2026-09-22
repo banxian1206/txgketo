@@ -19,7 +19,11 @@ function grepAll(pattern) {
       if (st.isDirectory()) walk(p);
       else if (/\.(ts|tsx)$/.test(f)) {
         const lines = fs.readFileSync(p, 'utf8').split('\n');
-        lines.forEach((l, i) => { if (pattern.test(l)) hits.push(`${p.replace(SRC, 'src')}:${i + 1}`); });
+        lines.forEach((l, i) => {
+          const code = l.trim();
+          if (code.startsWith('//') || code.startsWith('*') || code.startsWith('/*')) return; // 注释不算反模式
+          if (pattern.test(l)) hits.push(`${p.replace(SRC, 'src')}:${i + 1}`);
+        });
       }
     }
   };

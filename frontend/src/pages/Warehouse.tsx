@@ -24,6 +24,9 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
 import AuthedImage from '../components/AuthedImage'
+import AppModal from '../components/AppModal'
+import { useRequest } from '../hooks/useRequest'
+import { useSubmit } from '../hooks/useSubmit'
 
 import { api, createLocation, errMsg, generateEquipmentIssue, hasPerm, inspectPurchase, listEquipment, listLocations, listProjects, manualInbound, searchItems, storeReceipt, type GoodsReceiptRow, type ItemLite, type LocationRow } from '../api/client'
 
@@ -94,8 +97,7 @@ export default function Warehouse() {
   const [inboundOpen, setInboundOpen] = useState(false)
   const [itemOptions, setItemOptions] = useState<ItemLite[]>([])
   const [inboundForm] = Form.useForm()
-  // 库位管理
-  const [locs, setLocs] = useState<LocationRow[]>([])
+  // 库位管理（重构 1.2：库位数据改用下方 useRequest，不再 useState 手写）
   const [handOverId, setHandOverId] = useState<number | null>(null)
   const [handOverTo, setHandOverTo] = useState('')
   const [locOpen, setLocOpen] = useState(false)
@@ -135,8 +137,10 @@ export default function Warehouse() {
     listProjects()
       .then((rows) => setGenProjects(rows.map((p) => ({ project_no: p.project_no, project_name: p.project_name }))))
       .catch(() => undefined)
-    listLocations().then(setLocs).catch(() => undefined)
   }, [])
+  // ↓ 试点（重构 1.2）：库位选项改用 useRequest 三态（原 useEffect + useState 手写）
+  const locsReq = useRequest(() => listLocations(), [])
+  const locs = locsReq.data ?? []
 
   const searchItemOptions = (q: string) => {
     if (itemSearchTimer.current) clearTimeout(itemSearchTimer.current)
@@ -178,7 +182,7 @@ export default function Warehouse() {
       message.success('库位已建')
       setLocOpen(false)
       locForm.resetFields()
-      setLocs(await listLocations())
+      void locsReq.reload()
     } catch (e) {
       message.error(errMsg(e))
     } finally {
@@ -219,56 +223,44 @@ export default function Warehouse() {
   }
 
   const openAccept = (r: IncomingRow) => {
+    // 重构 1.2：不再手工 setFieldsValue —— 预填交给 AppModal 的 initialValues（打开即挂载即读）
     setAcceptTarget(r)
-    acceptForm.setFieldsValue({
-      receipt_date: dayjs(),
-      qty: Math.max(r.qty - r.qty_received, 0.001),
-      result: '合格',
-      note: undefined,
-    })
     setAcceptOpen(true)
   }
 
-  const submitAccept = async () => {
-    if (!acceptTarget) return
-    let v: { receipt_date: dayjs.Dayjs; qty: number; result: string; note?: string }
-    try { v = await acceptForm.validateFields() } catch { return }
-    setSaving(true)
-    try {
-      const res = await inspectPurchase(acceptTarget.project_no, acceptTarget.id, {
+  // 重构 1.2：提交走 useSubmit（validate/catch/防重/反馈一条龙，根治 P-09 类裸 await）
+  const acceptSubmit = useSubmit(acceptForm, {
+    request: (v) => {
+      if (!acceptTarget) throw new Error('无验收目标')
+      return inspectPurchase(acceptTarget.project_no, acceptTarget.id, {
         receipt_date: v.receipt_date.format('YYYY-MM-DD'),
         qty: v.qty,
         result: v.result,
         note: v.note,
       })
-      message.success(
-        v.result === '合格'
-          ? `验收合格 → ${res.receipt_no} 待入库`
-          : `验收不合格：${res.receipt_no} 已退回采购协商`,
-      )
-      setAcceptOpen(false)
-      await load()
-    } catch (e) { message.error(errMsg(e)) } finally { setSaving(false) }
-  }
+    },
+    success: (res) =>
+      acceptResult === '不合格'
+        ? `验收不合格：${res.receipt_no} 已退回采购协商`
+        : `验收合格 → ${res.receipt_no} 待入库`,
+    close: () => setAcceptOpen(false),
+    after: () => load(),
+  })
 
   const openStore = (r: StorageRow) => {
     setStoreTarget(r)
-    storeForm.setFieldsValue({ location: undefined, note: undefined })
     setStoreOpen(true)
   }
 
-  const submitStore = async () => {
-    if (!storeTarget) return
-    let v: { location?: string; note?: string }
-    try { v = await storeForm.validateFields() } catch { return }
-    setSaving(true)
-    try {
-      const res = await storeReceipt(storeTarget.id, { location: v.location, note: v.note })
-      message.success(`已入库：${res.receipt_no} → ${res.location}`)
-      setStoreOpen(false)
-      await load()
-    } catch (e) { message.error(errMsg(e)) } finally { setSaving(false) }
-  }
+  const storeSubmit = useSubmit(storeForm, {
+    request: (v) => {
+      if (!storeTarget) throw new Error('无入库目标')
+      return storeReceipt(storeTarget.id, { location: v.location, note: v.note })
+    },
+    success: (res) => `已入库：${res.receipt_no} → ${res.location}`,
+    close: () => setStoreOpen(false),
+    after: () => load(),
+  })
 
   const issueAction = async (id: number, action: 'pick' | 'hand-over') => {
     if (action === 'hand-over') {
@@ -711,24 +703,34 @@ export default function Warehouse() {
         </Form>
       </Modal>
 
-      {/* 验收（合格 / 不合格） */}
-      <Modal
-        title={`验收 · ${acceptTarget?.display_name ?? ''}`}
+      {/* 验收（合格 / 不合格）—— 重构 1.2 试点：AppModal + useSubmit（预填走 initialValues，打开即生效） */}
+      <AppModal
         open={acceptOpen}
+        title={`验收 · ${acceptTarget?.display_name ?? ''}`}
+        subtitle={
+          <Typography.Paragraph type="secondary" style={{ fontSize: 12, marginTop: 0 }}>
+            采购单 {acceptTarget?.po_no ?? '未编号'} · {acceptTarget?.supplier_name ?? '—'} ·{' '}
+            归属 {acceptTarget?.project_no ?? acceptTarget?.attribution ?? '—'} {acceptTarget?.equip_no ? `· ${acceptTarget.equip_no} ${acceptTarget.equip_name ?? ''}` : ''}
+            {acceptTarget ? `　（订购 ${acceptTarget.qty} ${acceptTarget.unit ?? ''}，已到 ${acceptTarget.qty_received}）` : ''}
+          </Typography.Paragraph>
+        }
         width={580}
-        onCancel={() => setAcceptOpen(false)}
-        onOk={() => void submitAccept()}
-        confirmLoading={saving}
+        form={acceptForm}
+        initialValues={
+          acceptTarget
+            ? {
+                receipt_date: dayjs(),
+                qty: Math.max(acceptTarget.qty - acceptTarget.qty_received, 0.001),
+                result: '合格',
+              }
+            : {}
+        }
+        onOk={acceptSubmit.run}
+        loading={acceptSubmit.loading}
         okText="提交验收"
-        okButtonProps={{ danger: acceptResult === '不合格' }}
-        forceRender
+        danger={acceptResult === '不合格'}
+        onClose={() => setAcceptOpen(false)}
       >
-        <Typography.Paragraph type="secondary" style={{ fontSize: 12, marginTop: 0 }}>
-          采购单 {acceptTarget?.po_no ?? '未编号'} · {acceptTarget?.supplier_name ?? '—'} ·{' '}
-          归属 {acceptTarget?.project_no ?? acceptTarget?.attribution ?? '—'} {acceptTarget?.equip_no ? `· ${acceptTarget.equip_no} ${acceptTarget.equip_name ?? ''}` : ''}
-          {acceptTarget ? `　（订购 ${acceptTarget.qty} ${acceptTarget.unit ?? ''}，已到 ${acceptTarget.qty_received}）` : ''}
-        </Typography.Paragraph>
-        <Form form={acceptForm} layout="vertical">
           <Form.Item name="result" label="验收结果" rules={[{ required: true }]}>
             <Radio.Group optionType="button" buttonStyle="solid">
               <Radio.Button value="合格">合格</Radio.Button>
@@ -765,26 +767,26 @@ export default function Warehouse() {
           >
             <Input.TextArea rows={2} placeholder={acceptResult === '不合格' ? '如：尺寸超差 / 外观划伤，采购去协商' : '可不填'} />
           </Form.Item>
-        </Form>
-      </Modal>
+      </AppModal>
 
-      {/* 入库 */}
-      <Modal
-        title={`入库 · ${storeTarget?.receipt_no ?? ''}`}
+      {/* 入库 —— 重构 1.2 试点：AppModal + useSubmit */}
+      <AppModal
         open={storeOpen}
+        title={`入库 · ${storeTarget?.receipt_no ?? ''}`}
+        subtitle={
+          <Typography.Paragraph type="secondary" style={{ fontSize: 12, marginTop: 0 }}>
+            {storeTarget?.display_name} × {storeTarget?.qty} {storeTarget?.unit ?? ''} · 采购单{' '}
+            {storeTarget?.po_no ?? '未编号'} · 项目 {storeTarget?.project_no}
+            {storeTarget?.equip_no ? ` · ${storeTarget.equip_no}` : ''}
+          </Typography.Paragraph>
+        }
         width={540}
-        onCancel={() => setStoreOpen(false)}
-        onOk={() => void submitStore()}
-        confirmLoading={saving}
+        form={storeForm}
+        onOk={storeSubmit.run}
+        loading={storeSubmit.loading}
         okText="确认入库"
-        forceRender
+        onClose={() => setStoreOpen(false)}
       >
-        <Typography.Paragraph type="secondary" style={{ fontSize: 12, marginTop: 0 }}>
-          {storeTarget?.display_name} × {storeTarget?.qty} {storeTarget?.unit ?? ''} · 采购单{' '}
-          {storeTarget?.po_no ?? '未编号'} · 项目 {storeTarget?.project_no}
-          {storeTarget?.equip_no ? ` · ${storeTarget.equip_no}` : ''}
-        </Typography.Paragraph>
-        <Form form={storeForm} layout="vertical">
           <Form.Item name="location" label="入库库位" rules={[{ required: true, message: '入库必须定库位' }]}>
             <Select
               showSearch
@@ -797,8 +799,7 @@ export default function Warehouse() {
           <Form.Item name="note" label="备注" style={{ marginBottom: 0 }}>
             <Input placeholder="可不填" />
           </Form.Item>
-        </Form>
-      </Modal>
+      </AppModal>
 
       {/* 车间领走：录领料人（P-12） */}
       <Modal

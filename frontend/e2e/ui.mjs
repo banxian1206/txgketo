@@ -188,6 +188,12 @@ try {
   if (await accBtn.count()) {
     await accBtn.click(); await page.waitForTimeout(700);
     const acc = page.locator('.ant-modal:visible').filter({ hasText: '验收 ·' });
+    // ★ 1.2 基座验收：AppModal 预填首帧可见（打开即"合格"选中 + 日期/数量已带）
+    const preChecked = await acc.locator('.ant-radio-button-wrapper-checked').count();
+    const dateVal = await acc.locator('.ant-picker input').first().inputValue().catch(() => '');
+    const qtyVal = await acc.locator('.ant-input-number-input').first().inputValue().catch(() => '');
+    check('BASE-预填', preChecked > 0 && !!dateVal && !!qtyVal,
+      `验收弹窗打开即预填: 合格=${preChecked > 0} 日期=${dateVal || '空'} 数量=${qtyVal || '空'}`);
     await acc.getByRole('button', { name: /提\s*交\s*验\s*收/ }).click();
     await page.waitForTimeout(2200);
     const stuck = await acc.isVisible().catch(() => false);
