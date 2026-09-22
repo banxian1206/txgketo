@@ -13,6 +13,7 @@ import {
   type PurchaseRequestItem,
   type SupplierRow,
 } from '../api/client'
+import { T } from '../theme/tokens'
 
 /**
  * 采购的下单动作（只做下单；到货/验收/入库由仓库推，见采购单详情）。
@@ -176,7 +177,7 @@ export default function PurchaseActions({
                   {recos.recommendations.slice(0, 5).map((r) => (
                     <div
                       key={r.supplier_id}
-                      style={{ cursor: 'pointer', padding: '4px 0', borderBottom: '1px dashed #f0f0f0' }}
+                      style={{ cursor: 'pointer', padding: '4px 0', borderBottom: `1px dashed ${T.border}` }}
                       onClick={() => {
                         orderForm.setFieldsValue({
                           supplier_id: r.supplier_id,
@@ -189,10 +190,10 @@ export default function PurchaseActions({
                       {r.price_hint ? `　参考价 ¥${r.price_hint.toLocaleString()}` : ''}
                       {r.lead_days ? `　交期 ${r.lead_days} 天` : ''}
                       {r.reasons.includes('首选供应商') && <Tag color="gold">首选</Tag>}
-                      <div style={{ color: '#8c8c8c' }}>{r.reasons.join('　·　')}</div>
+                      <div style={{ color: T.textSecondary }}>{r.reasons.join('　·　')}</div>
                     </div>
                   ))}
-                  <div style={{ color: '#8c8c8c', marginTop: 4 }}>{recos.note}</div>
+                  <div style={{ color: T.textSecondary, marginTop: 4 }}>{recos.note}</div>
                 </div>
               }
             />

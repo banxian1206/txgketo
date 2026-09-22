@@ -21,6 +21,7 @@ import {
 } from '../api/client'
 import { ORDER_STATUS as ORDER_STATUS_COLOR } from '../theme/status'
 import { RECEIPT_STATUS as RECEIPT_STATUS_COLOR } from '../theme/status'
+import { T } from '../theme/tokens'
 
 const today = () => dayjs().format('YYYY-MM-DD')
 
@@ -119,16 +120,16 @@ export default function PurchaseWorkbench() {
       {/* 待办头（06 卷 §8）：进页面第一眼看到该处理什么 */}
       <Row gutter={[12, 12]} style={{ marginBottom: 12 }}>
         {[
-          { label: '采购池待下单', value: poolRequests, sub: `${pool.length} 种`, tab: 'pool', color: poolRequests ? '#1f6feb' : '#bbb' },
-          { label: '在途采购单', value: openOrders.length, sub: '等货', tab: 'orders', color: openOrders.length ? '#fa8c16' : '#bbb' },
-          { label: '验收不合格', value: failedReceipts.length, sub: '待跟供应商协商', tab: 'failed', color: failedReceipts.length ? '#f5222d' : '#bbb' },
-          { label: '退换处理中', value: resolveReceipts.length, sub: '换货/退货', tab: 'resolve', color: resolveReceipts.length ? '#722ed1' : '#bbb' },
+          { label: '采购池待下单', value: poolRequests, sub: `${pool.length} 种`, tab: 'pool', color: poolRequests ? T.brand : T.textDisabled },
+          { label: '在途采购单', value: openOrders.length, sub: '等货', tab: 'orders', color: openOrders.length ? T.orange : T.textDisabled },
+          { label: '验收不合格', value: failedReceipts.length, sub: '待跟供应商协商', tab: 'failed', color: failedReceipts.length ? T.error : T.textDisabled },
+          { label: '退换处理中', value: resolveReceipts.length, sub: '换货/退货', tab: 'resolve', color: resolveReceipts.length ? T.purple : T.textDisabled },
         ].map((s) => (
           <Col xs={12} md={6} key={s.label}>
             <Card size="small" hoverable onClick={() => setTab(s.tab)} style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: 12, color: '#888' }}>{s.label}</div>
-              <div style={{ fontSize: 22, fontWeight: 600, color: s.color }}>{s.value}</div>
-              <div style={{ fontSize: 11, color: '#aaa' }}>{s.sub}</div>
+              <div style={{ fontSize: 12, color: T.textSecondary }}>{s.label}</div>
+              <div style={{ fontSize: 20, fontWeight: 600, color: s.color }}>{s.value}</div>
+              <div style={{ fontSize: 12, color: T.textDisabled }}>{s.sub}</div>
             </Card>
           </Col>
         ))}
@@ -219,7 +220,7 @@ export default function PurchaseWorkbench() {
                               r.part_no ? (
                                 <>
                                   <div style={{ fontSize: 12 }}>{r.part_no}</div>
-                                  <div style={{ fontSize: 12, color: '#8c8c8c' }}>
+                                  <div style={{ fontSize: 12, color: T.textSecondary }}>
                                     {r.part_title ?? ''}
                                   </div>
                                 </>
@@ -256,7 +257,7 @@ export default function PurchaseWorkbench() {
                                 <>
                                   <Tag color="orange">退货重采</Tag>
                                   {r.origin_po_no && (
-                                    <div style={{ fontSize: 12, color: '#8c8c8c' }}>
+                                    <div style={{ fontSize: 12, color: T.textSecondary }}>
                                       原 {r.origin_po_no}
                                     </div>
                                   )}
@@ -265,12 +266,12 @@ export default function PurchaseWorkbench() {
                                 <>
                                   <Tag>{v}</Tag>
                                   {r.source_release_no && (
-                                    <div style={{ fontSize: 12, color: '#8c8c8c' }}>
+                                    <div style={{ fontSize: 12, color: T.textSecondary }}>
                                       {r.source_release_no}
                                     </div>
                                   )}
                                   {v === '手工' && r.requester_name && (
-                                    <div style={{ fontSize: 12, color: '#8c8c8c' }}>
+                                    <div style={{ fontSize: 12, color: T.textSecondary }}>
                                       {r.requester_name}
                                     </div>
                                   )}
@@ -297,7 +298,7 @@ export default function PurchaseWorkbench() {
                       render: (_: unknown, g) => (
                         <>
                           <b>{g.display_name}</b>
-                          <div style={{ fontSize: 12, color: '#8c8c8c' }}>
+                          <div style={{ fontSize: 12, color: T.textSecondary }}>
                             {g.item_no}
                             {g.spec_text ? ` · ${g.spec_text}` : ''}
                           </div>
@@ -399,7 +400,7 @@ export default function PurchaseWorkbench() {
                       render: (v: string | null, o) => (
                         <>
                           <b>{v ?? '未编号'}</b>
-                          <div style={{ fontSize: 12, color: '#8c8c8c' }}>
+                          <div style={{ fontSize: 12, color: T.textSecondary }}>
                             {o.line_count} 条 · {o.item_kinds} 种物料
                           </div>
                         </>
@@ -525,7 +526,7 @@ export default function PurchaseWorkbench() {
                       render: (_: unknown, r) => (
                         <>
                           <b>{r.display_name}</b>
-                          <div style={{ fontSize: 12, color: '#8c8c8c' }}>{r.item_no}</div>
+                          <div style={{ fontSize: 12, color: T.textSecondary }}>{r.item_no}</div>
                         </>
                       ),
                     },
@@ -550,7 +551,7 @@ export default function PurchaseWorkbench() {
                       render: (_: unknown, r) => (
                         <>
                           <div>{r.project_no}</div>
-                          <div style={{ fontSize: 12, color: '#8c8c8c' }}>
+                          <div style={{ fontSize: 12, color: T.textSecondary }}>
                             {r.equip_no ? `${r.equip_no} ${r.equip_name ?? ''}` : (r.project_name ?? '')}
                           </div>
                         </>
@@ -569,7 +570,7 @@ export default function PurchaseWorkbench() {
                       render: (_: unknown, r) => (
                         <>
                           <div>{r.inspected_by ?? '—'}</div>
-                          <div style={{ fontSize: 12, color: '#8c8c8c' }}>
+                          <div style={{ fontSize: 12, color: T.textSecondary }}>
                             {r.inspected_at ? dayjs(r.inspected_at).format('MM-DD HH:mm') : ''}
                           </div>
                         </>
@@ -645,7 +646,7 @@ export default function PurchaseWorkbench() {
                       render: (_: unknown, r) => (
                         <>
                           <b>{r.display_name}</b>
-                          <div style={{ fontSize: 12, color: '#8c8c8c' }}>{r.item_no}</div>
+                          <div style={{ fontSize: 12, color: T.textSecondary }}>{r.item_no}</div>
                         </>
                       ),
                     },
@@ -670,7 +671,7 @@ export default function PurchaseWorkbench() {
                       render: (_: unknown, r) => (
                         <>
                           <div>{r.project_no}</div>
-                          <div style={{ fontSize: 12, color: '#8c8c8c' }}>
+                          <div style={{ fontSize: 12, color: T.textSecondary }}>
                             {r.equip_no ? `${r.equip_no} ${r.equip_name ?? ''}` : (r.project_name ?? '')}
                           </div>
                         </>
@@ -727,7 +728,7 @@ export default function PurchaseWorkbench() {
                       render: (_: unknown, r) => (
                         <>
                           <div>{r.inspected_by ?? '—'}</div>
-                          <div style={{ fontSize: 12, color: '#8c8c8c' }}>
+                          <div style={{ fontSize: 12, color: T.textSecondary }}>
                             {r.inspected_at ? dayjs(r.inspected_at).format('MM-DD HH:mm') : ''}
                           </div>
                         </>
@@ -740,7 +741,7 @@ export default function PurchaseWorkbench() {
                       render: (_: unknown, r) => (
                         <>
                           <div>{r.resolved_by ?? '—'}</div>
-                          <div style={{ fontSize: 12, color: '#8c8c8c' }}>
+                          <div style={{ fontSize: 12, color: T.textSecondary }}>
                             {r.resolved_at ? dayjs(r.resolved_at).format('MM-DD HH:mm') : ''}
                           </div>
                         </>
@@ -786,7 +787,7 @@ export default function PurchaseWorkbench() {
                       render: (_: unknown, r) => (
                         <>
                           <b>{r.display_name}</b>
-                          <div style={{ fontSize: 12, color: '#8c8c8c' }}>{r.item_no}</div>
+                          <div style={{ fontSize: 12, color: T.textSecondary }}>{r.item_no}</div>
                         </>
                       ),
                     },
@@ -811,7 +812,7 @@ export default function PurchaseWorkbench() {
                       render: (_: unknown, r) => (
                         <>
                           <div>{r.project_no}</div>
-                          <div style={{ fontSize: 12, color: '#8c8c8c' }}>
+                          <div style={{ fontSize: 12, color: T.textSecondary }}>
                             {r.equip_no ? `${r.equip_no} ${r.equip_name ?? ''}` : (r.project_name ?? '')}
                           </div>
                         </>

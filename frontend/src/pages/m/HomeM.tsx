@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
 import { errMsg, mobileHome, type MobileHome } from '../../api/client'
+import { T } from '../../theme/tokens'
 
 /** 手机端首页：按角色给待办数字，点进去干活 */
 export default function HomeM() {
@@ -53,7 +54,7 @@ export default function HomeM() {
               <Statistic
                 title={i.label}
                 value={i.value}
-                valueStyle={{ fontSize: 22, color: i.value ? '#1f6feb' : '#999' }}
+                valueStyle={{ fontSize: 20, color: i.value ? T.brand : T.textSecondary }}
               />
             </Card>
           </Col>

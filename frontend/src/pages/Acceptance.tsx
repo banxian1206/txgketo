@@ -37,6 +37,7 @@ import { SelectProject } from '../components/fields'
 import { acceptanceDocUrl } from '../api/client'
 import { readSession } from '../contexts/session'
 import { ACCEPTANCE_STATUS as ACC_COLOR } from '../theme/status'
+import { T } from '../theme/tokens'
 
 const DOC_TYPES = ['技术协议', '图纸清单', '检验报告', '调试记录', '操作手册', '备件清单', '培训记录', '验收单', '其他']
 
@@ -155,7 +156,7 @@ export default function AcceptancePage() {
       }
     >
       <Row gutter={12} style={{ marginBottom: 12 }}>
-        <Col span={4}><Statistic title="待验收" value={c?.pending ?? 0} valueStyle={{ color: c?.pending ? '#d48806' : undefined }} /></Col>
+        <Col span={4}><Statistic title="待验收" value={c?.pending ?? 0} valueStyle={{ color: c?.pending ? T.goldText : undefined }} /></Col>
         <Col span={4}><Statistic title="已通过" value={c?.passed ?? 0} /></Col>
         <Col span={4}><Statistic title="未通过" value={c?.rejected ?? 0} /></Col>
         <Col span={12} style={{ textAlign: 'right' }}>

@@ -175,7 +175,7 @@ export default function ProjectInitiate() {
           <Col flex="auto">
             <Space size={8}>
               <a onClick={() => nav(`/projects/${projectNo}`)}>← 返回项目</a>
-              <Typography.Text strong style={{ fontSize: 17 }}>
+              <Typography.Text strong style={{ fontSize: 16 }}>
                 立项 · {projectNo}
               </Typography.Text>
               <Typography.Text>{p?.project_name}</Typography.Text>

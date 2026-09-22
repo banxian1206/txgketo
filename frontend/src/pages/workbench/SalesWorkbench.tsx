@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom'
 
 import { errMsg, salesBoard, workbenchMe, type SalesBoard, type WorkbenchMe } from '../../api/client'
 import { PROJECT_STAGE as STAGE_COLOR } from '../../theme/status'
+import { T } from '../../theme/tokens'
 
 /** 商务部工作台（06 卷 §3）：我的商机 → 成交待立项 → 执行中 + 回款 */
 export default function SalesWorkbench() {
@@ -51,17 +52,17 @@ export default function SalesWorkbench() {
 
       <Row gutter={[12, 12]} style={{ marginBottom: 12 }}>
         {[
-          { label: '商机（线索）', value: s?.my_leads ?? 0, color: '#1f6feb' },
-          { label: '待立项', value: s?.to_initiate ?? 0, color: '#fa8c16' },
-          { label: '执行中 / 交付中', value: s?.executing ?? 0, color: '#13c2c2' },
-          { label: '跟进超期', value: s?.overdue_followup ?? 0, color: '#f5222d' },
-          { label: '待回款节点', value: s?.payments_due ?? 0, color: '#722ed1' },
-          { label: '回款逾期', value: s?.payments_overdue ?? 0, color: '#f5222d' },
+          { label: '商机（线索）', value: s?.my_leads ?? 0, color: T.brand },
+          { label: '待立项', value: s?.to_initiate ?? 0, color: T.orange },
+          { label: '执行中 / 交付中', value: s?.executing ?? 0, color: T.cyan },
+          { label: '跟进超期', value: s?.overdue_followup ?? 0, color: T.error },
+          { label: '待回款节点', value: s?.payments_due ?? 0, color: T.purple },
+          { label: '回款逾期', value: s?.payments_overdue ?? 0, color: T.error },
         ].map((x) => (
           <Col xs={12} sm={8} md={4} key={x.label}>
             <Card size="small" style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: 12, color: '#888' }}>{x.label}</div>
-              <div style={{ fontSize: 22, fontWeight: 600, color: x.value ? x.color : '#bbb' }}>{x.value}</div>
+              <div style={{ fontSize: 12, color: T.textSecondary }}>{x.label}</div>
+              <div style={{ fontSize: 20, fontWeight: 600, color: x.value ? x.color : T.textDisabled }}>{x.value}</div>
             </Card>
           </Col>
         ))}

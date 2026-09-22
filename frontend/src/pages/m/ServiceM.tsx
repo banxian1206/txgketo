@@ -17,6 +17,7 @@ import {
 } from '../../api/client'
 import MfgPhotoPicker from '../../components/MfgPhotoPicker'
 import { SERVICE_ORDER_STATUS as SO_COLOR } from '../../theme/status'
+import { T } from '../../theme/tokens'
 
 /** 售后手机端（S11）：报修 / 派工 / 到场 / 处理完成（拍照）。 */
 export default function ServiceM() {
@@ -81,10 +82,10 @@ export default function ServiceM() {
         {o.in_warranty != null && (o.in_warranty ? <Tag color="success">在保</Tag> : <Tag color="red">过保</Tag>)}
       </Space>
       <div style={{ fontSize: 13, marginTop: 4 }}>{o.fault ?? ''}</div>
-      <div style={{ fontSize: 12, color: '#999', marginTop: 2 }}>
+      <div style={{ fontSize: 12, color: T.textSecondary, marginTop: 2 }}>
         {o.project_no}{o.equip_no ? ` · ${o.equip_no}` : ''} · {o.dispatched_to ?? '未派工'}
       </div>
-      {o.solution && <div style={{ fontSize: 12, color: '#52c41a', marginTop: 4 }}>✅ {o.solution}</div>}
+      {o.solution && <div style={{ fontSize: 12, color: T.success, marginTop: 4 }}>✅ {o.solution}</div>}
       <Space wrap style={{ marginTop: 8 }}>
         {canEdit && o.status === '待受理' && <Button size="small" type="primary" onClick={() => open('dispatch', o)}>派工</Button>}
         {canEdit && o.status === '已派工' && <Button size="small" onClick={() => void arriveServiceOrder(o.id).then(() => void load()).catch((e) => message.error(errMsg(e)))}>到场</Button>}

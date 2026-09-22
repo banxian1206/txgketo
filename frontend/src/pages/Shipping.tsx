@@ -45,6 +45,7 @@ import {
 import AuthedImage from '../components/AuthedImage'
 import MfgPhotoPicker from '../components/MfgPhotoPicker'
 import { SHIP_STATUS as SHIP_COLOR } from '../theme/status'
+import { T } from '../theme/tokens'
 
 export default function Shipping() {
   const { message } = App.useApp()
@@ -300,7 +301,7 @@ export default function Shipping() {
         <>
           <Row gutter={12} style={{ marginBottom: 12 }}>
             <Col span={6}><Statistic title="未完成批次" value={counts.open} /></Col>
-            <Col span={6}><Statistic title="在途" value={counts.transit} valueStyle={{ color: counts.transit ? '#d48806' : undefined }} /></Col>
+            <Col span={6}><Statistic title="在途" value={counts.transit} valueStyle={{ color: counts.transit ? T.goldText : undefined }} /></Col>
             <Col span={6}><Statistic title="已签收" value={counts.signed} /></Col>
           </Row>
 
@@ -407,7 +408,7 @@ export default function Shipping() {
             <>
               {(itemsShip?.items ?? []).length === 0 && <Empty description="清单为空" />}
               {(itemsShip?.items ?? []).map((it) => (
-                <div key={it.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 0', borderBottom: '1px solid #f0f0f0' }}>
+                <div key={it.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 0', borderBottom: `1px solid ${T.border}` }}>
                   <Checkbox
                     checked={it.shipped}
                     onChange={() => void toggleShipped(it)}
@@ -488,7 +489,7 @@ export default function Shipping() {
           {(receiptTarget?.items ?? []).map((it) => {
             const st = receiptChecks[it.id] ?? { result: '到' }
             return (
-              <div key={it.id} style={{ padding: '6px 0', borderBottom: '1px solid #f0f0f0' }}>
+              <div key={it.id} style={{ padding: '6px 0', borderBottom: `1px solid ${T.border}` }}>
                 <Space wrap>
                   <Typography.Text>{it.ref}</Typography.Text>
                   <Typography.Text type="secondary" style={{ fontSize: 12 }}>应发 {it.qty}</Typography.Text>
@@ -551,7 +552,7 @@ export default function Shipping() {
             <Typography.Title level={5} style={{ marginTop: 16 }}>发运清单（{detail.items.length}）</Typography.Title>
             {detail.items.length === 0 && <Empty description="清单为空" />}
             {detail.items.map((p) => (
-              <div key={p.id} style={{ padding: '5px 0', borderBottom: '1px solid #f0f0f0' }}>
+              <div key={p.id} style={{ padding: '5px 0', borderBottom: `1px solid ${T.border}` }}>
                 <Space>
                   {p.shipped ? <Tag color="success">已发</Tag> : <Tag>未发</Tag>}
                   <Typography.Text>{p.ref}</Typography.Text>
@@ -574,7 +575,7 @@ export default function Shipping() {
                 <Tag color={r.result === '齐' ? 'success' : 'error'}>{r.result}</Tag>
                 {r.remark}
                 {r.shortage_detail.length > 0 && (
-                  <div style={{ fontSize: 12, color: '#cf1322', marginTop: 4 }}>
+                  <div style={{ fontSize: 12, color: T.error, marginTop: 4 }}>
                     {r.shortage_detail.map((s, i) => (
                       <div key={i}>{s.equip_no ?? ''} {s.item ?? ''}：{s.result}（实到 {s.received_qty ?? '—'}）{s.reason}</div>
                     ))}

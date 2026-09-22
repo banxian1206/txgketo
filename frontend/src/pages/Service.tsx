@@ -41,6 +41,7 @@ import {
 import MfgPhotoPicker from '../components/MfgPhotoPicker'
 import { SelectEquipment, SelectProject } from '../components/fields'
 import { SERVICE_ORDER_STATUS as SO_COLOR } from '../theme/status'
+import { T } from '../theme/tokens'
 
 type Kind = 'create' | 'dispatch' | 'fix' | 'sign' | 'part' | 'move'
 
@@ -145,11 +146,11 @@ export default function Service() {
     >
       <Row gutter={12} style={{ marginBottom: 12 }}>
         <Col span={4}><Statistic title="未关闭工单" value={c?.open ?? 0} /></Col>
-        <Col span={4}><Statistic title="待受理" value={c?.wait ?? 0} valueStyle={{ color: c?.wait ? '#cf1322' : undefined }} /></Col>
+        <Col span={4}><Statistic title="待受理" value={c?.wait ?? 0} valueStyle={{ color: c?.wait ? T.error : undefined }} /></Col>
         <Col span={4}><Statistic title="处理中" value={c?.in_progress ?? 0} /></Col>
         <Col span={4}><Statistic title="待客户签字" value={c?.to_sign ?? 0} /></Col>
         <Col span={4}><Statistic title="已关闭" value={c?.closed ?? 0} /></Col>
-        <Col span={4}><Statistic title="备件低库存" value={c?.low_parts ?? 0} valueStyle={{ color: c?.low_parts ? '#cf1322' : undefined }} /></Col>
+        <Col span={4}><Statistic title="备件低库存" value={c?.low_parts ?? 0} valueStyle={{ color: c?.low_parts ? T.error : undefined }} /></Col>
       </Row>
 
       <Tabs

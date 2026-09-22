@@ -33,6 +33,7 @@ import {
 import { PURCHASE_LINE_STATUS as STATUS_COLOR } from '../theme/status'
 import { RECEIPT_STATUS as RECEIPT_COLOR } from '../theme/status'
 import { ORDER_STATUS as ORDER_STATUS_COLOR } from '../theme/status'
+import { T } from '../theme/tokens'
 
 /** 到货单状态在行内标签上的短文案 */
 const RECEIPT_LABEL: Record<string, string> = {
@@ -300,7 +301,7 @@ export default function PurchaseOrderDrawer({
                         g.status === '不合格' || g.status === '已换货' || g.status === '已退货' ? (
                           <>
                             <Tag color="red">不合格</Tag>
-                            <div style={{ fontSize: 12, color: '#8c8c8c' }}>{g.inspect_note ?? '—'}</div>
+                            <div style={{ fontSize: 12, color: T.textSecondary }}>{g.inspect_note ?? '—'}</div>
                           </>
                         ) : (
                           <Tag color="green">
@@ -317,7 +318,7 @@ export default function PurchaseOrderDrawer({
                           return (
                             <>
                               <Tag color="orange">换货</Tag>
-                              <span style={{ fontSize: 12, color: '#8c8c8c' }}>{g.resolve_note ?? '等供应商补发'}</span>
+                              <span style={{ fontSize: 12, color: T.textSecondary }}>{g.resolve_note ?? '等供应商补发'}</span>
                             </>
                           )
                         }
@@ -325,9 +326,9 @@ export default function PurchaseOrderDrawer({
                           return (
                             <>
                               <Tag>退货</Tag>
-                              <span style={{ fontSize: 12, color: '#8c8c8c' }}>{g.resolve_note ?? '—'}</span>
+                              <span style={{ fontSize: 12, color: T.textSecondary }}>{g.resolve_note ?? '—'}</span>
                               {(g.retries ?? []).length > 0 && (
-                                <div style={{ fontSize: 12, color: '#1677ff' }}>
+                                <div style={{ fontSize: 12, color: T.brand }}>
                                   → 需求已回采购池：
                                   {g.retries
                                     ?.map((x) => (x.po_no ? `重采 ${x.po_no}` : `新需求 #${x.id}（${x.status}）`))
@@ -350,7 +351,7 @@ export default function PurchaseOrderDrawer({
                       render: (_: unknown, g) => (
                         <>
                           <div>{g.inspected_by ?? '—'}</div>
-                          <div style={{ fontSize: 12, color: '#8c8c8c' }}>
+                          <div style={{ fontSize: 12, color: T.textSecondary }}>
                             {g.inspected_at ? dayjs(g.inspected_at).format('MM-DD HH:mm') : ''}
                           </div>
                         </>
@@ -366,7 +367,7 @@ export default function PurchaseOrderDrawer({
                         return (
                           <>
                             <div>{by ?? '—'}</div>
-                            <div style={{ fontSize: 12, color: '#8c8c8c' }}>
+                            <div style={{ fontSize: 12, color: T.textSecondary }}>
                               {at ? dayjs(at).format('MM-DD HH:mm') : ''}
                             </div>
                           </>
@@ -391,7 +392,7 @@ export default function PurchaseOrderDrawer({
                         退货重采
                       </Tag>
                     )}
-                    <div style={{ fontSize: 12, color: '#8c8c8c' }}>
+                    <div style={{ fontSize: 12, color: T.textSecondary }}>
                       {l.item_no}
                       {l.spec_text ? ` · ${l.spec_text}` : ''}
                     </div>
@@ -405,12 +406,12 @@ export default function PurchaseOrderDrawer({
                 render: (_: unknown, l) => (
                   <>
                     <div>{l.project_no}</div>
-                    <div style={{ fontSize: 12, color: '#8c8c8c' }}>
+                    <div style={{ fontSize: 12, color: T.textSecondary }}>
                       {l.equip_no ? `${l.equip_no} ${l.equip_name ?? ''}` : (l.equip_name ?? '未挂设备')}
                     </div>
                     {l.part_no && (
                       <div
-                        style={{ fontSize: 12, color: '#8c8c8c' }}
+                        style={{ fontSize: 12, color: T.textSecondary }}
                         title={l.part_title ?? ''}
                       >
                         零件 {l.part_no}
@@ -427,7 +428,7 @@ export default function PurchaseOrderDrawer({
                   <>
                     <div>{v ? `${v} ${l.unit ?? ''}` : '—'}</div>
                     {(l.qty_returned > 0 || l.qty_exchanged > 0) && (
-                      <div style={{ fontSize: 12, color: '#8c8c8c' }} title={`原订购 ${l.qty_original} ${l.unit ?? ''}`}>
+                      <div style={{ fontSize: 12, color: T.textSecondary }} title={`原订购 ${l.qty_original} ${l.unit ?? ''}`}>
                         原 {l.qty_original}
                         {l.qty_exchanged > 0 ? ` · 换 ${l.qty_exchanged}` : ''}
                         {l.qty_returned > 0 ? ` · 退 ${l.qty_returned}` : ''}

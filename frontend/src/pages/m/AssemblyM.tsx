@@ -18,8 +18,9 @@ import {
 } from '../../api/client'
 import MfgPhotoPicker from '../../components/MfgPhotoPicker'
 import { ASSEMBLY_STATUS as STATUS_COLOR } from '../../theme/status'
+import { T } from '../../theme/tokens'
 
-const rateColor = (r: number) => (r >= 1 ? '#52c41a' : r >= 0.6 ? '#1677ff' : '#faad14')
+const rateColor = (r: number) => (r >= 1 ? T.success : r >= 0.6 ? T.brand : T.warning)
 
 /** 车间手机端 · 装配与齐套率（S6）：齐套率只展示，随时可开装（勾选 + 拍照）。 */
 export default function AssemblyM() {
@@ -131,7 +132,7 @@ export default function AssemblyM() {
             extra={<a onClick={() => void openDetail(o.equip_no)}>{detail?.equip_no === o.equip_no ? '收起' : '明细'}</a>}
           >
             <Progress percent={Math.round(o.kitting_rate * 100)} strokeColor={rateColor(o.kitting_rate)} />
-            <div style={{ fontSize: 12, color: '#999' }}>
+            <div style={{ fontSize: 12, color: T.textSecondary }}>
               到位 {o.arrived}/{o.total} 种 · 数量 {o.arrived_qty}/{o.total_qty}
             </div>
             <Space style={{ marginTop: 8 }}>
@@ -144,7 +145,7 @@ export default function AssemblyM() {
             {detail?.equip_no === o.equip_no && (
               <div style={{ marginTop: 8 }}>
                 {detail.lines.map((l: KittingLine) => (
-                  <div key={l.ref} style={{ fontSize: 12, padding: '3px 0', borderBottom: '1px solid #f0f0f0' }}>
+                  <div key={l.ref} style={{ fontSize: 12, padding: '3px 0', borderBottom: `1px solid ${T.border}` }}>
                     <span>{l.ref}</span>{' '}
                     {l.ready ? <Tag color="success">✅ {l.state}</Tag> : <Tag color="error">缺 · {l.state}</Tag>}
                   </div>
@@ -164,7 +165,7 @@ export default function AssemblyM() {
               <Typography.Text>{r.equip_no}</Typography.Text>
               <Tag color={rateColor(r.kitting_rate)}>开工齐套 {Math.round(r.kitting_rate * 100)}%</Tag>
             </Space>
-            <div style={{ fontSize: 12, color: '#999', marginTop: 4 }}>{r.sub_assembly} · {r.project_no}</div>
+            <div style={{ fontSize: 12, color: T.textSecondary, marginTop: 4 }}>{r.sub_assembly} · {r.project_no}</div>
             {r.debug_result && (
               <div style={{ fontSize: 12, marginTop: 4 }}>
                 调试：<Tag color={r.debug_result === '合格' ? 'success' : 'error'}>{r.debug_result}</Tag> {r.debug_note}

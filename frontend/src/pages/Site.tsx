@@ -45,6 +45,7 @@ import AuthedImage from '../components/AuthedImage'
 import MfgPhotoPicker from '../components/MfgPhotoPicker'
 import { SITE_ISSUE_STATUS as ISSUE_COLOR } from '../theme/status'
 import { SITE_COMMISSION_STATUS as COMMISSION_COLOR } from '../theme/status'
+import { T } from '../theme/tokens'
 
 /** 现场台（PC，S8）：给项目经理/现场负责人看整体 —— 手机端是现场的主终端。 */
 export default function Site() {
@@ -146,7 +147,7 @@ export default function Site() {
         <Row gutter={12} style={{ marginBottom: 12 }}>
             <Col span={4}><Statistic title="已勘测" value={c?.surveyed ?? 0} /></Col>
             <Col span={4}><Statistic title="今日汇报" value={c?.daily_today ?? 0} /></Col>
-            <Col span={4}><Statistic title="待处理问题" value={c?.open_issues ?? 0} valueStyle={{ color: c?.open_issues ? '#cf1322' : undefined }} /></Col>
+            <Col span={4}><Statistic title="待处理问题" value={c?.open_issues ?? 0} valueStyle={{ color: c?.open_issues ? T.error : undefined }} /></Col>
             <Col span={4}><Statistic title="待派调试" value={c?.to_dispatch ?? 0} /></Col>
             <Col span={4}><Statistic title="调试中" value={c?.debugging ?? 0} /></Col>
           </Row>

@@ -28,6 +28,7 @@ import {
   type StdClassInfo,
   type StdItem,
 } from '../api/client'
+import { T } from '../theme/tokens'
 
 /**
  * 标准库（01 卷 §5）：三层 → 类别 → 品类 → 型号
@@ -185,7 +186,7 @@ export default function Library() {
                     onClick={() => setActiveClass(k)}
                   >
                     {k.name}
-                    <span style={{ color: '#bbb', marginLeft: 6 }}>{k.item_count ?? 0}</span>
+                    <span style={{ color: T.textDisabled, marginLeft: 6 }}>{k.item_count ?? 0}</span>
                   </a>
                 ))}
               </div>

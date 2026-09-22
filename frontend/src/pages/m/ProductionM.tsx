@@ -20,6 +20,7 @@ import {
 import MfgPhotoPicker from '../../components/MfgPhotoPicker'
 import { PROD_STATUS as STATUS_COLOR } from '../../theme/status'
 import { OUTSOURCE_STATUS as OS_COLOR } from '../../theme/status'
+import { T } from '../../theme/tokens'
 
 const TEAMS = ['下料', '机加', '焊接', '钣金', '喷涂']
 
@@ -104,10 +105,10 @@ export default function ProductionM() {
         <Typography.Text strong>{o.item_no}</Typography.Text>
         <Tag color={STATUS_COLOR[o.status] ?? 'default'}>{o.status}</Tag>
       </div>
-      <div style={{ fontSize: 13, color: '#666', marginTop: 4 }}>
+      <div style={{ fontSize: 13, color: T.textStrong, marginTop: 4 }}>
         {o.item_name ?? ''} · {o.qty} {o.unit}
       </div>
-      <div style={{ fontSize: 12, color: '#999', marginTop: 2 }}>
+      <div style={{ fontSize: 12, color: T.textSecondary, marginTop: 2 }}>
         {o.project_no} · {o.equip_no ?? ''} · 计划 {o.plan_end ?? '—'} {o.overdue ? '（超期）' : ''}
       </div>
       <Space wrap style={{ marginTop: 10 }}>
@@ -126,7 +127,7 @@ export default function ProductionM() {
         <Typography.Text strong>{o.item_no}</Typography.Text>
         <Tag color={OS_COLOR[o.status] ?? 'default'}>{o.status}</Tag>
       </div>
-      <div style={{ fontSize: 13, color: '#666', marginTop: 4 }}>
+      <div style={{ fontSize: 13, color: T.textStrong, marginTop: 4 }}>
         {o.item_name ?? ''} · {o.qty} · {o.project_no} {o.equip_no ?? ''}
       </div>
       <Space wrap style={{ marginTop: 10 }}>
@@ -148,8 +149,8 @@ export default function ProductionM() {
           <span>待下发 {c?.wait ?? 0}</span>
           <span>在制 {c?.running ?? 0}</span>
           <span>待转运 {c?.to_transfer ?? 0}</span>
-          <span style={{ color: c?.rework ? '#cf1322' : undefined }}>返工 {c?.rework ?? 0}</span>
-          <span style={{ color: c?.overdue ? '#cf1322' : undefined }}>超期 {c?.overdue ?? 0}</span>
+          <span style={{ color: c?.rework ? T.error : undefined }}>返工 {c?.rework ?? 0}</span>
+          <span style={{ color: c?.overdue ? T.error : undefined }}>超期 {c?.overdue ?? 0}</span>
         </Space>
       </Card>
 

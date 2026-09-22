@@ -37,8 +37,9 @@ import AuthedImage from '../components/AuthedImage'
 import MfgPhotoPicker from '../components/MfgPhotoPicker'
 import { mfgPhotoUrl } from '../api/client'
 import { ASSEMBLY_STATUS as STATUS_COLOR } from '../theme/status'
+import { T } from '../theme/tokens'
 
-const rateColor = (r: number) => (r >= 1 ? '#52c41a' : r >= 0.6 ? '#1677ff' : '#faad14')
+const rateColor = (r: number) => (r >= 1 ? T.success : r >= 0.6 ? T.brand : T.warning)
 
 export default function Assembly() {
   const { message } = App.useApp()

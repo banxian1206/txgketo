@@ -2,6 +2,7 @@ import { Image } from 'antd'
 import { useEffect, useState } from 'react'
 
 import { fetchFileBlob } from '../api/client'
+import { T } from '../theme/tokens'
 
 /** 带鉴权取图（图纸/验收照片都走这里），给手机端做缩略图 */
 export default function AuthedImage({
@@ -31,7 +32,7 @@ export default function AuthedImage({
         style={{
           width: size,
           height: size,
-          background: '#f0f0f0',
+          background: T.border,
           borderRadius: 6,
           display: 'inline-block',
         }}

@@ -61,6 +61,7 @@ import {
   registerPayment,
   type KittingOverviewRow,
 } from '../api/client'
+import { T } from '../theme/tokens'
 
 const ATT_CATEGORIES = ['客户资料', '方案', '报价', '合同', '技术协议', '其他']
 const CLOSE_REASONS = ['价格', '交期', '技术不满足', '客户取消', '对手中标', '其他']
@@ -376,7 +377,7 @@ export default function ProjectDetailPage() {
           <Col flex="auto">
             <Space size={8} wrap>
               <a onClick={() => nav('/projects')}>← 返回列表</a>
-              <Typography.Text strong style={{ fontSize: 18 }}>
+              <Typography.Text strong style={{ fontSize: 16 }}>
                 {p.project_no}
               </Typography.Text>
               <Typography.Text style={{ fontSize: 16 }}>{p.project_name}</Typography.Text>
@@ -977,7 +978,7 @@ export default function ProjectDetailPage() {
                         <Progress
                           size="small"
                           percent={Math.round((r.kitting_rate ?? 0) * 100)}
-                          strokeColor={r.kitting_rate >= 1 ? '#52c41a' : r.kitting_rate >= 0.6 ? '#1677ff' : '#faad14'}
+                          strokeColor={r.kitting_rate >= 1 ? T.success : r.kitting_rate >= 0.6 ? T.brand : T.warning}
                         />
                       ),
                     },

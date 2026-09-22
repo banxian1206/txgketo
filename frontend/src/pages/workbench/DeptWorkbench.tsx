@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
 import { errMsg, workbenchMe, type WorkbenchMe } from '../../api/client'
+import { T } from '../../theme/tokens'
 
 type CountKey = keyof WorkbenchMe['counts']
 
@@ -125,7 +126,7 @@ export default function DeptWorkbench({ kind }: { kind: 'sales' | 'pm' | 'eng' |
               <Statistic
                 title={t.label}
                 value={c?.[t.key] ?? 0}
-                valueStyle={{ fontSize: 22, color: (c?.[t.key] ?? 0) ? '#1f6feb' : '#bbb' }}
+                valueStyle={{ fontSize: 20, color: (c?.[t.key] ?? 0) ? T.brand : T.textDisabled }}
               />
             </Card>
           </Col>

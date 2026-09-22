@@ -15,6 +15,7 @@ import {
 } from 'antd'
 import type { Dayjs } from 'dayjs'
 import type { ReactNode } from 'react'
+import { T } from '../theme/tokens'
 
 /** 项目表单的全部字段（新建 / 编辑共用） */
 export interface ProjectFormValues {
@@ -93,7 +94,7 @@ function Group({ title, hint, children }: { title: string; hint?: ReactNode; chi
         </Space>
       }
       style={{ marginBottom: 16 }}
-      styles={{ header: { background: '#fafafa' } }}
+      styles={{ header: { background: T.bgSubtle } }}
     >
       {children}
     </Card>

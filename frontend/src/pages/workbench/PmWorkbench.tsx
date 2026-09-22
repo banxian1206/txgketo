@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom'
 
 import { errMsg, pmBoard, workbenchMe, type PmBoard, type PmProjectRow, type WorkbenchMe } from '../../api/client'
 import { PROJECT_STAGE as STAGE_COLOR } from '../../theme/status'
+import { T } from '../../theme/tokens'
 
 /** 项目经理台（06 卷 §3）：我项目的全链进度（设计 → 采购 → 到货/入库）+ 风险/待办 */
 export default function PmWorkbench() {
@@ -61,7 +62,7 @@ export default function PmWorkbench() {
             size="small"
             status={r.design_total && r.design_done === r.design_total ? 'success' : 'active'}
           />
-          <Typography.Text type="secondary" style={{ fontSize: 11 }}>
+          <Typography.Text type="secondary" style={{ fontSize: 12 }}>
             已发布 {r.design_done}/{r.design_total}
           </Typography.Text>
         </Space>
@@ -116,16 +117,16 @@ export default function PmWorkbench() {
 
       <Row gutter={[12, 12]} style={{ marginBottom: 12 }}>
         {[
-          { label: '我负责的项目', value: s?.projects ?? 0, color: '#1f6feb' },
-          { label: '有风险项目', value: s?.at_risk ?? 0, color: '#f5222d' },
-          { label: '缺料（待采购）', value: s?.shortage ?? 0, color: '#fa8c16' },
-          { label: '在途采购', value: s?.in_transit ?? 0, color: '#13c2c2' },
-          { label: '超期任务', value: s?.overdue_tasks ?? 0, color: '#f5222d' },
+          { label: '我负责的项目', value: s?.projects ?? 0, color: T.brand },
+          { label: '有风险项目', value: s?.at_risk ?? 0, color: T.error },
+          { label: '缺料（待采购）', value: s?.shortage ?? 0, color: T.orange },
+          { label: '在途采购', value: s?.in_transit ?? 0, color: T.cyan },
+          { label: '超期任务', value: s?.overdue_tasks ?? 0, color: T.error },
         ].map((x) => (
           <Col xs={12} sm={8} md={4} key={x.label}>
             <Card size="small" style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: 12, color: '#888' }}>{x.label}</div>
-              <div style={{ fontSize: 22, fontWeight: 600, color: x.value ? x.color : '#bbb' }}>{x.value}</div>
+              <div style={{ fontSize: 12, color: T.textSecondary }}>{x.label}</div>
+              <div style={{ fontSize: 20, fontWeight: 600, color: x.value ? x.color : T.textDisabled }}>{x.value}</div>
             </Card>
           </Col>
         ))}

@@ -31,6 +31,7 @@ import { useSubmit } from '../hooks/useSubmit'
 
 import { api, createLocation, errMsg, generateEquipmentIssue, hasPerm, inspectPurchase, listEquipment, listLocations, listProjects, manualInbound, searchItems, storeReceipt, type GoodsReceiptRow, type ItemLite, type LocationRow } from '../api/client'
 import { WH_ISSUE_STATUS as ISSUE_COLOR } from '../theme/status'
+import { T } from '../theme/tokens'
 
 /** 在路上 / 部分到货：货到了就在这行上验收 */
 interface IncomingRow {
@@ -315,9 +316,9 @@ export default function Warehouse() {
         ].map((s) => (
           <Col xs={8} key={s.label}>
             <Card size="small" hoverable onClick={() => setTab('todo')} style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: 12, color: '#888' }}>{s.label}</div>
-              <div style={{ fontSize: 22, fontWeight: 600, color: s.value ? '#1f6feb' : '#bbb' }}>{s.value}</div>
-              <div style={{ fontSize: 11, color: '#aaa' }}>{s.hint}</div>
+              <div style={{ fontSize: 12, color: T.textSecondary }}>{s.label}</div>
+              <div style={{ fontSize: 20, fontWeight: 600, color: s.value ? T.brand : T.textDisabled }}>{s.value}</div>
+              <div style={{ fontSize: 12, color: T.textDisabled }}>{s.hint}</div>
             </Card>
           </Col>
         ))}
@@ -397,7 +398,7 @@ export default function Warehouse() {
                       render: (_: unknown, r) => (
                         <>
                           <b>{r.display_name}</b>
-                          <div style={{ fontSize: 12, color: '#8c8c8c' }}>{r.item_no}</div>
+                          <div style={{ fontSize: 12, color: T.textSecondary }}>{r.item_no}</div>
                         </>
                       ),
                     },
@@ -406,7 +407,7 @@ export default function Warehouse() {
                       render: (_: unknown, r) => (
                         <>
                           <b>{r.qty} {r.unit ?? ''}</b>
-                          <div style={{ fontSize: 12, color: '#8c8c8c' }}>已到 {r.qty_received}</div>
+                          <div style={{ fontSize: 12, color: T.textSecondary }}>已到 {r.qty_received}</div>
                         </>
                       ),
                     },
@@ -420,7 +421,7 @@ export default function Warehouse() {
                           ) : (
                             <Tag>{r.attribution ?? '辅料'}</Tag>
                           )}
-                          <div style={{ fontSize: 12, color: '#8c8c8c' }}>
+                          <div style={{ fontSize: 12, color: T.textSecondary }}>
                             {r.equip_no ? `${r.equip_no} ${r.equip_name ?? ''}` : (r.project_name ?? '')}
                           </div>
                         </>
@@ -457,7 +458,7 @@ export default function Warehouse() {
                       render: (_: unknown, r) => (
                         <>
                           <b>{r.display_name}</b>
-                          <div style={{ fontSize: 12, color: '#8c8c8c' }}>
+                          <div style={{ fontSize: 12, color: T.textSecondary }}>
                             {r.item_no ?? ''}{r.spec_text ? ` · ${r.spec_text}` : ''}
                           </div>
                         </>
@@ -474,7 +475,7 @@ export default function Warehouse() {
                           ) : (
                             <Tag>{r.attribution ?? '辅料'}</Tag>
                           )}
-                          <div style={{ fontSize: 12, color: '#8c8c8c' }}>
+                          <div style={{ fontSize: 12, color: T.textSecondary }}>
                             {r.equip_no ? `${r.equip_no} ${r.equip_name ?? ''}` : (r.project_name ?? '')}
                           </div>
                         </>

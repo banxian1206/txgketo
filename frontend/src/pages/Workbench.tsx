@@ -14,6 +14,7 @@ import {
 } from '../api/client'
 import { WB_TYPE as TYPE_COLOR } from '../theme/status'
 import { PROJECT_STAGE as STAGE_COLOR } from '../theme/status'
+import { T } from '../theme/tokens'
 
 interface TodoCard {
   label: string
@@ -93,10 +94,10 @@ export default function Workbench() {
               <Statistic
                 title={t.label}
                 value={t.count}
-                valueStyle={{ fontSize: 24, color: t.count ? '#1f6feb' : '#bbb' }}
+                valueStyle={{ fontSize: 20, color: t.count ? T.brand : T.textDisabled }}
               />
               {t.hint && (
-                <Typography.Text type="secondary" style={{ fontSize: 11 }}>
+                <Typography.Text type="secondary" style={{ fontSize: 12 }}>
                   {t.hint}
                 </Typography.Text>
               )}

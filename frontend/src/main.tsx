@@ -10,7 +10,7 @@ import './styles.css'
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <ConfigProvider locale={zhCN} theme={{ token: { colorPrimary: '#1f6feb', borderRadius: 6 } }}>
+    <ConfigProvider locale={zhCN} theme={{ token: { colorPrimary: T.brand, borderRadius: 6 } }}>
       <AntApp>
         <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
           <AuthProvider>
@@ -21,3 +21,5 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
     </ConfigProvider>
   </React.StrictMode>,
 )
+
+import { T } from './theme/tokens'

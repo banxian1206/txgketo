@@ -23,6 +23,7 @@ import {
   type PurchasePoolGroup,
 } from '../api/client'
 import { SelectSupplier } from './fields'
+import { T } from '../theme/tokens'
 
 interface MergeLine {
   request_id: number
@@ -268,7 +269,7 @@ export default function MergeOrderModal({
             render: (_: unknown, l) => (
               <>
                 <b>{l.display_name}</b>
-                <div style={{ fontSize: 12, color: '#8c8c8c' }}>
+                <div style={{ fontSize: 12, color: T.textSecondary }}>
                   {l.item_no}
                   {l.spec_text ? ` · ${l.spec_text}` : ''}
                 </div>
@@ -283,7 +284,7 @@ export default function MergeOrderModal({
               <>
                 <div>{l.project_no}</div>
                 {(l.project_name || l.equip_no) && (
-                  <div style={{ fontSize: 12, color: '#8c8c8c' }}>
+                  <div style={{ fontSize: 12, color: T.textSecondary }}>
                     {l.project_name ?? ''}
                     {l.equip_no ? `${l.project_name ? ' · ' : ''}${l.equip_no}` : ''}
                   </div>
@@ -302,7 +303,7 @@ export default function MergeOrderModal({
                   {v && v < today && <Tag color="red">赶不上</Tag>}
                 </Space>
                 {l.lead_days ? (
-                  <div style={{ fontSize: 12, color: '#8c8c8c' }}>周期 {l.lead_days} 天</div>
+                  <div style={{ fontSize: 12, color: T.textSecondary }}>周期 {l.lead_days} 天</div>
                 ) : null}
               </>
             ),
@@ -427,7 +428,7 @@ export default function MergeOrderModal({
                 title: '理由',
                 dataIndex: 'reasons',
                 render: (v: string[]) => (
-                  <span style={{ fontSize: 12, color: '#8c8c8c' }}>{v.join(' · ')}</span>
+                  <span style={{ fontSize: 12, color: T.textSecondary }}>{v.join(' · ')}</span>
                 ),
               },
               {

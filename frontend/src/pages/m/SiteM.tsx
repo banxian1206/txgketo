@@ -33,6 +33,7 @@ import {
 import MfgPhotoPicker from '../../components/MfgPhotoPicker'
 import { SITE_ISSUE_STATUS as ISSUE_COLOR } from '../../theme/status'
 import { SITE_COMMISSION_STATUS as COMMISSION_COLOR } from '../../theme/status'
+import { T } from '../../theme/tokens'
 
 type Kind = 'survey' | 'daily' | 'issue' | 'commission' | 'incoming' | 'acc-apply' | 'acc-confirm'
 
@@ -151,9 +152,9 @@ export default function SiteM() {
       </Space>
       <div style={{ fontSize: 12, marginTop: 4 }}>
         {d.done_items.map((x, i) => <div key={i}>✅ {x}</div>)}
-        {d.problem && <div style={{ color: '#cf1322' }}>⚠ {d.problem}</div>}
+        {d.problem && <div style={{ color: T.error }}>⚠ {d.problem}</div>}
       </div>
-      <div style={{ fontSize: 12, color: '#999', marginTop: 4 }}>照片 {d.photos.length} · 视频 {d.videos.length}</div>
+      <div style={{ fontSize: 12, color: T.textSecondary, marginTop: 4 }}>照片 {d.photos.length} · 视频 {d.videos.length}</div>
     </Card>
   )
 
@@ -169,7 +170,7 @@ export default function SiteM() {
           <Space split="|" wrap>
             <span>已勘测 {c?.surveyed ?? 0}</span>
             <span>今日汇报 {c?.daily_today ?? 0}</span>
-            <span style={{ color: c?.open_issues ? '#cf1322' : undefined }}>待处理问题 {c?.open_issues ?? 0}</span>
+            <span style={{ color: c?.open_issues ? T.error : undefined }}>待处理问题 {c?.open_issues ?? 0}</span>
             <span>待派调试 {c?.to_dispatch ?? 0}</span>
           </Space>
         </Card>
@@ -187,7 +188,7 @@ export default function SiteM() {
                   {incoming.pending.map((p) => (
                     <Card key={p.receipt_no} size="small" style={{ marginBottom: 10 }}>
                       <div><b>{p.item_no}</b> × {p.qty} {p.unit ?? ''}</div>
-                      <div style={{ fontSize: 12, color: '#999' }}>{p.receipt_no} · {p.receipt_date ?? ''} · 直发客户现场</div>
+                      <div style={{ fontSize: 12, color: T.textSecondary }}>{p.receipt_no} · {p.receipt_date ?? ''} · 直发客户现场</div>
                       {canEdit && <Button size="small" type="primary" style={{ marginTop: 8 }} onClick={() => open('incoming', p)}>清点验收</Button>}
                     </Card>
                   ))}
@@ -218,7 +219,7 @@ export default function SiteM() {
                         <Tag color={ISSUE_COLOR[it.status] ?? 'default'}>{it.status}</Tag>
                         <b>{it.title}</b>
                       </Space>
-                      <div style={{ fontSize: 12, color: '#666', marginTop: 4 }}>{it.desc}</div>
+                      <div style={{ fontSize: 12, color: T.textStrong, marginTop: 4 }}>{it.desc}</div>
                       {canEdit && it.status === '待处理' && (
                         <Space style={{ marginTop: 8 }}>
                           <Button size="small" onClick={() => void linkSiteIssue(it.id, { change_id: undefined }).then(() => void load(projectNo))}>转变更</Button>
@@ -266,9 +267,9 @@ export default function SiteM() {
                         <span>资料 {a.doc_count} 个（已签 {a.signed_count}）</span>
                       </Space>
                       {a.warranty_start && (
-                        <div style={{ fontSize: 12, color: '#666', marginTop: 4 }}>质保 {a.warranty_start} ~ {a.warranty_end}</div>
+                        <div style={{ fontSize: 12, color: T.textStrong, marginTop: 4 }}>质保 {a.warranty_start} ~ {a.warranty_end}</div>
                       )}
-                      {a.signed_by && <div style={{ fontSize: 12, color: '#666' }}>客户签字：{a.signed_by}</div>}
+                      {a.signed_by && <div style={{ fontSize: 12, color: T.textStrong }}>客户签字：{a.signed_by}</div>}
                       {canEdit && a.status === '待验收' && (
                         <Button size="small" type="primary" style={{ marginTop: 8 }} onClick={() => open('acc-confirm', undefined, undefined, a)}>客户确认验收</Button>
                       )}
@@ -286,7 +287,7 @@ export default function SiteM() {
                   {(wb?.surveys.length ?? 0) === 0 && <Empty description="还没勘测" />}
                   {wb?.surveys.map((s) => (
                     <Card key={s.id} size="small" style={{ marginBottom: 10 }} title={`约定入场 ${s.enter_date ?? '待定'}`}>
-                      <div style={{ fontSize: 12, color: '#666' }}>
+                      <div style={{ fontSize: 12, color: T.textStrong }}>
                         甲方：{s.contact ?? '—'} · 承重：{s.floor_load ?? '—'} · 通道：{s.passage ?? '—'}
                         <br />电：{s.power ?? '—'} · 气：{s.air ?? '—'} · 网：{s.network ?? '—'}
                       </div>

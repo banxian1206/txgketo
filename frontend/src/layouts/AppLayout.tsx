@@ -11,6 +11,7 @@ import {
   workbenchMe,
   type WorkbenchItem,
 } from '../api/client'
+import { T } from '../theme/tokens'
 
 const { Header, Sider, Content } = Layout
 
@@ -60,10 +61,10 @@ export default function AppLayout() {
         <div style={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
           <div
             style={{
-              color: '#fff',
+              color: T.bg,
               padding: '16px 20px',
               fontWeight: 600,
-              fontSize: 15,
+              fontSize: 16,
               lineHeight: 1.4,
               flexShrink: 0,
             }}
@@ -126,8 +127,8 @@ export default function AppLayout() {
         {impersonateName && (
           <div
             style={{
-              background: '#fa8c16',
-              color: '#fff',
+              background: T.orange,
+              color: T.bg,
               padding: '6px 20px',
               fontSize: 13,
               display: 'flex',
@@ -136,7 +137,7 @@ export default function AppLayout() {
           >
             <span>正在以「{impersonateName}」身份查看（只读，不能提交/审批/下单）</span>
             <a
-              style={{ color: '#fff', textDecoration: 'underline' }}
+              style={{ color: T.bg, textDecoration: 'underline' }}
               onClick={() => stopImpersonate()}
             >
               退出查看
@@ -145,7 +146,7 @@ export default function AppLayout() {
         )}
         <Header
           style={{
-            background: '#fff',
+            background: T.bg,
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
@@ -159,7 +160,7 @@ export default function AppLayout() {
                 <SettingOutlined /> 用户与权限
               </Link>
             )}
-            <Avatar size="small" style={{ background: '#1f6feb' }}>
+            <Avatar size="small" style={{ background: T.brand }}>
               {name.slice(0, 1)}
             </Avatar>
             <Typography.Text>{name}</Typography.Text>

@@ -1,3 +1,4 @@
+import { AppstoreOutlined, BlockOutlined, FolderOpenOutlined } from '@ant-design/icons'
 import {
   Alert,
   App,
@@ -362,7 +363,7 @@ export default function EquipmentDesign({ projectNo: p0, equipNo: e0, embedded }
           {
             // ★ 总装图还没建时用哨兵值：提交时不传父级，后端会自动创建总装图（P-01）
             value: root.exists ? root.drawing_no : '__ROOT__',
-            label: `📦 ${root.equip_no} ${root.title}（${root.exists ? root.drawing_no : '新增后自动创建'}）`,
+            label: `${root.equip_no} ${root.title}（${root.exists ? root.drawing_no : '新增后自动创建'}）`,
           },
         ]
       : []),
@@ -409,7 +410,7 @@ export default function EquipmentDesign({ projectNo: p0, equipNo: e0, embedded }
             <Col flex="auto">
               <Space size={8} wrap>
                 <a onClick={() => nav(`/projects/${projectNo}`)}>← 返回项目</a>
-                <Typography.Text strong style={{ fontSize: 17 }}>
+                <Typography.Text strong style={{ fontSize: 16 }}>
                   {equipNo} 设计工作面
                 </Typography.Text>
                 {root && (
@@ -617,7 +618,7 @@ export default function EquipmentDesign({ projectNo: p0, equipNo: e0, embedded }
               width: 260,
               render: (v: string, r: TreeNode) => (
                 <span style={{ paddingLeft: r.level * 16 }}>
-                  {r.level === 0 ? '📦 ' : r.is_part ? '🔩 ' : '🧩 '}
+                  {r.level === 0 ? <AppstoreOutlined style={{ marginRight: 4 }} /> : r.is_part ? <BlockOutlined style={{ marginRight: 4 }} /> : <FolderOpenOutlined style={{ marginRight: 4 }} />}
                   <Typography.Text strong={r.level === 0}>{v}</Typography.Text>
                 </span>
               ),

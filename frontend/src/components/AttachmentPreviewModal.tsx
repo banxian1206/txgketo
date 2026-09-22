@@ -1,4 +1,5 @@
 import { Empty, Image, Modal } from 'antd'
+import { T } from '../theme/tokens'
 
 export interface PreviewState {
   name: string
@@ -46,7 +47,7 @@ export default function AttachmentPreviewModal({
             maxHeight: '64vh',
             overflow: 'auto',
             whiteSpace: 'pre-wrap',
-            background: '#f6f8fa',
+            background: T.bgSunken,
             padding: 12,
             borderRadius: 6,
             margin: 0,

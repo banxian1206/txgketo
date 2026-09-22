@@ -59,11 +59,21 @@ const colorMaps = grepAll(/_COLOR\s*:\s*Record/);
 check('VIS-状态色Map', colorMaps.length === 0,
   colorMaps.length ? `业务文件又冒出自定义状态色 Map: ${colorMaps.slice(0, 4).join(', ')}` : '0（全部收敛在 theme/status.ts）');
 
-// 图标：emoji 不进 UI chrome（视觉规范 §4）—— 基线 9（全在 MobileLayout，Phase1.5 换 antd icons 后收紧为 0）
+// 图标：emoji 不进 UI chrome（视觉规范 §4 · 1.5b 已换 antd icons，业务代码 = 0）
 const emoji = grepAll(/icon:\s*'[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/u);
-const EMOJI_BASELINE = 9;
-check('VIS-emoji图标', emoji.length <= EMOJI_BASELINE,
-  emoji.length ? `残留 ${emoji.length}（基线 ${EMOJI_BASELINE}，均在 MobileLayout，Phase1.5 处理）` : 'icon 无 emoji = 0');
+const emojiTree = grepAll(/[📦🔩🧩]/u); // 图纸树层级方块（u flag：按码点匹配，否则代理码元误伤 💡📄 等内容符号）
+check('VIS-emoji图标', emoji.length + emojiTree.length === 0,
+  emoji.length + emojiTree.length ? `残留: ${[...emoji, ...emojiTree].slice(0, 4).join(', ')}` : 'icon emoji = 0（含图纸树层级）');
+
+// 1.5b：业务代码禁止裸 hex（唯一合法来源 theme/tokens.ts；styles.css 属主题层不在扫描内）
+const hexes = grepAll(/#[0-9a-fA-F]{3,8}\b/).filter((h) => !h.includes('theme/'));
+check('VIS-hex', hexes.length === 0,
+  hexes.length ? `业务文件裸 hex: ${hexes.slice(0, 4).join(', ')}` : '0（全部走 T token）');
+
+// 1.5b：字号 5 档 {12,13,14,16,20}（白名单反向：命中非法档 = 失败）
+const badSize = grepAll(/fontSize: ?(11|15|17|18|19|21|22|23|24|25|26|28|30|32)\b/);
+check('VIS-fontSize', badSize.length === 0,
+  badSize.length ? `越档字号: ${badSize.slice(0, 4).join(', ')}` : '5 档 {12,13,14,16,20} 内');
 
 // 1.3 Auth 收口：登录态 localStorage 只允许 contexts/session.ts 碰（grepAll 已跳过注释行）
 const strayStorage = grepAll(/localStorage\.(getItem|setItem|removeItem)\(['"]txgk_/)

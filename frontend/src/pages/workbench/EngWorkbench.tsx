@@ -19,6 +19,7 @@ import {
 } from '../../api/client'
 import { ENG_BOARD_STATE as STATE_COLOR } from '../../theme/status'
 import { TASK_STATUS as TASK_STATUS_COLOR } from '../../theme/status'
+import { T } from '../../theme/tokens'
 
 const PROFS = ['机械', '电气', '程序', '工艺']
 
@@ -149,7 +150,7 @@ export default function EngWorkbench() {
         return (
           <Space size={2} direction="vertical">
             <Tag color={STATE_COLOR[c?.state] ?? 'default'}>{c?.state ?? '—'}</Tag>
-            <Typography.Text type="secondary" style={{ fontSize: 11 }}>
+            <Typography.Text type="secondary" style={{ fontSize: 12 }}>
               {c?.owner ?? ''} {c?.overdue ? '·超期' : ''}
             </Typography.Text>
           </Space>
@@ -289,8 +290,8 @@ export default function EngWorkbench() {
                               onClick={() => s.to && nav(s.to)}
                               style={{ textAlign: 'center' }}
                             >
-                              <div style={{ fontSize: 12, color: '#888' }}>{s.label}</div>
-                              <div style={{ fontSize: 22, fontWeight: 600, color: s.value ? '#1f6feb' : '#bbb' }}>
+                              <div style={{ fontSize: 12, color: T.textSecondary }}>{s.label}</div>
+                              <div style={{ fontSize: 20, fontWeight: 600, color: s.value ? T.brand : T.textDisabled }}>
                                 {s.value}
                               </div>
                             </Card>

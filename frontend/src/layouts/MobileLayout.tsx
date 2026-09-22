@@ -1,42 +1,57 @@
 import { Badge, Typography } from 'antd'
+import type { ReactNode } from 'react'
 import { useCallback, useEffect, useState } from 'react'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
+import {
+  BellOutlined,
+  BuildOutlined,
+  CarOutlined,
+  ExportOutlined,
+  HomeOutlined,
+  SettingOutlined,
+  InboxOutlined,
+  ApartmentOutlined,
+  ToolOutlined,
+  UserOutlined,
+} from '@ant-design/icons'
 
 import NotificationsDrawer from '../components/NotificationsDrawer'
 import { useAuth } from '../contexts/AuthContext'
 import { hasPerm, unreadNotificationCount } from '../api/client'
+import { T } from '../theme/tokens'
 
 // 底部入口按角色/权限显示（03 卷）：仓库看仓库、车间看制造/装配、交付/现场看发运
-const ALL_TABS: { key: string; label: string; icon: string; show: () => boolean }[] = [
-  { key: '/m', label: '首页', icon: '🏠', show: () => true },
+// 图标用 antd icons（视觉规范 §4：emoji 不进 UI chrome，跨平台渲染一致）
+const ALL_TABS: { key: string; label: string; icon: ReactNode; show: () => boolean }[] = [
+  { key: '/m', label: '首页', icon: <HomeOutlined />, show: () => true },
   {
     key: '/m/warehouse',
     label: '仓库',
-    icon: '📦',
+    icon: <InboxOutlined />,
     show: () => hasPerm('warehouse:edit') || hasPerm('warehouse:view'),
   },
-  { key: '/m/issues', label: '领料', icon: '🧰', show: () => true },
-  { key: '/m/production', label: '制造', icon: '🏭', show: () => hasPerm('mfg:view') },
-  { key: '/m/assembly', label: '装配', icon: '🔧', show: () => hasPerm('mfg:view') },
+  { key: '/m/issues', label: '领料', icon: <ExportOutlined />, show: () => true },
+  { key: '/m/production', label: '制造', icon: <SettingOutlined />, show: () => hasPerm('mfg:view') },
+  { key: '/m/assembly', label: '装配', icon: <ApartmentOutlined />, show: () => hasPerm('mfg:view') },
   {
     key: '/m/shipping',
     label: '发运',
-    icon: '🚚',
+    icon: <CarOutlined />,
     show: () => hasPerm('ship:edit') || hasPerm('site:edit'),
   },
   {
     key: '/m/site',
     label: '现场',
-    icon: '🏗️',
+    icon: <BuildOutlined />,
     show: () => hasPerm('site:edit') || hasPerm('project:edit'),
   },
   {
     key: '/m/service',
     label: '售后',
-    icon: '🛠️',
+    icon: <ToolOutlined />,
     show: () => hasPerm('service:edit'),
   },
-  { key: '/m/me', label: '我的', icon: '👤', show: () => true },
+  { key: '/m/me', label: '我的', icon: <UserOutlined />, show: () => true },
 ]
 
 /** 手机端外壳（03 卷）：顶栏 + 底部入口（按角色），页面走「清单 + 勾选 + 拍照」动线 */
@@ -66,28 +81,28 @@ export default function MobileLayout() {
     TABS.filter((t) => t.key !== '/m').find((t) => loc.pathname.startsWith(t.key))?.key ?? '/m'
 
   return (
-    <div style={{ minHeight: '100vh', background: '#f5f5f5', paddingBottom: 64 }}>
+    <div style={{ minHeight: '100vh', background: T.bgPage, paddingBottom: 64 }}>
       <div
         style={{
           position: 'sticky',
           top: 0,
           zIndex: 10,
-          background: '#1f6feb',
-          color: '#fff',
+          background: T.brand,
+          color: T.bg,
           padding: '12px 16px',
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
         }}
       >
-        <Typography.Text style={{ color: '#fff', fontWeight: 600 }}>同兴高科 · 移动端</Typography.Text>
-        <a style={{ color: '#fff' }} onClick={() => setNotifOpen(true)}>
+        <Typography.Text style={{ color: T.bg, fontWeight: 600 }}>同兴高科 · 移动端</Typography.Text>
+        <a style={{ color: T.bg }} onClick={() => setNotifOpen(true)}>
           <Badge count={unread} size="small">
-            <span style={{ fontSize: 16 }}>🔔</span>
+            <span style={{ fontSize: 16 }}><BellOutlined /></span>
           </Badge>
         </a>
         <a
-          style={{ color: '#fff', fontSize: 13 }}
+          style={{ color: T.bg, fontSize: 13 }}
           onClick={() => logout()}
         >
           {name} · 退出
@@ -111,8 +126,8 @@ export default function MobileLayout() {
           left: 0,
           right: 0,
           height: 58,
-          background: '#fff',
-          borderTop: '1px solid #ececec',
+          background: T.bg,
+          borderTop: `1px solid ${T.border}`,
           display: 'flex',
         }}
       >
@@ -125,7 +140,7 @@ export default function MobileLayout() {
               textAlign: 'center',
               paddingTop: 7,
               fontSize: 12,
-              color: active === t.key ? '#1f6feb' : '#666',
+              color: active === t.key ? T.brand : T.textStrong,
               userSelect: 'none',
             }}
           >

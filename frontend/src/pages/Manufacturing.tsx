@@ -50,6 +50,7 @@ import AuthedImage from '../components/AuthedImage'
 import AuthedFileLink from '../components/AuthedFileLink'
 import { PROD_STATUS as STATUS_COLOR } from '../theme/status'
 import { OUTSOURCE_STATUS as OS_COLOR } from '../theme/status'
+import { T } from '../theme/tokens'
 
 const TEAMS = ['下料', '机加', '焊接', '钣金', '喷涂']
 
@@ -345,9 +346,9 @@ export default function Manufacturing() {
           <Row gutter={12} style={{ marginBottom: 12 }}>
             <Col span={3}><Statistic title="待下发" value={c?.wait ?? 0} /></Col>
             <Col span={3}><Statistic title="在制" value={c?.running ?? 0} /></Col>
-            <Col span={3}><Statistic title="待转运" value={c?.to_transfer ?? 0} valueStyle={{ color: c?.to_transfer ? '#d48806' : undefined }} /></Col>
-            <Col span={3}><Statistic title="返工" value={c?.rework ?? 0} valueStyle={{ color: c?.rework ? '#cf1322' : undefined }} /></Col>
-            <Col span={3}><Statistic title="超期" value={c?.overdue ?? 0} valueStyle={{ color: c?.overdue ? '#cf1322' : undefined }} /></Col>
+            <Col span={3}><Statistic title="待转运" value={c?.to_transfer ?? 0} valueStyle={{ color: c?.to_transfer ? T.goldText : undefined }} /></Col>
+            <Col span={3}><Statistic title="返工" value={c?.rework ?? 0} valueStyle={{ color: c?.rework ? T.error : undefined }} /></Col>
+            <Col span={3}><Statistic title="超期" value={c?.overdue ?? 0} valueStyle={{ color: c?.overdue ? T.error : undefined }} /></Col>
             <Col span={3}><Statistic title="外协在途" value={c?.outsource ?? 0} /></Col>
             <Col span={3}><Statistic title="已转运" value={c?.transferred ?? 0} /></Col>
           </Row>
@@ -582,7 +583,7 @@ export default function Manufacturing() {
               <Card key={a.id} size="small" style={{ marginBottom: 8 }}>
                 <Tag color={a.result === '合格' ? 'success' : 'error'}>{a.result}</Tag>
                 {a.reason}
-                <div style={{ fontSize: 12, color: '#888' }}>
+                <div style={{ fontSize: 12, color: T.textSecondary }}>
                   {a.accepted_at?.slice(0, 16).replace('T', ' ') ?? ''}
                   {a.transfer_at ? ` · 已转运 ${a.transfer_to}（${a.transfer_at.slice(0, 16).replace('T', ' ')}）` : ''}
                 </div>

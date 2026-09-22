@@ -20,6 +20,7 @@ import {
 import AuthedImage from '../../components/AuthedImage'
 import MfgPhotoPicker from '../../components/MfgPhotoPicker'
 import { SHIP_STATUS as SHIP_COLOR } from '../../theme/status'
+import { T } from '../../theme/tokens'
 
 /** 手机端 · 发运（S7）：散件发运，逐项勾「已发」+ 拍照；现场按清单清点。 */
 export default function ShippingM() {
@@ -128,7 +129,7 @@ export default function ShippingM() {
         <Card size="small" title="待发设备（勾本次要发的）" style={{ marginBottom: 10 }}>
           {toShipRows.length === 0 && <Empty description="没有设备" />}
           {toShipRows.map((t) => (
-            <div key={t.equip_no} style={{ padding: '6px 0', borderBottom: '1px solid #f0f0f0', opacity: t.in_open_shipment ? 0.5 : 1 }}>
+            <div key={t.equip_no} style={{ padding: '6px 0', borderBottom: `1px solid ${T.border}`, opacity: t.in_open_shipment ? 0.5 : 1 }}>
               <Checkbox
                 disabled={t.in_open_shipment}
                 checked={selected.includes(t.equip_no)}
@@ -154,7 +155,7 @@ export default function ShippingM() {
           const done = s.items.filter((i) => i.shipped).length
           return (
             <Card key={s.id} size="small" style={{ marginBottom: 10 }} title={`${s.shipment_no} · ${s.lines.map((l) => l.equip_no).join('、')}`} extra={<Tag color={SHIP_COLOR[s.status] ?? 'default'}>{s.status}</Tag>}>
-              <div style={{ fontSize: 12, color: '#999' }}>
+              <div style={{ fontSize: 12, color: T.textSecondary }}>
                 {s.plate_no ?? ''} {s.driver ?? ''} · 已发 {done}/{s.items.length} 项
               </div>
               <Space wrap style={{ marginTop: 8 }}>
@@ -167,7 +168,7 @@ export default function ShippingM() {
               {expanded === s.id && (
                 <div style={{ marginTop: 8 }}>
                   {s.items.map((it) => (
-                    <div key={it.id} style={{ fontSize: 12, padding: '3px 0', borderBottom: '1px solid #f0f0f0', display: 'flex', justifyContent: 'space-between' }}>
+                    <div key={it.id} style={{ fontSize: 12, padding: '3px 0', borderBottom: `1px solid ${T.border}`, display: 'flex', justifyContent: 'space-between' }}>
                       <span>{it.equip_no} {it.ref} ×{it.qty}</span>
                       {it.shipped ? <Tag color="success">已发</Tag> : <Tag>未发</Tag>}
                     </div>
@@ -176,7 +177,7 @@ export default function ShippingM() {
                     <div key={r.id} style={{ fontSize: 12, marginTop: 6 }}>
                       清点：<Tag color={r.result === '齐' ? 'success' : 'error'}>{r.result}</Tag>
                       {r.shortage_detail.map((sd, i) => (
-                        <div key={i} style={{ color: '#cf1322' }}>{sd.item}：{sd.result}（实到 {sd.received_qty ?? '—'}）{sd.reason}</div>
+                        <div key={i} style={{ color: T.error }}>{sd.item}：{sd.result}（实到 {sd.received_qty ?? '—'}）{sd.reason}</div>
                       ))}
                     </div>
                   ))}
@@ -222,7 +223,7 @@ export default function ShippingM() {
           {(receiptTarget?.items ?? []).map((it) => {
             const st = receiptChecks[it.id] ?? { result: '到' }
             return (
-              <div key={it.id} style={{ padding: '6px 0', borderBottom: '1px solid #f0f0f0' }}>
+              <div key={it.id} style={{ padding: '6px 0', borderBottom: `1px solid ${T.border}` }}>
                 <Space wrap>
                   <Typography.Text>{it.ref}</Typography.Text>
                   <Select

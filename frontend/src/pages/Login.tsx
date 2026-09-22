@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom'
 
 import { errMsg } from '../api/client'
 import { useAuth } from '../contexts/AuthContext'
+import { T } from '../theme/tokens'
 
 export default function Login() {
   const [loading, setLoading] = useState(false)
@@ -18,7 +19,7 @@ export default function Login() {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        background: 'linear-gradient(135deg,#1f6feb 0%,#0f2b52 100%)',
+        background: `linear-gradient(135deg,${T.brand} 0%,${T.brandDeep} 100%)`,
       }}
     >
       <Card style={{ width: 380, boxShadow: '0 8px 32px rgba(0,0,0,.18)' }}>
