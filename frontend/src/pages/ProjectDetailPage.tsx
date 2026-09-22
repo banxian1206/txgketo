@@ -294,7 +294,12 @@ export default function ProjectDetailPage() {
   }
 
   const submitDeal = async () => {
-    const v = await dealForm.validateFields()
+    let v
+    try {
+      v = await dealForm.validateFields()
+    } catch {
+      return // 校验未过（P-09）
+    }
     setSaving(true)
     try {
       const r = await registerDeal(projectNo, {
@@ -1223,7 +1228,7 @@ export default function ProjectDetailPage() {
               },
             ]}
           >
-            {(fields, { add, remove }) => (
+            {(fields, { add, remove }, { errors }) => (
               <>
                 {fields.map((field) => (
                   <Row key={field.key} gutter={8} align="middle">
@@ -1254,6 +1259,7 @@ export default function ProjectDetailPage() {
                 <Button type="dashed" onClick={() => add()} block>
                   + 添加付款节点
                 </Button>
+                <Form.ErrorList errors={errors} />
               </>
             )}
           </Form.List>

@@ -55,7 +55,12 @@ export default function ProjectCreate() {
   }, [])
 
   const submit = async () => {
-    const v = await form.validateFields()
+    let v
+    try {
+      v = await form.validateFields()
+    } catch {
+      return // 校验未过：antd 已标红 / 列表级错误已渲染，不抛未捕获异常（P-09）
+    }
     const body: ProjectCreate = {
       customer_name: v.customer_name,
       project_name: v.project_name,

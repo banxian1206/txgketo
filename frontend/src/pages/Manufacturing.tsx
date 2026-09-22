@@ -140,14 +140,20 @@ export default function Manufacturing() {
     }
   }
 
+  // ★ 预填必须在弹窗打开、表单项挂载之后（P-03）：destroyOnClose+preserve=false 时
+  //   在 setAction 之前 setFieldsValue 会丢失，改在 action 变化后统一预填。
+  useEffect(() => {
+    if (!action) return
+    form.resetFields()
+    if (action.kind === 'dispatch') form.setFieldsValue({ step_name: '下料', material_item_no: action.order?.material_item_no })
+    if (action.kind === 'accept') form.setFieldsValue({ result: '合格' })
+    if (action.kind === 'transfer') form.setFieldsValue({ transfer_to: '装配区' })
+    if (action.kind === 'os-send') form.setFieldsValue({ material_supplied: true, sent_at: dayjs(), due_date: dayjs().add(7, 'day') })
+    if (action.kind === 'os-accept') form.setFieldsValue({ result: '合格' })
+  }, [action, form])
+
   const openAction = (kind: ActionKind, order?: ProdOrderRow, os?: OutsourceRow) => {
     setPhotos([])
-    form.resetFields()
-    if (kind === 'dispatch') form.setFieldsValue({ step_name: '下料', material_item_no: order?.material_item_no })
-    if (kind === 'accept') form.setFieldsValue({ result: '合格' })
-    if (kind === 'transfer') form.setFieldsValue({ transfer_to: '装配区' })
-    if (kind === 'os-send') form.setFieldsValue({ material_supplied: true, sent_at: dayjs(), due_date: dayjs().add(7, 'day') })
-    if (kind === 'os-accept') form.setFieldsValue({ result: '合格' })
     setAction({ kind, order, os })
   }
 

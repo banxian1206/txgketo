@@ -198,7 +198,7 @@ export default function ProjectFormFields({
                 },
               ]}
             >
-              {(fields, { add, remove }) => (
+              {(fields, { add, remove }, { errors }) => (
                 <>
                   {fields.map((field) => (
                     <Row key={field.key} gutter={8} align="middle" style={{ marginTop: 8 }}>
@@ -256,6 +256,7 @@ export default function ProjectFormFields({
                   <Button type="dashed" onClick={() => add()} block style={{ marginTop: 8 }}>
                     + 添加联系人
                   </Button>
+                  <Form.ErrorList errors={errors} />
                 </>
               )}
             </Form.List>

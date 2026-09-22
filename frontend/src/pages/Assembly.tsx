@@ -65,6 +65,18 @@ export default function Assembly() {
   const [saving, setSaving] = useState(false)
   const [form] = Form.useForm()
 
+  // ★ 预填在弹窗挂载后执行（P-03）
+  useEffect(() => {
+    if (!startTarget) return
+    form.resetFields()
+    form.setFieldsValue({ sub_assembly: '整机装配' })
+  }, [startTarget, form])
+  useEffect(() => {
+    if (!debugTarget) return
+    form.resetFields()
+    form.setFieldsValue({ result: '合格' })
+  }, [debugTarget, form])
+
   const load = useCallback(
     async (pno?: string) => {
       setLoading(true)
@@ -141,8 +153,6 @@ export default function Assembly() {
 
   const openDebug = (r: AssemblyRecordRow) => {
     setPhotos([])
-    form.resetFields()
-    form.setFieldsValue({ result: '合格' })
     setDebugTarget(r)
   }
 
@@ -205,7 +215,7 @@ export default function Assembly() {
                   <Space size={4}>
                     <a onClick={() => void openDetail(o.equip_no)}>明细</a>
                     {canEdit && (
-                      <a onClick={() => { setPhotos([]); form.resetFields(); form.setFieldsValue({ sub_assembly: '整机装配' }); setStartTarget({ equip_no: o.equip_no, rate: o.kitting_rate }) }}>
+                      <a onClick={() => { setPhotos([]); setStartTarget({ equip_no: o.equip_no, rate: o.kitting_rate }) }}>
                         开始装配
                       </a>
                     )}
