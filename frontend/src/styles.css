@@ -156,7 +156,7 @@ body {
   display: flex;
   flex-direction: column;
   justify-content: center;
-  padding: 56px 64px;
+  padding: 56px 56px 96px;
   color: #fff;
   /* 深空主导、右下微微透蓝 —— 保留既有品牌渐变基因（#1f6feb → #0f2b52） */
   background: linear-gradient(145deg, #0f2b52 0%, #12315a 55%, #16386b 100%);
@@ -200,43 +200,50 @@ body {
   width: 44px;
   height: 3px;
   background: #e08000;
-  margin: 26px 0 22px;
+  margin: 24px 0 16px;
 }
 
 .login-slogan {
   position: relative;
-  margin: 0 0 14px;
+  margin: 0 0 12px;
   font-size: 28px;
   font-weight: 600;
-  letter-spacing: 2px;
+  letter-spacing: 1px;
   line-height: 1.3;
 }
 
 .login-chain {
   position: relative;
   margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
   font-size: 13px;
   letter-spacing: 1px;
   opacity: 0.65;
-  line-height: 1.8;
+  line-height: 1.6;
 }
 
 .login-brand-foot {
-  position: relative;
-  margin-top: 48px;
+  position: absolute;
+  left: 56px;
+  bottom: 40px;
+  margin: 0;
   font-size: 12px;
   letter-spacing: 2px;
   opacity: 0.45;
 }
 
 .login-pane {
+  position: relative;
   flex: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 40px 24px;
-  background: #fafafa;
+  /* 底部 96px 留给绝对定位的页脚，内容在剩余空间垂直居中（不与页脚重叠） */
+  padding: 40px 24px 96px;
+  background: #fff;
 }
 
 /* 移动端字标：桌面隐藏（DOM 保留 → BRAND 断言仍可验真实加载） */
@@ -252,20 +259,24 @@ body {
 }
 
 .login-title {
-  margin: 0 0 6px;
+  margin: 0 0 4px;
   font-size: 24px;
   font-weight: 600;
   color: rgba(0, 0, 0, 0.88);
 }
 
 .login-sub {
-  margin: 0 0 28px;
+  margin: 0 0 24px;
   font-size: 13px;
   color: #8c8c8c;
 }
 
 .login-foot {
-  margin-top: 28px;
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 40px;
+  margin: 0;
   font-size: 12px;
   color: rgba(0, 0, 0, 0.35);
   text-align: center;
@@ -287,7 +298,7 @@ body {
 
 /* 记住密码行 + 自动登录态（2026-09-23 新功能） */
 .login-remember {
-  margin: -6px 0 18px;
+  margin: -4px 0 24px;
   font-size: 13px;
   color: #595959;
 }
@@ -308,4 +319,14 @@ body {
 
 .login-switch:hover {
   color: #1f6feb;
+}
+
+/* 超矮窗口：页脚回流为常规流，避免盖住表单 */
+@media (max-height: 560px) {
+  .login-foot,
+  .login-brand-foot {
+    position: static;
+    margin-top: 24px;
+    text-align: center;
+  }
 }

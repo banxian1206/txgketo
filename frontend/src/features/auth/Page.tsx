@@ -95,7 +95,8 @@ export default function Login() {
         <div className="login-rule" />
         <h2 className="login-slogan">项目全生命周期管理</h2>
         <p className="login-chain">
-          商机 · 立项 · 工程设计 · 采购 · 制造 · 装配 · 发运 · 现场 · 验收 · 质保
+          <span>商机 · 立项 · 工程设计 · 采购 · 制造</span>
+          <span>装配 · 发运 · 现场 · 验收 · 质保</span>
         </p>
         <div className="login-brand-foot">TXGK · Guangdong Tongxing High-Tech</div>
       </aside>
