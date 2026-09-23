@@ -26,6 +26,8 @@ interface TodoCard {
   count: number
   to: string
   hint?: string
+  /** 角色码标注（A3）：缺省 = 人人可见 */
+  roles?: string[]
 }
 
 /** 我的工作台（06 卷 §8）：一屏看完「我该干的事」+ 我能进的工作台 */
@@ -62,18 +64,26 @@ export default function Workbench() {
   }
 
   const c = data?.counts
+  // A3（v2 拍板）：KPI 按角色裁剪 —— 卡带 roles 标注（对齐后端 WORKBENCHES 思路），ADMIN 角色兜底；
+  // 人人卡（我的任务/我提的改版）不标注。仓库三卡改指 PC 仓库台（A6 桌面跳移动修正提前完成）。
   const todos: TodoCard[] = [
     { label: '我的任务', count: c?.my_tasks ?? 0, to: '/my-tasks' },
-    { label: '待我审核', count: c?.to_review ?? 0, to: '/reviews', hint: '评审单' },
-    { label: '待我裁决', count: c?.to_decide ?? 0, to: '/changes', hint: '改版申请' },
-    { label: '待我改版', count: c?.to_change ?? 0, to: '/changes', hint: '改版任务' },
+    { label: '待我审核', count: c?.to_review ?? 0, to: '/reviews', hint: '评审单', roles: ['DESIGN_AUDIT', 'ADMIN'] },
+    { label: '待我裁决', count: c?.to_decide ?? 0, to: '/changes', roles: ['DESIGN_AUDIT', 'ADMIN'] },
+    { label: '待我改版', count: c?.to_change ?? 0, to: '/changes', hint: '改版任务', roles: ['DESIGN', 'DESIGN_AUDIT', 'CRAFT', 'ADMIN'] },
     { label: '我提的改版', count: c?.my_changes ?? 0, to: '/changes' },
-    { label: '待采购', count: c?.to_purchase ?? 0, to: '/purchase', hint: '采购池' },
-    { label: '待验收', count: c?.to_inspect ?? 0, to: '/m/warehouse' },
-    { label: '待入库', count: c?.to_store ?? 0, to: '/m/warehouse' },
-    { label: '待领料', count: c?.issues ?? 0, to: '/m/issues' },
-    { label: '我的商机', count: c?.my_leads ?? 0, to: '/projects', hint: '线索 / 待立项' },
+    { label: '待采购', count: c?.to_purchase ?? 0, to: '/purchase', hint: '采购池', roles: ['PURCHASE', 'PURCHASE_LEAD', 'ADMIN'] },
+    { label: '待验收', count: c?.to_inspect ?? 0, to: '/warehouse', roles: ['WAREHOUSE', 'ADMIN'] },
+    { label: '待入库', count: c?.to_store ?? 0, to: '/warehouse', roles: ['WAREHOUSE', 'ADMIN'] },
+    { label: '待领料', count: c?.issues ?? 0, to: '/warehouse', roles: ['WAREHOUSE', 'ADMIN'] },
+    { label: '我的商机', count: c?.my_leads ?? 0, to: '/projects', hint: '线索 / 待立项', roles: ['SALES', 'SCHEME', 'ADMIN'] },
   ]
+  // 裁剪：角色码交集 + ADMIN 兜底（无 roles = 人人卡）
+  const myRoles = data?.user.roles ?? []
+  const isAdminRole = myRoles.includes('ADMIN')
+  const visibleTodos = todos.filter((t) => !t.roles || isAdminRole || t.roles.some((r) => myRoles.includes(r)))
+  // 管理入口卡（canManageUsers 对齐：ADMIN 角色或总监岗）——纯入口无数字，不发明数据
+  const canManageUsers = isAdminRole || data?.user.position === '总监'
 
 
 
@@ -106,7 +116,7 @@ export default function Workbench() {
       </Card>
 
       <Row gutter={[12, 12]}>
-        {todos.map((t) => (
+        {visibleTodos.map((t) => (
           <Col xs={12} sm={8} md={6} lg={4} xl={4} key={t.label}>
             <Card size="small" hoverable onClick={() => nav(t.to)} style={{ textAlign: 'center' }}>
               <Statistic
@@ -122,6 +132,16 @@ export default function Workbench() {
             </Card>
           </Col>
         ))}
+        {canManageUsers && (
+          <Col xs={12} sm={8} md={6} lg={4} xl={4}>
+            <Card size="small" hoverable onClick={() => nav('/admin/users')} style={{ textAlign: 'center' }}>
+              <Statistic title="系统管理" value="入口" valueStyle={{ fontSize: 20, color: T.brand }} />
+              <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                用户与权限 · 操作日志 · 演示数据
+              </Typography.Text>
+            </Card>
+          </Col>
+        )}
       </Row>
 
 

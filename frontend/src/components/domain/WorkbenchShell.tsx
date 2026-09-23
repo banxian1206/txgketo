@@ -1,3 +1,4 @@
+import { Badge } from 'antd'
 import { useEffect, useState } from 'react'
 
 import { workbenchMe, type WorkbenchItem } from '../../api/client'
@@ -14,15 +15,31 @@ import type { TabItem } from '../../configs/domain'
 export default function WorkbenchShell({ children }: { children?: React.ReactNode }) {
   const [tabs, setTabs] = useState<TabItem[]>([])
 
+  // A3：台 Tab 待办角标 —— counts 与 tabs 同一响应；0 不显示
   useEffect(() => {
     workbenchMe()
-      .then((d) =>
+      .then((d) => {
+        const c = d.counts
+        const badge: Record<string, number> = {
+          '/workbench': c.my_tasks + c.to_review + c.to_decide + c.to_change,
+          '/workbench/sales': c.my_leads,
+          '/workbench/eng': c.to_review + c.to_decide,
+          '/purchase': c.to_purchase,
+          '/warehouse': c.to_inspect + c.to_store + c.issues,
+          '/workbench/shop': c.shop_wait + c.shop_accept + c.shop_transfer + c.shop_assembling + c.shop_debug,
+        }
         setTabs(
           (d.workbenches as WorkbenchItem[])
             .filter((w) => w.visible)
-            .map((w) => ({ path: w.route, label: w.name })),
-        ),
-      )
+            .map((w) => {
+              const n = badge[w.route] ?? 0
+              return {
+                path: w.route,
+                label: n > 0 ? <>{w.name}<Badge count={n} size="small" style={{ marginLeft: 6 }} /></> : w.name,
+              }
+            }),
+        )
+      })
       .catch(() => undefined)
   }, [])
 

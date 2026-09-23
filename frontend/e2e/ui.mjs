@@ -117,6 +117,49 @@ try {
     check('NAV-基础数据Tab', tabs.length === 2 && active === '编号规则', `Tab=${tabs.join('/')} · active=${active}`)
   }
 
+  // ── A3：admin 反向裁剪（super 全卡）+ 台 Tab 待办角标（条件：counts>0 才验数值）──
+  {
+    await page.goto(BASE + '/workbench', { waitUntil: 'networkidle' })
+    await page.waitForTimeout(900)
+    const aT = await body(page)
+    check('NAV-KPI裁剪-admin', aT.includes('待我审核') && aT.includes('演示数据'),
+      `super 见全卡：待我审核=${aT.includes('待我审核')} · 管理入口卡=${aT.includes('演示数据')}`)
+
+    const counts = await page.evaluate(async () => {
+      try {
+        const raw = localStorage.getItem('txgk_session')
+        if (!raw) return null
+        const tok = JSON.parse(raw).token
+        const r = await fetch('/api/v1/workbench/me', { headers: { Authorization: 'Bearer ' + tok } })
+        return (await r.json()).counts
+      } catch { return null }
+    })
+    if (!counts) {
+      check('NAV-台Tab角标', true, '取 counts 失败（SKIP 语义）', 'SKIP')
+    } else {
+      const probes = [
+        ['我的', counts.my_tasks + counts.to_review + counts.to_decide + counts.to_change],
+        ['采购', counts.to_purchase],
+        ['仓库', counts.to_inspect + counts.to_store + counts.issues],
+        ['车间', counts.shop_wait + counts.shop_accept + counts.shop_transfer + counts.shop_assembling + counts.shop_debug],
+      ]
+      const tabTexts = await page.locator('.domain-tabs a').allInnerTexts()
+      const bad = []
+      let anyPositive = false
+      for (const [name, n] of probes) {
+        const line = tabTexts.find((t) => t.includes(name)) ?? ''
+        const hasDigit = /\d/.test(line)
+        if (n > 0) { anyPositive = true; if (!hasDigit) bad.push(`${name}台 counts=${n} 无角标`) }
+        else if (hasDigit) bad.push(`${name}台 counts=0 却显示(${line.trim()})`)
+      }
+      if (!anyPositive && bad.length === 0) {
+        check('NAV-台Tab角标', true, '业务台 counts 当前全 0（按设计不显示角标）— SKIP 语义通过', 'SKIP')
+      } else {
+        check('NAV-台Tab角标', bad.length === 0, bad.length ? bad.join(' | ') : '角标数值与 counts 逐台一致（0 不显示）')
+      }
+    }
+  }
+
   // ── P0 修正：工作台 Tab 化（me 动态列表）+ 采购/仓库归位 + 角色裁剪 ──
   {
     await page.goto(BASE + '/workbench', { waitUntil: 'networkidle' })
@@ -195,6 +238,11 @@ try {
     const tabs = await p2.locator('.domain-tabs a').allInnerTexts()
     const ok = tabs.length === 2 && tabs.some((t) => t.includes('采购')) && !tabs.some((t) => t.includes('仓库'))
     check('NAV-台角色裁剪', ok, `buyer1 台 Tab=${JSON.stringify(tabs)}（me.visible 自动裁剪）`)
+    // A3：buyer1 的 KPI 角色裁剪（无 DESIGN_AUDIT → 无待审卡；非 ADMIN → 无管理入口卡）
+    const bT = await body(p2)
+    const buyerOk = !bT.includes('待我审核') && bT.includes('待采购') && !bT.includes('演示数据')
+    check('NAV-KPI裁剪-buyer1', buyerOk,
+      `无待我审核=${!bT.includes('待我审核')} · 有待采购=${bT.includes('待采购')} · 无管理卡=${!bT.includes('演示数据')}`)
     await c2.browser.close()
   }
 

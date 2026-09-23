@@ -1,3 +1,5 @@
+import type { ReactNode } from 'react'
+
 import { Navigate, Route } from 'react-router-dom'
 
 /**
@@ -7,7 +9,7 @@ import { Navigate, Route } from 'react-router-dom'
  */
 export interface TabItem {
   path: string
-  label: string
+  label: ReactNode // 台 Tab 角标 Badge 需要节点（A3）
 }
 
 export const DELIVERY_TABS: TabItem[] = [
