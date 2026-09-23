@@ -126,7 +126,7 @@ export default function EngWorkbench() {
       title: '操作',
       key: 'action',
       width: 90,
-      render: () => <a onClick={() => nav('/reviews')}>去处理</a>,
+      render: () => <a onClick={() => nav('/workbench/reviews')}>去处理</a>,
     },
   ]
 
@@ -279,8 +279,8 @@ export default function EngWorkbench() {
                           { label: '设备总数', value: board?.summary.equipments ?? 0 },
                           { label: '全部专业已发布', value: board?.summary.all_released ?? 0 },
                           { label: '卡住设备', value: board?.summary.blocked ?? 0 },
-                          { label: '待我终审', value: board?.summary.pending_reviews ?? 0, to: '/reviews' },
-                          { label: '待我裁决改版', value: board?.summary.pending_changes ?? 0, to: '/changes' },
+                          { label: '待我终审', value: board?.summary.pending_reviews ?? 0, to: '/workbench/reviews' },
+                          { label: '待我裁决改版', value: board?.summary.pending_changes ?? 0, to: '/workbench/changes' },
                           { label: '超期任务', value: board?.summary.overdue_tasks ?? 0 },
                         ].map((s) => (
                           <Col xs={12} sm={8} md={4} key={s.label}>

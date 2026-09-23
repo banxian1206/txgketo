@@ -160,6 +160,27 @@ try {
     }
   }
 
+  // ── A5 车间台收编：台内 card 页签（看板|制造|装配）= URL 子路由 ──
+  {
+    await page.goto(BASE + '/workbench/shop', { waitUntil: 'networkidle' })
+    await page.waitForSelector('.domain-content .ant-tabs', { timeout: 8000 }).catch(() => {})
+    await page.waitForTimeout(400)
+    const inner = page.locator('.domain-content .ant-tabs')
+    const innerTabs = await inner.locator('.ant-tabs-tab').allInnerTexts().catch(() => [])
+    const mfgTab = inner.locator('.ant-tabs-tab', { hasText: '制造' }).first()
+    let urlOk = false, contentOk = false
+    if (await mfgTab.count()) {
+      await mfgTab.click()
+      await page.waitForURL(/\/workbench\/shop\/mfg/, { timeout: 6000 }).catch(() => {})
+      urlOk = page.url().includes('/workbench/shop/mfg')
+      await page.waitForTimeout(700)
+      const t2 = await body(page)
+      contentOk = t2.includes('排产') || t2.includes('制造') || t2.includes('下发')
+    }
+    check('NAV-车间台收编', innerTabs.length === 3 && urlOk && contentOk,
+      `页签=${JSON.stringify(innerTabs)} · URL=${urlOk} · 制造内容挂载=${contentOk}`)
+  }
+
   // ── A4 到货跟踪（催货视图：active 页签 + 在途行/空态双分支）──
   {
     await page.goto(BASE + '/purchase?tab=arrivals', { waitUntil: 'networkidle' })

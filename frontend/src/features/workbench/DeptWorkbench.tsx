@@ -1,4 +1,4 @@
-import { Alert, App, Button, Card, Col, Row, Space, Statistic, Tag, Typography } from 'antd'
+import { Alert, App, Button, Card, Col, Row, Space, Statistic, Typography } from 'antd'
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
@@ -32,8 +32,8 @@ const CONFIG: Record<string, Cfg> = {
     note: '我负责的项目全链进度：立项 → 设计 → 采购 → 到货/入库 → 缺料。',
     todos: [
       { label: '我参与的项目', key: 'my_projects', to: '/projects' },
-      { label: '我的任务', key: 'my_tasks', to: '/my-tasks' },
-      { label: '待我审核', key: 'to_review', to: '/reviews' },
+      { label: '我的任务', key: 'my_tasks', to: '/workbench/tasks' },
+      { label: '待我审核', key: 'to_review', to: '/workbench/reviews' },
     ],
     quick: [
       { label: '商机 / 项目', to: '/projects' },
@@ -45,16 +45,16 @@ const CONFIG: Record<string, Cfg> = {
     title: '工程部工作台',
     note: '组员 / 经理 / 总监 三视角：待我处理、我负责的、部门看板。',
     todos: [
-      { label: '我的任务', key: 'my_tasks', to: '/my-tasks' },
-      { label: '待我审核', key: 'to_review', to: '/reviews' },
-      { label: '待我改版', key: 'to_change', to: '/changes' },
-      { label: '待我裁决', key: 'to_decide', to: '/changes' },
-      { label: '我提的改版', key: 'my_changes', to: '/changes' },
+      { label: '我的任务', key: 'my_tasks', to: '/workbench/tasks' },
+      { label: '待我审核', key: 'to_review', to: '/workbench/reviews' },
+      { label: '待我改版', key: 'to_change', to: '/workbench/changes' },
+      { label: '待我裁决', key: 'to_decide', to: '/workbench/changes' },
+      { label: '我提的改版', key: 'my_changes', to: '/workbench/changes' },
     ],
     quick: [
-      { label: '我的任务', to: '/my-tasks' },
-      { label: '设计评审', to: '/reviews' },
-      { label: '改版', to: '/changes' },
+      { label: '我的任务', to: '/workbench/tasks' },
+      { label: '设计评审', to: '/workbench/reviews' },
+      { label: '改版', to: '/workbench/changes' },
       { label: '项目 / 设备设计', to: '/projects' },
     ],
   },
@@ -62,17 +62,16 @@ const CONFIG: Record<string, Cfg> = {
     title: '车间工作台',
     note: '制造（S5）：下发（原材料 + 图纸，拍照）→ 到职验收（拍照）→ 转运装配区（拍照）。装配（S6）：齐套率只展示，随时可开工。只管两头，不做工序级报工。',
     todos: [
-      { label: '待下发排产单', key: 'shop_wait', to: '/manufacturing' },
-      { label: '在制 / 待验收', key: 'shop_accept', to: '/manufacturing' },
-      { label: '待转运装配区', key: 'shop_transfer', to: '/manufacturing' },
-      { label: '装配中', key: 'shop_assembling', to: '/assembly' },
-      { label: '待厂内调试', key: 'shop_debug', to: '/assembly' },
-      { label: '待领料', key: 'issues', to: '/m/issues' },
+      { label: '待下发排产单', key: 'shop_wait', to: '/workbench/shop/mfg' },
+      { label: '在制 / 待验收', key: 'shop_accept', to: '/workbench/shop/mfg' },
+      { label: '待转运装配区', key: 'shop_transfer', to: '/workbench/shop/mfg' },
+      { label: '装配中', key: 'shop_assembling', to: '/workbench/shop/assembly' },
+      { label: '待厂内调试', key: 'shop_debug', to: '/workbench/shop/assembly' },
+      { label: '待领料', key: 'issues', to: '/warehouse' },
     ],
     quick: [
-      { label: '制造（车间）', to: '/manufacturing' },
-      { label: '装配 · 齐套率', to: '/assembly' },
-      { label: '领料（手机端）', to: '/m/issues' },
+      { label: '制造（车间）', to: '/workbench/shop/mfg' },
+      { label: '装配 · 齐套率', to: '/workbench/shop/assembly' },
       { label: '仓库工作台', to: '/warehouse' },
     ],
   },
@@ -92,7 +91,6 @@ export default function DeptWorkbench({ kind }: { kind: 'sales' | 'pm' | 'eng' |
   }, [message])
 
   const c = data?.counts
-  const tabs = (data?.workbenches ?? []).filter((w) => w.visible)
 
   return (
     <>
@@ -101,18 +99,6 @@ export default function DeptWorkbench({ kind }: { kind: 'sales' | 'pm' | 'eng' |
           <Typography.Title level={5} style={{ margin: 0 }}>
             {cfg.title}
           </Typography.Title>
-          <Space wrap>
-            {tabs.map((w) => (
-              <Tag
-                key={w.key}
-                color={w.route.includes(kind) || (kind === 'sales' && w.key === 'sales') ? 'blue' : 'default'}
-                style={{ cursor: 'pointer' }}
-                onClick={() => nav(w.route)}
-              >
-                {w.name}
-              </Tag>
-            ))}
-          </Space>
         </Space>
       </Card>
 

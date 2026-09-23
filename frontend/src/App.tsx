@@ -36,6 +36,7 @@ const ShippingM = lazy(() => import('./features/shipping/MobilePage'))
 const SiteM = lazy(() => import('./features/site/MobilePage'))
 const ServiceM = lazy(() => import('./features/service/MobilePage'))
 const Workbench = lazy(() => import('./features/workbench/Page'))
+import ShopShell from './features/workbench/ShopShell'
 const DeptWorkbench = lazy(() => import('./features/workbench/DeptWorkbench'))
 const EngWorkbench = lazy(() => import('./features/workbench/EngWorkbench'))
 const PmWorkbench = lazy(() => import('./features/workbench/PmWorkbench'))
@@ -95,7 +96,12 @@ export default function App() {
         <Route path="workbench/sales" element={<SalesWorkbench />} />
         <Route path="workbench/pm" element={<PmWorkbench />} />
         <Route path="workbench/eng" element={<EngWorkbench />} />
-        <Route path="workbench/shop" element={<DeptWorkbench kind="shop" />} />
+        {/* A5：车间台收编制造/装配 —— 台内 card 页签（v2 拍板③：交付执行组保留，双入口中间态） */}
+        <Route path="workbench/shop" element={<ShopShell />}>
+          <Route index element={<DeptWorkbench kind="shop" />} />
+          <Route path="mfg" element={<Manufacturing />} />
+          <Route path="assembly" element={<Assembly />} />
+        </Route>
         {/* A2：我的台内页签 = URL 子路由（v2 拍板②·组件复用挂入） */}
         <Route path="workbench/tasks" element={<Workbench />} />
         <Route path="workbench/reviews" element={<Workbench />} />
