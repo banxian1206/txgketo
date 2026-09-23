@@ -94,7 +94,7 @@ try {
       await page.waitForURL(/\/delivery\/assembly/, { timeout: 6000 }).catch(() => {})
       check('NAV-Tab切换', page.url().includes('/delivery/assembly'), `点装配Tab → ${page.url()}`)
     } else check('NAV-Tab切换', false, '交付域无装配Tab')
-    const cases = [['/my-tasks', 'mine\\/tasks'], ['/users', 'admin\\/users'], ['/purchase', 'purchase\\/orders']]
+    const cases = [['/my-tasks', 'mine\\/tasks'], ['/users', 'admin\\/users'], ['/purchase/orders', 'purchase(?!,/suppliers)'], ['/purchase/suppliers', 'suppliers']]
     const bad = []
     for (const [from, to] of cases) {
       await page.goto(BASE + from, { waitUntil: 'domcontentloaded' })
@@ -110,6 +110,37 @@ try {
     const tabs = await page.locator('.domain-tabs a').allInnerTexts()
     const active = await page.locator('.domain-tabs a.active').innerText().catch(() => '')
     check('NAV-基础数据Tab', tabs.length === 2 && active === '编号规则', `Tab=${tabs.join('/')} · active=${active}`)
+  }
+
+  // ── P0 修正：工作台 Tab 化（me 动态列表）+ 采购/仓库归位 + 角色裁剪 ──
+  {
+    await page.goto(BASE + '/workbench', { waitUntil: 'networkidle' })
+    await page.waitForSelector('.domain-tabs a', { timeout: 10000 }).catch(() => {})
+    await page.waitForTimeout(600)
+    const tabs = await page.locator('.domain-tabs a').allInnerTexts()
+    const hasPurchase = tabs.some((t) => t.includes('采购'))
+    const hasWarehouse = tabs.some((t) => t.includes('仓库'))
+    check('NAV-工作台Tab', tabs.length >= 6 && hasPurchase && hasWarehouse,
+      `admin 台 Tab=${tabs.length} 个 · 采购台=${hasPurchase} · 仓库台=${hasWarehouse}（me 列表原样）`)
+    // 点采购台 Tab → 走到采购工作台
+    const pTab = page.locator('.domain-tabs a', { hasText: '采购' })
+    if (await pTab.count()) {
+      await pTab.click(); await page.waitForTimeout(1200)
+      const onPurchase = page.url().includes('/purchase')
+      check('NAV-采购台在工作台', onPurchase, `点采购Tab → ${page.url()}（角色台归位工作台域）`)
+    } else check('NAV-采购台在工作台', false, '无采购Tab')
+  }
+  // 角色裁剪：buyer1 只见 我的工作台 + 采购工作台
+  {
+    const c2 = await newCtx(); const p2 = c2.page
+    await login(p2, 'buyer1', 'txgk@123')
+    await p2.goto(BASE + '/workbench', { waitUntil: 'networkidle' })
+    await p2.waitForSelector('.domain-tabs a', { timeout: 10000 }).catch(() => {})
+    await p2.waitForTimeout(500)
+    const tabs = await p2.locator('.domain-tabs a').allInnerTexts()
+    const ok = tabs.length === 2 && tabs.some((t) => t.includes('采购')) && !tabs.some((t) => t.includes('仓库'))
+    check('NAV-台角色裁剪', ok, `buyer1 台 Tab=${JSON.stringify(tabs)}（me.visible 自动裁剪）`)
+    await c2.browser.close()
   }
 
   // —— P-09：空提交列表级错误 + 零 pageerror ——

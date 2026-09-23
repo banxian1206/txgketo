@@ -5,7 +5,8 @@ import { Navigate, Route, Routes } from 'react-router-dom'
 
 import AppLayout from './layouts/AppLayout'
 import DomainShell from './components/domain/DomainShell'
-import { ADMIN_TABS, BASE_TABS, DELIVERY_TABS, MINE_TABS, PURCHASE_TABS, redirectRoutes } from './configs/domain'
+import WorkbenchShell from './components/domain/WorkbenchShell'
+import { ADMIN_TABS, BASE_TABS, DELIVERY_TABS, MINE_TABS, redirectRoutes } from './configs/domain'
 import MobileLayout from './layouts/MobileLayout'
 const Changes = lazy(() => import('./features/change/Page'))
 import Login from './features/auth/Page'
@@ -92,11 +93,17 @@ export default function App() {
         }
       >
         <Route index element={<Workbench />} />
+        {/* P0 修正：工作台域 = 角色台 Tab 化（me 动态列表；采购台/仓库台归位） */}
+        <Route element={<WorkbenchShell />}>
         <Route path="workbench" element={<Workbench />} />
         <Route path="workbench/sales" element={<SalesWorkbench />} />
         <Route path="workbench/pm" element={<PmWorkbench />} />
         <Route path="workbench/eng" element={<EngWorkbench />} />
         <Route path="workbench/shop" element={<DeptWorkbench kind="shop" />} />
+        <Route path="purchase" element={<PurchaseWorkbench />} />
+        <Route path="warehouse" element={<Warehouse />} />
+        </Route>
+        <Route path="suppliers" element={<Suppliers />} />
         <Route path="projects" element={<Projects />} />
         <Route path="projects/new" element={<ProjectCreate />} />
         <Route path="projects/:projectNo" element={<ProjectDetailPage />} />
@@ -115,11 +122,6 @@ export default function App() {
           <Route path="acceptance" element={<AcceptancePage />} />
           <Route path="service" element={<Service />} />
         </Route>
-        <Route path="/purchase" element={<DomainShell tabs={PURCHASE_TABS} />}>
-          <Route index element={<Navigate to="/purchase/orders" replace />} />
-          <Route path="orders" element={<PurchaseWorkbench />} />
-          <Route path="suppliers" element={<Suppliers />} />
-        </Route>
         <Route path="/admin" element={<DomainShell tabs={ADMIN_TABS} />}>
           <Route index element={<Navigate to="/admin/users" replace />} />
           <Route path="users" element={<Users />} />
@@ -129,7 +131,6 @@ export default function App() {
           <Route path="numbering" element={<NumberRules />} />
         </Route>
         {redirectRoutes()}
-        <Route path="warehouse" element={<Warehouse />} />
         <Route path="projects/:projectNo/design/:equipNo" element={<EquipmentDesign />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />

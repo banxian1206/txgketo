@@ -70,7 +70,7 @@ export default function AppLayout() {
     )
     const groups: { label: string; keys: string[] }[] = [
       { label: '工作台', keys: ['/workbench'] },
-      { label: '业务', keys: ['/mine/tasks', '/projects', '/delivery/mfg', '/purchase/orders', '/library'] },
+      { label: '业务', keys: ['/mine/tasks', '/projects', '/delivery/mfg', '/suppliers', '/library'] },
       { label: '系统管理', keys: ['/admin/users'] },
     ]
     return groups

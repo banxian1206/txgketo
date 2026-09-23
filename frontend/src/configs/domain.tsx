@@ -51,8 +51,8 @@ export const ROUTE_REDIRECTS: [string, string][] = [
   ['/site', '/delivery/site'],
   ['/acceptance', '/delivery/acceptance'],
   ['/service', '/delivery/service'],
-  ['/purchase', '/purchase/orders'],
-  ['/suppliers', '/purchase/suppliers'],
+  ['/purchase/orders', '/purchase'],
+  ['/purchase/suppliers', '/suppliers'],
   ['/users', '/admin/users'],
 ]
 
@@ -69,11 +69,12 @@ export interface SidebarRoot {
 }
 
 export const SIDEBAR_ROOTS: SidebarRoot[] = [
-  { key: '/workbench', label: '工作台', to: '/workbench', prefixes: ['/workbench', '/'], icon: 'home' },
+  // 工作台 = 角色台（Tab 化，数据 = /workbench/me 的 visible 列表；采购台 /purchase、仓库台 /warehouse 同属此类 —— 用户纠偏 2026-09-23）
+  { key: '/workbench', label: '工作台', to: '/workbench', prefixes: ['/workbench', '/purchase', '/warehouse', '/'], icon: 'home' },
   { key: '/mine/tasks', label: '我的工作', to: '/mine/tasks', prefixes: ['/mine'], icon: 'checklist', group: '业务' },
   { key: '/projects', label: '项目', to: '/projects', prefixes: ['/projects'], icon: 'folder', group: '业务' },
   { key: '/delivery/mfg', label: '交付执行', to: '/delivery/mfg', prefixes: ['/delivery'], icon: 'truck', group: '业务', perm: 'mfg' },
-  { key: '/purchase/orders', label: '采购', to: '/purchase/orders', prefixes: ['/purchase'], icon: 'cart', group: '业务' },
+  { key: '/suppliers', label: '供应商', to: '/suppliers', prefixes: ['/suppliers', '/purchase/suppliers'], icon: 'cart', group: '业务' },
   { key: '/library', label: '基础数据', to: '/library', prefixes: ['/library', '/numbering'], icon: 'database', group: '业务' },
   { key: '/admin/users', label: '系统管理', to: '/admin/users', prefixes: ['/admin', '/users'], icon: 'setting', group: '系统管理', admin: true },
 ]
