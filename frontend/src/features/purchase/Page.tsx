@@ -11,6 +11,7 @@ import PurchaseOrderDrawer from '../../components/PurchaseOrderDrawer'
 import ReceiptNegotiateModal from '../../components/ReceiptNegotiateModal'
 import {
   errMsg,
+  listSuppliers,
   listGoodsReceipts,
   purchaseOrders,
   purchasePool,
@@ -47,6 +48,13 @@ export default function PurchaseWorkbench() {
   const [manualOpen, setManualOpen] = useState(false)
   const [mergeOpen, setMergeOpen] = useState(false)
   const [orderKey, setOrderKey] = useState<string | null>(null)
+  // A4：到货跟踪行内带供应商联系方式（催货一屏可见 —— 方案 §2.0.4）
+  const [supMap, setSupMap] = useState<Record<number, { contact_name?: string | null; phone?: string | null }>>({})
+  useEffect(() => {
+    listSuppliers()
+      .then((rows) => setSupMap(Object.fromEntries(rows.filter((r) => r.id != null).map((r) => [r.id, r]))))
+      .catch(() => undefined)
+  }, [])
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [negotiate, setNegotiate] = useState<{
     open: boolean
@@ -90,6 +98,12 @@ export default function PurchaseWorkbench() {
 
   const poolRequests = pool.reduce((s, g) => s + g.request_count, 0)
   const openOrders = orders.filter((o) => o.status !== '已取消' && o.status !== '已完成')
+  // 到货跟踪 = 没到齐的单（在途/部分到货），按预计到货日升序；超期红、3天内临期黄
+  const arrivals = orders
+    .filter((o) => o.status === '在途' || o.status === '部分到货')
+    .slice()
+    .sort((a, b) => String(a.expected_date ?? '9999-99-99').localeCompare(String(b.expected_date ?? '9999-99-99')))
+  const overdueCount = arrivals.filter((o) => o.expected_date && dayjs(o.expected_date).isBefore(dayjs(), 'day')).length
   const canBuy = hasPerm('purchase:edit')
 
   const selectedGroups = useMemo(
@@ -128,8 +142,9 @@ export default function PurchaseWorkbench() {
           { label: '在途采购单', value: openOrders.length, sub: '等货', tab: 'orders', color: openOrders.length ? T.orange : T.textDisabled },
           { label: '验收不合格', value: failedReceipts.length, sub: '待跟供应商协商', tab: 'failed', color: failedReceipts.length ? T.error : T.textDisabled },
           { label: '退换处理中', value: resolveReceipts.length, sub: '换货/退货', tab: 'resolve', color: resolveReceipts.length ? T.purple : T.textDisabled },
+          { label: '到货跟踪', value: arrivals.length, sub: overdueCount > 0 ? `${overdueCount} 单已超期` : '在途盯货', tab: 'arrivals', color: overdueCount > 0 ? T.error : T.warning },
         ].map((s) => (
-          <Col xs={12} md={6} key={s.label}>
+          <Col xs={12} md={4} key={s.label}>
             <Card size="small" hoverable onClick={() => setTab(s.tab)} style={{ textAlign: 'center' }}>
               <div style={{ fontSize: 12, color: T.textSecondary }}>{s.label}</div>
               <div style={{ fontSize: 20, fontWeight: 600, color: s.color }}>{s.value}</div>
@@ -493,6 +508,76 @@ export default function PurchaseWorkbench() {
                   ]}
                 />
               </>
+            ),
+          },
+
+          // A4：到货跟踪（v2 §2.0.4「催到货」—— 只聚合在途信息，不发明催货动作）
+          {
+            key: 'arrivals',
+            label: `到货跟踪 (${arrivals.length})`,
+            children: (
+              <Table<PurchaseOrderSummary>
+                rowKey="key"
+                dataSource={arrivals}
+                pagination={{ pageSize: 20, showSizeChanger: false }}
+                locale={{
+                  emptyText: <Empty description="当前没有在途采购单 —— 下单后到「采购单」页签盯发货，验收后自动流转" />,
+                }}
+                columns={[
+                  {
+                    title: '采购单',
+                    dataIndex: 'po_no',
+                    width: 110,
+                    render: (v: string | null, r) => (v ? <a onClick={() => openOrder(r.key)}>{v}</a> : '—'),
+                  },
+                  { title: '物料 / 行数', width: 120, render: (_v, r) => `${r.item_kinds} 种 · ${r.line_count} 行` },
+                  { title: '归属项目', render: (_v, r) => r.projects.map((x) => x.project_no).join(' / ') || '辅料 / 其他' },
+                  {
+                    title: '收货地',
+                    dataIndex: 'deliver_to',
+                    width: 140,
+                    render: (v: string | null) =>
+                      v ? <Tag color={v.includes('直发') ? 'purple' : 'blue'}>{v}</Tag> : '—',
+                  },
+                  {
+                    title: '预计到货',
+                    dataIndex: 'expected_date',
+                    width: 150,
+                    defaultSortOrder: 'ascend',
+                    sorter: (a, b) =>
+                      String(a.expected_date ?? '9999-99-99').localeCompare(String(b.expected_date ?? '9999-99-99')),
+                    render: (v: string | null) => {
+                      if (!v) return <Typography.Text type="secondary">未约期</Typography.Text>
+                      const d = dayjs(v)
+                      if (d.isBefore(dayjs(), 'day')) return <span><Tag color="error">超期</Tag>{v}</span>
+                      if (d.diff(dayjs(), 'day') <= 3) return <span><Tag color="warning">临期</Tag>{v}</span>
+                      return v
+                    },
+                  },
+                  {
+                    title: '供应商 / 联系',
+                    render: (_v, r) => {
+                      const sup = r.supplier_id != null ? supMap[r.supplier_id] : undefined
+                      return (
+                        <>
+                          {r.supplier_name ?? '—'}
+                          {sup && (sup.contact_name || sup.phone) && (
+                            <Typography.Text type="secondary" style={{ fontSize: 12, display: 'block' }}>
+                              {[sup.contact_name, sup.phone].filter(Boolean).join(' · ')}
+                            </Typography.Text>
+                          )}
+                        </>
+                      )
+                    },
+                  },
+                  {
+                    title: '状态',
+                    dataIndex: 'status',
+                    width: 100,
+                    render: (v: string) => <Tag color={ORDER_STATUS_COLOR[v] ?? 'default'}>{v}</Tag>,
+                  },
+                ]}
+              />
             ),
           },
 

@@ -160,6 +160,19 @@ try {
     }
   }
 
+  // ── A4 到货跟踪（催货视图：active 页签 + 在途行/空态双分支）──
+  {
+    await page.goto(BASE + '/purchase?tab=arrivals', { waitUntil: 'networkidle' })
+    await page.waitForTimeout(900)
+    const active = await page.locator('.ant-tabs-tab-active').first().innerText().catch(() => '')
+    const tabN = await page.locator('.ant-tabs-tab').count()
+    const t = await body(page)
+    const hasRows = (t.match(/PO\d{5}/g) || []).length > 0
+    const hasEmpty = t.includes('没有在途采购单')
+    check('NAV-到货跟踪', active.includes('到货跟踪') && tabN >= 8 && (hasRows || hasEmpty),
+      `active=「${active.trim()}」 · 页签=${tabN} · 在途行=${hasRows}${hasEmpty ? '(空态引导)' : ''}`)
+  }
+
   // ── P0 修正：工作台 Tab 化（me 动态列表）+ 采购/仓库归位 + 角色裁剪 ──
   {
     await page.goto(BASE + '/workbench', { waitUntil: 'networkidle' })
@@ -210,7 +223,7 @@ try {
     const tabN = await page.locator('.ant-tabs-tab').count()
     const siderHasSupplier = await page.locator('.ant-layout-sider').innerText().catch(() => '')
     const noSideEntry = !siderHasSupplier.includes('供应商')
-    check('NAV-供应商入台', landed && active.includes('供应商') && noSideEntry && tabN === 7,
+    check('NAV-供应商入台', landed && active.includes('供应商') && noSideEntry && tabN >= 7,
       `旧链→${page.url().split('?')[1] || page.url()} · active=「${active.trim()}」 · 页签=${tabN}/7 · 侧栏已收=${noSideEntry}`)
   }
 
