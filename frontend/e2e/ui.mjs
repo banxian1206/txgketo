@@ -378,6 +378,55 @@ try {
     check('BRAND-登录logo', lhas > 0 && lnw > 0, lhas ? `naturalWidth=${lnw}` : '登录卡无正色字标');
   } else check('AUTH-登出', false, '顶栏无退出入口');
 
+  // —— 记住密码闭环（2026-09-23 新功能 · 交互规范 §2.6）——
+  // 前置：上一步 AUTH-登出 后位于 /login 且凭据已被主动登出清除 → 表单可见
+  {
+    // ① 勾选记住并登录
+    await page.fill('input[placeholder="admin"]', 'admin')
+    await page.fill('input[type="password"]', 'admin12345')
+    const rememberBox = page.locator('.login-remember input[type=checkbox]')
+    if (await rememberBox.count()) await rememberBox.check()
+    await page.getByRole('button', { name: /登\s*录/ }).click()
+    await page.waitForURL(/\/workbench/, { timeout: 10000 }).catch(() => {})
+    const saved = await page.evaluate(() => !!localStorage.getItem('txgk_credential'))
+    check('REMEMBER-保存凭据', page.url().includes('/workbench') && saved,
+      `登录成功=${page.url().includes('/workbench')} · 凭据已存=${saved}`)
+
+    // ② 模拟被动 401（session 置坏 → 任意请求被踢 → 登录页应自动重登）
+    await page.evaluate(() => {
+      const raw = localStorage.getItem('txgk_session')
+      if (raw) { const s = JSON.parse(raw); s.token = 'corrupted-by-401-test'; localStorage.setItem('txgk_session', JSON.stringify(s)) }
+    })
+    await page.goto(BASE + '/purchase', { waitUntil: 'domcontentloaded' })
+    // 401 → 清 session 跳 /login → 凭据自动重登 → 回 /workbench
+    let autoBack = false
+    try {
+      await page.waitForURL(/\/workbench/, { timeout: 12000 })
+      autoBack = true
+    } catch {
+      autoBack = page.url().includes('/workbench')
+    }
+    const stillHasCred = await page.evaluate(() => !!localStorage.getItem('txgk_credential'))
+    check('REMEMBER-被动自动登录', autoBack && stillHasCred,
+      autoBack ? `401 被踢后自动重登回 ${page.url()} · 凭据仍在=${stillHasCred}` : `未自动恢复 URL=${page.url()}`)
+    await shot(page, 'remember-auto')
+
+    // ③ 主动登出 → 清凭据 → 停在表单（不被自动登回）
+    const out = page.getByText('退出', { exact: false }).last()
+    if (await out.count()) {
+      await out.click()
+      await page.waitForURL(/\/login/, { timeout: 8000 }).catch(() => {})
+      await page.waitForTimeout(1500)
+      const credGone = await page.evaluate(() => !localStorage.getItem('txgk_credential'))
+      const formBack = await page.locator('.login-box input').count()
+      const stayed = page.url().includes('/login')
+      check('REMEMBER-主动登出清凭据', credGone && stayed && formBack >= 2,
+        `凭据已清=${credGone} · 停登录页=${stayed} · 表单可见=${formBack >= 2}（退出不被自动登回）`)
+      await shot(page, 'remember-logout')
+    } else check('REMEMBER-主动登出清凭据', false, '找不到退出入口')
+  }
+
+
 } catch (e) {
   check('UI-写链', false, '异常中断: ' + String(e).slice(0, 250));
   await shot(page, 'ui-regress-crash');

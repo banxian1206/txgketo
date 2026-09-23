@@ -36,7 +36,8 @@
 2. 后端：`models/` → alembic 迁移 → `services/`（注释标注来源章节，如 `# 01 卷 §6.1`）→ `api/routes/` → pytest
 3. 前端：`api/` client → 页面 → 组件 → `npm run build && npx tsc --noEmit`
 4. 跑 §5 自测命令，全绿才算完成
-5. commit：`feat(T02): 发号引擎（01 卷 §6.1）`
+5. **功能新增/行为变更 → 回档对应文档**（2026-09-23 定为硬性步骤）：交互行为进《前端交互设计规范》、视觉进《前端UI视觉规范》、结构/进度进《前端重构执行计划》与本文件 §8.2 功能表、修复进对应测试报告；新行为同步补 e2e 断言（护栏）
+6. commit：`feat(T02): 发号引擎（01 卷 §6.1）`
 
 ## 5. 自测命令
 
@@ -165,6 +166,7 @@ deploy/          docker-compose.dev.yml
 | **账号与角色可用性（06 卷 §4）** | ✅ | 岗位统一三级（组员/经理/总监，迁移 `f3a5c7e9b104`）；**演示账号一键生成**（`services/demo.py` + `POST /demo-users` + `scripts/seed_demo_users.py`，19 个，密码 `txgk@123`）；**以某人身份查看**（`X-Impersonate`，GET 生效、写操作 403、顶栏橙色横幅） |
 | **权限强校验 + 金额分档 + 离职转交（06 卷 F 步）** | ✅ | `deps.require_permission`/`has_permission`/`scrub_money`；采购下单类→`purchase:edit`、验收/入库/领料→`warehouse:edit`；金额：`purchase:price`（采购单/报价/价格参考）、`project:amount`（项目金额/列表）无权限返回 null；`POST /users/{id}/handover` 一键转交；前端 `hasPerm()` 按钮显隐 + Users 页「转交」弹窗 |
 | **入口补齐（领料 / 回款 / 日志 / 其他入库·库位 / 价格参考）** | ✅ | ① 仓库待办页「生成领料单（按设备）」（`generateEquipmentIssue`）；② `POST /projects/{p}/payment-terms/{seq}/receive` 登记回款（多次累加、超额拦截）+ 项目详情付款节点「登记回款」（`payment:edit`）；③「用户与权限」加「操作日志」页签（`GET /audit-logs`）；④ 库存页「其他入库」（`POST /warehouse/inbound`，退料回库/盘盈）；⑤ 仓库新增「库位」页签 + 新建库位（`GET/POST /warehouse/locations`）；⑥ 采购工作台「价格参考」页签（物料搜索 + 历史价 + 推荐供应商，需 `purchase:price`，后端同步收紧） |
+| 登录「记住密码」（本机自动登录） | ✅ | 登录页勾选 → 凭据存本机（`utils/credential.ts`，XOR+Base64 **弱混淆非加密**，内网+主动勾选）；**被动 401 被踢 → 登录页自动重登，无需重输**；主动退出清凭据（`AuthContext.logout`，否则退出会被登回）；凭据失效（改密/停用）自动清理回表单 + 「使用其他账号」切换；e2e `REMEMBER-*` 三断言 |
 | **S5 制造（★只管两头）** | ✅ | 迁移 `g1b3d5f70c29`（`prod_order`/`prod_task`/`prod_acceptance`/`outsource_task`；编号 `PR{YY}{NNN}` 排产单 / `WX{YY}{NNN}` 外协单）；`services/manufacturing.py`（按设备**已发布图纸**展开：自制件→排产单、外协件→外协任务，幂等）；`routes/manufacturing.py`（生成/列表/工作台/下发/开工/验收/转运/外协发出·回厂·验收 + 拍照 `POST /manufacturing/photos` ✓鉴权取回）；`pages/Manufacturing.tsx`（PC）、`pages/m/ProductionM.tsx`（手机批量）、车间台 `GET /workbench/shop`；通知 MFG 角色 + 不合格通知项目团队/设计；**不做工序级报工/工时** |
 | **S6 装配与齐套率** | ✅ | 迁移 `h2c4e6a81d35`（`kitting_snapshot` / `assembly_record`）；`services/kitting.py`（自制件看排产是否已转运、外协看是否合格、采购/库存看是否到货入库 → **齐套率只展示**）；`routes/assembly.py`（齐套率/概览/装配开始·完成/厂内调试/装配台）；`pages/Assembly.tsx`（项目 → 各设备齐套率进度条 + 明细 + 装配记录/调试）；**项目详情新增「齐套率」卡**；车间台计数装配中/待调试；**不设 100% 门槛，随时可开装** |
 | **S7 发运（发货指令）** | ✅ | 迁移 `i3e5a7c92d48`（`shipment`/`shipment_line`/`site_receipt`；编号 `FH{YY}{NNN}`）→ **发运清单部分已按用户反馈重构为 `shipment_item`，见下一行** |

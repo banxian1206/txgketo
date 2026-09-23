@@ -1,21 +1,66 @@
-import { App, Button, Form, Input } from 'antd'
-import { useState } from 'react'
+import { App, Button, Checkbox, Form, Input, Spin, Typography } from 'antd'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
 import { errMsg } from '../../api/client'
 import { useAuth } from '../../contexts/AuthContext'
+import { clearCredential, readCredential, saveCredential } from '../../utils/credential'
 
 /**
- * 登录页（2026-09-23 重做 · 简单有格调）：
+ * 登录页（2026-09-23 重做 · 简单有格调 + 记住密码）
  * 桌面 = 左品牌面板（深空渐变 + 反白字标 + 橙 rule + 图纸网格暗纹）× 右极简表单
  * 移动 = 单栏白底 + 顶部正色字标（≤880px 由 styles.css 媒体查询切换）
- * 约束：e2e 选择器（placeholder="admin" / password / 按钮「登录」）与 BRAND 断言保持兼容
+ *
+ * 记住密码（交互规范 §2.6）：
+ * - 勾选后凭据存本机；session 被动失效（401 被踢）回登录页 → 自动重登，无需重输
+ * - 主动退出会清凭据（AuthContext.logout）；凭据失效自动清理并回表单
+ * - 「使用其他账号」可随时切换（清除凭据 + 回表单）
  */
 export default function Login() {
   const [loading, setLoading] = useState(false)
   const nav = useNavigate()
   const { message } = App.useApp()
   const { login } = useAuth()
+
+  const [form] = Form.useForm()
+  const [remember, setRemember] = useState(false)
+  /** true = 展示表单（无凭据 / 用户主动换号 / 自动登录失败回退） */
+  const [manual, setManual] = useState(() => !readCredential())
+  const autoRan = useRef(false)
+
+  const goAfterLogin = () => {
+    // 手机（窄屏）默认进移动端；电脑进工作台（03 卷：手机端是主要终端）
+    const isPhone = window.matchMedia('(max-width: 820px)').matches
+    nav(isPhone ? '/m' : '/workbench')
+  }
+
+  // 自动登录：有凭据且未在手动模式 → 静默重登（401 被踢后的无感恢复）
+  useEffect(() => {
+    if (manual || autoRan.current) return
+    const cred = readCredential()
+    if (!cred) return
+    autoRan.current = true
+    ;(async () => {
+      try {
+        await login(cred.username, cred.password)
+        goAfterLogin()
+      } catch {
+        // 凭据失效（改密/停用）→ 清理并回表单，不循环
+        clearCredential()
+        setRemember(false)
+        setManual(true)
+        message.warning('记住的密码已失效，请重新登录')
+      }
+    })()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [manual])
+
+  const switchAccount = () => {
+    clearCredential()
+    setRemember(false)
+    setManual(true)
+    form.resetFields()
+  }
 
   return (
     <div className="login-page">
@@ -30,41 +75,66 @@ export default function Login() {
         <div className="login-brand-foot">TXGK · Guangdong Tongxing High-Tech</div>
       </aside>
 
-      {/* 右：表单 */}
+      {/* 右：表单 / 自动登录 */}
       <main className="login-pane">
         {/* 移动端可见的正色字标（桌面隐藏，但保留在 DOM——BRAND 断言依赖它真实加载） */}
         <img className="login-logo-compact" src="/brand/logo.png" alt="同兴高科 TXGK" />
         <div className="login-box">
-          <h1 className="login-title">登录</h1>
-          <p className="login-sub">使用管理员分配的账号访问系统</p>
-          <Form
-            layout="vertical"
-            onFinish={async (v) => {
-              setLoading(true)
-              try {
-                // 重构 1.3：登录写入统一走 AuthContext（单一 session，新登录天然清伪装）
-                await login(v.username, v.password)
-                // 手机（窄屏）默认进移动端；电脑进工作台（03 卷：手机端是主要终端）
-                const isPhone = window.matchMedia('(max-width: 820px)').matches
-                nav(isPhone ? '/m' : '/workbench')
-              } catch (e) {
-                message.error(errMsg(e))
-              } finally {
-                setLoading(false)
-              }
-            }}
-          >
-            <Form.Item name="username" label="账号" rules={[{ required: true, message: '请输入账号' }]}>
-              <Input size="large" placeholder="admin" autoComplete="username" />
-            </Form.Item>
-            <Form.Item name="password" label="密码" rules={[{ required: true, message: '请输入密码' }]}>
-              <Input.Password size="large" autoComplete="current-password" />
-            </Form.Item>
-            <Button type="primary" htmlType="submit" size="large" block loading={loading}>
-              登录
-            </Button>
-          </Form>
-          <div className="login-foot">© 广东同兴高科智能装备有限公司</div>
+          {manual ? (
+            <>
+              <h1 className="login-title">登录</h1>
+              <p className="login-sub">使用管理员分配的账号访问系统</p>
+              <Form
+                form={form}
+                layout="vertical"
+                onFinish={async (v) => {
+                  setLoading(true)
+                  try {
+                    // 记住密码：勾选存本机、不勾则清除旧凭据
+                    if (remember) saveCredential(v.username, v.password)
+                    else clearCredential()
+                    // 重构 1.3：登录写入统一走 AuthContext（单一 session，新登录天然清伪装）
+                    await login(v.username, v.password)
+                    goAfterLogin()
+                  } catch (e) {
+                    message.error(errMsg(e))
+                  } finally {
+                    setLoading(false)
+                  }
+                }}
+              >
+                <Form.Item name="username" label="账号" rules={[{ required: true, message: '请输入账号' }]}>
+                  <Input size="large" placeholder="admin" autoComplete="username" />
+                </Form.Item>
+                <Form.Item name="password" label="密码" rules={[{ required: true, message: '请输入密码' }]}>
+                  <Input.Password size="large" autoComplete="current-password" />
+                </Form.Item>
+                <div className="login-remember">
+                  <Checkbox
+                    checked={remember}
+                    onChange={(e) => setRemember(e.target.checked)}
+                  >
+                    记住密码，本机下次自动登录
+                  </Checkbox>
+                </div>
+                <Button type="primary" htmlType="submit" size="large" block loading={loading}>
+                  登录
+                </Button>
+              </Form>
+              <div className="login-foot">© 广东同兴高科智能装备有限公司</div>
+            </>
+          ) : (
+            /* 凭据存在：自动登录中（通常一闪而过；失败则回上表单） */
+            <div className="login-auto" data-testid="auto-login">
+              <Spin />
+              <Typography.Text type="secondary" style={{ marginTop: 16 }}>
+                正在自动登录…
+              </Typography.Text>
+              <a className="login-switch" onClick={switchAccount}>
+                使用其他账号
+              </a>
+            </div>
+          )}
         </div>
       </main>
     </div>
