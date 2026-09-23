@@ -1,8 +1,9 @@
 import { App, Button, Card, Col, Empty, Row, Space, Table, Tabs, Tag, Typography } from 'antd'
 import dayjs from 'dayjs'
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 
+import SuppliersPage from './SuppliersPage'
 import ManualPurchaseModal from '../../components/ManualPurchaseModal'
 import MergeOrderModal from '../../components/MergeOrderModal'
 import PriceReferencePanel from '../../components/PriceReferencePanel'
@@ -39,7 +40,10 @@ export default function PurchaseWorkbench() {
   const [resolveReceipts, setResolveReceipts] = useState<GoodsReceiptRow[]>([])
   const [doneReceipts, setDoneReceipts] = useState<GoodsReceiptRow[]>([])
   const [selected, setSelected] = useState<string[]>([])
-  const [tab, setTab] = useState('pool')
+  // A1（v2 方案 §2.0.6）：页签 = URL query（?tab=suppliers 深链 / 旧 /suppliers redirect 落点 / 分享可还原）
+  const [sp, setSp] = useSearchParams()
+  const tab = sp.get('tab') || 'pool'
+  const setTab = (k: string) => setSp(k === 'pool' ? {} : { tab: k }, { replace: true })
   const [manualOpen, setManualOpen] = useState(false)
   const [mergeOpen, setMergeOpen] = useState(false)
   const [orderKey, setOrderKey] = useState<string | null>(null)
@@ -851,6 +855,12 @@ export default function PurchaseWorkbench() {
                 },
               ]
             : []),
+          // A1：供应商入采购台（v2 拍板①）——可见性随台（采购角色可见）
+          {
+            key: 'suppliers',
+            label: '供应商',
+            children: <SuppliersPage />,
+          },
         ]}
       />
 

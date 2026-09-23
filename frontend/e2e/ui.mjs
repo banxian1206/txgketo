@@ -130,6 +130,20 @@ try {
       check('NAV-采购台在工作台', onPurchase, `点采购Tab → ${page.url()}（角色台归位工作台域）`)
     } else check('NAV-采购台在工作台', false, '无采购Tab')
   }
+  // A1（v2 拍板①）：供应商入采购台 —— 旧链落台内页签 + 侧栏收编
+  {
+    await page.goto(BASE + '/suppliers', { waitUntil: 'networkidle' })
+    await page.waitForURL(/\/purchase\?tab=suppliers/, { timeout: 8000 }).catch(() => {})
+    const landed = page.url().includes('tab=suppliers')
+    await page.waitForSelector('.ant-tabs-tab-active', { timeout: 8000 }).catch(() => {})
+    const active = await page.locator('.ant-tabs-tab-active').first().innerText().catch(() => '')
+    const tabN = await page.locator('.ant-tabs-tab').count()
+    const siderHasSupplier = await page.locator('.ant-layout-sider').innerText().catch(() => '')
+    const noSideEntry = !siderHasSupplier.includes('供应商')
+    check('NAV-供应商入台', landed && active.includes('供应商') && noSideEntry && tabN === 7,
+      `旧链→${page.url().split('?')[1] || page.url()} · active=「${active.trim()}」 · 页签=${tabN}/7 · 侧栏已收=${noSideEntry}`)
+  }
+
   // 选中态 = 最长前缀（用户实测 bug：/workbench/eng 被错标「我的工作台」——eng/sales 两台都验）
   {
     const bad = []

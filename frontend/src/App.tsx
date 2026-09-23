@@ -25,7 +25,6 @@ const MyTasks = lazy(() => import('./features/task/Page'))
 const Projects = lazy(() => import('./features/project/Page'))
 const PurchaseWorkbench = lazy(() => import('./features/purchase/Page'))
 const Reviews = lazy(() => import('./features/review/Page'))
-const Suppliers = lazy(() => import('./features/purchase/SuppliersPage'))
 const Users = lazy(() => import('./features/admin/Page'))
 const Warehouse = lazy(() => import('./features/warehouse/Page'))
 const Manufacturing = lazy(() => import('./features/manufacturing/Page'))
@@ -103,7 +102,6 @@ export default function App() {
         <Route path="purchase" element={<PurchaseWorkbench />} />
         <Route path="warehouse" element={<Warehouse />} />
         </Route>
-        <Route path="suppliers" element={<Suppliers />} />
         <Route path="projects" element={<Projects />} />
         <Route path="projects/new" element={<ProjectCreate />} />
         <Route path="projects/:projectNo" element={<ProjectDetailPage />} />

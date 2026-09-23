@@ -25,11 +25,6 @@ export const DELIVERY_TABS: TabItem[] = [
   { path: '/delivery/service', label: '售后' },
 ]
 
-export const PURCHASE_TABS: TabItem[] = [
-  { path: '/purchase/orders', label: '采购工作台' },
-  { path: '/purchase/suppliers', label: '供应商' },
-]
-
 export const BASE_TABS: TabItem[] = [
   { path: '/library', label: '标准库' },
   { path: '/numbering', label: '编号规则' },
@@ -52,7 +47,8 @@ export const ROUTE_REDIRECTS: [string, string][] = [
   ['/acceptance', '/delivery/acceptance'],
   ['/service', '/delivery/service'],
   ['/purchase/orders', '/purchase'],
-  ['/purchase/suppliers', '/suppliers'],
+  ['/suppliers', '/purchase?tab=suppliers'],
+  ['/purchase/suppliers', '/purchase?tab=suppliers'],
   ['/users', '/admin/users'],
 ]
 
@@ -74,7 +70,6 @@ export const SIDEBAR_ROOTS: SidebarRoot[] = [
   { key: '/mine/tasks', label: '我的工作', to: '/mine/tasks', prefixes: ['/mine'], icon: 'checklist', group: '业务' },
   { key: '/projects', label: '项目', to: '/projects', prefixes: ['/projects'], icon: 'folder', group: '业务' },
   { key: '/delivery/mfg', label: '交付执行', to: '/delivery/mfg', prefixes: ['/delivery'], icon: 'truck', group: '业务', perm: 'mfg' },
-  { key: '/suppliers', label: '供应商', to: '/suppliers', prefixes: ['/suppliers', '/purchase/suppliers'], icon: 'cart', group: '业务' },
   { key: '/library', label: '基础数据', to: '/library', prefixes: ['/library', '/numbering'], icon: 'database', group: '业务' },
   { key: '/admin/users', label: '系统管理', to: '/admin/users', prefixes: ['/admin', '/users'], icon: 'setting', group: '系统管理', admin: true },
 ]
