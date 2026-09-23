@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from datetime import UTC, date, datetime
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.models.assembly import AssemblyRecord
@@ -330,6 +330,7 @@ def depart(
     depart_at: date | None = None,
     photos: list | None = None,
     remark: str | None = None,
+    actor_id: int | None = None,
 ) -> Shipment:
     if sh.status not in (SHIP_LOADED, SHIP_SHIPPING):
         raise ShippingError(f"当前状态「{sh.status}」，不能发运（先装车）")
@@ -341,6 +342,23 @@ def depart(
         sh.photos = list(sh.photos or []) + list(photos)
     if remark:
         sh.remark = remark
+    # ★ 发运 → 通知现场（客户口径）：现场按同一份清单逐项核对到/缺/损
+    shipped_count = session.scalar(
+        select(func.count()).select_from(ShipmentItem).where(
+            ShipmentItem.shipment_id == sh.id, ShipmentItem.shipped.is_(True)
+        )
+    )
+    notify.notify_role(
+        session,
+        "SITE",
+        type_="ship",
+        title=f"已发运：{sh.project_no}（{sh.shipment_no}）共 {shipped_count or 0} 项",
+        body="货已发出，请按发运清单逐项清点「到 / 缺 / 损」。",
+        link="/m/site",
+        biz_type="shipment",
+        biz_id=sh.id,
+        actor_id=actor_id,
+    )
     # 发运即进入「交付中」阶段（执行中 → 交付中）
     project = session.get(Project, sh.project_no)
     if project is not None and project.stage not in (project_stage.DELIVERING, project_stage.WARRANTY, project_stage.CLOSED):
@@ -382,12 +400,21 @@ def site_receipt(
     ).all()
     if not items:
         raise ShippingError("这批没有发运清单（先回系统生成/勾选发运项）")
-    unchecked = [i for i in items if i.id not in {c.get("item_id") for c in checks}]
+    # ★ 发货与收货一致（客户口径）：现场只核对本批「已勾发」的项（未发的留在后续批次，不属于本次交付）
+    shipped = [i for i in items if i.shipped]
+    if not shipped:
+        raise ShippingError("本批一项都没勾「已发」—— 发货和收货要一致：先勾选实际发出的件，再发运/清点")
+    shipped_ids = {i.id for i in shipped}
+    checked_ids = {c.get("item_id") for c in checks}
+    unchecked = [i for i in shipped if i.id not in checked_ids]
     if unchecked:
         raise ShippingError(f"还有 {len(unchecked)} 项没清点：{unchecked[0].ref} 等")
+    extra = [cid for cid in checked_ids if cid not in shipped_ids]
+    if extra:
+        raise ShippingError("清点范围只能包含本批已勾「已发」的项（未发的件不在本次交付内）")
     shortage: list[dict] = []
     damaged: list[dict] = []
-    by_id = {i.id: i for i in items}
+    by_id = {i.id: i for i in shipped}
     for ck in checks:
         row = by_id.get(ck.get("item_id"))
         if row is None:

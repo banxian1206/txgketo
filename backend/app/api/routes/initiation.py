@@ -101,6 +101,11 @@ def add_member(
     user = session.get(User, body.user_id)
     if user is None:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "用户不存在")
+    # ★ 任命「项目经理」时同步 project.pm_id（所有“通知项目经理”靠它定位；此前从未赋值 → 通知静默丢失）
+    if body.project_role == "项目经理":
+        project = session.get(Project, project_no)
+        if project is not None:
+            project.pm_id = body.user_id
 
     # 同一个角色只能有一个人：再任命令即换人（留痕）
     exists = session.scalar(
@@ -156,6 +161,10 @@ def remove_member(
     if row is None or row.project_no != project_no:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "团队成员不存在")
     user = session.get(User, row.user_id)
+    if row.project_role == "项目经理":
+        project = session.get(Project, project_no)
+        if project is not None and project.pm_id == row.user_id:
+            project.pm_id = None
     session.delete(row)
     audit.log(
         session,

@@ -108,6 +108,32 @@ const wh1 = await apiLogin('wh1', 'txgk@123');
   }
 }
 
+// 观察-02：通知「接收方视角」—— 不只看发出，还要看该收的人真收到（用便宜的售后报修触发）
+{
+  const projects = await (await apiGet('/projects', admin)).json();
+  const proj = (Array.isArray(projects) ? projects : []).find(p => ['执行中', '交付中', '质保'].includes(p.stage)) || (Array.isArray(projects) ? projects[0] : null);
+  if (!proj) {
+    check('RCPT-售后报修→项目经理', true, '无项目可探', 'SKIP');
+  } else {
+    const svc = await apiLogin('service1', 'txgk@123');
+    const pm = await apiLogin('pm1', 'txgk@123');
+    const uniq = `E2E通知探针-${Date.now()}`;
+    const h = { 'Content-Type': 'application/json', Authorization: `Bearer ${svc}` };
+    const so = await (await fetch(`${API}/api/v1/service/orders`, {
+      method: 'POST', headers: h,
+      body: JSON.stringify({ project_no: proj.project_no, fault: uniq }),
+    })).json();
+    const fetchItems = async (token, unread) => {
+      const r = await (await fetch(`${API}/api/v1/notifications?unread=${unread}`, { headers: { Authorization: `Bearer ${token}` } })).json();
+      return r.items ?? [];
+    };
+    const pmHit = (await fetchItems(pm, true)).find(n => /报修已受理/.test(n.title || '') && (n.body || '').includes(uniq));
+    check('RCPT-售后报修→项目经理', !!pmHit, pmHit ? `pm1 收到「${pmHit.title}」` : `pm1 未收到（工单 ${so.so_no ?? '?'}）`);
+    const svcSelf = (await fetchItems(svc, false)).find(n => /报修已受理/.test(n.title || '') && (n.body || '').includes(uniq));
+    check('RCPT-操作人不自收', !svcSelf, svcSelf ? '操作人收到了自己触发的通知（应排除）' : '操作人未收到自己触发的（预期）');
+  }
+}
+
 // P-15：favicon 200
 {
   const r = await fetch(`${BASE}/brand/favicon.ico`);

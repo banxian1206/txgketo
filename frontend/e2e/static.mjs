@@ -102,6 +102,19 @@ check('SUBMIT-无裸validate', bareValidate.length === 0,
     (prodGuard ? '' : '注册缺 PROD 守卫; ') + (apiBypass ? 'API 旁路缓存 ✓' : 'API 未旁路缓存'));
 }
 
+// 观察-01：发货与收货一致（客户口径）—— 现场只清点「已发」项；0 项已发不能清点；发运要通知现场
+{
+  const ROOT = path.resolve(SRC, '../..');
+  const shipSvc = fs.readFileSync(path.join(ROOT, 'backend/app/services/shipping.py'), 'utf8');
+  const shipRoute = fs.readFileSync(path.join(ROOT, 'backend/app/api/routes/shipping.py'), 'utf8');
+  const okReceipt = /shipped = \[i for i in items if i\.shipped\]/.test(shipSvc) && /本批一项都没勾/.test(shipSvc);
+  const okRoute = /已勾「已发」\{shipped_count\} 项/.test(shipRoute);
+  const okNotify = /notify_role\([\s\S]{0,140}"SITE"/.test(shipSvc);
+  check('SHIP-发货收货一致', okReceipt && okRoute && okNotify,
+    [okReceipt ? '' : '清点未按已发项', okRoute ? '' : '路由仍按全清单计数', okNotify ? '' : '发运未通知现场']
+      .filter(Boolean).join('; ') || '清点只核已发 + 0项拦截 + 发运通知现场 ✓');
+}
+
 // P-03/R2-02：禁止「先 setFieldsValue 后开弹窗」的手写预填（destroyOnHidden 弹窗会丢值）
 // 正确做法：AppModal + initialValues（挂载时读取）；或 forceRender 让 Form 提前挂载
 {

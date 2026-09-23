@@ -356,7 +356,7 @@ def depart(
     if sh is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "发运批次不存在")
     try:
-        shp.depart(session, sh, depart_at=body.depart_at, photos=body.photos, remark=body.remark)
+        shp.depart(session, sh, depart_at=body.depart_at, photos=body.photos, remark=body.remark, actor_id=current.id)
     except shp.ShippingError as e:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, str(e)) from e
     audit.log(
@@ -414,11 +414,13 @@ def receipt(
     sh = session.get(Shipment, ship_id)
     if sh is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "发运批次不存在")
-    item_count = len(shp.shipment_dict(session, sh)["items"])
-    if item_count and len(body.checks) != item_count:
+    # ★ 发货与收货一致：只要求清点本批「已勾发」的项（未发的件不在本次交付内）
+    all_items = shp.shipment_dict(session, sh)["items"]
+    shipped_count = len([i for i in all_items if i.get("shipped")])
+    if shipped_count and len(body.checks) != shipped_count:
         raise HTTPException(
             status.HTTP_400_BAD_REQUEST,
-            f"发运清单共 {item_count} 项，必须逐项清点（当前 {len(body.checks)} 项）",
+            f"本批已勾「已发」{shipped_count} 项，必须逐项清点（当前 {len(body.checks)} 项）",
         )
     try:
         shp.site_receipt(

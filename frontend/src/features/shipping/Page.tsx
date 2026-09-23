@@ -223,7 +223,13 @@ export default function Shipping() {
       message.warning('现场清点要拍照')
       return
     }
-    const checks = receiptTarget.items.map((it) => {
+    // ★ 发货与收货一致：只清点本批已勾「已发」的项
+    const shipped = receiptTarget.items.filter((i) => i.shipped)
+    if (!shipped.length) {
+      message.warning('本批没有勾「已发」的项——先勾选实际发出的件再发运/清点')
+      return
+    }
+    const checks = shipped.map((it) => {
       const st = receiptChecks[it.id] ?? { result: '到' }
       return { item_id: it.id, result: st.result || '到', received_qty: st.received_qty, reason: st.reason }
     })
@@ -350,7 +356,14 @@ export default function Shipping() {
                     {canEdit && ['已指令', '发货中', '已装车'].includes(r.status) && <a onClick={() => { setLoadPhotos([]); setLoadTarget(r) }}>装车</a>}
                     {canEdit && ['已装车', '发货中'].includes(r.status) && <a onClick={() => void doDepart(r)}>发运</a>}
                     {canEdit && r.status === '在途' && <a onClick={() => void doArrive(r)}>登记到货</a>}
-                    {canEdit && ['已到货', '在途'].includes(r.status) && <a onClick={() => openReceipt(r)}>现场清点</a>}
+                    {canEdit && ['已到货', '在途'].includes(r.status) &&
+                      (r.items.some((i) => i.shipped) ? (
+                        <a onClick={() => openReceipt(r)}>现场清点</a>
+                      ) : (
+                        <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                          未勾「已发」，不能清点
+                        </Typography.Text>
+                      ))}
                     <a onClick={() => setDetail(r)}>详情</a>
                   </Space>
                 ),
@@ -462,9 +475,12 @@ export default function Shipping() {
       >
         <Typography.Paragraph type="secondary" style={{ fontSize: 12 }}>
           按发运清单逐项勾「到 / 缺 / 损」；全到=齐，有缺=缺件，有损=破损，系统自动判定并通知。
+          <br />
+          本批只清点**已勾「已发」**的 {receiptTarget?.items.filter((i) => i.shipped).length ?? 0} 项；
+          未勾发的 {receiptTarget?.items.filter((i) => !i.shipped).length ?? 0} 项不在本次交付内（发货与收货一致）。
         </Typography.Paragraph>
         <div style={{ maxHeight: 380, overflowY: 'auto' }}>
-          {(receiptTarget?.items ?? []).map((it) => {
+          {(receiptTarget?.items ?? []).filter((i) => i.shipped).map((it) => {
             const st = receiptChecks[it.id] ?? { result: '到' }
             return (
               <div key={it.id} style={{ padding: '6px 0', borderBottom: `1px solid ${T.border}` }}>

@@ -80,7 +80,10 @@ export default function ShippingM() {
   const doReceipt = async () => {
     if (!receiptTarget) return
     if (!receiptPhotos.length) { message.warning('现场清点要拍照'); return }
-    const checks = receiptTarget.items.map((it) => {
+    // ★ 发货与收货一致：只清点本批已勾「已发」的项
+    const shipped = receiptTarget.items.filter((i) => i.shipped)
+    if (!shipped.length) { message.warning('本批没有勾「已发」的项——先勾选实际发出的件再发运/清点'); return }
+    const checks = shipped.map((it) => {
       const st = receiptChecks[it.id] ?? { result: '到' }
       return { item_id: it.id, result: st.result || '到', received_qty: st.received_qty, reason: st.reason }
     })
@@ -144,7 +147,12 @@ export default function ShippingM() {
                 {canShip && ['已指令', '发货中'].includes(s.status) && <Button size="small" type="primary" onClick={() => void doDepart(s)}>发运</Button>}
                 {canShip && ['已指令', '发货中', '已装车'].includes(s.status) && <Button size="small" onClick={() => { setLoadPhotos([]); setLoadTarget(s) }}>装车</Button>}
                 {canShip && s.status === '在途' && <Button size="small" onClick={() => void doArrive(s)}>登记到货</Button>}
-                {canReceive && ['已到货', '在途'].includes(s.status) && <Button size="small" type="primary" onClick={() => { setReceiptChecks({}); setReceiptPhotos([]); setReceiptTarget(s) }}>现场清点</Button>}
+                {canReceive && ['已到货', '在途'].includes(s.status) &&
+                  (s.items.some((i) => i.shipped) ? (
+                    <Button size="small" type="primary" onClick={() => { setReceiptChecks({}); setReceiptPhotos([]); setReceiptTarget(s) }}>现场清点</Button>
+                  ) : (
+                    <Typography.Text type="secondary" style={{ fontSize: 12 }}>未勾「已发」，不能清点</Typography.Text>
+                  ))}
                 <a onClick={() => setExpanded(expanded === s.id ? null : s.id)}>{expanded === s.id ? '收起清单' : '看清单'}</a>
               </Space>
               {expanded === s.id && (
@@ -201,8 +209,12 @@ export default function ShippingM() {
         okText="提交清点"
         destroyOnHidden
       >
+        <Typography.Paragraph type="secondary" style={{ fontSize: 12 }}>
+          本批只清点**已勾「已发」**的 {receiptTarget?.items.filter((i) => i.shipped).length ?? 0} 项；
+          未勾发的 {receiptTarget?.items.filter((i) => !i.shipped).length ?? 0} 项不在本次交付内（发货与收货一致）。
+        </Typography.Paragraph>
         <div style={{ maxHeight: 380, overflowY: 'auto' }}>
-          {(receiptTarget?.items ?? []).map((it) => {
+          {(receiptTarget?.items ?? []).filter((i) => i.shipped).map((it) => {
             const st = receiptChecks[it.id] ?? { result: '到' }
             return (
               <div key={it.id} style={{ padding: '6px 0', borderBottom: `1px solid ${T.border}` }}>
