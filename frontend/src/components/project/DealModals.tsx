@@ -8,11 +8,12 @@ import {
   Form,
   Input,
   InputNumber,
-  Modal,
   Row,
   Select,
   Typography,
 } from 'antd'
+
+import AppModal from '../AppModal'
 
 import {
   type ProjectContact,
@@ -26,6 +27,7 @@ export default function DealModals({
   contactOpen,
   dealForm,
   dealOpen,
+  dealInitialValues,
   editingContact,
   saving,
   setCloseOpen,
@@ -43,6 +45,7 @@ export default function DealModals({
   contactOpen: boolean;
   dealForm: FormInstance;
   dealOpen: boolean;
+  dealInitialValues: Record<string, unknown>;
   editingContact: ProjectContact | null;
   message: any;
   saving: boolean;
@@ -56,21 +59,23 @@ export default function DealModals({
 }) {
   return (
     <>
-      <Modal
+      <AppModal
         title={`成交登记 · ${projectNo}`}
         open={dealOpen}
         width={900}
-        onCancel={() => setDealOpen(false)}
+        onClose={() => setDealOpen(false)}
         onOk={() => void submitDeal()}
-        confirmLoading={saving}
+        loading={saving}
         okText="确认成交"
-        destroyOnHidden
+        form={dealForm}
+        initialValues={dealInitialValues}
+        subtitle={
+          <Typography.Paragraph type="secondary" style={{ fontSize: 12 }}>
+            登记后阶段变为「成交待立项」；所有字段都会记入操作记录（旧值 → 新值）
+          </Typography.Paragraph>
+        }
         styles={{ body: { maxHeight: '68vh', overflowY: 'auto', paddingRight: 8 } }}
       >
-        <Typography.Paragraph type="secondary" style={{ fontSize: 12 }}>
-          登记后阶段变为「成交待立项」；所有字段都会记入操作记录（旧值 → 新值）
-        </Typography.Paragraph>
-        <Form form={dealForm} layout="vertical" preserve={false}>
           <Row gutter={12}>
             <Col span={6}>
               <Form.Item name="period_start" label="合同签订日" rules={[{ required: true, message: '必填' }]}>
@@ -176,25 +181,25 @@ export default function DealModals({
               </>
             )}
           </Form.List>
-        </Form>
-      </Modal>
+      </AppModal>
 
       {/* ============ 关闭订单 ============ */}
-      <Modal
+      <AppModal
         title={`关闭订单 · ${projectNo}`}
         open={closeOpen}
         width={520}
-        onCancel={() => setCloseOpen(false)}
+        onClose={() => setCloseOpen(false)}
         onOk={() => void submitClose()}
-        confirmLoading={saving}
+        loading={saving}
         okText="确认关闭"
-        okButtonProps={{ danger: true }}
-        destroyOnHidden
+        danger
+        form={closeForm}
+        subtitle={
+          <Typography.Paragraph type="secondary" style={{ fontSize: 12 }}>
+            关闭后阶段变为「已关闭」，不可再推进
+          </Typography.Paragraph>
+        }
       >
-        <Typography.Paragraph type="secondary" style={{ fontSize: 12 }}>
-          关闭后阶段变为「已关闭」，不可再推进
-        </Typography.Paragraph>
-        <Form form={closeForm} layout="vertical" preserve={false}>
           <Form.Item
             name="close_reason"
             label="关闭原因"
@@ -205,21 +210,31 @@ export default function DealModals({
           <Form.Item name="close_note" label="备注">
             <Input.TextArea rows={2} placeholder="如：客户预算砍了 30%，本轮放弃" />
           </Form.Item>
-        </Form>
-      </Modal>
+      </AppModal>
 
       {/* ============ 联系人 ============ */}
-      <Modal
+      <AppModal
         title={editingContact ? `编辑联系人 · ${editingContact.name}` : '新增联系人'}
         open={contactOpen}
         width={560}
-        onCancel={() => setContactOpen(false)}
+        onClose={() => setContactOpen(false)}
         onOk={() => void submitContact()}
-        confirmLoading={saving}
+        loading={saving}
         okText="保存"
-        destroyOnHidden
+        form={contactForm}
+        initialValues={
+          editingContact
+            ? {
+                name: editingContact.name,
+                role_tag: editingContact.role_tag ?? undefined,
+                title: editingContact.title ?? undefined,
+                phone: editingContact.phone ?? undefined,
+                wechat: editingContact.wechat ?? undefined,
+                email: editingContact.email ?? undefined,
+              }
+            : {}
+        }
       >
-        <Form form={contactForm} layout="vertical" preserve={false}>
           <Row gutter={12}>
             <Col span={12}>
               <Form.Item name="name" label="姓名" rules={[{ required: true, message: '请输入姓名' }]}>
@@ -259,8 +274,7 @@ export default function DealModals({
               </Form.Item>
             </Col>
           </Row>
-        </Form>
-      </Modal>
+      </AppModal>
     </>
   )
 }

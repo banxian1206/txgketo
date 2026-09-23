@@ -31,6 +31,7 @@ export default function AppModal<V extends Record<string, unknown>>({
   onClose,
   extraFooter,
   children,
+  onValuesChange,
   ...modalRest
 }: {
   open: boolean
@@ -48,6 +49,8 @@ export default function AppModal<V extends Record<string, unknown>>({
   onClose: () => void
   /** 弹窗底部左侧补充区（如「取消」外的次操作） */
   extraFooter?: ReactNode
+  /** 字段变化回调（如「收货地点」联动） */
+  onValuesChange?: FormProps<V>['onValuesChange']
   children: ReactNode
 } & Omit<Parameters<typeof Modal>[0], 'title' | 'onOk' | 'confirmLoading' | 'onCancel' | 'footer'>) {
   return (
@@ -64,7 +67,7 @@ export default function AppModal<V extends Record<string, unknown>>({
       {...modalRest}
     >
       {subtitle}
-      <Form form={form} layout="vertical" preserve={false} initialValues={initialValues as FormProps<V>['initialValues']}>
+      <Form form={form} layout="vertical" preserve={false} initialValues={initialValues as FormProps<V>['initialValues']} onValuesChange={onValuesChange}>
         {children}
       </Form>
       {extraFooter}

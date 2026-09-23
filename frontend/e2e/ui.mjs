@@ -106,8 +106,7 @@ try {
   await fillDate('period_end', '2027-06-30');
   await page.locator('#amount').fill('500000');
   await page.locator('#warranty_months').fill('12');
-  await page.getByRole('button', { name: /\+\s*添加\s*付款\s*节点/ }).click();
-  await page.getByPlaceholder('节点名，如 预付款').first().fill('预付款');
+  // AppModal 已预填 4 个付款节点（R2-02 修复后）——不再多点「添加付款节点」
   await page.getByRole('button', { name: /确\s*认\s*成\s*交/ }).click();
   await page.waitForTimeout(2000);
 
@@ -238,11 +237,11 @@ try {
   }
   await page.keyboard.press('Escape'); await page.waitForTimeout(400);
 
-  // —— P-10：项目列表无「还剩 N 天」——
+  // —— P-10：成交后阶段不再显示「还剩 N 天」（只看写链这个新项目那一行，避免其它线索项目干扰）——
   await page.goto(BASE + '/projects', { waitUntil: 'networkidle' });
   await page.waitForTimeout(800);
-  const t3 = await body(page);
-  check('P-10', !/还剩 \d+ 天|已过期/.test(t3), '列表无商机剩余天数');
+  const p10row = await page.locator('tr', { hasText: newNo }).first().innerText().catch(() => '');
+  check('P-10', !/还剩 \d+ 天|已过期/.test(p10row), `${newNo} 行无商机剩余（该行：${p10row.replace(/\n/g, ' ').slice(0, 60)}）`);
 
   // —— P-04：PC 现场页手机端提示 ——
   await page.goto(BASE + '/site', { waitUntil: 'networkidle' });

@@ -103,6 +103,7 @@ export default function ProjectDetailPage() {
 
   // 成交登记 / 关闭订单 / 联系人
   const [dealOpen, setDealOpen] = useState(false)
+  const [dealInitial, setDealInitial] = useState<Record<string, unknown>>({})
   const [closeOpen, setCloseOpen] = useState(false)
   const [contactOpen, setContactOpen] = useState(false)
   const [editingContact, setEditingContact] = useState<ProjectContact | null>(null)
@@ -158,8 +159,8 @@ export default function ProjectDetailPage() {
 
   const openReceive = (t: { seq: number; node_name: string; amount?: number | null; received_amount?: number | null }) => {
     const unpaid = Math.max(0, Number(t.amount ?? 0) - Number(t.received_amount ?? 0))
+    // 预填交给 AppModal 的 initialValues（挂载时读取）——不再手写 setFieldsValue（R2-02）
     setReceiveTarget({ seq: t.seq, node_name: t.node_name, unpaid })
-    receiveForm.setFieldsValue({ received_amount: unpaid || undefined, received_date: dayjs() })
   }
 
   const doReceive = async () => {
@@ -262,7 +263,7 @@ export default function ProjectDetailPage() {
           { node_name: '验收款', percent: 20, condition: '客户验收签字后' },
           { node_name: '质保金', percent: 10, condition: '质保期满' },
         ]
-    dealForm.setFieldsValue({
+    setDealInitial({
       period_start: p.period_start ? dayjs(p.period_start) : undefined,
       period_end: p.period_end ? dayjs(p.period_end) : undefined,
       amount: p.amount ?? undefined,
@@ -322,19 +323,8 @@ export default function ProjectDetailPage() {
   }
 
   const openContact = (c?: ProjectContact) => {
+    // 预填交给 AppModal 的 initialValues（DealModals 根据 editingContact 计算）（R2-02）
     setEditingContact(c ?? null)
-    if (c) {
-      contactForm.setFieldsValue({
-        name: c.name,
-        title: c.title ?? undefined,
-        phone: c.phone ?? undefined,
-        wechat: c.wechat ?? undefined,
-        email: c.email ?? undefined,
-        role_tag: c.role_tag ?? undefined,
-      })
-    } else {
-      contactForm.resetFields()
-    }
     setContactOpen(true)
   }
 
@@ -400,7 +390,7 @@ export default function ProjectDetailPage() {
       </Row>
 
       {/* ============ 成交登记 ============ */}
-      <DealModals CLOSE_REASONS={CLOSE_REASONS} closeForm={closeForm} closeOpen={closeOpen} contactForm={contactForm} contactOpen={contactOpen} dealForm={dealForm} dealOpen={dealOpen} editingContact={editingContact} message={message} saving={saving} setCloseOpen={setCloseOpen} setContactOpen={setContactOpen} setDealOpen={setDealOpen} submitClose={submitClose} submitContact={submitContact} submitDeal={submitDeal} projectNo={projectNo} />
+      <DealModals CLOSE_REASONS={CLOSE_REASONS} closeForm={closeForm} closeOpen={closeOpen} contactForm={contactForm} contactOpen={contactOpen} dealForm={dealForm} dealOpen={dealOpen} dealInitialValues={dealInitial} editingContact={editingContact} message={message} saving={saving} setCloseOpen={setCloseOpen} setContactOpen={setContactOpen} setDealOpen={setDealOpen} submitClose={submitClose} submitContact={submitContact} submitDeal={submitDeal} projectNo={projectNo} />
     </>
   )
 }

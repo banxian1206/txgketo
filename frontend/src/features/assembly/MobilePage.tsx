@@ -1,5 +1,5 @@
 import { useAsmBoard } from '../../hooks/useAsmBoard'
-import { App, Button, Card, Empty, Form, Input, Modal, Progress, Radio, Select, Space, Tag, Typography } from 'antd'
+import { App, Button, Card, Empty, Form, Input, Progress, Radio, Select, Space, Tag, Typography } from 'antd'
 import {useEffect, useState} from 'react'
 
 import {
@@ -16,6 +16,7 @@ import {
   type KittingResult,
 } from '../../api/client'
 import MfgPhotoPicker from '../../components/MfgPhotoPicker'
+import AppModal from '../../components/AppModal'
 import { ASSEMBLY_STATUS as STATUS_COLOR } from '../../theme/status'
 import { T } from '../../theme/tokens'
 
@@ -29,7 +30,9 @@ export default function AssemblyM() {
   const [projectNo, setProjectNo] = useState<string | undefined>()
   const [detail, setDetail] = useState<KittingResult | null>(null)
   const [startTarget, setStartTarget] = useState<KittingOverviewRow | null>(null)
+  const [startInitial, setStartInitial] = useState<Record<string, unknown>>({})
   const [debugTarget, setDebugTarget] = useState<AssemblyRecordRow | null>(null)
+  const [debugInitial, setDebugInitial] = useState<Record<string, unknown>>({})
   const [photos, setPhotos] = useState<string[]>([])
   const [saving, setSaving] = useState(false)
   const [form] = Form.useForm()
@@ -122,7 +125,7 @@ export default function AssemblyM() {
             </div>
             <Space style={{ marginTop: 8 }}>
               {canEdit && (
-                <Button size="small" type="primary" onClick={() => { setPhotos([]); form.resetFields(); form.setFieldsValue({ sub_assembly: '整机装配' }); setStartTarget(o) }}>
+                <Button size="small" type="primary" onClick={() => { setPhotos([]); setStartInitial({ sub_assembly: '整机装配' }); setStartTarget(o) }}>
                   开始装配
                 </Button>
               )}
@@ -163,7 +166,7 @@ export default function AssemblyM() {
                 </Button>
               )}
               {canEdit && (r.status === '已装配' || r.status === '调试中') && (
-                <Button size="small" type="primary" onClick={() => { setPhotos([]); form.resetFields(); form.setFieldsValue({ result: '合格' }); setDebugTarget(r) }}>
+                <Button size="small" type="primary" onClick={() => { setPhotos([]); setDebugInitial({ result: '合格' }); setDebugTarget(r) }}>
                   厂内调试
                 </Button>
               )}
@@ -171,11 +174,21 @@ export default function AssemblyM() {
           </Card>
         ))}
 
-      <Modal open={!!startTarget} title={`开始装配 · ${startTarget?.equip_no ?? ''}`} onCancel={() => setStartTarget(null)} onOk={() => void doStart()} confirmLoading={saving} okText="开始装配" destroyOnHidden>
-        <Typography.Paragraph type="secondary" style={{ fontSize: 12 }}>
-          当前齐套率 <b>{Math.round((startTarget?.kitting_rate ?? 0) * 100)}%</b> —— 不看齐套率，到了多少都能开工（会记录在履历里）。
-        </Typography.Paragraph>
-        <Form form={form} layout="vertical" preserve={false}>
+      <AppModal
+        open={!!startTarget}
+        title={`开始装配 · ${startTarget?.equip_no ?? ''}`}
+        onClose={() => setStartTarget(null)}
+        onOk={() => void doStart()}
+        loading={saving}
+        okText="开始装配"
+        form={form}
+        initialValues={startInitial}
+        subtitle={
+          <Typography.Paragraph type="secondary" style={{ fontSize: 12 }}>
+            当前齐套率 <b>{Math.round((startTarget?.kitting_rate ?? 0) * 100)}%</b> —— 不看齐套率，到了多少都能开工（会记录在履历里）。
+          </Typography.Paragraph>
+        }
+      >
           <Form.Item name="sub_assembly" label="装配形态" rules={[{ required: true }]}>
             <Radio.Group optionType="button" buttonStyle="solid">
               <Radio.Button value="整机装配">整机装配</Radio.Button>
@@ -188,11 +201,18 @@ export default function AssemblyM() {
           <Form.Item label="装配照片">
             <MfgPhotoPicker projectNo={projectNo ?? ''} refNo={`${startTarget?.equip_no ?? ''}-assembly`} value={photos} onChange={setPhotos} label="拍照（可后补）" />
           </Form.Item>
-        </Form>
-      </Modal>
+      </AppModal>
 
-      <Modal open={!!debugTarget} title={`厂内调试 · ${debugTarget?.equip_no ?? ''}`} onCancel={() => setDebugTarget(null)} onOk={() => void doDebug()} confirmLoading={saving} okText="记录" destroyOnHidden>
-        <Form form={form} layout="vertical" preserve={false}>
+      <AppModal
+        open={!!debugTarget}
+        title={`厂内调试 · ${debugTarget?.equip_no ?? ''}`}
+        onClose={() => setDebugTarget(null)}
+        onOk={() => void doDebug()}
+        loading={saving}
+        okText="记录"
+        form={form}
+        initialValues={debugInitial}
+      >
           <Form.Item name="result" label="调试结果" rules={[{ required: true }]}>
             <Radio.Group optionType="button" buttonStyle="solid">
               <Radio.Button value="合格">合格</Radio.Button>
@@ -205,8 +225,7 @@ export default function AssemblyM() {
           <Form.Item label="调试照片">
             <MfgPhotoPicker projectNo={debugTarget?.project_no ?? ''} refNo={`${debugTarget?.equip_no ?? ''}-debug`} value={photos} onChange={setPhotos} label="拍照（可后补）" />
           </Form.Item>
-        </Form>
-      </Modal>
+      </AppModal>
     </>
   )
 }

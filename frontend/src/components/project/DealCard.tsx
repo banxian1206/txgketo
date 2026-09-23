@@ -1,5 +1,6 @@
 // components/project/DealCard.tsx —— 由 ProjectDetailPage 拆出（重构 1.6b · 只拆不改）
 import type { FormInstance } from 'antd'
+import dayjs from 'dayjs'
 import type { Project } from '../../api/client'
 import {
   Button,
@@ -10,13 +11,13 @@ import {
   Form,
   Input,
   InputNumber,
-  Modal,
   Space,
   Table,
   Tag,
   Typography,
 } from 'antd'
 
+import AppModal from '../AppModal'
 import EditableField from '../EditableField'
 import {
   type ProjectDetail as Detail,
@@ -200,30 +201,34 @@ export default function DealCard({
                   ]}
                 />
 
-                <Modal
-                  title={`登记回款：${receiveTarget?.node_name ?? ''}`}
+                <AppModal
                   open={!!receiveTarget}
-                  onCancel={() => setReceiveTarget(null)}
+                  title={`登记回款：${receiveTarget?.node_name ?? ''}`}
+                  subtitle={
+                    <Typography.Paragraph type="secondary" style={{ fontSize: 12 }}>
+                      这个节点还有未收 ¥{Number(receiveTarget?.unpaid ?? 0).toLocaleString()}；可多次登记，未收不超总额。
+                    </Typography.Paragraph>
+                  }
+                  form={receiveForm}
+                  initialValues={{
+                    received_amount: receiveTarget?.unpaid || undefined,
+                    received_date: dayjs(),
+                  }}
                   onOk={() => void doReceive()}
-                  confirmLoading={saving}
+                  loading={saving}
                   okText="登记"
-                  destroyOnHidden
+                  onClose={() => setReceiveTarget(null)}
                 >
-                  <Typography.Paragraph type="secondary" style={{ fontSize: 12 }}>
-                    这个节点还有未收 ¥{Number(receiveTarget?.unpaid ?? 0).toLocaleString()}；可多次登记，未收不超总额。
-                  </Typography.Paragraph>
-                  <Form form={receiveForm} layout="vertical" preserve={false}>
-                    <Form.Item name="received_amount" label="本次实收金额" rules={[{ required: true, message: '填金额' }]}>
-                      <InputNumber style={{ width: '100%' }} min={0.01} />
-                    </Form.Item>
-                    <Form.Item name="received_date" label="收款日期">
-                      <DatePicker style={{ width: '100%' }} />
-                    </Form.Item>
-                    <Form.Item name="remark" label="备注">
-                      <Input placeholder="如：银行转账 / 承兑" />
-                    </Form.Item>
-                  </Form>
-                </Modal>
+                  <Form.Item name="received_amount" label="本次实收金额" rules={[{ required: true, message: '填金额' }]}>
+                    <InputNumber style={{ width: '100%' }} min={0.01} />
+                  </Form.Item>
+                  <Form.Item name="received_date" label="收款日期">
+                    <DatePicker style={{ width: '100%' }} />
+                  </Form.Item>
+                  <Form.Item name="remark" label="备注">
+                    <Input placeholder="如：银行转账 / 承兑" />
+                  </Form.Item>
+                </AppModal>
               </>
             )}
           </Card>

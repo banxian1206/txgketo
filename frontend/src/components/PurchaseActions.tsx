@@ -1,4 +1,4 @@
-import { Alert, App, Button, DatePicker, Form, Input, InputNumber, Modal, Select, Space, Tag, Typography } from 'antd'
+import { Alert, App, Button, DatePicker, Form, Input, InputNumber, Select, Space, Tag, Typography } from 'antd'
 import dayjs from 'dayjs'
 import { useState } from 'react'
 
@@ -14,6 +14,7 @@ import {
   type SupplierRow,
 } from '../api/client'
 import { T } from '../theme/tokens'
+import AppModal from './AppModal'
 
 /**
  * 采购的下单动作（只做下单；到货/验收/入库由仓库推，见采购单详情）。
@@ -30,6 +31,7 @@ export default function PurchaseActions({
 }) {
   const { message } = App.useApp()
   const [orderOpen, setOrderOpen] = useState(false)
+  const [orderInitial, setOrderInitial] = useState<Record<string, unknown>>({})
   const [saving, setSaving] = useState(false)
   const [orderForm] = Form.useForm()
   const [suppliers, setSuppliers] = useState<SupplierRow[]>([])
@@ -78,7 +80,7 @@ export default function PurchaseActions({
       setPriceRef(null)
     }
     setOrderDeliverTo(row.deliver_to ?? '公司仓库')
-    orderForm.setFieldsValue({
+    setOrderInitial({
       supplier_name: row.supplier_name ?? undefined,
       po_no: row.po_no ?? undefined,
       unit_price: row.unit_price ?? undefined,
@@ -131,24 +133,20 @@ export default function PurchaseActions({
       </Space>
 
       {/* 下单 */}
-      <Modal
+      <AppModal
         title={`采购下单 · ${row.item_name ?? row.item_no}`}
         open={orderOpen}
         width={620}
-        onCancel={() => setOrderOpen(false)}
+        onClose={() => setOrderOpen(false)}
         onOk={() => void submitOrder()}
-        confirmLoading={saving}
+        loading={saving}
         okText="确认下单"
-        destroyOnHidden
+        form={orderForm}
+        initialValues={orderInitial}
+        onValuesChange={(changed) => {
+          if ('deliver_to' in changed) setOrderDeliverTo(changed.deliver_to)
+        }}
       >
-        <Form
-          form={orderForm}
-          layout="vertical"
-          preserve={false}
-          onValuesChange={(changed) => {
-            if ('deliver_to' in changed) setOrderDeliverTo(changed.deliver_to)
-          }}
-        >
           <Space style={{ display: 'flex' }} size="middle">
             <Form.Item
               name="supplier_id"
@@ -299,8 +297,7 @@ export default function PurchaseActions({
               />
             </Form.Item>
           </Space>
-        </Form>
-      </Modal>
+      </AppModal>
     </>
   )
 }

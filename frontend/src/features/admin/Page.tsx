@@ -20,6 +20,7 @@ import type { ColumnsType } from 'antd/es/table'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import { useAuth } from '../../contexts/AuthContext'
+import AppModal from '../../components/AppModal'
 
 import {
   POSITIONS,
@@ -140,12 +141,14 @@ export default function Users() {
   // 用户编辑
   const [editUser, setEditUser] = useState<UserRow | null>(null)
   const [userOpen, setUserOpen] = useState(false)
+  const [userInitial, setUserInitial] = useState<Record<string, unknown>>({})
   const [userForm] = Form.useForm()
   const [saving, setSaving] = useState(false)
 
   // 组织编辑
   const [selectedOrg, setSelectedOrg] = useState<number | undefined>()
   const [orgOpen, setOrgOpen] = useState(false)
+  const [orgInitial, setOrgInitial] = useState<Record<string, unknown>>({})
   const [orgEditing, setOrgEditing] = useState<OrgRow | null>(null)
   const [orgForm] = Form.useForm()
   // 演示账号
@@ -244,18 +247,14 @@ export default function Users() {
 
   const openCreateUser = () => {
     setEditUser(null)
-    userForm.resetFields()
-    userForm.setFieldsValue({
-      org_id: scope?.department?.id,
-      position: '组员',
-      role_codes: [],
-    })
+    // 预填交给 AppModal initialValues（R2-02 根治）
+    setUserInitial({ org_id: scope?.department?.id, position: '组员', role_codes: [] })
     setUserOpen(true)
   }
 
   const openEditUser = (row: UserRow) => {
     setEditUser(row)
-    userForm.setFieldsValue({
+    setUserInitial({
       username: row.username,
       name: row.name,
       phone: row.phone,
@@ -313,8 +312,7 @@ export default function Users() {
 
   const openCreateOrg = (admin: boolean) => {
     setOrgEditing(null)
-    orgForm.resetFields()
-    orgForm.setFieldsValue({ parent_id: admin ? undefined : (scope?.department?.id ?? undefined) })
+    setOrgInitial({ parent_id: admin ? undefined : (scope?.department?.id ?? undefined) })
     setOrgOpen(true)
   }
 
@@ -325,7 +323,7 @@ export default function Users() {
       return
     }
     setOrgEditing(org)
-    orgForm.setFieldsValue({ name: org.name, parent_id: org.parent_id, kind: org.kind })
+    setOrgInitial({ name: org.name, parent_id: org.parent_id, kind: org.kind })
     setOrgOpen(true)
   }
 
@@ -728,16 +726,16 @@ export default function Users() {
       />
 
       {/* 用户编辑 */}
-      <Modal
+      <AppModal
         open={userOpen}
         title={editUser ? `编辑用户：${editUser.name}` : '新建用户'}
-        onCancel={() => setUserOpen(false)}
+        onClose={() => setUserOpen(false)}
         onOk={() => void saveUser()}
-        confirmLoading={saving}
+        loading={saving}
         okText="保存"
-        destroyOnHidden
+        form={userForm}
+        initialValues={userInitial}
       >
-        <Form form={userForm} layout="vertical" preserve={false}>
           <Form.Item
             name="username"
             label="账号"
@@ -788,8 +786,7 @@ export default function Users() {
               <Switch />
             </Form.Item>
           )}
-        </Form>
-      </Modal>
+      </AppModal>
 
       {/* 转交 */}
       <Modal
@@ -858,16 +855,16 @@ export default function Users() {
       </Modal>
 
       {/* 组织编辑 */}
-      <Modal
+      <AppModal
         open={orgOpen}
         title={orgEditing ? `编辑组织：${orgEditing.name}` : '新增组织'}
-        onCancel={() => setOrgOpen(false)}
+        onClose={() => setOrgOpen(false)}
         onOk={() => void saveOrg()}
-        confirmLoading={saving}
+        loading={saving}
         okText="保存"
-        destroyOnHidden
+        form={orgForm}
+        initialValues={orgInitial}
       >
-        <Form form={orgForm} layout="vertical" preserve={false}>
           <Form.Item name="name" label="名称" rules={[{ required: true, message: '请输入名称' }]}>
             <Input placeholder="如：机械组 / 深圳仓" />
           </Form.Item>
@@ -880,8 +877,7 @@ export default function Users() {
           <Typography.Paragraph type="secondary" style={{ fontSize: 12 }}>
             上级留空 = 顶级部门（仅管理员）；总监只能在自己部门下建组。
           </Typography.Paragraph>
-        </Form>
-      </Modal>
+      </AppModal>
     </Card>
   )
 }

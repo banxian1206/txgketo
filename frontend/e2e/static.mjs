@@ -102,5 +102,34 @@ check('SUBMIT-无裸validate', bareValidate.length === 0,
     (prodGuard ? '' : '注册缺 PROD 守卫; ') + (apiBypass ? 'API 旁路缓存 ✓' : 'API 未旁路缓存'));
 }
 
+// P-03/R2-02：禁止「先 setFieldsValue 后开弹窗」的手写预填（destroyOnHidden 弹窗会丢值）
+// 正确做法：AppModal + initialValues（挂载时读取）；或 forceRender 让 Form 提前挂载
+{
+  const bad = [];
+  const walk = dir => {
+    for (const f of fs.readdirSync(dir)) {
+      const p = path.join(dir, f);
+      const st = fs.statSync(p);
+      if (st.isDirectory()) walk(p);
+      else if (/\.tsx$/.test(f)) {
+        const src = fs.readFileSync(p, 'utf8');
+        if (!src.includes('<Modal') || !src.includes('destroyOnHidden')) continue;
+        if (src.includes('forceRender')) continue; // Form 提前挂载，预填安全
+        const lines = src.split('\n');
+        lines.forEach((l, i) => {
+          if (!l.includes('setFieldsValue(')) return;
+          const win = lines.slice(i, i + 22).join('\n');
+          if (/set[A-Z]\w*(?:Open|Target|Modal)\((?:true|\{)/.test(win)) {
+            bad.push(`${p.replace(SRC, 'src')}:${i + 1}`);
+          }
+        });
+      }
+    }
+  };
+  walk(SRC);
+  check('PREFILL-无先设后开', bad.length === 0,
+    bad.length ? `手写预填残留（改 AppModal+initialValues）: ${bad.slice(0, 5).join(', ')}` : '无「先 setFieldsValue 后开弹窗」残留');
+}
+
 const fails = summary('静态回归');
 exitWith(fails);
