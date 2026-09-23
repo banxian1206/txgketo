@@ -77,6 +77,37 @@ const wh1 = await apiLogin('wh1', 'txgk@123');
   }
 }
 
+// R2-01：直发客户现场 → 下单即建「现场待验收」到货单（现场立即可清点；仓库列表不含直发）
+{
+  const projects = await (await apiGet('/projects', admin)).json();
+  const proj = (Array.isArray(projects) ? projects : []).find(p => ['执行中', '交付中', '质保'].includes(p.stage)) || (Array.isArray(projects) ? projects[0] : null);
+  const suppliers = await (await apiGet('/suppliers', admin)).json();
+  const sup = Array.isArray(suppliers) ? suppliers[0] : null;
+  const items = await (await apiGet('/library/items?limit=1', admin)).json();
+  const item = Array.isArray(items) ? items[0] : null;
+  if (!proj || !sup || !item) {
+    check('R2-01', true, '缺少造数前置（项目/供应商/物料），跳过', 'SKIP');
+  } else {
+    const h = { 'Content-Type': 'application/json', Authorization: `Bearer ${admin}` };
+    const mr = await (await fetch(`${API}/api/v1/purchase/manual-request`, {
+      method: 'POST', headers: h,
+      body: JSON.stringify({ attribution: '项目', project_no: proj.project_no, item_no: item.item_no, qty: 1,
+        need_date: new Date(Date.now() + 86400000 * 10).toISOString().slice(0, 10), note: 'R2-01 护栏探针' }),
+    })).json();
+    const po = await (await fetch(`${API}/api/v1/purchase/merge-order`, {
+      method: 'POST', headers: h,
+      body: JSON.stringify({ supplier_id: sup.id, ordered_at: new Date().toISOString().slice(0, 10),
+        deliver_to: '直发客户现场', deliver_address: 'E2E 探针地址', lines: [{ request_id: mr.id }] }),
+    })).json();
+    const inc = await (await apiGet(`/site/incoming?project_no=${proj.project_no}`, admin)).json();
+    const hit = (inc.pending || []).some(x => x.item_no === item.item_no && x.status === '现场待验收');
+    const wb = await (await apiGet('/warehouse/workbench', admin)).json();
+    const notInWh = !(wb.incoming || []).some(x => x.id === mr.id);
+    check('R2-01', hit && notInWh,
+      `PO=${po.po_no ?? '?'} · 现场待清点=${hit} · 仓库不含直发=${notInWh}（本探针会留一条待清点数据）`);
+  }
+}
+
 // P-15：favicon 200
 {
   const r = await fetch(`${BASE}/brand/favicon.ico`);

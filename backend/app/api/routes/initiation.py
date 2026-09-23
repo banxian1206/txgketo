@@ -940,6 +940,8 @@ def order(
     row.deliver_to = body.deliver_to
     row.deliver_address = body.deliver_address
     row.status = "在途"  # 下完单就是在途（等货）
+    # ★ R2-01：直发客户现场 → 下单即建「现场待验收」到货单（现场立即可清点）
+    _ensure_site_pending_receipt(session, row, current.id)
     # ★ 成交价落进价格库 —— 下次买同一个东西就能看到"上次多少钱"
     if row.unit_price:
         from app.models.purchasing import SupplierQuote
@@ -1023,6 +1025,53 @@ def _recalc_request_status(session: Session, row: PurchaseRequest) -> str:
     return row.status
 
 
+def _ensure_site_pending_receipt(session: Session, row: PurchaseRequest, actor_id: int) -> GoodsReceipt | None:
+    """R2-01（口径①）：直发客户现场下单即建「现场待验收」到货单，现场立即可清点。
+
+    - 幂等：同一条需求已有「现场待验收」单就不再建。
+    - 需求状态保持「在途」：货还没到现场，且「在途」在净需求 OPEN_STATUS 里，
+      不会因建单而把在跑需求算漏（避免重复采购）。
+    """
+    if (row.deliver_to or "") != "直发客户现场":
+        return None
+    existing = session.scalar(
+        select(GoodsReceipt)
+        .where(GoodsReceipt.request_id == row.id, GoodsReceipt.status == "现场待验收")
+        .limit(1)
+    )
+    if existing is not None:
+        return existing
+    item = session.get(Item, row.item_no)
+    gr = GoodsReceipt(
+        receipt_no=next_number(session, "RECEIPT", scope_key=year_scope_key()),
+        project_no=row.project_no,
+        request_id=row.id,
+        item_no=row.item_no,
+        qty=row.qty,
+        unit=row.unit or (item.unit if item else None),
+        receipt_date=None,
+        deliver_to="直发客户现场",
+        status="现场待验收",
+        inspect_note="下单即生成：直发客户现场，等现场清点",
+    )
+    session.add(gr)
+    session.flush()
+    project = session.get(Project, row.project_no) if row.project_no else None
+    if project is not None and project.pm_id:
+        notify.notify(
+            session,
+            [project.pm_id],
+            type_=notify.TYPE_WAREHOUSE,
+            title=f"直发件已下单，待现场清点：{row.item_no} × {float(row.qty or 0):g}",
+            body=f"{row.project_no} {row.equip_no or ''}（{gr.receipt_no}）—— 货到现场后请清点验收",
+            link="/site",
+            biz_type="goods_receipt",
+            biz_id=gr.id,
+            actor_id=actor_id,
+        )
+    return gr
+
+
 def _resolve_location(session: Session, location: str | None):
     """入库库位：填了就找/建，没填用「待定」。"""
     from app.models.warehouse import WarehouseLocation
@@ -1078,6 +1127,22 @@ def _perform_inspect(
         raise HTTPException(status.HTTP_400_BAD_REQUEST, f"这一行已经结束了（{row.status}），不能再验收")
     if row.status not in ("在途", "部分到货", "待入库", "不合格", "已下单"):
         raise HTTPException(status.HTTP_400_BAD_REQUEST, f"当前状态是「{row.status}」，不能验收")
+
+    # ★ R2-01：直发单在下单时已生成「现场待验收」单 —— 仓库不再重复验收，直接返回该单
+    if (row.deliver_to or "") == "直发客户现场":
+        existing = session.scalar(
+            select(GoodsReceipt)
+            .where(GoodsReceipt.request_id == row.id, GoodsReceipt.status == "现场待验收")
+            .limit(1)
+        )
+        if existing is not None:
+            return {
+                "receipt_id": existing.id,
+                "receipt_no": existing.receipt_no,
+                "receipt_status": existing.status,
+                "request_status": row.status,
+                "qty_received": float(row.qty_received or 0),
+            }
 
     # ★ 超额验收硬拦（2026-09-22 产品决策）：到货数量不得超过「订购 − 有效到货」
     receipts = _request_receipts(session, row.id)
@@ -1864,6 +1929,8 @@ def merge_order(
         row.deliver_to = body.deliver_to
         row.deliver_address = body.deliver_address
         row.status = "在途"
+        # ★ R2-01：直发客户现场 → 下单即建「现场待验收」到货单（现场立即可清点）
+        _ensure_site_pending_receipt(session, row, current.id)
         _sync_purchase_task(
             session, row, "进行中", f"已合并下单 {po_no}（{sup.name}），{body.deliver_to}，等货"
         )
