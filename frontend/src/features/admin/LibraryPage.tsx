@@ -7,7 +7,6 @@ import {
   Form,
   Input,
   InputNumber,
-  Modal,
   Row,
   Select,
   Space,
@@ -28,6 +27,7 @@ import {
   type StdClassInfo,
   type StdItem,
 } from '../../api/client'
+import AppModal from '../../components/AppModal'
 import { T } from '../../theme/tokens'
 
 /**
@@ -42,6 +42,7 @@ export default function Library() {
   const [q, setQ] = useState('')
   const [loading, setLoading] = useState(false)
   const [open, setOpen] = useState(false)
+  const [initial, setInitial] = useState<Record<string, unknown>>({})
   const [editing, setEditing] = useState<StdItem | null>(null)
   const [saving, setSaving] = useState(false)
   const [form] = Form.useForm()
@@ -83,8 +84,7 @@ export default function Library() {
 
   const openCreate = () => {
     setEditing(null)
-    form.resetFields()
-    form.setFieldsValue({ unit: '件' })
+    setInitial({ unit: '件' })
     setOpen(true)
   }
 
@@ -97,8 +97,7 @@ export default function Library() {
         const val = full.spec?.[f.code]
         if (val !== undefined && val !== null) v[`spec_${f.code}`] = val
       }
-      form.resetFields()
-      form.setFieldsValue(v)
+      setInitial(v)
       setOpen(true)
     } catch (e) {
       message.error(errMsg(e))
@@ -260,22 +259,24 @@ export default function Library() {
       </Col>
 
       {/* 新建物料：按品类规格模板动态生成表单 */}
-      <Modal
+      <AppModal
         title={editing ? `编辑物料 · ${editing.item_no}` : `新建物料 · ${activeClass?.name ?? ''}`}
         open={open}
         width={720}
-        onCancel={() => setOpen(false)}
+        onClose={() => setOpen(false)}
         onOk={() => void submit()}
-        confirmLoading={saving}
+        loading={saving}
         okText={editing ? '保存' : '建码'}
-        destroyOnHidden
+        form={form}
+        initialValues={initial}
+        subtitle={
+          <Typography.Paragraph type="secondary" style={{ fontSize: 12 }}>
+            {editing
+              ? '改规格/品牌/型号/单位（编码不变）；留空即清空该字段'
+              : `编码由系统自动发（${activeClass?.category_code}-${activeClass?.code}-0001 形式）；规格按品类模板逐字段填写，缺一项都存不了`}
+          </Typography.Paragraph>
+        }
       >
-        <Typography.Paragraph type="secondary" style={{ fontSize: 12 }}>
-          {editing
-            ? '改规格/品牌/型号/单位（编码不变）；留空即清空该字段'
-            : `编码由系统自动发（${activeClass?.category_code}-${activeClass?.code}-0001 形式）；规格按品类模板逐字段填写，缺一项都存不了`}
-        </Typography.Paragraph>
-        <Form form={form} layout="vertical" preserve={false}>
           <Row gutter={12}>
             {(activeClass?.spec_template ?? []).map((f) => (
               <Col span={f.type === 'text' ? 12 : 8} key={f.code}>
@@ -291,8 +292,7 @@ export default function Library() {
           {!activeClass?.spec_template?.length && (
             <Empty description="这个品类还没配规格模板" />
           )}
-        </Form>
-      </Modal>
+      </AppModal>
     </Row>
   )
 }

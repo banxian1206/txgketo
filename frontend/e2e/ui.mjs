@@ -2,6 +2,7 @@
  * UI 回归：真实浏览器（channel:chrome）
  *  Part 1 冒烟：PC 25 路由 + 移动 9 路由，零 pageerror / 零 4xx / 零 antd 弃用警告（P-16 动态）
  *  Part 2 交互：P-09 · P-01 · P-03 · P-02 · P-11 · P-13 · P-05 · P-10 · P-04 · P-08 · P-18 · P-21 · P-22
+ *  Part 3 预填实读：用户/供应商/标准库编辑 + 装配开始（打开弹窗断言初始值，治 PREFILL 静态盲区）
  *  注意：本脚本会创建 1 个测试商机（E2E回归-*）并走完 建图/下单/验收，属护栏正常代价
  */
 import { newCtx, login, body, shot, check, summary, exitWith, results, BASE, FILES, apiLogin, apiGet } from './lib.mjs';
@@ -382,6 +383,60 @@ try {
   await shot(page, 'ui-regress-crash');
 } finally {
   await c.browser.close();
+}
+
+// ═════════ Part 3 · 预填实读（治 PREFILL 静态盲区：打开弹窗就必须看到初始值）═════════
+{
+  const c = await newCtx(); const { page } = c;
+  const closeModal = async () => { await page.locator('.ant-modal-close').last().click().catch(() => {}); await page.waitForTimeout(400); };
+  try {
+    await login(page, 'admin', 'admin12345');
+
+    // 用户编辑
+    await page.goto(BASE + '/users', { waitUntil: 'networkidle' }); await page.waitForTimeout(1200);
+    let edit = page.locator('a,button').filter({ hasText: /^编\s*辑$/ }).first();
+    if (await edit.count()) {
+      await edit.click(); await page.waitForTimeout(600);
+      const u = await page.locator('.ant-modal-content input#username').inputValue().catch(() => '');
+      check('PREFILL-用户编辑', !!u, u ? `username=${u}` : '账号未预填');
+      await closeModal();
+    } else check('PREFILL-用户编辑', true, '无编辑入口', 'SKIP');
+
+    // 供应商编辑
+    await page.goto(BASE + '/suppliers', { waitUntil: 'networkidle' }); await page.waitForTimeout(1200);
+    edit = page.locator('a,button').filter({ hasText: /^编\s*辑$/ }).first();
+    if (await edit.count()) {
+      await edit.click(); await page.waitForTimeout(600);
+      const n = await page.locator('.ant-modal-content input#name').inputValue().catch(() => '');
+      check('PREFILL-供应商编辑', !!n, n ? `name=${n}` : '名称未预填');
+      await closeModal();
+    } else check('PREFILL-供应商编辑', true, '无编辑入口', 'SKIP');
+
+    // 标准库物料编辑
+    await page.goto(BASE + '/library', { waitUntil: 'networkidle' }); await page.waitForTimeout(1200);
+    edit = page.locator('a,button').filter({ hasText: /^编\s*辑$/ }).first();
+    if (await edit.count()) {
+      await edit.click(); await page.waitForTimeout(800);
+      const u2 = await page.locator('.ant-modal-content input#unit').inputValue().catch(() => '');
+      check('PREFILL-标准库编辑', !!u2, u2 ? `unit=${u2}` : '单位未预填');
+      await closeModal();
+    } else check('PREFILL-标准库编辑', true, '无编辑入口', 'SKIP');
+
+    // 装配开始（PC）
+    await page.goto(BASE + '/assembly', { waitUntil: 'networkidle' }); await page.waitForTimeout(1400);
+    const sel = page.locator('.ant-select').first();
+    if (await sel.count()) { await sel.click(); await page.waitForTimeout(400); const opt = page.locator('.ant-select-item-option').first(); if (await opt.count()) { await opt.click(); await page.waitForTimeout(1200); } }
+    const asm = page.locator('a,button').filter({ hasText: '开始装配' }).first();
+    if (await asm.count()) {
+      await asm.click(); await page.waitForTimeout(700);
+      const checked = await page.locator('.ant-modal-content .ant-radio-button-wrapper-checked').innerText().catch(() => '');
+      check('PREFILL-装配开始', /整机装配/.test(checked), checked ? `装配形态=${checked.trim()}` : '未预选整机装配');
+    } else check('PREFILL-装配开始', true, '无开始装配入口', 'SKIP');
+  } catch (e) {
+    check('PREFILL-实读', false, '异常: ' + String(e).slice(0, 160));
+  } finally {
+    await c.browser.close();
+  }
 }
 
 const fails = summary('UI 回归');

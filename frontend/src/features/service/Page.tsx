@@ -8,7 +8,6 @@ import {
   Form,
   Input,
   InputNumber,
-  Modal,
   Row,
   Select,
   Space,
@@ -37,6 +36,7 @@ import {
   type SparePartRow,
 } from '../../api/client'
 import MfgPhotoPicker from '../../components/MfgPhotoPicker'
+import AppModal from '../../components/AppModal'
 import { SelectEquipment, SelectProject } from '../../components/fields'
 import { SERVICE_ORDER_STATUS as SO_COLOR } from '../../theme/status'
 import { T } from '../../theme/tokens'
@@ -52,6 +52,7 @@ export default function Service() {
   const [tab, setTab] = useState('orders')
 
   const [modal, setModal] = useState<{ kind: Kind; order?: ServiceOrderRow; part?: SparePartRow } | null>(null)
+  const [modalInitial, setModalInitial] = useState<Record<string, unknown>>({})
   const [photos, setPhotos] = useState<string[]>([])
   const [saving, setSaving] = useState(false)
   const [form] = Form.useForm()
@@ -63,8 +64,7 @@ export default function Service() {
 
   const open = (kind: Kind, order?: ServiceOrderRow, part?: SparePartRow) => {
     setPhotos([])
-    form.resetFields()
-    if (kind === 'move' && part) form.setFieldsValue({ part_id: part.id, move_type: '领出', qty: 1 })
+    setModalInitial(kind === 'move' && part ? { part_id: part.id, move_type: '领出', qty: 1 } : {})
     setModal({ kind, order, part })
   }
 
@@ -248,7 +248,7 @@ export default function Service() {
         ]}
       />
 
-      <Modal
+      <AppModal
         open={!!modal}
         title={
           modal?.kind === 'create' ? '报修（新建服务工单）'
@@ -257,13 +257,13 @@ export default function Service() {
                 : modal?.kind === 'sign' ? `客户签字 · ${modal.order?.so_no ?? ''}`
                   : modal?.kind === 'part' ? '备件建账' : '备件收发'
         }
-        onCancel={() => setModal(null)}
+        onClose={() => setModal(null)}
         onOk={() => void submit()}
-        confirmLoading={saving}
+        loading={saving}
         okText="提交"
-        destroyOnHidden
+        form={form}
+        initialValues={modalInitial}
       >
-        <Form form={form} layout="vertical" preserve={false}>
           {modal?.kind === 'create' && (
             <>
               <Form.Item name="project_no" label="项目号" rules={[{ required: true, message: '选项目' }]}>
@@ -333,8 +333,7 @@ export default function Service() {
               <Form.Item name="remark" label="备注"><Input /></Form.Item>
             </>
           )}
-        </Form>
-      </Modal>
+      </AppModal>
     </Card>
   )
 }

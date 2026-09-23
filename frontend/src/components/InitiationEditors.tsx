@@ -18,6 +18,8 @@ import dayjs from 'dayjs'
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
+import AppModal from './AppModal'
+
 import {
   addEquipment,
   addMilestone,
@@ -557,6 +559,7 @@ export function LongLeadEditor({ projectNo, onChanged }: Omit<Props, 'users'>) {
   const { message } = App.useApp()
   const [rows, setRows] = useState<PurchaseRequestItem[]>([])
   const [open, setOpen] = useState(false)
+  const [initial, setInitial] = useState<Record<string, unknown>>({})
   const [editing, setEditing] = useState<PurchaseRequestItem | null>(null)
   const [saving, setSaving] = useState(false)
   const [form] = Form.useForm()
@@ -575,9 +578,8 @@ export function LongLeadEditor({ projectNo, onChanged }: Omit<Props, 'users'>) {
 
   const openForm = (row?: PurchaseRequestItem) => {
     setEditing(row ?? null)
-    form.resetFields()
     if (row) {
-      form.setFieldsValue({
+      setInitial({
         item_no: row.item_no,
         qty: row.qty,
         unit: row.unit,
@@ -588,7 +590,7 @@ export function LongLeadEditor({ projectNo, onChanged }: Omit<Props, 'users'>) {
         remark: row.remark,
       })
     } else {
-      form.setFieldsValue({ ordered_at: dayjs() })
+      setInitial({ ordered_at: dayjs() })
     }
     setOpen(true)
   }
@@ -702,17 +704,17 @@ export function LongLeadEditor({ projectNo, onChanged }: Omit<Props, 'users'>) {
         ]}
       />
 
-      <Modal
+      <AppModal
         title={editing ? `编辑 · ${editing.item_name}` : '登记长周期件'}
         open={open}
         width={640}
-        onCancel={() => setOpen(false)}
+        onClose={() => setOpen(false)}
         onOk={() => void submit()}
-        confirmLoading={saving}
+        loading={saving}
         okText="保存"
-        destroyOnHidden
+        form={form}
+        initialValues={initial}
       >
-        <Form form={form} layout="vertical" preserve={false}>
           <Form.Item
             name="item_no"
             label="标准库物料"
@@ -758,8 +760,7 @@ export function LongLeadEditor({ projectNo, onChanged }: Omit<Props, 'users'>) {
           <Form.Item name="remark" label="备注">
             <Input.TextArea rows={2} />
           </Form.Item>
-        </Form>
-      </Modal>
+      </AppModal>
     </>
   )
 }

@@ -11,7 +11,6 @@ import {
   Form,
   Input,
   InputNumber,
-  Modal,
   Radio,
   Row,
   Select,
@@ -45,6 +44,7 @@ import {
   type ProdOrderRow,
 } from '../../api/client'
 import MfgPhotoPicker from '../../components/MfgPhotoPicker'
+import AppModal from '../../components/AppModal'
 import AuthedImage from '../../components/AuthedImage'
 import AuthedFileLink from '../../components/AuthedFileLink'
 import { PROD_STATUS as STATUS_COLOR } from '../../theme/status'
@@ -76,6 +76,7 @@ export default function Manufacturing() {
   const [photos, setPhotos] = useState<string[]>([])
   const [saving, setSaving] = useState(false)
   const [form] = Form.useForm()
+  const [actionInitial, setActionInitial] = useState<Record<string, unknown>>({})
 
   // 详情
   const [detail, setDetail] = useState<ProdOrderRow | null>(null)
@@ -116,20 +117,16 @@ export default function Manufacturing() {
     }
   }
 
-  // ★ 预填必须在弹窗打开、表单项挂载之后（P-03）：destroyOnHidden+preserve=false 时
-  //   在 setAction 之前 setFieldsValue 会丢失，改在 action 变化后统一预填。
-  useEffect(() => {
-    if (!action) return
-    form.resetFields()
-    if (action.kind === 'dispatch') form.setFieldsValue({ step_name: '下料', material_item_no: action.order?.material_item_no })
-    if (action.kind === 'accept') form.setFieldsValue({ result: '合格' })
-    if (action.kind === 'transfer') form.setFieldsValue({ transfer_to: '装配区' })
-    if (action.kind === 'os-send') form.setFieldsValue({ material_supplied: true, sent_at: dayjs(), due_date: dayjs().add(7, 'day') })
-    if (action.kind === 'os-accept') form.setFieldsValue({ result: '合格' })
-  }, [action, form])
-
   const openAction = (kind: ActionKind, order?: ProdOrderRow, os?: OutsourceRow) => {
     setPhotos([])
+    // 预填交给 AppModal initialValues（挂载时读）
+    let init: Record<string, unknown> = {}
+    if (kind === 'dispatch') init = { step_name: '下料', material_item_no: order?.material_item_no }
+    if (kind === 'accept') init = { result: '合格' }
+    if (kind === 'transfer') init = { transfer_to: '装配区' }
+    if (kind === 'os-send') init = { material_supplied: true, sent_at: dayjs(), due_date: dayjs().add(7, 'day') }
+    if (kind === 'os-accept') init = { result: '合格' }
+    setActionInitial(init)
     setAction({ kind, order, os })
   }
 
@@ -416,7 +413,7 @@ export default function Manufacturing() {
       )}
 
       {/* 动作弹窗 */}
-      <Modal
+      <AppModal
         open={!!action}
         title={
           action?.kind === 'dispatch'
@@ -429,13 +426,13 @@ export default function Manufacturing() {
                   ? `外协发出 · ${action?.os?.item_no ?? ''}`
                   : `外协验收 · ${action?.os?.item_no ?? ''}`
         }
-        onCancel={() => setAction(null)}
+        onClose={() => setAction(null)}
         onOk={() => void submitAction()}
-        confirmLoading={saving}
+        loading={saving}
         okText="提交"
-        destroyOnHidden
+        form={form}
+        initialValues={actionInitial}
       >
-        <Form form={form} layout="vertical" preserve={false}>
           {action?.kind === 'dispatch' && (
             <>
               <Typography.Paragraph type="secondary" style={{ fontSize: 12 }}>
@@ -529,8 +526,7 @@ export default function Manufacturing() {
               />
             </Form.Item>
           )}
-        </Form>
-      </Modal>
+      </AppModal>
 
       {/* 详情 */}
       <Drawer

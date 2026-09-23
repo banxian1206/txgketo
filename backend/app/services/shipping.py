@@ -334,6 +334,16 @@ def depart(
 ) -> Shipment:
     if sh.status not in (SHIP_LOADED, SHIP_SHIPPING):
         raise ShippingError(f"当前状态「{sh.status}」，不能发运（先装车）")
+    # ★ 发运门禁（客户口径 R3-02 方案A）：0 项已发不能发运（否则到货后无法清点，成死批次）
+    shipped_count = session.scalar(
+        select(func.count()).select_from(ShipmentItem).where(
+            ShipmentItem.shipment_id == sh.id, ShipmentItem.shipped.is_(True)
+        )
+    )
+    if not shipped_count:
+        raise ShippingError(
+            "本批一项都没勾「已发」—— 勾「已发」的就是实际发出的：先勾选实际发出的件（可分批，只勾这一批发走的），再发运"
+        )
     sh.status = SHIP_TRANSIT
     sh.depart_at = _now()
     if depart_at:
@@ -343,11 +353,6 @@ def depart(
     if remark:
         sh.remark = remark
     # ★ 发运 → 通知现场（客户口径）：现场按同一份清单逐项核对到/缺/损
-    shipped_count = session.scalar(
-        select(func.count()).select_from(ShipmentItem).where(
-            ShipmentItem.shipment_id == sh.id, ShipmentItem.shipped.is_(True)
-        )
-    )
     notify.notify_role(
         session,
         "SITE",

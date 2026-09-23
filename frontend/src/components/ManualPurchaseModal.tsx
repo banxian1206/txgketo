@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { App, DatePicker, Form, Input, InputNumber, Modal, Select, Typography } from 'antd'
+import { App, DatePicker, Form, Input, InputNumber, Select, Typography } from 'antd'
 
 import {
   ATTRIBUTIONS,
@@ -10,6 +10,7 @@ import {
   type EquipmentItem,
 } from '../api/client'
 import { SelectStdItem } from './fields'
+import AppModal from './AppModal'
 
 interface Props {
   open: boolean
@@ -28,8 +29,7 @@ export default function ManualPurchaseModal({ open, onClose, onDone }: Props) {
 
   useEffect(() => {
     if (!open) return
-    form.resetFields()
-    form.setFieldsValue({ attribution: '项目', qty: 1 })
+    // 表单默认值交给 AppModal initialValues（挂载时读）；这里只重置非表单状态
     setAttribution('项目')
     setEquipments([])
     void listProjects().then(setProjects).catch(() => setProjects([]))
@@ -72,21 +72,23 @@ export default function ManualPurchaseModal({ open, onClose, onDone }: Props) {
   }
 
   return (
-    <Modal
+    <AppModal
       title="手工采购申请（免审核，直入采购池）"
       open={open}
       width={600}
-      onCancel={onClose}
+      onClose={onClose}
       onOk={() => void submit()}
-      confirmLoading={saving}
+      loading={saving}
       okText="提交进池"
-      destroyOnHidden
+      form={form}
+      initialValues={{ attribution: '项目', qty: 1 }}
+      subtitle={
+        <Typography.Paragraph type="secondary" style={{ fontSize: 12 }}>
+          车间耗品、现场缺件、辅料、办公用品都能提。每条需求有归属；不挂项目的（辅料/办公用品）
+          也算需求，采购处理时判断合理性。物料从标准库选，库里没有先去标准库建。
+        </Typography.Paragraph>
+      }
     >
-      <Typography.Paragraph type="secondary" style={{ fontSize: 12 }}>
-        车间耗品、现场缺件、辅料、办公用品都能提。每条需求有归属；不挂项目的（辅料/办公用品）
-        也算需求，采购处理时判断合理性。物料从标准库选，库里没有先去标准库建。
-      </Typography.Paragraph>
-      <Form form={form} layout="vertical" preserve={false}>
         <Form.Item name="attribution" label="归属" rules={[{ required: true, message: '选归属' }]}>
           <Select
             onChange={(v) => setAttribution(v)}
@@ -143,7 +145,6 @@ export default function ManualPurchaseModal({ open, onClose, onDone }: Props) {
         <Form.Item name="note" label="用途说明">
           <Input.TextArea rows={2} placeholder="如：车间焊丝用完了 / 现场缺 2 个气管接头" />
         </Form.Item>
-      </Form>
-    </Modal>
+    </AppModal>
   )
 }

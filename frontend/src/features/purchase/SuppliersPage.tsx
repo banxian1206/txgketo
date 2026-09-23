@@ -9,7 +9,6 @@ import {
   Form,
   Input,
   InputNumber,
-  Modal,
   Rate,
   Select,
   Space,
@@ -38,6 +37,7 @@ import {
   type StdItem,
   type SupplierRow,
 } from '../../api/client'
+import AppModal from '../../components/AppModal'
 
 const KINDS = ['原材料', '标准件', '机加工', '外协', '电气', '气动', '其他']
 
@@ -48,6 +48,7 @@ export default function Suppliers() {
   const [loading, setLoading] = useState(false)
   const [q, setQ] = useState('')
   const [open, setOpen] = useState(false)
+  const [initial, setInitial] = useState<Record<string, unknown>>({})
   const [editing, setEditing] = useState<SupplierRow | null>(null)
   const [saving, setSaving] = useState(false)
   const [form] = Form.useForm()
@@ -78,8 +79,8 @@ export default function Suppliers() {
 
   const openForm = (row?: SupplierRow) => {
     setEditing(row ?? null)
-    form.resetFields()
-    if (row) form.setFieldsValue(row)
+    // 预填交给 AppModal initialValues（挂载时读）
+    setInitial(row ? { ...row } : {})
     setOpen(true)
   }
 
@@ -213,17 +214,17 @@ export default function Suppliers() {
       </Card>
 
       {/* 新增/编辑供应商 */}
-      <Modal
+      <AppModal
         title={editing ? `编辑供应商 · ${editing.name}` : '新增供应商'}
         open={open}
         width={680}
-        onCancel={() => setOpen(false)}
+        onClose={() => setOpen(false)}
         onOk={() => void submit()}
-        confirmLoading={saving}
+        loading={saving}
         okText="保存"
-        destroyOnHidden
+        form={form}
+        initialValues={initial}
       >
-        <Form form={form} layout="vertical" preserve={false}>
           <Space style={{ display: 'flex' }} size="middle">
             <Form.Item name="name" label="名称" rules={[{ required: true, message: '请填名称' }]} style={{ minWidth: 300 }}>
               <Input placeholder="如：ABB（上海）" />
@@ -260,8 +261,7 @@ export default function Suppliers() {
           <Form.Item name="remark" label="备注">
             <Input.TextArea rows={2} />
           </Form.Item>
-        </Form>
-      </Modal>
+      </AppModal>
 
       {/* 报价抽屉 */}
       <Drawer

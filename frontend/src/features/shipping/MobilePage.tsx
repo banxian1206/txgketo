@@ -58,6 +58,11 @@ export default function ShippingM() {
   }
 
   const doDepart = async (s: ShipmentRow) => {
+    // R3-02 方案A：0 项已发不能发运
+    if (!s.items.some((i) => i.shipped)) {
+      message.warning('本批一项都没勾「已发」——先勾选实际发出的件再发运')
+      return
+    }
     try {
       await departShipment(s.id, {})
       message.success('已发运（在途）')

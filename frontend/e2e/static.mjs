@@ -132,7 +132,7 @@ check('SUBMIT-无裸validate', bareValidate.length === 0,
         lines.forEach((l, i) => {
           if (!l.includes('setFieldsValue(')) return;
           const win = lines.slice(i, i + 22).join('\n');
-          if (/set[A-Z]\w*(?:Open|Target|Modal)\((?:true|\{)/.test(win)) {
+          if (/set\w*(?:Open|Target|Modal)\((?:true|\{)/.test(win)) {
             bad.push(`${p.replace(SRC, 'src')}:${i + 1}`);
           }
         });

@@ -1,6 +1,6 @@
 import { useSiteBoard } from './hooks'
 import IncomingCheckFields from './components/IncomingCheckFields'
-import { App, Button, Card, DatePicker, Empty, Form, Input, InputNumber, Modal, Radio, Select, Space, Tabs, Tag, Typography } from 'antd'
+import { App, Button, Card, DatePicker, Empty, Form, Input, InputNumber, Radio, Select, Space, Tabs, Tag, Typography } from 'antd'
 import { MinusCircleOutlined, PlusOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import {useState} from 'react'
@@ -28,6 +28,7 @@ import {
   type SiteIssueRow,
 } from '../../api/client'
 import MfgPhotoPicker from '../../components/MfgPhotoPicker'
+import AppModal from '../../components/AppModal'
 import { SITE_ISSUE_STATUS as ISSUE_COLOR } from '../../theme/status'
 import { SITE_COMMISSION_STATUS as COMMISSION_COLOR } from '../../theme/status'
 import { T } from '../../theme/tokens'
@@ -41,6 +42,7 @@ export default function SiteM() {
   const [photos, setPhotos] = useState<string[]>([])
   const [videos, setVideos] = useState<string[]>([])
   const [modal, setModal] = useState<{ kind: Kind; target?: SiteIncomingPending; issue?: SiteIssueRow; acc?: AcceptanceRow } | null>(null)
+  const [modalInitial, setModalInitial] = useState<Record<string, unknown>>({})
   const [saving, setSaving] = useState(false)
   const [form] = Form.useForm()
 
@@ -54,12 +56,12 @@ export default function SiteM() {
   const open = (kind: Kind, target?: SiteIncomingPending, issue?: SiteIssueRow, acc?: AcceptanceRow) => {
     setPhotos([])
     setVideos([])
-    form.resetFields()
-    if (kind === 'daily') form.setFieldsValue({ stage: '安装', report_date: dayjs(), done_items: [{ text: '' }], people: 4 })
-    if (kind === 'survey') form.setFieldsValue({})
-    if (kind === 'incoming') form.setFieldsValue({ result: '齐', shortage: [] })
-    if (kind === 'commission') form.setFieldsValue({ plan_date: dayjs().add(3, 'day') })
-    if (kind === 'acc-confirm') form.setFieldsValue({ result: '通过', accepted_at: dayjs() })
+    let init: Record<string, unknown> = {}
+    if (kind === 'daily') init = { stage: '安装', report_date: dayjs(), done_items: [{ text: '' }], people: 4 }
+    if (kind === 'incoming') init = { result: '齐', shortage: [] }
+    if (kind === 'commission') init = { plan_date: dayjs().add(3, 'day') }
+    if (kind === 'acc-confirm') init = { result: '通过', accepted_at: dayjs() }
+    setModalInitial(init)
     setModal({ kind, target, issue, acc })
   }
 
@@ -271,16 +273,16 @@ export default function SiteM() {
         />
       )}
 
-      <Modal
+      <AppModal
         open={!!modal}
         title={modal?.kind === 'survey' ? '现场勘测' : modal?.kind === 'daily' ? '每日汇报' : modal?.kind === 'issue' ? '上报现场问题' : modal?.kind === 'commission' ? '申请调试' : modal?.kind === 'acc-apply' ? '申请客户验收' : modal?.kind === 'acc-confirm' ? '客户确认验收' : `来货清点 · ${modal?.target?.item_no ?? ''}`}
-        onCancel={() => setModal(null)}
+        onClose={() => setModal(null)}
         onOk={() => void submit()}
-        confirmLoading={saving}
+        loading={saving}
         okText="提交"
-        destroyOnHidden
+        form={form}
+        initialValues={modalInitial}
       >
-        <Form form={form} layout="vertical" preserve={false}>
           {modal?.kind === 'survey' && (
             <>
               <Form.Item name="contact" label="甲方现场负责人 / 电话"><Input /></Form.Item>
@@ -387,8 +389,7 @@ export default function SiteM() {
               </Form.Item>
             </>
           )}
-        </Form>
-      </Modal>
+      </AppModal>
     </>
   )
 }

@@ -199,7 +199,14 @@ export default function Shipping() {
     })
   }
 
-  const doDepart = (s: ShipmentRow) => confirmUnshipped(s, '发运', () => doDepartConfirmed(s))
+  const doDepart = (s: ShipmentRow) => {
+    // R3-02 方案A：0 项已发不能发运（否则到货后无法清点 → 死批次）
+    if (!s.items.some((i) => i.shipped)) {
+      message.warning('本批一项都没勾「已发」——勾「已发」的就是实际发出的，先勾选实际发出的件再发运')
+      return
+    }
+    confirmUnshipped(s, '发运', () => doDepartConfirmed(s))
+  }
 
   const doArrive = async (s: ShipmentRow) => {
     try {

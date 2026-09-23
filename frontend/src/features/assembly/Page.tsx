@@ -6,7 +6,6 @@ import {
   Empty,
   Form,
   Input,
-  Modal,
   Progress,
   Radio,
   Row,
@@ -33,6 +32,7 @@ import {
 } from '../../api/client'
 import AuthedImage from '../../components/AuthedImage'
 import MfgPhotoPicker from '../../components/MfgPhotoPicker'
+import AppModal from '../../components/AppModal'
 import { mfgPhotoUrl } from '../../api/client'
 import { ASSEMBLY_STATUS as STATUS_COLOR } from '../../theme/status'
 import { T } from '../../theme/tokens'
@@ -50,22 +50,12 @@ export default function Assembly() {
 
   // 弹窗
   const [startTarget, setStartTarget] = useState<{ equip_no: string; rate: number } | null>(null)
+  const [startInitial, setStartInitial] = useState<Record<string, unknown>>({})
   const [debugTarget, setDebugTarget] = useState<AssemblyRecordRow | null>(null)
+  const [debugInitial, setDebugInitial] = useState<Record<string, unknown>>({})
   const [photos, setPhotos] = useState<string[]>([])
   const [saving, setSaving] = useState(false)
   const [form] = Form.useForm()
-
-  // ★ 预填在弹窗挂载后执行（P-03）
-  useEffect(() => {
-    if (!startTarget) return
-    form.resetFields()
-    form.setFieldsValue({ sub_assembly: '整机装配' })
-  }, [startTarget, form])
-  useEffect(() => {
-    if (!debugTarget) return
-    form.resetFields()
-    form.setFieldsValue({ result: '合格' })
-  }, [debugTarget, form])
 
   // 重构 2.3：看板数据走共享 hook（与另一端同源）
   const { overview, records, loading, reload: load } = useAsmBoard()
@@ -127,6 +117,7 @@ export default function Assembly() {
 
   const openDebug = (r: AssemblyRecordRow) => {
     setPhotos([])
+    setDebugInitial({ result: '合格' })
     setDebugTarget(r)
   }
 
@@ -190,7 +181,7 @@ export default function Assembly() {
                   <Space size={4}>
                     <a onClick={() => void openDetail(o.equip_no)}>明细</a>
                     {canEdit && (
-                      <a onClick={() => { setPhotos([]); setStartTarget({ equip_no: o.equip_no, rate: o.kitting_rate }) }}>
+                      <a onClick={() => { setPhotos([]); setStartInitial({ sub_assembly: '整机装配' }); setStartTarget({ equip_no: o.equip_no, rate: o.kitting_rate }) }}>
                         开始装配
                       </a>
                     )}
@@ -308,20 +299,22 @@ export default function Assembly() {
       />
 
       {/* 开始装配 */}
-      <Modal
+      <AppModal
         open={!!startTarget}
         title={`开始装配 · ${startTarget?.equip_no ?? ''}`}
-        onCancel={() => setStartTarget(null)}
+        onClose={() => setStartTarget(null)}
         onOk={() => void doStart()}
-        confirmLoading={saving}
+        loading={saving}
         okText="开始装配"
-        destroyOnHidden
+        form={form}
+        initialValues={startInitial}
+        subtitle={
+          <Typography.Paragraph type="secondary" style={{ fontSize: 12 }}>
+            当前齐套率 <b>{Math.round((startTarget?.rate ?? 0) * 100)}%</b> —— 系统**不看齐套率**，到了多少都能开工，
+            开工时把这个数字记录在装配履历里，方便回头看。
+          </Typography.Paragraph>
+        }
       >
-        <Typography.Paragraph type="secondary" style={{ fontSize: 12 }}>
-          当前齐套率 <b>{Math.round((startTarget?.rate ?? 0) * 100)}%</b> —— 系统**不看齐套率**，到了多少都能开工，
-          开工时把这个数字记录在装配履历里，方便回头看。
-        </Typography.Paragraph>
-        <Form form={form} layout="vertical" preserve={false}>
           <Form.Item name="sub_assembly" label="装配形态" rules={[{ required: true }]}>
             <Radio.Group optionType="button" buttonStyle="solid">
               <Radio.Button value="整机装配">整机装配</Radio.Button>
@@ -340,20 +333,19 @@ export default function Assembly() {
               label="拍照（可后补）"
             />
           </Form.Item>
-        </Form>
-      </Modal>
+      </AppModal>
 
       {/* 厂内调试 */}
-      <Modal
+      <AppModal
         open={!!debugTarget}
         title={`厂内调试 · ${debugTarget?.project_no ?? ''} / ${debugTarget?.equip_no ?? ''}`}
-        onCancel={() => setDebugTarget(null)}
+        onClose={() => setDebugTarget(null)}
         onOk={() => void doDebug()}
-        confirmLoading={saving}
+        loading={saving}
         okText="记录"
-        destroyOnHidden
+        form={form}
+        initialValues={debugInitial}
       >
-        <Form form={form} layout="vertical" preserve={false}>
           <Form.Item name="result" label="调试结果" rules={[{ required: true }]}>
             <Radio.Group optionType="button" buttonStyle="solid">
               <Radio.Button value="合格">合格</Radio.Button>
@@ -372,8 +364,7 @@ export default function Assembly() {
               label="拍照（可后补）"
             />
           </Form.Item>
-        </Form>
-      </Modal>
+      </AppModal>
     </Card>
   )
 }
