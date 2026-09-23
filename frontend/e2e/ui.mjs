@@ -310,6 +310,22 @@ try {
   }
     check('P-08', p08 === 'PASS', p08note, p08);
 
+  // —— 3.2 离线感知：断网横幅出现 → 恢复后消失（setOffline 模拟现场弱网）——
+  await c.ctx.setOffline(true);
+  await page.waitForTimeout(700);
+  {
+    const t = await body(page);
+    const on = t.includes('离线模式');
+    check('OFFLINE-横幅出现', on, on ? '断网后顶栏出现离线横幅' : '未见离线横幅: ' + t.slice(0, 80).replace(/\n/g, '|'));
+  }
+  await c.ctx.setOffline(false);
+  await page.waitForTimeout(700);
+  {
+    const t = await body(page);
+    const off = !t.includes('离线模式');
+    check('OFFLINE-恢复消失', off, off ? '联网后横幅消失' : '横幅未消失');
+  }
+
   // —— 1.3 Auth：伪装进入 → 横幅 → 退出查看（本步改造的功能面）——
   await page.goto(BASE + '/users', { waitUntil: 'networkidle' });
   await page.waitForTimeout(900);

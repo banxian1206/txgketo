@@ -1,3 +1,4 @@
+import OfflineBanner from '../components/OfflineBanner'
 import { Avatar, Badge, Button, Layout, Menu, Space, Tooltip, Typography } from 'antd'
 import { BellOutlined, SettingOutlined } from '@ant-design/icons'
 import { useCallback, useEffect, useState } from 'react'
@@ -126,6 +127,7 @@ export default function AppLayout() {
         </div>
       </Sider>
       <Layout>
+        <OfflineBanner />
         {impersonateName && (
           <div
             style={{

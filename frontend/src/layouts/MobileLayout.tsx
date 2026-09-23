@@ -1,3 +1,4 @@
+import OfflineBanner from '../components/OfflineBanner'
 import { Badge, Space, Typography } from 'antd'
 import type { ReactNode } from 'react'
 import { useCallback, useEffect, useState } from 'react'
@@ -112,6 +113,8 @@ export default function MobileLayout() {
           {name} · 退出
         </a>
       </div>
+
+      <OfflineBanner />
 
       <div style={{ padding: 12 }}>
         <Outlet />
