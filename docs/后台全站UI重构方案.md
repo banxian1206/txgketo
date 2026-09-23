@@ -96,7 +96,7 @@ S0 商机 → S1 立项 → S2 工程设计 → S3 采购 → S4 仓库 → S5·
 
 **一期（纯前端 ≈ 4 天）**
 - ✅ **A1 供应商入采购台**（7 页签 · query 驱动 tab · `/suppliers` 与旧两级链均 redirect → `?tab=suppliers` · 独立路由退役=入口唯一 · 侧栏业务组 5→4）【拍板① · 2026-09-24 完成，72 断言】
-- A2 「我的工作」组退役：三页签挂入我的台（`/workbench/tasks|reviews|changes` 子路由，`/mine/*` redirect 保留）【拍板②】
+- ✅ **A2 「我的工作」组退役**：我的台包台内 **card 型**4 页签（待办/我的任务/设计评审/改版申请，三业务页 lazy 组件复用挂入·同 chunk）· `/workbench/{tasks,reviews,changes}` 子路由 · `/my-tasks` 与 `/mine/*` 六旧链 redirect · 删重复切台卡 · 侧栏业务组 4→3 = **侧栏终态 5 项达成**【拍板② · 2026-09-24 完成，73 断言】
 - A3 mine KPI 按角色裁剪（卡带 roles/perm 标记，对齐后端 WORKBENCHES 思路）+ 管理员可选卡 + **台 Tab 待办角标**（me counts 现成）
 - A4 采购台「到货跟踪」页签（纯聚合视图）
 - A5 车间台收编制造/装配（台内页签挂现有组件实例）【拍板③】

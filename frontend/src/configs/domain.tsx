@@ -10,12 +10,6 @@ export interface TabItem {
   label: string
 }
 
-export const MINE_TABS: TabItem[] = [
-  { path: '/mine/tasks', label: '我的任务' },
-  { path: '/mine/reviews', label: '设计评审' },
-  { path: '/mine/changes', label: '改版申请' },
-]
-
 export const DELIVERY_TABS: TabItem[] = [
   { path: '/delivery/mfg', label: '制造' },
   { path: '/delivery/assembly', label: '装配' },
@@ -37,9 +31,12 @@ export const ADMIN_TABS: TabItem[] = [
 
 /** 旧路径 → 新路径（通知 link / 书签 / 外部引用不断 —— e2e 只增不改的前提） */
 export const ROUTE_REDIRECTS: [string, string][] = [
-  ['/my-tasks', '/mine/tasks'],
-  ['/reviews', '/mine/reviews'],
-  ['/changes', '/mine/changes'],
+  ['/my-tasks', '/workbench/tasks'],
+  ['/reviews', '/workbench/reviews'],
+  ['/changes', '/workbench/changes'],
+  ['/mine/tasks', '/workbench/tasks'],
+  ['/mine/reviews', '/workbench/reviews'],
+  ['/mine/changes', '/workbench/changes'],
   ['/manufacturing', '/delivery/mfg'],
   ['/assembly', '/delivery/assembly'],
   ['/shipping', '/delivery/shipping'],
@@ -67,7 +64,6 @@ export interface SidebarRoot {
 export const SIDEBAR_ROOTS: SidebarRoot[] = [
   // 工作台 = 角色台（Tab 化，数据 = /workbench/me 的 visible 列表；采购台 /purchase、仓库台 /warehouse 同属此类 —— 用户纠偏 2026-09-23）
   { key: '/workbench', label: '工作台', to: '/workbench', prefixes: ['/workbench', '/purchase', '/warehouse', '/'], icon: 'home' },
-  { key: '/mine/tasks', label: '我的工作', to: '/mine/tasks', prefixes: ['/mine'], icon: 'checklist', group: '业务' },
   { key: '/projects', label: '项目', to: '/projects', prefixes: ['/projects'], icon: 'folder', group: '业务' },
   { key: '/delivery/mfg', label: '交付执行', to: '/delivery/mfg', prefixes: ['/delivery'], icon: 'truck', group: '业务', perm: 'mfg' },
   { key: '/library', label: '基础数据', to: '/library', prefixes: ['/library', '/numbering'], icon: 'database', group: '业务' },

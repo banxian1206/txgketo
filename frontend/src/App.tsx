@@ -6,9 +6,8 @@ import { Navigate, Route, Routes } from 'react-router-dom'
 import AppLayout from './layouts/AppLayout'
 import DomainShell from './components/domain/DomainShell'
 import WorkbenchShell from './components/domain/WorkbenchShell'
-import { ADMIN_TABS, BASE_TABS, DELIVERY_TABS, MINE_TABS, redirectRoutes } from './configs/domain'
+import { ADMIN_TABS, BASE_TABS, DELIVERY_TABS, redirectRoutes } from './configs/domain'
 import MobileLayout from './layouts/MobileLayout'
-const Changes = lazy(() => import('./features/change/Page'))
 import Login from './features/auth/Page'
 const AcceptM = lazy(() => import('./features/acceptance/MobilePage'))
 const HomeM = lazy(() => import('./features/home/MobilePage'))
@@ -21,10 +20,8 @@ const ProjectDetailPage = lazy(() => import('./features/project/DetailPage'))
 const ProjectInitiate = lazy(() => import('./features/project/InitiatePage'))
 const Library = lazy(() => import('./features/admin/LibraryPage'))
 const EquipmentDesign = lazy(() => import('./features/design/Page'))
-const MyTasks = lazy(() => import('./features/task/Page'))
 const Projects = lazy(() => import('./features/project/Page'))
 const PurchaseWorkbench = lazy(() => import('./features/purchase/Page'))
-const Reviews = lazy(() => import('./features/review/Page'))
 const Users = lazy(() => import('./features/admin/Page'))
 const Warehouse = lazy(() => import('./features/warehouse/Page'))
 const Manufacturing = lazy(() => import('./features/manufacturing/Page'))
@@ -99,6 +96,10 @@ export default function App() {
         <Route path="workbench/pm" element={<PmWorkbench />} />
         <Route path="workbench/eng" element={<EngWorkbench />} />
         <Route path="workbench/shop" element={<DeptWorkbench kind="shop" />} />
+        {/* A2：我的台内页签 = URL 子路由（v2 拍板②·组件复用挂入） */}
+        <Route path="workbench/tasks" element={<Workbench />} />
+        <Route path="workbench/reviews" element={<Workbench />} />
+        <Route path="workbench/changes" element={<Workbench />} />
         <Route path="purchase" element={<PurchaseWorkbench />} />
         <Route path="warehouse" element={<Warehouse />} />
         </Route>
@@ -106,12 +107,6 @@ export default function App() {
         <Route path="projects/new" element={<ProjectCreate />} />
         <Route path="projects/:projectNo" element={<ProjectDetailPage />} />
         <Route path="projects/:projectNo/initiate" element={<ProjectInitiate />} />
-        {/* P0 域路由：二级 Tab = 子路由；旧路径 redirect 见 redirectRoutes */}
-        <Route path="/mine" element={<DomainShell tabs={MINE_TABS} />}>
-          <Route path="tasks" element={<MyTasks />} />
-          <Route path="reviews" element={<Reviews />} />
-          <Route path="changes" element={<Changes />} />
-        </Route>
         <Route path="/delivery" element={<DomainShell tabs={DELIVERY_TABS} />}>
           <Route path="mfg" element={<Manufacturing />} />
           <Route path="assembly" element={<Assembly />} />

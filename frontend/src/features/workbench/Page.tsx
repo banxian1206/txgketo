@@ -1,6 +1,7 @@
-import { App, Button, Card, Col, List, Row, Space, Statistic, Table, Tag, Typography } from 'antd'
-import { useCallback, useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+
+import { App, Button, Card, Col, List, Row, Space, Statistic, Table, Tabs, Tag, Typography } from 'antd'
+import { lazy, useCallback, useEffect, useState } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
 
 import NotificationsDrawer from '../../components/NotificationsDrawer'
 import {
@@ -15,6 +16,10 @@ import {
 import { WB_TYPE as TYPE_COLOR } from '../../theme/status'
 import { PROJECT_STAGE as STAGE_COLOR } from '../../theme/status'
 import { T } from '../../theme/tokens'
+// A2（v2 拍板②）：三业务页组件复用挂入我的台（lazy import 与 App 同 chunk）
+const MyTasks = lazy(() => import('../task/Page'))
+const Reviews = lazy(() => import('../review/Page'))
+const Changes = lazy(() => import('../change/Page'))
 
 interface TodoCard {
   label: string
@@ -27,6 +32,7 @@ interface TodoCard {
 export default function Workbench() {
   const { message } = App.useApp()
   const nav = useNavigate()
+  const loc = useLocation()
   const [data, setData] = useState<WorkbenchMe | null>(null)
   const [messages, setMessages] = useState<NotificationRow[]>([])
   const [notifOpen, setNotifOpen] = useState(false)
@@ -69,9 +75,21 @@ export default function Workbench() {
     { label: '我的商机', count: c?.my_leads ?? 0, to: '/projects', hint: '线索 / 待立项' },
   ]
 
-  const visibleWorkbenches = (data?.workbenches ?? []).filter((w) => w.visible && w.key !== 'mine')
 
+
+  // A2：台内页签 = URL 子路由（/workbench/tasks 等）——待办/我的任务/设计评审/改版申请
+  const seg = loc.pathname.replace(/^\/workbench\/?/, '')
+  const activeKey = ['tasks', 'reviews', 'changes'].includes(seg) ? seg : 'todo'
   return (
+    <Tabs
+      type="card"
+      activeKey={activeKey}
+      onChange={(k) => nav(k === 'todo' ? '/workbench' : `/workbench/${k}`)}
+      items={[
+        {
+          key: 'todo',
+          label: '待办',
+          children: (
     <>
       <Card size="small" style={{ marginBottom: 12 }}>
         <Space wrap>
@@ -106,22 +124,6 @@ export default function Workbench() {
         ))}
       </Row>
 
-      {visibleWorkbenches.length > 0 && (
-        <Card size="small" title="我能进的工作台" style={{ marginTop: 12 }}>
-          <Space wrap>
-            {visibleWorkbenches.map((w) => (
-              <Tag
-                key={w.key}
-                color="blue"
-                style={{ cursor: 'pointer', padding: '4px 10px', fontSize: 13 }}
-                onClick={() => nav(w.route)}
-              >
-                {w.name} →
-              </Tag>
-            ))}
-          </Space>
-        </Card>
-      )}
 
       <Card
         size="small"
@@ -183,5 +185,12 @@ export default function Workbench() {
         每个节点一个工作台，按角色显示；「我的工作台」把所有待办收在一屏。工作台的详细内容随后续步骤补齐（06 卷 §11）。
       </Typography.Paragraph>
     </>
+        ),
+        },
+        { key: 'tasks', label: '我的任务', children: <MyTasks /> },
+        { key: 'reviews', label: '设计评审', children: <Reviews /> },
+        { key: 'changes', label: '改版申请', children: <Changes /> },
+      ]}
+    />
   )
 }

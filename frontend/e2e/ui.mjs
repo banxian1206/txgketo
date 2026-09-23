@@ -71,14 +71,19 @@ try {
     await page.waitForTimeout(500)
     const t = await body(page)
     const groups = ['业务', '系统管理'].every((g) => t.includes(g))
-    const roots = ['我的工作', '项目', '交付执行', '采购', '基础数据', '系统管理']
+    const roots = ['项目', '交付执行', '基础数据', '系统管理']
     const missing = roots.filter((r) => !t.includes(r))
     const siderIcons = await page.locator('.ant-menu-item .anticon').count()
-    const oldFlat = ['制造（车间）', '装配 · 齐套率', '发运（发货指令）'].filter((x) => t.includes(x))
-    check('NAV-侧栏7项', groups && missing.length === 0 && siderIcons >= 6,
-      `三分类组=${groups} · 缺项=${missing.join('/') || '无'} · 一级图标=${siderIcons}`)
+    const siderText = await page.locator('.ant-layout-sider').innerText().catch(() => '')
+    const siderLines = siderText.split('\n').map((x) => x.trim())
+    // 整行匹配（防'我的工作台'子串误伤'我的工作'）
+    const oldFlat = ['制造（车间）', '装配 · 齐套率', '发运（发货指令）', '我的工作'].filter((x) => siderLines.includes(x))
+    // A2 后侧栏终态 5 项：工作台 + 项目 + 交付执行 + 基础数据 + 系统管理
+    const itemCount = await page.locator('.ant-layout-sider .ant-menu-item').count()
+    check('NAV-侧栏5项终态', groups && missing.length === 0 && itemCount === 5,
+      `项数=${itemCount}/5 · 三分类组=${groups} · 缺项=${missing.join('/') || '无'} · 图标=${siderIcons}`)
     check('NAV-旧平铺已收', oldFlat.length === 0,
-      oldFlat.length ? `侧栏仍有平铺: ${oldFlat.join('/')}` : '业务二级已收进右侧 Tab')
+      oldFlat.length ? `侧栏仍有平铺: ${oldFlat.join('/')}` : '我的工作/交付执行二级已全部收编')
   }
 
   // ── P0 域 Tab + 旧路径 redirect（通知/书签不断）──
@@ -94,7 +99,7 @@ try {
       await page.waitForURL(/\/delivery\/assembly/, { timeout: 6000 }).catch(() => {})
       check('NAV-Tab切换', page.url().includes('/delivery/assembly'), `点装配Tab → ${page.url()}`)
     } else check('NAV-Tab切换', false, '交付域无装配Tab')
-    const cases = [['/my-tasks', 'mine\\/tasks'], ['/users', 'admin\\/users'], ['/purchase/orders', 'purchase(?!,/suppliers)'], ['/purchase/suppliers', 'suppliers']]
+    const cases = [['/my-tasks', 'workbench\\/tasks'], ['/mine/tasks', 'workbench\\/tasks'], ['/users', 'admin\\/users'], ['/purchase/orders', 'purchase(?!,/suppliers)'], ['/purchase/suppliers', 'suppliers']]
     const bad = []
     for (const [from, to] of cases) {
       await page.goto(BASE + from, { waitUntil: 'domcontentloaded' })
@@ -130,6 +135,28 @@ try {
       check('NAV-采购台在工作台', onPurchase, `点采购Tab → ${page.url()}（角色台归位工作台域）`)
     } else check('NAV-采购台在工作台', false, '无采购Tab')
   }
+  // A2（v2 拍板②）：我的台内页签 —— 待办/我的任务/设计评审/改版申请（card 型，与域 Tab 下划线区分）
+  {
+    await page.goto(BASE + '/workbench', { waitUntil: 'networkidle' })
+    await page.waitForSelector('.ant-tabs-type-card', { timeout: 8000 }).catch(() => {})
+    const inner = page.locator('.domain-content .ant-tabs')
+    const innerTabs = await inner.locator('.ant-tabs-tab').allInnerTexts().catch(() => [])
+    const cardType = (await inner.getAttribute('class').catch(() => ''))?.includes('ant-tabs-card')
+    // 点「我的任务」→ URL 子路由 + 内容挂载
+    const taskTab = inner.locator('.ant-tabs-tab', { hasText: '我的任务' }).first()
+    let urlOk = false, contentOk = false
+    if (await taskTab.count()) {
+      await taskTab.click()
+      await page.waitForURL(/\/workbench\/tasks/, { timeout: 6000 }).catch(() => {})
+      urlOk = page.url().includes('/workbench/tasks')
+      await page.waitForTimeout(600)
+      const t = await body(page)
+      contentOk = t.includes('任务号') || t.includes('拆分派工') || t.includes('我的任务')
+    }
+    check('NAV-台内页签', innerTabs.length === 4 && !!cardType && urlOk && contentOk,
+      `页签=${JSON.stringify(innerTabs)} · card型=${!!cardType} · URL=${urlOk} · 内容挂载=${contentOk}`)
+  }
+
   // A1（v2 拍板①）：供应商入采购台 —— 旧链落台内页签 + 侧栏收编
   {
     await page.goto(BASE + '/suppliers', { waitUntil: 'networkidle' })
