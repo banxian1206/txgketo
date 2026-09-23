@@ -114,6 +114,8 @@ export default function App() {
         <Route path="projects/:projectNo" element={<ProjectDetailPage />} />
         <Route path="projects/:projectNo/initiate" element={<ProjectInitiate />} />
         <Route path="/delivery" element={<DomainShell tabs={DELIVERY_TABS} />}>
+          {/* B1：发运台 route=/delivery（域入口）→ 默认落制造（S5 流程首位） */}
+          <Route index element={<Navigate to="mfg" replace />} />
           <Route path="mfg" element={<Manufacturing />} />
           <Route path="assembly" element={<Assembly />} />
           <Route path="shipping" element={<Shipping />} />

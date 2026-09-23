@@ -234,6 +234,42 @@ try {
       `页签=${JSON.stringify(innerTabs)} · card型=${!!cardType} · URL=${urlOk} · 内容挂载=${contentOk}`)
   }
 
+  // ── B1 三角色开台（拍板④）：发运/现场/售后各见自己的台 + 台Tab直达交付域 ──
+  {
+    const roles = [['delivery1', '发运台'], ['site1', '现场台'], ['service1', '售后台']]
+    const bad = []
+    let domainOk = false
+    for (const [u, expect] of roles) {
+      const cr = await newCtx()
+      try {
+        await login(cr.page, u, 'txgk@123')
+        await cr.page.goto(BASE + '/workbench', { waitUntil: 'networkidle' })
+        await cr.page.waitForSelector('.domain-tabs a', { timeout: 8000 }).catch(() => {})
+        await cr.page.waitForTimeout(400)
+        const tabs = await cr.page.locator('.domain-tabs a').allInnerTexts().catch(() => [])
+        if (tabs.length !== 2 || !tabs.some((t) => t.includes(expect))) {
+          bad.push(`${u}: Tab=[${tabs.join(',')}] 应含「${expect}」且共 2`)
+        }
+        // 第一个角色：点发运台 → 交付域（index redirect → /delivery/mfg，域 Tab 6）
+        if (u === 'delivery1' && !bad.length) {
+          const t0 = cr.page.locator('.domain-tabs a', { hasText: '发运台' }).first()
+          if (await t0.count()) {
+            await t0.click()
+            await cr.page.waitForURL(/\/delivery\/mfg/, { timeout: 8000 }).catch(() => {})
+            domainOk = cr.page.url().includes('/delivery/mfg')
+            await cr.page.waitForTimeout(500)
+            const dTabs = await cr.page.locator('.domain-tabs a').count()
+            if (dTabs < 6) bad.push(`点发运台后域Tab=${dTabs} 应≥6`)
+          } else bad.push('delivery1 无发运台Tab')
+        }
+      } finally {
+        await cr.browser.close()
+      }
+    }
+    check('NAV-B1三角色开台', bad.length === 0 && domainOk,
+      bad.length ? bad.join(' | ') : `三角色各 2 Tab 正确 · 发运台Tab → ${'/delivery/mfg'}（index redirect）+ 域 Tab 6 项`)
+  }
+
   // A1（v2 拍板①）：供应商入采购台 —— 旧链落台内页签 + 侧栏收编
   {
     await page.goto(BASE + '/suppliers', { waitUntil: 'networkidle' })

@@ -46,6 +46,12 @@ WORKBENCHES: list[dict] = [
     {"key": "purchase", "name": "采购工作台", "route": "/purchase", "roles": ("PURCHASE", "PURCHASE_LEAD")},
     {"key": "warehouse", "name": "仓库工作台", "route": "/warehouse", "roles": ("WAREHOUSE",)},
     {"key": "shop", "name": "车间工作台", "route": "/workbench/shop", "roles": ("MFG", "ASSY", "QC")},
+    # B1（v2 方案 §2.0.6 拍板④）：发运/现场/售后三角色开台 —— role code 已在（05 卷权限表），route 指交付域：
+    # 台 Tab 点击直达交付域（delivery 台=域入口，index→mfg；site/service 直达子页，域 Tab 随行）
+    # 附带修复：SITE 无 mfg:view 进不了交付组菜单 —— 开台后经台 Tab 获得验收/现场入口
+    {"key": "delivery", "name": "发运台", "route": "/delivery", "roles": ("DELIVERY",)},
+    {"key": "site", "name": "现场台", "route": "/delivery/site", "roles": ("SITE",)},
+    {"key": "service", "name": "售后台", "route": "/delivery/service", "roles": ("SERVICE",)},
 ]
 
 

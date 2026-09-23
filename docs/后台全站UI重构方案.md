@@ -102,12 +102,15 @@ S0 商机 → S1 立项 → S2 工程设计 → S3 采购 → S4 仓库 → S5·
 - ✅ **A5 车间台收编**（ShopShell 台内 card 页签 [看板|制造|装配] = URL 子路由 `/workbench/shop/{mfg,assembly}` · 制造/装配同组件复用挂载 · shop 配置路径全部台内归位）【拍板③ · 2026-09-24 完成】
 - ✅ **A6 收尾**（删委派台重复切台卡=域 Tab 成为唯一切换器 · 台内旧路径全换新 `/my-tasks·/reviews·/changes→/workbench/*`、`/manufacturing·/assembly→台内子路由`、`/m/issues→/warehouse` 含文案去「手机端」 · 桌面跳移动已在 A3 完成 · 台内 card 页签与域 Tab 下划线双层视觉区分）【2026-09-24 完成】
 
-> 🏁 **一期 A1–A6 全部完成（2026-09-24，护栏 78 断言 EXIT=0）** —— 侧栏 5 项终态、各角色台内闭环（下采购单/催到货/管供应商不出采购台）、双层 Tab 体系成立；二期 B1–B3（发运/现场/售后开台，后端 WORKBENCHES +3 行）待拍板④启动。
+> 🏁 **一期 A1–A6 全部完成（2026-09-24，护栏 78 断言 EXIT=0）** —— 侧栏 5 项终态、各角色台内闭环（下采购单/催到货/管供应商不出采购台）、双层 Tab 体系成立；~~二期 B1–B3 待拍板④启动~~ → **二期 B1–B3 已于 2026-09-24 完成（B2/B3 按数据修订）——v2 方案全部执行完毕，护栏 79 断言 + pytest 31。**
 
-**二期（后端 WORKBENCHES +3 行 + 前端 ≈ 2 天）**【拍板④】
-- B1 开三台：发运台(DELIVERY→/delivery/shipping) · 现场台(SITE→/delivery/site) · 售后台(SERVICE→/delivery/service)；验收页签挂交付台
-- B2 交付执行组退役 → 侧栏终态 4 项，三角色登录直落自己台
-- B3（视拍板③）管理员台 KPI 卡
+**二期（已完成 2026-09-24 · 护栏 79 断言 + pytest 31 全绿）**【拍板④ ✅ 已执行】
+- ✅ **B1 三台开通**：发运台(DELIVERY→`/delivery` 域入口) · 现场台(SITE→`/delivery/site`) · 售后台(SERVICE→`/delivery/service`)；交付域补 index redirect→mfg
+  - role code 全部现成（05 卷权限表），后端仅 WORKBENCHES +3 行；e2e `NAV-B1三角色开台` 三角色各 2 Tab + 台Tab 直达交付域（域 Tab 6 项）
+  - **顺带修复**：SITE 角色无 `mfg:view` 进不了交付组菜单 —— 开台后经台 Tab 获得现场/验收入口
+  - ⚠️ 修订原假设：验收归属实测 = **acceptance:edit → PM + SITE**（非发运岗），故「验收页签挂交付台」按数据调整为：验收经**交付域 Tab** 可达（PM 走侧栏组、SITE 走台Tab，双通道）
+- ✅ **B2 数据否决退役**：`mfg:view → ASSY/MFG/PM/QC` —— PM（无专属台的跨角色操作人：同时持有 ship/site/acceptance:edit）与 QC 必须依赖交付执行组入口 → **交付执行组保留**，侧栏终态维持 **5 项**；各台 Tab 与侧栏组的双入口 = 拍板③已接受的过渡态
+- ✅ **B3 取消**：A3 管理员入口卡（纯入口不发明数字）已覆盖
 
 ---
 
