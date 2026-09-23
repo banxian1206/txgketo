@@ -4,6 +4,8 @@ import { Spin } from 'antd'
 import { Navigate, Route, Routes } from 'react-router-dom'
 
 import AppLayout from './layouts/AppLayout'
+import DomainShell from './components/domain/DomainShell'
+import { ADMIN_TABS, BASE_TABS, DELIVERY_TABS, MINE_TABS, PURCHASE_TABS, redirectRoutes } from './configs/domain'
 import MobileLayout from './layouts/MobileLayout'
 const Changes = lazy(() => import('./features/change/Page'))
 import Login from './features/auth/Page'
@@ -99,21 +101,35 @@ export default function App() {
         <Route path="projects/new" element={<ProjectCreate />} />
         <Route path="projects/:projectNo" element={<ProjectDetailPage />} />
         <Route path="projects/:projectNo/initiate" element={<ProjectInitiate />} />
-        <Route path="numbering" element={<NumberRules />} />
-        <Route path="users" element={<Users />} />
-        <Route path="library" element={<Library />} />
-        <Route path="my-tasks" element={<MyTasks />} />
-        <Route path="reviews" element={<Reviews />} />
-        <Route path="changes" element={<Changes />} />
-        <Route path="purchase" element={<PurchaseWorkbench />} />
-        <Route path="suppliers" element={<Suppliers />} />
+        {/* P0 域路由：二级 Tab = 子路由；旧路径 redirect 见 redirectRoutes */}
+        <Route path="/mine" element={<DomainShell tabs={MINE_TABS} />}>
+          <Route path="tasks" element={<MyTasks />} />
+          <Route path="reviews" element={<Reviews />} />
+          <Route path="changes" element={<Changes />} />
+        </Route>
+        <Route path="/delivery" element={<DomainShell tabs={DELIVERY_TABS} />}>
+          <Route path="mfg" element={<Manufacturing />} />
+          <Route path="assembly" element={<Assembly />} />
+          <Route path="shipping" element={<Shipping />} />
+          <Route path="site" element={<Site />} />
+          <Route path="acceptance" element={<AcceptancePage />} />
+          <Route path="service" element={<Service />} />
+        </Route>
+        <Route path="/purchase" element={<DomainShell tabs={PURCHASE_TABS} />}>
+          <Route index element={<Navigate to="/purchase/orders" replace />} />
+          <Route path="orders" element={<PurchaseWorkbench />} />
+          <Route path="suppliers" element={<Suppliers />} />
+        </Route>
+        <Route path="/admin" element={<DomainShell tabs={ADMIN_TABS} />}>
+          <Route index element={<Navigate to="/admin/users" replace />} />
+          <Route path="users" element={<Users />} />
+        </Route>
+        <Route element={<DomainShell tabs={BASE_TABS} />}>
+          <Route path="library" element={<Library />} />
+          <Route path="numbering" element={<NumberRules />} />
+        </Route>
+        {redirectRoutes()}
         <Route path="warehouse" element={<Warehouse />} />
-        <Route path="manufacturing" element={<Manufacturing />} />
-        <Route path="assembly" element={<Assembly />} />
-        <Route path="shipping" element={<Shipping />} />
-        <Route path="site" element={<Site />} />
-        <Route path="acceptance" element={<AcceptancePage />} />
-        <Route path="service" element={<Service />} />
         <Route path="projects/:projectNo/design/:equipNo" element={<EquipmentDesign />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />

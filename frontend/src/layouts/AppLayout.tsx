@@ -1,16 +1,24 @@
 import OfflineBanner from '../components/OfflineBanner'
-import { Avatar, Badge, Button, Layout, Menu, Space, Tooltip, Typography } from 'antd'
-import { BellOutlined, SettingOutlined } from '@ant-design/icons'
+import { Avatar, Badge, Button, Layout, Menu, Space, Tooltip, Typography, type MenuProps } from 'antd'
+import {
+  BellOutlined,
+  OrderedListOutlined,
+  DatabaseOutlined,
+  FolderOutlined,
+  HomeOutlined,
+  SettingOutlined,
+  ShoppingCartOutlined,
+  TruckOutlined,
+} from '@ant-design/icons'
 import { useCallback, useEffect, useState } from 'react'
 import { Link, Outlet, useLocation } from 'react-router-dom'
 
 import NotificationsDrawer from '../components/NotificationsDrawer'
+import { SIDEBAR_ROOTS, matchSidebarKey } from '../configs/domain'
 import { useAuth } from '../contexts/AuthContext'
 import {
   hasPerm,
   unreadNotificationCount,
-  workbenchMe,
-  type WorkbenchItem,
 } from '../api/client'
 import { T } from '../theme/tokens'
 
@@ -23,9 +31,6 @@ export default function AppLayout() {
   const name = profile?.name ?? '用户'
   // 用户与权限：系统管理员 + 总监（06 卷 §4）
   const canManageUsers = profile?.is_superuser === true || profile?.position === '总监'
-  const [workbenches, setWorkbenches] = useState<WorkbenchItem[]>([
-    { key: 'mine', name: '我的工作台', route: '/workbench', visible: true },
-  ])
   // 站内消息红点（06 卷 §9）：60s 轮询未读数
   const [unread, setUnread] = useState(0)
   const [notifOpen, setNotifOpen] = useState(false)
@@ -47,13 +52,42 @@ export default function AppLayout() {
     void refreshMe()
   }, [refreshMe])
 
-  useEffect(() => {
-    workbenchMe()
-      .then((d) => setWorkbenches(d.workbenches.filter((w) => w.visible)))
-      .catch(() => undefined)
-  }, [])
 
-  const selected = loc.pathname === '/' ? '/workbench' : loc.pathname
+  // P0：最长前缀匹配（/delivery/mfg → 交付执行）
+  const selected = matchSidebarKey(loc.pathname)
+
+  const SIDEBAR_ICONS: Record<string, React.ReactNode> = {
+    home: <HomeOutlined />, checklist: <OrderedListOutlined />, folder: <FolderOutlined />,
+    truck: <TruckOutlined />, cart: <ShoppingCartOutlined />, database: <DatabaseOutlined />,
+    setting: <SettingOutlined />,
+  }
+  /** P0：侧栏一级 21→7（三分类=组标题；二级由右侧 DomainShell Tab 承接） */
+  const sidebarItems: MenuProps['items'] = (() => {
+    const roots = SIDEBAR_ROOTS.filter((r) =>
+      r.admin ? canManageUsers : true,
+    ).filter((r) =>
+      r.perm !== 'mfg' || hasPerm('mfg:view') || canManageUsers,
+    )
+    const groups: { label: string; keys: string[] }[] = [
+      { label: '工作台', keys: ['/workbench'] },
+      { label: '业务', keys: ['/mine/tasks', '/projects', '/delivery/mfg', '/purchase/orders', '/library'] },
+      { label: '系统管理', keys: ['/admin/users'] },
+    ]
+    return groups
+      .map((g) => ({
+        type: 'group' as const,
+        label: g.label,
+        children: roots
+          .filter((r) => g.keys.includes(r.key))
+          .map((r) => ({
+            key: r.key,
+            icon: SIDEBAR_ICONS[r.icon],
+            label: <Link to={r.to}>{r.label}</Link>,
+          })),
+      }))
+      .filter((g) => (g.children as unknown[]).length > 0)
+  })()
+
 
   return (
     <Layout style={{ minHeight: '100%' }}>
@@ -80,48 +114,7 @@ export default function AppLayout() {
               theme="dark"
               mode="inline"
               selectedKeys={[selected]}
-              items={[
-                {
-                  type: 'group',
-                  label: '工作台',
-                  children: workbenches.map((w) => ({
-                    key: w.route,
-                    label: <Link to={w.route}>{w.name}</Link>,
-                  })),
-                },
-                {
-                  type: 'group',
-                  label: '业务',
-                  children: [
-                    { key: '/my-tasks', label: <Link to="/my-tasks">我的任务</Link> },
-                    { key: '/projects', label: <Link to="/projects">商机 / 项目</Link> },
-                    { key: '/reviews', label: <Link to="/reviews">设计评审</Link> },
-                    { key: '/changes', label: <Link to="/changes">改版</Link> },
-                    ...(hasPerm('mfg:view') || canManageUsers
-                      ? [
-                          { key: '/manufacturing', label: <Link to="/manufacturing">制造（车间）</Link> },
-                          { key: '/assembly', label: <Link to="/assembly">装配 · 齐套率</Link> },
-                          { key: '/shipping', label: <Link to="/shipping">发运（发货指令）</Link> },
-                          { key: '/site', label: <Link to="/site">现场安装</Link> },
-                          { key: '/acceptance', label: <Link to="/acceptance">验收与质保</Link> },
-                          { key: '/service', label: <Link to="/service">售后</Link> },
-                        ]
-                      : []),
-                    { key: '/suppliers', label: <Link to="/suppliers">供应商</Link> },
-                  ],
-                },
-                {
-                  type: 'group',
-                  label: '基础数据 / 管理',
-                  children: [
-                    { key: '/library', label: <Link to="/library">标准库</Link> },
-                    { key: '/numbering', label: <Link to="/numbering">编号规则</Link> },
-                    ...(canManageUsers
-                      ? [{ key: '/users', label: <Link to="/users">用户与权限</Link> }]
-                      : []),
-                  ],
-                },
-              ]}
+              items={sidebarItems}
             />
           </div>
         </div>

@@ -330,3 +330,55 @@ body {
     text-align: center;
   }
 }
+
+/* ═════════ 域壳：右侧二级 Tab（全站 UI 重构 P0 · 下划线风格，8 系间距）══════════ */
+.domain-shell {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.domain-tabs {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+  padding: 0 16px;
+  border-bottom: 1px solid #f0f0f0;
+  background: #fff;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.domain-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.domain-tabs a {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  height: 44px;
+  padding: 0 16px;
+  font-size: 14px;
+  color: rgba(0, 0, 0, 0.65);
+  white-space: nowrap;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  transition: color 0.15s;
+}
+
+.domain-tabs a:hover {
+  color: #1f6feb;
+}
+
+.domain-tabs a.active {
+  color: #1f6feb;
+  font-weight: 500;
+  border-bottom-color: #1f6feb;
+}
+
+.domain-content {
+  flex: 1;
+  overflow: auto;
+  padding: 16px;
+}

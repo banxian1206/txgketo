@@ -64,6 +64,54 @@ let newNo = null;
 try {
   await login(page, 'admin', 'admin12345');
 
+  // ── P0 全站 IA：侧栏 7 项三分类 + 一级图标 + 旧平铺收进右侧 ──
+  {
+    // lazy chunk 加载期整页是 Skeleton —— 等侧栏真实挂载再断言（否则断在加载时序上）
+    await page.waitForSelector('.ant-menu-item', { timeout: 10000 }).catch(() => {})
+    await page.waitForTimeout(500)
+    const t = await body(page)
+    const groups = ['业务', '系统管理'].every((g) => t.includes(g))
+    const roots = ['我的工作', '项目', '交付执行', '采购', '基础数据', '系统管理']
+    const missing = roots.filter((r) => !t.includes(r))
+    const siderIcons = await page.locator('.ant-menu-item .anticon').count()
+    const oldFlat = ['制造（车间）', '装配 · 齐套率', '发运（发货指令）'].filter((x) => t.includes(x))
+    check('NAV-侧栏7项', groups && missing.length === 0 && siderIcons >= 6,
+      `三分类组=${groups} · 缺项=${missing.join('/') || '无'} · 一级图标=${siderIcons}`)
+    check('NAV-旧平铺已收', oldFlat.length === 0,
+      oldFlat.length ? `侧栏仍有平铺: ${oldFlat.join('/')}` : '业务二级已收进右侧 Tab')
+  }
+
+  // ── P0 域 Tab + 旧路径 redirect（通知/书签不断）──
+  {
+    await page.goto(BASE + '/manufacturing', { waitUntil: 'networkidle' })
+    await page.waitForURL(/\/delivery\/mfg/, { timeout: 8000 }).catch(() => {})
+    const redirected = page.url().includes('/delivery/mfg')
+    const tabN = await page.locator('.domain-tabs a').count()
+    check('NAV-redirect交付', redirected && tabN >= 6, `旧 /manufacturing → ${page.url()} · 交付Tab=${tabN}`)
+    const asmTab = page.locator('.domain-tabs a', { hasText: '装配' })
+    if (await asmTab.count()) {
+      await asmTab.click()
+      await page.waitForURL(/\/delivery\/assembly/, { timeout: 6000 }).catch(() => {})
+      check('NAV-Tab切换', page.url().includes('/delivery/assembly'), `点装配Tab → ${page.url()}`)
+    } else check('NAV-Tab切换', false, '交付域无装配Tab')
+    const cases = [['/my-tasks', 'mine\\/tasks'], ['/users', 'admin\\/users'], ['/purchase', 'purchase\\/orders']]
+    const bad = []
+    for (const [from, to] of cases) {
+      await page.goto(BASE + from, { waitUntil: 'domcontentloaded' })
+      try { await page.waitForURL(new RegExp(to), { timeout: 6000 }) } catch { bad.push(`${from}→${page.url()}`) }
+    }
+    check('NAV-redirect抽样', bad.length === 0, bad.length ? bad.join(' | ') : '3 条旧路径全部落到新址')
+  }
+
+  // ── P0 基础数据域（路径零变 + pathless Tab 壳）──
+  {
+    await page.goto(BASE + '/numbering', { waitUntil: 'networkidle' })
+    await page.waitForTimeout(700)
+    const tabs = await page.locator('.domain-tabs a').allInnerTexts()
+    const active = await page.locator('.domain-tabs a.active').innerText().catch(() => '')
+    check('NAV-基础数据Tab', tabs.length === 2 && active === '编号规则', `Tab=${tabs.join('/')} · active=${active}`)
+  }
+
   // —— P-09：空提交列表级错误 + 零 pageerror ——
   await page.goto(BASE + '/projects/new', { waitUntil: 'networkidle' });
   await page.waitForTimeout(700);
