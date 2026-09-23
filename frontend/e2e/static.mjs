@@ -92,5 +92,15 @@ const bareValidate = grepAll(/const \w+ = await \w+\.validateFields\(\)/);
 check('SUBMIT-无裸validate', bareValidate.length === 0,
   bareValidate.length ? `裸 await validateFields 又出现: ${bareValidate.slice(0, 4).join(', ')}` : '0（一律 let+try/catch 或 useSubmit）');
 
+// 3.3 PWA SW：仅生产注册（dev/e2e 不注册=防缓存污染）+ API 绝不进缓存
+{
+  const sw = fs.readFileSync(path.join(SRC, '../public/sw.js'), 'utf8');
+  const main = fs.readFileSync(path.join(SRC, 'main.tsx'), 'utf8');
+  const prodGuard = /import\.meta\.env\.PROD[\s\S]{0,260}register\('/.test(main);
+  const apiBypass = /startsWith\('\/api\/'\)/.test(sw) && /method !== 'GET'/.test(sw);
+  check('PWA-SW守卫', prodGuard && apiBypass,
+    (prodGuard ? '' : '注册缺 PROD 守卫; ') + (apiBypass ? 'API 旁路缓存 ✓' : 'API 未旁路缓存'));
+}
+
 const fails = summary('静态回归');
 exitWith(fails);
