@@ -139,3 +139,148 @@ body {
   background: #fafafa;
   color: #999;
 }
+
+/* ═══════════ 登录页（2026-09-23 重做 · 简单有格调）═══════════
+   桌面：左品牌面板 × 右极简表单；≤880px 收成单栏白底。
+   零依赖：渐变 / 网格暗纹 / 橙 rule 全部纯 CSS。 */
+.login-page {
+  min-height: 100vh;
+  display: flex;
+  background: #fff;
+}
+
+.login-brand {
+  position: relative;
+  flex: 1.15;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 56px 64px;
+  color: #fff;
+  /* 深空主导、右下微微透蓝 —— 保留既有品牌渐变基因（#1f6feb → #0f2b52） */
+  background: linear-gradient(145deg, #0f2b52 0%, #12315a 55%, #16386b 100%);
+}
+
+/* 图纸网格暗纹（智能制造的行业气质，极淡不喧宾） */
+.login-brand::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image:
+    repeating-linear-gradient(0deg, transparent 0 39px, rgba(255, 255, 255, 0.05) 39px 40px),
+    repeating-linear-gradient(90deg, transparent 0 39px, rgba(255, 255, 255, 0.05) 39px 40px);
+  -webkit-mask-image: radial-gradient(ellipse 70% 60% at 30% 45%, #000 0%, transparent 100%);
+  mask-image: radial-gradient(ellipse 70% 60% at 30% 45%, #000 0%, transparent 100%);
+  pointer-events: none;
+}
+
+/* 右上角同心弧（细节装饰） */
+.login-brand::after {
+  content: '';
+  position: absolute;
+  top: -140px;
+  right: -140px;
+  width: 380px;
+  height: 380px;
+  border-radius: 50%;
+  border: 40px solid rgba(255, 255, 255, 0.04);
+  pointer-events: none;
+}
+
+.login-logo-wide {
+  position: relative;
+  height: 44px;
+  width: fit-content;
+}
+
+/* 品牌橙 rule（视觉规范 §6.2：橙只做点缀） */
+.login-rule {
+  position: relative;
+  width: 44px;
+  height: 3px;
+  background: #e08000;
+  margin: 26px 0 22px;
+}
+
+.login-slogan {
+  position: relative;
+  margin: 0 0 14px;
+  font-size: 28px;
+  font-weight: 600;
+  letter-spacing: 2px;
+  line-height: 1.3;
+}
+
+.login-chain {
+  position: relative;
+  margin: 0;
+  font-size: 13px;
+  letter-spacing: 1px;
+  opacity: 0.65;
+  line-height: 1.8;
+}
+
+.login-brand-foot {
+  position: relative;
+  margin-top: 48px;
+  font-size: 12px;
+  letter-spacing: 2px;
+  opacity: 0.45;
+}
+
+.login-pane {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 24px;
+  background: #fafafa;
+}
+
+/* 移动端字标：桌面隐藏（DOM 保留 → BRAND 断言仍可验真实加载） */
+.login-logo-compact {
+  display: none;
+  height: 40px;
+  margin-bottom: 28px;
+}
+
+.login-box {
+  width: 340px;
+  max-width: 100%;
+}
+
+.login-title {
+  margin: 0 0 6px;
+  font-size: 24px;
+  font-weight: 600;
+  color: rgba(0, 0, 0, 0.88);
+}
+
+.login-sub {
+  margin: 0 0 28px;
+  font-size: 13px;
+  color: #8c8c8c;
+}
+
+.login-foot {
+  margin-top: 28px;
+  font-size: 12px;
+  color: rgba(0, 0, 0, 0.35);
+  text-align: center;
+  letter-spacing: 0.5px;
+}
+
+@media (max-width: 880px) {
+  .login-brand {
+    display: none;
+  }
+  .login-pane {
+    background: #fff;
+    min-height: 100vh;
+  }
+  .login-logo-compact {
+    display: block;
+  }
+}
