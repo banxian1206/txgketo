@@ -130,6 +130,20 @@ try {
       check('NAV-采购台在工作台', onPurchase, `点采购Tab → ${page.url()}（角色台归位工作台域）`)
     } else check('NAV-采购台在工作台', false, '无采购Tab')
   }
+  // 选中态 = 最长前缀（用户实测 bug：/workbench/eng 被错标「我的工作台」——eng/sales 两台都验）
+  {
+    const bad = []
+    for (const [route, expect] of [['/workbench/eng', '工程'], ['/workbench/sales', '商务']]) {
+      await page.goto(BASE + route, { waitUntil: 'networkidle' })
+      await page.waitForSelector('.domain-tabs a.active', { timeout: 8000 }).catch(() => {})
+      await page.waitForTimeout(300)
+      const act = await page.locator('.domain-tabs a.active').innerText().catch(() => '(无高亮)')
+      if (!act.includes(expect)) bad.push(`${route} → 高亮「${act}」应含「${expect}」`)
+    }
+    check('NAV-台选中态', bad.length === 0,
+      bad.length ? bad.join(' | ') : 'eng→工程部、sales→商务部 各自高亮正确（最长前缀匹配）')
+  }
+
   // 角色裁剪：buyer1 只见 我的工作台 + 采购工作台
   {
     const c2 = await newCtx(); const p2 = c2.page
