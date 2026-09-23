@@ -4,7 +4,15 @@ import { useNavigate } from 'react-router-dom'
 
 import { errMsg } from '../../api/client'
 import { useAuth } from '../../contexts/AuthContext'
-import { clearCredential, readCredential, saveCredential } from '../../utils/credential'
+import {
+  clearCredential,
+  clearManualLogout,
+  isManualLogout,
+  readCredential,
+  readRememberPref,
+  saveCredential,
+  saveRememberPref,
+} from '../../utils/credential'
 
 /**
  * 登录页（2026-09-23 重做 · 简单有格调 + 记住密码）
@@ -23,10 +31,25 @@ export default function Login() {
   const { login } = useAuth()
 
   const [form] = Form.useForm()
-  const [remember, setRemember] = useState(false)
-  /** true = 展示表单（无凭据 / 用户主动换号 / 自动登录失败回退） */
-  const [manual, setManual] = useState(() => !readCredential())
+  // 记住的【偏好本身】跨会话保留（2026-09-23 反馈：退出后勾选不该丢）
+  const [remember, setRemember] = useState(readRememberPref)
+  /** true = 展示表单：无凭据 / 主动退出（填充预填）/ 用户换号 / 自动登录失败回退 */
+  const [manual, setManual] = useState(() => {
+    const c = readCredential()
+    return !c || isManualLogout()
+  })
   const autoRan = useRef(false)
+
+  // 主动退出回到登录页：表单预填好（填充模式 —— 点一下登录即可，无需重输）
+  useEffect(() => {
+    if (!manual) return
+    const c = readCredential()
+    if (c && isManualLogout()) {
+      form.setFieldsValue({ username: c.username, password: c.password })
+      setRemember(true)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const goAfterLogin = () => {
     // 手机（窄屏）默认进移动端；电脑进工作台（03 卷：手机端是主要终端）
@@ -57,6 +80,8 @@ export default function Login() {
 
   const switchAccount = () => {
     clearCredential()
+    saveRememberPref(false)
+    clearManualLogout()
     setRemember(false)
     setManual(true)
     form.resetFields()
@@ -90,9 +115,11 @@ export default function Login() {
                 onFinish={async (v) => {
                   setLoading(true)
                   try {
-                    // 记住密码：勾选存本机、不勾则清除旧凭据
+                    // 记住密码：偏好始终持久化；勾选才留凭据（取消勾选 = 主动清除）
+                    saveRememberPref(remember)
                     if (remember) saveCredential(v.username, v.password)
                     else clearCredential()
+                    clearManualLogout()
                     // 重构 1.3：登录写入统一走 AuthContext（单一 session，新登录天然清伪装）
                     await login(v.username, v.password)
                     goAfterLogin()

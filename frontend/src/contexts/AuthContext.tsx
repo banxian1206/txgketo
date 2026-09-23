@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 
 import { login as apiLogin, me as fetchMe } from '../api/auth'
 import type { User } from '../api/user'
-import { clearCredential } from '../utils/credential'
+import { markManualLogout } from '../utils/credential'
 import { clearSession, patchSession, readSession, writeSession, type Session } from './session'
 
 /**
@@ -44,9 +44,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const logout = useCallback(() => {
-    // 主动退出 = 真退出：连「记住密码」凭据一并清（否则退出后被自动登回，按钮形同虚设）
-    // 被动 401 由 http 拦截器只清 session → 凭据保留 → 登录页自动重登（记住密码功能）
-    clearCredential()
+    // 主动退出（2026-09-23 二次修正）：保留凭据 + 置 manual 标记 → 登录页【填充表单】而非自动登录；
+    // 被动 401 不置标记 → 登录页自动重登。退出既有确认感，再次进入也无需重输。
+    markManualLogout()
     clearSession()
     setSession(null)
     nav('/login')

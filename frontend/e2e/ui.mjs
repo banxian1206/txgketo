@@ -411,19 +411,28 @@ try {
       autoBack ? `401 被踢后自动重登回 ${page.url()} · 凭据仍在=${stillHasCred}` : `未自动恢复 URL=${page.url()}`)
     await shot(page, 'remember-auto')
 
-    // ③ 主动登出 → 清凭据 → 停在表单（不被自动登回）
+    // ③ 主动登出（2026-09-23 二次修正）→ 停在表单【预填好 + 勾选保持】，点一下登录即可
     const out = page.getByText('退出', { exact: false }).last()
     if (await out.count()) {
       await out.click()
       await page.waitForURL(/\/login/, { timeout: 8000 }).catch(() => {})
-      await page.waitForTimeout(1500)
-      const credGone = await page.evaluate(() => !localStorage.getItem('txgk_credential'))
-      const formBack = await page.locator('.login-box input').count()
+      await page.waitForTimeout(1800) // 若错误地自动登录会在此期间跳走
       const stayed = page.url().includes('/login')
-      check('REMEMBER-主动登出清凭据', credGone && stayed && formBack >= 2,
-        `凭据已清=${credGone} · 停登录页=${stayed} · 表单可见=${formBack >= 2}（退出不被自动登回）`)
-      await shot(page, 'remember-logout')
-    } else check('REMEMBER-主动登出清凭据', false, '找不到退出入口')
+      const userVal = await page.locator('input[placeholder="admin"]').inputValue().catch(() => '')
+      const pwdVal = await page.locator('input[type=password]').inputValue().catch(() => '')
+      const cb = page.locator('.login-remember input[type=checkbox]')
+      const checked = await cb.isChecked().catch(() => false)
+      check('REMEMBER-主动登出预填', stayed && userVal === 'admin' && !!pwdVal && checked,
+        `停登录页=${stayed} · 预填账号=${userVal === 'admin'} · 预填密码=${!!pwdVal} · 勾选保持=${checked}（填充模式，不自动登录）`)
+      await shot(page, 'remember-prefill')
+      // ④ 预填后点登录即回工作台（闭环）
+      if (stayed && userVal === 'admin') {
+        await page.getByRole('button', { name: /登\s*录/ }).click()
+        await page.waitForURL(/\/workbench|m\//, { timeout: 10000 }).catch(() => {})
+        const back = !page.url().includes('/login')
+        check('REMEMBER-一键登录', back, back ? `预填态点登录即入 ${page.url()}` : `未跳转 URL=${page.url()}`)
+      } else check('REMEMBER-一键登录', false, '前置（预填）未满足，跳过登录')
+    } else check('REMEMBER-主动登出预填', false, '找不到退出入口')
   }
 
 
