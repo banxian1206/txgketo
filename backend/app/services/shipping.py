@@ -354,8 +354,14 @@ def depart(
     remark: str | None = None,
     actor_id: int | None = None,
 ) -> Shipment:
-    if sh.status not in (SHIP_LOADED, SHIP_SHIPPING):
-        raise ShippingError(f"当前状态「{sh.status}」，不能发运（先装车）")
+    # ★ D3（客户口径 2026-09-24）：按 00 卷 S7 原序——逐项勾「已发」→ 装车 → 发运，
+    #   所以发运只接受「已装车」；「发货中」只是清单确认中（sync_items 自动转），不是可绕过装车的快捷路径
+    if sh.status != SHIP_LOADED:
+        raise ShippingError(
+            f"当前状态「{sh.status}」，不能发运 —— 按流程需先「装车」（拍装车照）再发运"
+            if sh.status in (SHIP_INSTRUCTED, SHIP_SHIPPING)
+            else f"当前状态「{sh.status}」，不能发运"
+        )
     # ★ 发运门禁（客户口径 R3-02 方案A）：0 项已发不能发运（否则到货后无法清点，成死批次）
     shipped_count = _shipped_count(session, sh)
     if not shipped_count:

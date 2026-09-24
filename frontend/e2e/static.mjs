@@ -126,13 +126,21 @@ check('SUBMIT-无裸validate', bareValidate.length === 0,
       if (st.isDirectory()) walk(p);
       else if (/\.tsx$/.test(f)) {
         const src = fs.readFileSync(p, 'utf8');
-        if (!src.includes('<Modal') || !src.includes('destroyOnHidden')) continue;
-        if (src.includes('forceRender')) continue; // Form 提前挂载，预填安全
+        if (!src.includes('setFieldsValue(')) continue;
+        // ★ 销毁式弹窗有两种来源：自己写 destroyOnHidden，或用 AppModal（基座内部就带销毁）
+        //   旧版只认前者 → 改用 AppModal 的文件反而漏扫（自证注入时发现的）
+        const hasDestroy = /destroyOnHidden/.test(src) || /<AppModal\b/.test(src);
+        if (!hasDestroy) continue;
+        // 逐弹窗判定（整文件豁免也是盲区：一个 forceRender 弹窗放过全文件）
+        const blocks = [...src.matchAll(/<(Modal|Drawer)\b([\s\S]{0,600}?)>/g)].map(m => m[2]);
+        const plainModalCount = blocks.filter(b => !b.includes('forceRender')).length;
+        if (!src.includes('destroyOnHidden') && !src.includes('<AppModal') ) continue;
+        if (plainModalCount === 0 && !src.includes('<AppModal')) continue; // 只有 forceRender 弹窗 → 安全
         const lines = src.split('\n');
         lines.forEach((l, i) => {
           if (!l.includes('setFieldsValue(')) return;
           const win = lines.slice(i, i + 22).join('\n');
-          if (/set\w*(?:Open|Target|Modal)\((?:true|\{)/.test(win)) {
+          if (/set\w*(?:Open|Target|Modal|Visible)\s*\((?!false)/.test(win)) { // 不挑参数：setTarget(r) 这种传变量的也曾漏判（现场清点「齐」预选丢）
             bad.push(`${p.replace(SRC, 'src')}:${i + 1}`);
           }
         });

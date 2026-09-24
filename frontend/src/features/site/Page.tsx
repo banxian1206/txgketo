@@ -7,7 +7,6 @@ import {
   Col,
   Empty,
   Form,
-  Modal,
   Row,
   Select,
   Space,
@@ -38,6 +37,7 @@ import {
 } from '../../api/client'
 import AuthedImage from '../../components/AuthedImage'
 import MfgPhotoPicker from '../../components/MfgPhotoPicker'
+import AppModal from '../../components/AppModal'
 import { SITE_ISSUE_STATUS as ISSUE_COLOR } from '../../theme/status'
 import { SITE_COMMISSION_STATUS as COMMISSION_COLOR } from '../../theme/status'
 import { T } from '../../theme/tokens'
@@ -48,6 +48,7 @@ export default function Site() {
   const nav = useNavigate()
   const canEdit = hasPerm('site:edit') || hasPerm('project:edit')
   const [target, setTarget] = useState<SiteIncomingPending | null>(null)
+  const [targetInitial, setTargetInitial] = useState<Record<string, unknown>>({})
   const [photos, setPhotos] = useState<string[]>([])
   const [saving, setSaving] = useState(false)
   const [form] = Form.useForm()
@@ -146,7 +147,12 @@ export default function Site() {
                         key: 'a',
                         width: 100,
                         render: (_: unknown, r) =>
-                          canEdit ? <a onClick={() => { setPhotos([]); form.resetFields(); form.setFieldsValue({ result: '齐', shortage: [] }); setTarget(r) }}>清点验收</a> : '—',
+                          canEdit ? <a onClick={() => {
+                            setPhotos([])
+                            // 预填交给 AppModal initialValues：弹窗 destroyOnHidden，先 setFieldsValue 会丢（实测「齐」预选不上）
+                            setTargetInitial({ result: '齐', shortage: [] })
+                            setTarget(r)
+                          }}>清点验收</a> : '—',
                       },
                     ]}
                   />
@@ -277,22 +283,21 @@ export default function Site() {
         </>
       )}
 
-      <Modal
+      <AppModal
         open={!!target}
         title={`现场清点 · ${target?.item_no ?? ''}`}
-        onCancel={() => setTarget(null)}
+        onClose={() => setTarget(null)}
         onOk={() => void doIncoming()}
-        confirmLoading={saving}
+        loading={saving}
         okText="提交"
-        destroyOnHidden
+        form={form}
+        initialValues={targetInitial}
       >
-        <Form form={form} layout="vertical" preserve={false}>
                     <IncomingCheckFields />
           <Form.Item label="照片（必须）" required>
             <MfgPhotoPicker projectNo={projectNo ?? ''} refNo="incoming" value={photos} onChange={setPhotos} upload={uploadSitePhotos} photoUrl={sitePhotoUrl} label="拍照" />
           </Form.Item>
-        </Form>
-      </Modal>
+      </AppModal>
     </Card>
   )
 }

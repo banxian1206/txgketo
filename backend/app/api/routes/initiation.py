@@ -900,8 +900,9 @@ def _resolve_expected(
     """
     if given:
         return given
-    if ordered_at and lead_days:
-        return (ordered_at if base is None else base) + timedelta(days=int(lead_days))
+    anchor = base or ordered_at  # 下单用下单日；换货/重排期用基准日（今天）
+    if anchor and lead_days:
+        return anchor + timedelta(days=int(lead_days))
     raise HTTPException(
         status.HTTP_400_BAD_REQUEST,
         "必须填「预计到货日期」（或填采购周期由系统推算）—— 到货跟踪、超期预警、催货都以它为凭",

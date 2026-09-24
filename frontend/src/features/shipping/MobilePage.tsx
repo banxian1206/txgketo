@@ -100,7 +100,7 @@ export default function ShippingM() {
   }
 
   const doDepart = async (s: ShipmentRow) => {
-    // R3-02 方案A：0 项已发不能发运
+    // R3-02 方案A + D3：必须先装车（入口已只在已装车显示），再卡 0 项已发
     if (!s.items.some((i) => i.shipped)) {
       message.warning('本批一项都没勾「已发」——先勾选实际发出的件再发运')
       return
@@ -193,7 +193,7 @@ export default function ShippingM() {
               <Space wrap style={{ marginTop: 8 }}>
                 {canShip && ['已指令', '发货中', '已装车'].includes(s.status) &&
                   <Button size="small" type="primary" onClick={() => void openTick(s)}>发运清单</Button>}
-                {canShip && ['已装车', '发货中'].includes(s.status) && <Button size="small" type="primary" onClick={() => void doDepart(s)}>发运</Button>}
+                {canShip && s.status === '已装车' && <Button size="small" type="primary" onClick={() => void doDepart(s)}>发运</Button>}
                 {canShip && ['已指令', '发货中', '已装车'].includes(s.status) && <Button size="small" onClick={() => { if (!s.items.some((i) => i.shipped)) { message.warning('本批一项都没勾「已发」，不能装车——先到「发运清单」勾选实际发出的件并拍照'); return } setLoadPhotos([]); setLoadTarget(s) }}>装车</Button>}
                 {canShip && s.status === '在途' && <Button size="small" onClick={() => void doArrive(s)}>登记到货</Button>}
                 {canReceive && ['已到货', '在途'].includes(s.status) &&

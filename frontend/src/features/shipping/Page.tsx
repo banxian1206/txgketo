@@ -269,7 +269,7 @@ export default function Shipping() {
       title="发运（S7）"
       extra={
         <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-          按设备结构生成发运清单 → 逐项勾「已发」+ 拍照 → 现场按同一份清单清点（到/缺/损）
+          按设备结构生成发运清单 → 逐项勾「已发」+ 拍照 → 装车（拍照）→ 发运 → 现场按同一份清单清点（到/缺/损）
         </Typography.Text>
       }
     >
@@ -361,7 +361,7 @@ export default function Shipping() {
                   <Space size={4} wrap>
                     {canEdit && ['已指令', '发货中', '已装车'].includes(r.status) && <a onClick={() => void openItems(r)}>发运清单</a>}
                     {canEdit && ['已指令', '发货中', '已装车'].includes(r.status) && <a onClick={() => { setLoadPhotos([]); setLoadTarget(r) }}>装车</a>}
-                    {canEdit && ['已装车', '发货中'].includes(r.status) && <a onClick={() => void doDepart(r)}>发运</a>}
+                    {canEdit && r.status === '已装车' && <a onClick={() => void doDepart(r)}>发运</a>}
                     {canEdit && r.status === '在途' && <a onClick={() => void doArrive(r)}>登记到货</a>}
                     {canEdit && ['已到货', '在途'].includes(r.status) &&
                       (r.items.some((i) => i.shipped) ? (

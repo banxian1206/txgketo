@@ -15,6 +15,10 @@ from sqlalchemy.orm import Mapped, mapped_column
 from app.models.base import Base, TimestampMixin
 
 # 发货指令 / 发运状态（02 卷 §8）
+# ★ 命名约定（D4）：SHIP_SHIPPING「发货中」的真实语义是**清单确认中** ——
+#   sync_items 生成发运清单时会把批次从「已指令」自动推到这一档（哪怕一项都还没勾），
+#   所以它不代表“车在路上”。S7 真实顺序：勾「已发」→ 装车 → 发运（在途）→ 到货 → 清点签收。
+#   不改存储值（改名要动存量数据/状态色表/断言，风险大于收益），靠本注释 + 发运页副标题消歧。
 SHIP_INSTRUCTED = "已指令"
 SHIP_SHIPPING = "发货中"
 SHIP_LOADED = "已装车"

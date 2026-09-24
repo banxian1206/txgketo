@@ -537,12 +537,12 @@ try {
   // —— P-08：API 预查有批次的项目 → UI 精准选择（不遍历下拉：antd 虚拟滚动下 nth(i) 随数据规模失效）——
   await page.goto(BASE + '/shipping', { waitUntil: 'networkidle' });
   await page.waitForTimeout(900);
-  let p08 = 'SKIP', p08note = '当前无待发运批次（新批次下次跑验证）';
+  let p08 = 'SKIP', p08note = '当前无「已装车」批次（软提示由 UI 探针 Z 系列 + API R5 链覆盖）';
   {
     const tok = await apiLogin('admin', 'admin12345');
     const all = await (await apiGet('/shipping/list', tok)).json();
-    const open = (Array.isArray(all) ? all : []).find((x) =>
-      ['已指令', '发货中', '已装车'].includes(x.status));
+    // D3 收紧后「发运」只在「已装车」档出现（勾已发 → 装车 → 发运）
+    const open = (Array.isArray(all) ? all : []).find((x) => x.status === '已装车');
     if (open && open.project_no) {
       const projSel = page.locator('.ant-select-selector').first();
       await projSel.click(); await page.waitForTimeout(400);
@@ -746,6 +746,35 @@ try {
       const checked = await page.locator('.ant-modal-content .ant-radio-button-wrapper-checked').innerText().catch(() => '');
       check('PREFILL-装配开始', /整机装配/.test(checked), checked ? `装配形态=${checked.trim()}` : '未预选整机装配');
     } else check('PREFILL-装配开始', true, '无开始装配入口', 'SKIP');
+    // 现场来货清点（PC）：默认结论「齐」必须预选（曾先设后开丢值，护栏也只认 destroyOnHidden 而漏扫）
+    let projWithIncoming = null;
+    const toks = await apiLogin('admin', 'admin12345');
+    const ps = (await (await apiGet('/projects', toks)).json()) ?? [];
+    // 有活儿的阶段优先（/projects 按号倒序，测试项目会把真正在跑的项目挤出前 40 个）
+    const ACT = ['执行中', '交付中', '质保'];
+    const cands = (Array.isArray(ps) ? ps : []).slice()
+      .sort((a, b) => (ACT.includes(b.stage) - ACT.includes(a.stage)) || String(a.project_no).localeCompare(String(b.project_no)));
+    for (const p of cands) {
+      const inc = await (await apiGet(`/site/incoming?project_no=${p.project_no}`, toks)).json();
+      if ((inc.pending ?? []).length) { projWithIncoming = p.project_no; break; }
+    }
+    if (!projWithIncoming) check('PREFILL-现场清点', true, '无待清点直发行，跳过', 'SKIP');
+    else {
+      await page.goto(BASE + '/delivery/site', { waitUntil: 'networkidle' }); await page.waitForTimeout(1400);
+      await page.locator('.ant-select-selector').first().click(); await page.waitForTimeout(400);
+      await page.keyboard.type(projWithIncoming); await page.waitForTimeout(900);
+      await page.locator('.ant-select-dropdown:visible .ant-select-item').first().click(); await page.waitForTimeout(1600);
+      const tab = page.locator('.ant-tabs-tab').filter({ hasText: /来货清点/ }).first();
+      if (await tab.count()) { await tab.click(); await page.waitForTimeout(1200); }
+      const link = page.locator('a').filter({ hasText: /清点验收/ }).first();
+      if (!(await link.count())) check('PREFILL-现场清点', true, '该行无清点入口，跳过', 'SKIP');
+      else {
+        await link.click(); await page.waitForTimeout(900);
+        const ck = (await page.locator('.ant-modal-content .ant-radio-button-wrapper-checked').first().innerText().catch(() => '')).replace(/\s+/g, '');
+        check('PREFILL-现场清点', /齐/.test(ck), ck ? `默认结论=「${ck}」` : '「齐」未预选');
+        await page.locator('.ant-modal-close').last().click().catch(() => {}); await page.waitForTimeout(500);
+      }
+    }
   } catch (e) {
     check('PREFILL-实读', false, '异常: ' + String(e).slice(0, 160));
   } finally {
