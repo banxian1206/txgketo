@@ -202,6 +202,18 @@ def generate_items(
     return out
 
 
+def _shipped_count(session: Session, sh: Shipment) -> int:
+    """本批已勾「已发」的项数（装车/发运共用的门禁）。"""
+    return int(
+        session.scalar(
+            select(func.count()).select_from(ShipmentItem).where(
+                ShipmentItem.shipment_id == sh.id, ShipmentItem.shipped.is_(True)
+            )
+        )
+        or 0
+    )
+
+
 def sync_items(
     session: Session,
     sh: Shipment,
@@ -244,9 +256,13 @@ def mark_shipped(
     item_ids: list[int],
     photos: list | None = None,
 ) -> int:
-    """勾选「已发」：大组件勾上 = 子树全部标记已发；可拍照。"""
-    if sh.status not in (SHIP_INSTRUCTED, SHIP_SHIPPING):
-        raise ShippingError(f"当前状态「{sh.status}」，不能再勾选发货")
+    """勾选「已发」：大组件勾上 = 子树全部标记已发；可拍照。
+
+    ★ R5-01：装车后（已装车）发运前仍要能补勾 —— 否则 0 项已发的死端只是往后挪了一格。
+      但**车一旦发走（在途）清单就锁死**：那是现场清点和对账的唯一依据。
+    """
+    if sh.status not in (SHIP_INSTRUCTED, SHIP_SHIPPING, SHIP_LOADED):
+        raise ShippingError(f"当前状态「{sh.status}」，不能再勾选发货（已发运的批次清单已锁死）")
     items = session.scalars(select(ShipmentItem).where(ShipmentItem.shipment_id == sh.id)).all()
     by_id = {i.id: i for i in items}
     # 勾组件 → 子树全部勾上
@@ -282,9 +298,9 @@ def add_manual_item(
     qty: float,
     remark: str | None = None,
 ) -> ShipmentItem:
-    """结构外补充项：说明书 / 备件 / 工具等。"""
-    if sh.status not in (SHIP_INSTRUCTED, SHIP_SHIPPING):
-        raise ShippingError(f"当前状态「{sh.status}」，不能再补清单")
+    """结构外补充项：说明书 / 备件 / 工具等（同 R5-01：发运前可补，发运后锁死）。"""
+    if sh.status not in (SHIP_INSTRUCTED, SHIP_SHIPPING, SHIP_LOADED):
+        raise ShippingError(f"当前状态「{sh.status}」，不能再补清单（已发运的批次清单已锁死）")
     row = ShipmentItem(
         shipment_id=sh.id,
         equip_no=equip_no or (sh.lines[0].equip_no if sh.lines else None),
@@ -313,6 +329,12 @@ def load(
         raise ShippingError(f"当前状态「{sh.status}」，不能装车")
     if not photos:
         raise ShippingError("装车要拍照")
+    # ★ R5-01（客户口径）：0 项已发**不能装车** —— 一件都没发，车上装的是什么？
+    #   只软提示会让批次一路装到「已装车」后无法发运（发运被 R3-02 硬拦）→ 死端前移堵住
+    if not _shipped_count(session, sh):
+        raise ShippingError(
+            "本批一项都没勾「已发」，不能装车 —— 先到「发运清单」勾选实际发出的件（可分批）并拍照，再装车"
+        )
     sh.vehicle = vehicle or sh.vehicle
     sh.driver = driver or sh.driver
     sh.plate_no = plate_no or sh.plate_no
@@ -335,11 +357,7 @@ def depart(
     if sh.status not in (SHIP_LOADED, SHIP_SHIPPING):
         raise ShippingError(f"当前状态「{sh.status}」，不能发运（先装车）")
     # ★ 发运门禁（客户口径 R3-02 方案A）：0 项已发不能发运（否则到货后无法清点，成死批次）
-    shipped_count = session.scalar(
-        select(func.count()).select_from(ShipmentItem).where(
-            ShipmentItem.shipment_id == sh.id, ShipmentItem.shipped.is_(True)
-        )
-    )
+    shipped_count = _shipped_count(session, sh)
     if not shipped_count:
         raise ShippingError(
             "本批一项都没勾「已发」—— 勾「已发」的就是实际发出的：先勾选实际发出的件（可分批，只勾这一批发走的），再发运"

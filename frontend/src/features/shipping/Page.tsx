@@ -359,7 +359,7 @@ export default function Shipping() {
                 width: 230,
                 render: (_: unknown, r: ShipmentRow) => (
                   <Space size={4} wrap>
-                    {canEdit && ['已指令', '发货中'].includes(r.status) && <a onClick={() => void openItems(r)}>发运清单</a>}
+                    {canEdit && ['已指令', '发货中', '已装车'].includes(r.status) && <a onClick={() => void openItems(r)}>发运清单</a>}
                     {canEdit && ['已指令', '发货中', '已装车'].includes(r.status) && <a onClick={() => { setLoadPhotos([]); setLoadTarget(r) }}>装车</a>}
                     {canEdit && ['已装车', '发货中'].includes(r.status) && <a onClick={() => void doDepart(r)}>发运</a>}
                     {canEdit && r.status === '在途' && <a onClick={() => void doArrive(r)}>登记到货</a>}
@@ -438,6 +438,11 @@ export default function Shipping() {
         onOk={() => {
           if (!loadTarget) return
           if (!loadPhotos.length) { message.warning('装车要拍照'); return }
+          // ★ R5-01：0 项已发不能装车（装到底就发不出去、又开不了清单 = 死端）
+          if (!loadTarget.items.some((i) => i.shipped)) {
+            message.warning('本批一项都没勾「已发」，不能装车——先到「发运清单」勾选实际发出的件并拍照')
+            return
+          }
           confirmUnshipped(loadTarget, '装车', () =>
             loadForm.validateFields().then(async (v) => {
               try {

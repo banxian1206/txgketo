@@ -97,6 +97,8 @@ const wh1 = await apiLogin('wh1', 'txgk@123');
     const po = await (await fetch(`${API}/api/v1/purchase/merge-order`, {
       method: 'POST', headers: h,
       body: JSON.stringify({ supplier_id: sup.id, ordered_at: new Date().toISOString().slice(0, 10),
+        // 客户口径 O3-A：手工单无采购周期 → 预计到货日必填（不填会被 400 拦，本探针要往下跑）
+        expected_date: new Date(Date.now() + 86400000 * 7).toISOString().slice(0, 10),
         deliver_to: '直发客户现场', deliver_address: 'E2E 探针地址', lines: [{ request_id: mr.id }] }),
     })).json();
     const inc = await (await apiGet(`/site/incoming?project_no=${proj.project_no}`, admin)).json();
@@ -145,6 +147,100 @@ const wh1 = await apiLogin('wh1', 'txgk@123');
   const orders = await (await apiGet('/purchase/orders', admin)).json();
   const withPrice = (Array.isArray(orders) ? orders : []).some(o => (o.total_amount ?? 0) > 0);
   check('P-17', withPrice, withPrice ? '存在带金额的采购单' : '所有采购单金额为 0/空');
+}
+
+// ── O3-A（客户口径）：预计到货日必须有 —— 无采购周期又不填 → 400 ──
+{
+  const h = { 'Content-Type': 'application/json', Authorization: `Bearer ${admin}` };
+  const projects = await (await apiGet('/projects', admin)).json();
+  const proj = (Array.isArray(projects) ? projects : []).find(p => ['执行中', '交付中', '质保'].includes(p.stage));
+  const sup = ((await (await apiGet('/suppliers', admin)).json()) ?? [])[0];
+  const item = ((await (await apiGet('/library/items?limit=1', admin)).json()) ?? [])[0];
+  if (!proj || !sup || !item) {
+    check('O3A-预计到货必填', true, '缺造数前置，跳过', 'SKIP');
+  } else {
+    const mr = await (await fetch(`${API}/api/v1/purchase/manual-request`, {
+      method: 'POST', headers: h,
+      body: JSON.stringify({ attribution: '辅料', item_no: item.item_no, qty: 1, unit: item.unit, note: 'O3A 护栏探针' }),
+    })).json();
+    const ordered = new Date().toISOString().slice(0, 10);
+    const noDate = await fetch(`${API}/api/v1/purchase/merge-order`, {
+      method: 'POST', headers: h,
+      body: JSON.stringify({ supplier_id: sup.id, ordered_at: ordered, deliver_to: '公司仓库', lines: [{ request_id: mr.id }] }),
+    });
+    const d1 = await noDate.json().catch(() => ({}));
+    const withDate = await fetch(`${API}/api/v1/purchase/merge-order`, {
+      method: 'POST', headers: h,
+      body: JSON.stringify({ supplier_id: sup.id, ordered_at: ordered,
+        expected_date: new Date(Date.now() + 86400000 * 7).toISOString().slice(0, 10),
+        deliver_to: '公司仓库', lines: [{ request_id: mr.id }] }),
+    });
+    check('O3A-预计到货必填',
+      noDate.status === 400 && /预计到货/.test(String(d1.detail)) && withDate.status < 300,
+      `不填→${noDate.status}「${String(d1.detail ?? '').slice(0, 34)}」 · 填了→${withDate.status}`);
+  }
+}
+
+// ── R5-01/R5-02：装车与发运双门禁 · 已装车可补勾 · 发运后清单锁死 ──
+{
+  const H = (t) => ({ 'Content-Type': 'application/json', Authorization: `Bearer ${t}` });
+  const post = async (url, body, token = admin) => {
+    const r = await fetch(`${API}/api/v1${url}`, { method: 'POST', headers: H(token), body: JSON.stringify(body ?? {}) });
+    let j = null; try { j = await r.json(); } catch { /* noop */ }
+    return { code: r.status, j };
+  };
+  const PH = ['e2e-guard-probe.png'];
+  let target = null;
+  const ps = (await (await apiGet('/projects', admin)).json()) ?? [];
+  for (const p of (Array.isArray(ps) ? ps : [])) {
+    const ts = await (await apiGet(`/shipping/to-ship?project_no=${p.project_no}`, admin)).json();
+    const rows = (Array.isArray(ts) ? ts : (ts.items ?? [])).filter(r => r.ready && !r.in_open_shipment);
+    if (rows.length) { target = { pno: p.project_no, equip: rows[0].equip_no }; break; }
+  }
+  if (!target) {
+    check('R5-01-装车硬拦', true, '无可下达设备，跳过', 'SKIP');
+    check('R5-01-已装车可补勾', true, '同上', 'SKIP');
+    check('R5-02-锁死报400非500', true, '同上', 'SKIP');
+  } else {
+    const ins = await post('/shipping/instructions', { project_no: target.pno, equip_nos: [target.equip] });
+    const sid = ins.j?.id;
+    await post(`/shipping/${sid}/items/generate`, {});
+    const its = (await (await apiGet(`/shipping/${sid}/items`, admin)).json()) ?? [];
+    if (!sid || its.length === 0) {
+      check('R5-01-装车硬拦', true, `批次 ${ins.j?.shipment_no ?? '?'} 清单为空（结构未发布），跳过`, 'SKIP');
+      check('R5-01-已装车可补勾', true, '同上', 'SKIP');
+      check('R5-02-锁死报400非500', true, '同上', 'SKIP');
+      check('R5-探针自清理', true, '同上', 'SKIP');
+    } else {
+    const shot = async () => (await (await apiGet(`/shipping/${sid}`, admin)).json()).status;
+    // ① 0 项已发：装车与发运都必须 400
+    const ld0 = await post(`/shipping/${sid}/load`, { photos: PH });
+    const dp0 = await post(`/shipping/${sid}/depart`, {});
+    check('R5-01-装车硬拦',
+      ld0.code === 400 && dp0.code === 400 && /一项都没勾/.test(String(ld0.j?.detail)) && await shot() === '发货中',
+      `装车→${ld0.code}「${String(ld0.j?.detail ?? '').slice(0, 24)}」 · 发运→${dp0.code} · 状态=${await shot()}`);
+    // ② 勾 1 项 → 装车 → 已装车档仍能补勾（死端不复发）
+    await post('/shipping/items/ship', { item_ids: [its[0].id], photos: PH });
+    const ld1 = await post(`/shipping/${sid}/load`, { photos: PH });
+    const tick2 = await post('/shipping/items/ship', { item_ids: [its[1]?.id ?? its[0].id], photos: PH });
+    check('R5-01-已装车可补勾',
+      ld1.code === 200 && await shot() === '已装车' && tick2.code === 200,
+      `装车→${ld1.code} 状态=${await shot()} · 已装车档补勾→${tick2.code}「${String(tick2.j?.detail ?? tick2.j?.marked ?? '').slice(0, 24)}」`);
+    // ③ 发运后清单锁死，且错误码是 400 不是 500（R5-02）
+    await post(`/shipping/${sid}/depart`, {});
+    const lock = await post('/shipping/items/ship', { item_ids: [its[its.length - 1].id], photos: PH });
+    check('R5-02-锁死报400非500',
+      await shot() === '在途' && lock.code === 400 && /锁死/.test(String(lock.j?.detail)),
+      `在途后补勾→${lock.code}「${String(lock.j?.detail ?? '').slice(0, 34)}」`);
+    // ④ 探针自清理：到货 + 清点 → 已签收（不留未完成批次）
+    await post(`/shipping/${sid}/arrive`, {});
+    const shipped = (((await (await apiGet(`/shipping/${sid}`, admin)).json()) ?? {}).items ?? []).filter(i => i.shipped);
+    const rec = await post(`/shipping/${sid}/receipt`, {
+      checks: shipped.map(i => ({ item_id: i.id, result: '到', received_qty: i.qty })), photos: PH, remark: 'R5 护栏探针自清理',
+    });
+    check('R5-探针自清理', rec.code < 300 && await shot() === '已签收', `清点→${rec.code} · 终点状态=${await shot()}`);
+    }
+  }
 }
 
 const fails = summary('API 回归');

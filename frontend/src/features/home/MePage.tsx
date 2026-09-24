@@ -17,12 +17,11 @@ export default function MeM() {
   const canManageUsers = profile?.is_superuser === true || profile?.position === '总监'
 
   const links = [
-    { label: '我的任务', to: '/my-tasks' },
-    { label: '设计评审', to: '/reviews' },
-    { label: '改版申请', to: '/changes' },
+    // R4-01（客户口径 A）：手机端隐藏 PC-only 入口 —— 任务/评审/改版无移动页，
+    //   点了会跳进 /workbench/* 桌面壳（手机出现侧栏 + 宽表横滚）。移页列入后续迭代。
     { label: '采购工作台', to: '/purchase' },
     { label: '商机 / 项目', to: '/projects' },
-    ...(canManageUsers ? [{ label: '用户与权限', to: '/users' }] : []),
+    ...(canManageUsers ? [{ label: '用户与权限', to: '/admin/users' }] : []),
   ]
 
   return (

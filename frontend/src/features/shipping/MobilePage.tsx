@@ -7,9 +7,11 @@ import {
   createShipment,
   departShipment,
   errMsg,
+  generateShipItems,
   hasPerm,
   listProjects,
   loadShipment,
+  markShipItems,
   receiptShipment,
   shipPhotoUrl,
   uploadShipPhotos,
@@ -34,6 +36,10 @@ export default function ShippingM() {
   const [receiptTarget, setReceiptTarget] = useState<ShipmentRow | null>(null)
   const [receiptChecks, setReceiptChecks] = useState<Record<number, { result: string; reason?: string; received_qty?: number }>>({})
   const [receiptPhotos, setReceiptPhotos] = useState<string[]>([])
+  // 发运清单勾选（03 卷：手机端 = 发运清单勾选+拍照·装车·到货·清点）
+  const [tickTarget, setTickTarget] = useState<ShipmentRow | null>(null)
+  const [tickPhotos, setTickPhotos] = useState<string[]>([])
+  const [ticking, setTicking] = useState(false)
   const [saving, setSaving] = useState(false)
 
   // 重构 2.3：看板数据走共享 hook（与另一端同源）
@@ -54,6 +60,42 @@ export default function ShippingM() {
       await load(projectNo)
     } catch (e) {
       message.error(errMsg(e))
+    }
+  }
+
+  const openTick = async (s: ShipmentRow) => {
+    setTickPhotos([])
+    setTickTarget(s)
+    if (s.items.length === 0 && canShip) {
+      setTicking(true)
+      try {
+        const fresh = await generateShipItems(s.id)
+        setTickTarget(fresh)
+        await load(projectNo)
+      } catch (e) {
+        message.error(errMsg(e))
+      } finally {
+        setTicking(false)
+      }
+    }
+  }
+
+  const toggleShipped = async (ship: ShipmentRow, itemId: number) => {
+    if (!tickPhotos.length) {
+      message.warning('先拍这个件的发货照片，再勾「已发」')
+      return
+    }
+    setTicking(true)
+    try {
+      await markShipItems([itemId], tickPhotos)
+      setTickPhotos([])
+      const list = await load(ship.project_no ?? projectNo)
+      const fresh = (list ?? []).find((x) => x.id === ship.id)
+      if (fresh) setTickTarget(fresh)
+    } catch (e) {
+      message.error(errMsg(e))
+    } finally {
+      setTicking(false)
     }
   }
 
@@ -149,8 +191,10 @@ export default function ShippingM() {
                 {s.plate_no ?? ''} {s.driver ?? ''} · 已发 {done}/{s.items.length} 项
               </div>
               <Space wrap style={{ marginTop: 8 }}>
-                {canShip && ['已指令', '发货中'].includes(s.status) && <Button size="small" type="primary" onClick={() => void doDepart(s)}>发运</Button>}
-                {canShip && ['已指令', '发货中', '已装车'].includes(s.status) && <Button size="small" onClick={() => { setLoadPhotos([]); setLoadTarget(s) }}>装车</Button>}
+                {canShip && ['已指令', '发货中', '已装车'].includes(s.status) &&
+                  <Button size="small" type="primary" onClick={() => void openTick(s)}>发运清单</Button>}
+                {canShip && ['已装车', '发货中'].includes(s.status) && <Button size="small" type="primary" onClick={() => void doDepart(s)}>发运</Button>}
+                {canShip && ['已指令', '发货中', '已装车'].includes(s.status) && <Button size="small" onClick={() => { if (!s.items.some((i) => i.shipped)) { message.warning('本批一项都没勾「已发」，不能装车——先到「发运清单」勾选实际发出的件并拍照'); return } setLoadPhotos([]); setLoadTarget(s) }}>装车</Button>}
                 {canShip && s.status === '在途' && <Button size="small" onClick={() => void doArrive(s)}>登记到货</Button>}
                 {canReceive && ['已到货', '在途'].includes(s.status) &&
                   (s.items.some((i) => i.shipped) ? (
@@ -186,6 +230,42 @@ export default function ShippingM() {
             </Card>
           )
         })}
+
+      {/* 发运清单：逐项勾「已发」+ 拍照（03 卷：手机端也是勾选+拍照，不扫码） */}
+      <Modal
+        open={!!tickTarget}
+        title={`发运清单 · ${tickTarget?.shipment_no ?? ''}`}
+        onCancel={() => setTickTarget(null)}
+        footer={<Button onClick={() => setTickTarget(null)}>完成</Button>}
+        width={560}
+        destroyOnHidden
+      >
+        <Space wrap style={{ marginBottom: 8 }}>
+          <MfgPhotoPicker
+            projectNo={tickTarget?.project_no ?? ''}
+            refNo={tickTarget?.shipment_no ?? ''}
+            value={tickPhotos}
+            onChange={setTickPhotos}
+            upload={uploadShipPhotos}
+            photoUrl={shipPhotoUrl}
+            label="发货拍照"
+            max={9}
+          />
+          <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+            先拍照再勾；勾大组件 = 整组都发了。没勾的留在后续批次。
+          </Typography.Text>
+        </Space>
+        <div style={{ maxHeight: 380, overflowY: 'auto' }}>
+          {(tickTarget?.items ?? []).map((it) => (
+            <div key={it.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0', borderBottom: `1px solid ${T.border}` }}>
+              <Checkbox checked={it.shipped} disabled={ticking || it.shipped} onChange={() => void toggleShipped(tickTarget as ShipmentRow, it.id)}>
+                <span style={{ fontSize: 13 }}>{it.equip_no} {it.ref} ×{it.qty} {it.kind}</span>
+              </Checkbox>
+              {it.shipped && <Tag color="success">已发</Tag>}
+            </div>
+          ))}
+        </div>
+      </Modal>
 
       {/* 装车 */}
       <Modal open={!!loadTarget} title={`装车 · ${loadTarget?.shipment_no ?? ''}`} onCancel={() => setLoadTarget(null)} onOk={() => {

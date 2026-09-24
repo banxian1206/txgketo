@@ -211,7 +211,7 @@ export default function Site() {
                                 <a onClick={() => void linkSiteIssue(r.id, { close: true }).then(() => void load(projectNo))}>闭环</a>
                               </>
                             )}
-                            {r.related_change_id && <a onClick={() => nav('/changes')}>看变更</a>}
+                            {r.related_change_id && <a onClick={() => nav('/workbench/changes')}>看变更</a>}
                           </Space>
                         ),
                       },

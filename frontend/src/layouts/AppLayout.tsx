@@ -153,7 +153,7 @@ export default function AppLayout() {
           <Typography.Text strong>项目全生命周期管理</Typography.Text>
           <Space>
             {canManageUsers && (
-              <Link to="/users" style={{ fontSize: 13 }}>
+              <Link to="/admin/users" style={{ fontSize: 13 }}>
                 <SettingOutlined /> 用户与权限
               </Link>
             )}

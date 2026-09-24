@@ -3,6 +3,7 @@
  *  Part 1 冒烟：PC 25 路由 + 移动 9 路由，零 pageerror / 零 4xx / 零 antd 弃用警告（P-16 动态）
  *  Part 2 交互：P-09 · P-01 · P-03 · P-02 · P-11 · P-13 · P-05 · P-10 · P-04 · P-08 · P-18 · P-21 · P-22
  *  Part 3 预填实读：用户/供应商/标准库编辑 + 装配开始（打开弹窗断言初始值，治 PREFILL 静态盲区）
+ *  Part 4 本轮口径：O1 侧栏不再重名 · R4-01 移动端已下线 PC-only 卡
  *  注意：本脚本会创建 1 个测试商机（E2E回归-*）并走完 建图/下单/验收，属护栏正常代价
  */
 import { newCtx, login, body, shot, check, summary, exitWith, results, BASE, FILES, apiLogin, apiGet } from './lib.mjs';
@@ -423,6 +424,9 @@ try {
   await page.locator('.ant-select-dropdown:visible .ant-select-item').first().click();
   const od = om.locator('.ant-form-item').filter({ hasText: '下单日期' }).locator('input');
   await od.click(); await page.keyboard.type('2026-09-22'); await page.keyboard.press('Enter');
+  // 客户口径 O3-A：无采购周期的需求（辅料）下单必须有预计到货日 —— 不填会被表单拦下
+  const ed = om.locator('.ant-form-item').filter({ hasText: '预计到货' }).locator('input');
+  if (await ed.count()) { await ed.click(); await page.keyboard.type('2026-09-29'); await page.keyboard.press('Enter'); }
   await om.locator('.ant-form-item').filter({ hasText: '收货地点' }).locator('.ant-select-selector').click();
   await page.waitForTimeout(400);
   await page.locator('.ant-select-dropdown:visible .ant-select-item').first().click();
@@ -747,6 +751,33 @@ try {
   } finally {
     await c.browser.close();
   }
+}
+
+// ═════════ Part 4 · 本轮客户口径的 UI 断言（O1 重名 / R4-01 移动隐卡）═════════
+{
+  const c = await newCtx(); const { page } = c;
+  try {
+    await login(page, 'admin', 'admin12345');
+    await page.goto(BASE + '/admin/users', { waitUntil: 'networkidle' }); await page.waitForTimeout(1500);
+    const dup = await page.locator('.ant-layout-sider').getByText('系统管理', { exact: true }).count();
+    const item = await page.locator('.ant-layout-sider').getByText('用户与权限', { exact: true }).count();
+    check('O1-侧栏不再重名', dup === 1 && item > 0, `侧栏内「系统管理」=${dup} 次（应仅剩组标题）·「用户与权限」=${item} 个`);
+  } catch (e) { check('O1-侧栏不再重名', false, '异常 ' + String(e).slice(0, 160)); }
+  finally { await c.browser.close(); }
+}
+{
+  const c = await newCtx({ mobile: true }); const { page } = c;
+  try {
+    await login(page, 'mech1', 'txgk@123');
+    const gone = [];
+    for (const r of ['/m', '/m/me']) {
+      await page.goto(BASE + r, { waitUntil: 'networkidle' }); await page.waitForTimeout(1500);
+      const t = await body(page);
+      for (const k of ['我的任务', '待我审', '待我裁决', '设计评审', '改版申请']) if (t.includes(k)) gone.push(`${r}:${k}`);
+    }
+    check('R4-01-移动已下线PC卡', gone.length === 0, gone.length ? `仍可见 PC-only 入口: ${gone.join(', ')}` : '移动首页/我的页不再出现任务/评审/改版卡（不会再被带进桌面壳）');
+  } catch (e) { check('R4-01-移动已下线PC卡', false, '异常 ' + String(e).slice(0, 160)); }
+  finally { await c.browser.close(); }
 }
 
 const fails = summary('UI 回归');

@@ -73,7 +73,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const stopImpersonate = useCallback(() => {
     const next = patchSession({ impersonateId: undefined, impersonateName: undefined })
     setSession(next)
-    window.location.href = '/users'
+    window.location.href = '/admin/users'
   }, [])
 
   const value: AuthValue = {

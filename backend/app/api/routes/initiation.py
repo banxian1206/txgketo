@@ -890,6 +890,24 @@ def clear_milestones(
 # ============================================================================
 
 
+def _resolve_expected(
+    given: date | None, ordered_at: date | None, lead_days: int | None, *, base: date | None = None
+) -> date:
+    """预计到货日（客户口径 O3-A）：**下单/换货必须有**——要么直接填，要么由「下单日 + 采购周期」算出来。
+
+    两者都空就报错：没有预计到货日，采购台的「到货跟踪」就无法排序/超期红/临期黄，催货没有依据。
+    （设计发布/工艺发布/长周期需求带 lead_days，会自动算出，不强迫多填一格）
+    """
+    if given:
+        return given
+    if ordered_at and lead_days:
+        return (ordered_at if base is None else base) + timedelta(days=int(lead_days))
+    raise HTTPException(
+        status.HTTP_400_BAD_REQUEST,
+        "必须填「预计到货日期」（或填采购周期由系统推算）—— 到货跟踪、超期预警、催货都以它为凭",
+    )
+
+
 class OrderIn(BaseModel):
     """下单：采购员真正去下采购单，把这些填回来。"""
 
@@ -937,9 +955,7 @@ def order(
     if row.unit_price and row.qty:
         row.amount = float(row.unit_price) * float(row.qty)
     row.ordered_at = body.ordered_at
-    row.expected_date = body.expected_date or (
-        body.ordered_at + timedelta(days=row.lead_days or 0) if row.lead_days else None
-    )
+    row.expected_date = _resolve_expected(body.expected_date, body.ordered_at, row.lead_days)
     if body.deliver_to not in DELIVER_TO:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, f"收货地点只能是：{'/'.join(DELIVER_TO)}")
     if body.deliver_to == "直发客户现场" and not body.deliver_address:
@@ -1932,9 +1948,7 @@ def merge_order(
         if ln.unit_price and row.qty:
             row.amount = float(ln.unit_price) * float(row.qty)
             total += float(row.amount)
-        row.expected_date = body.expected_date or (
-            body.ordered_at + timedelta(days=row.lead_days) if row.lead_days else None
-        )
+        row.expected_date = _resolve_expected(body.expected_date, body.ordered_at, row.lead_days)
         row.deliver_to = body.deliver_to
         row.deliver_address = body.deliver_address
         row.status = "在途"
@@ -2405,9 +2419,7 @@ def negotiate_failed_lines(
             g.resolved_at = datetime.now(UTC)
         session.flush()  # 到货单处理结果先落库，状态重算才看得到
         if body.action == "换货":
-            r.expected_date = body.expected_date or (
-                today + timedelta(days=r.lead_days) if r.lead_days else None
-            )
+            r.expected_date = _resolve_expected(body.expected_date, None, r.lead_days, base=today)
             _recalc_request_status(session, r)
             _sync_purchase_task(
                 session,

@@ -187,6 +187,9 @@ export default function MergeOrderModal({
     [lines],
   )
   const unpriced = lines.filter((l) => !l.unit_price).length
+  // ★ 预计到货日（客户口径 O3-A）：不填时系统要拿「下单日 + 采购周期」逐条推算；
+  //   只要有一条需求没周期，就推不出来 → 此时必须手填（到货跟踪/超期预警的凭据）
+  const noLead = lines.filter((l) => !l.lead_days).length
   const today = dayjs().format('YYYY-MM-DD')
 
   const submit = async () => {
@@ -484,7 +487,15 @@ export default function MergeOrderModal({
             name="expected_date"
             label="预计到货日期"
             style={{ minWidth: 190 }}
-            tooltip="不填则按各条需求自己的采购周期自动推算"
+            tooltip={noLead ? `${noLead} 条需求没填采购周期，推不出来 —— 这一格必填` : '不填则按各条需求自己的采购周期自动推算'}
+            rules={[
+              noLead
+                ? {
+                    required: true,
+                    message: `${noLead} 条需求无采购周期，必须填预计到货日期（催货/超期预警以它为凭）`,
+                  }
+                : {},
+            ]}
           >
             <DatePicker style={{ width: '100%' }} />
           </Form.Item>

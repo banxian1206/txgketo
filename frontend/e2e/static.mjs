@@ -144,5 +144,40 @@ check('SUBMIT-无裸validate', bareValidate.length === 0,
     bad.length ? `手写预填残留（改 AppModal+initialValues）: ${bad.slice(0, 5).join(', ')}` : '无「先 setFieldsValue 后开弹窗」残留');
 }
 
+// R5-01（客户口径①+②）：装车与发运共用「0 项已发」门禁，且已装车档仍可补勾（否则死端复发）
+{
+  const f = path.resolve(SRC, '../../backend/app/services/shipping.py');
+  const s = fs.existsSync(f) ? fs.readFileSync(f, 'utf8') : '';
+  const body = (name) => {
+    const i = s.indexOf(`def ${name}(`);
+    return i < 0 ? '' : s.slice(i, s.indexOf('\ndef ', i + 1));
+  };
+  const ld = body('load'), dp = body('depart'), mk = body('mark_shipped');
+  const gateLine = (b) => (b.split('\n').find(l => l.includes('status not in')) ?? '');
+  const ok = /_shipped_count\(session, sh\)/.test(ld) && /_shipped_count\(session, sh\)/.test(dp)
+    && /SHIP_LOADED/.test(gateLine(mk)) && !/SHIP_TRANSIT/.test(gateLine(mk));
+  check('SHIP-装车发运双门禁', ok,
+    `装车含0项门禁=${/_shipped_count/.test(ld)} 发运含=${/_shipped_count/.test(dp)} ` +
+    `补勾允许已装车=${/SHIP_LOADED/.test(gateLine(mk))} 发运后锁死=${!/SHIP_TRANSIT/.test(gateLine(mk))}`);
+}
+
+// R4-01（客户口径 A）：移动端不得链到 PC-only 工作台路由（任务/评审/改版无移动页）
+{
+  const PC_ONLY = ['/my-tasks', '/reviews', '/changes', '/mine/tasks', '/mine/reviews', '/mine/changes'];
+  const bad = [];
+  for (const rel of ['features/home/MePage.tsx', 'features/home/MobilePage.tsx']) {
+    const p = path.join(SRC, rel);
+    if (!fs.existsSync(p)) continue;
+    fs.readFileSync(p, 'utf8').split('\n').forEach((l, i) => {
+      const t = l.trim();
+      if (t.startsWith('//') || t.startsWith('*')) return;
+      const m = l.match(/(?:to:|nav\()\s*['"`](\/[^'"`]+)['"`]/);
+      if (m && PC_ONLY.includes(m[1])) bad.push(`src/${rel}:${i + 1} → ${m[1]}`);
+    });
+  }
+  check('R4-01-移动不链PC台', bad.length === 0,
+    bad.length ? `移动端又链到 PC-only 路由: ${bad.join(', ')}` : '移动首页/我的页已无 PC-only 入口（任务/评审/改版）');
+}
+
 const fails = summary('静态回归');
 exitWith(fails);

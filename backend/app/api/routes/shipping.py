@@ -271,9 +271,14 @@ def mark_items_shipped(
     n = 0
     items = session.scalars(select(ShipmentItem).where(ShipmentItem.id.in_(body.item_ids))).all()
     sh_ids = {i.shipment_id for i in items}
-    for sid in sh_ids:
-        sh = session.get(Shipment, sid)
-        n += shp.mark_shipped(session, sh, actor_id=current.id, item_ids=body.item_ids, photos=body.photos)
+    try:
+        for sid in sh_ids:
+            sh = session.get(Shipment, sid)
+            n += shp.mark_shipped(session, sh, actor_id=current.id, item_ids=body.item_ids, photos=body.photos)
+    except shp.ShippingError as e:
+        # R5-02：状态不允许是业务错（400），不能当服务器错（500）抛给前端
+        session.rollback()
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, str(e)) from e
     audit.log(session, user=current, action="ship_mark", object_type="shipment",
               summary=f"标记已发 {n} 项", ip=client_ip(request))
     session.commit()

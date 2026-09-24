@@ -261,7 +261,17 @@ export default function PurchaseActions({
               <DatePicker style={{ width: '100%' }} />
             </Form.Item>
           </Space>
-          <Form.Item name="expected_date" label="预计到货日期">
+          <Form.Item
+            name="expected_date"
+            label="预计到货日期"
+            tooltip={row.lead_days ? '已按采购周期推算，可改' : '催货/到货跟踪/超期预警都看这一格，必填'}
+            rules={[
+              {
+                required: !row.lead_days,
+                message: '必须填预计到货日期（到货跟踪、超期预警、催货都以它为凭）',
+              },
+            ]}
+          >
             <DatePicker style={{ width: '100%' }} />
           </Form.Item>
           <Space style={{ display: 'flex' }} size="middle" align="start">

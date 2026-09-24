@@ -69,7 +69,7 @@ export const SIDEBAR_ROOTS: SidebarRoot[] = [
   { key: '/projects', label: '项目', to: '/projects', prefixes: ['/projects'], icon: 'folder', group: '业务' },
   { key: '/delivery/mfg', label: '交付执行', to: '/delivery/mfg', prefixes: ['/delivery'], icon: 'truck', group: '业务', perm: 'mfg' },
   { key: '/library', label: '基础数据', to: '/library', prefixes: ['/library', '/numbering'], icon: 'database', group: '业务' },
-  { key: '/admin/users', label: '系统管理', to: '/admin/users', prefixes: ['/admin', '/users'], icon: 'setting', group: '系统管理', admin: true },
+  { key: '/admin/users', label: '用户与权限', to: '/admin/users', prefixes: ['/admin', '/users'], icon: 'setting', group: '系统管理', admin: true },
 ]
 
 export function matchSidebarKey(pathname: string): string {
