@@ -16,6 +16,7 @@ from app.models.initiation import ProjectMember
 from app.models.project import Project
 from app.models.site import COMMISSION_DONE, SiteCommission
 from app.services import notify
+from app.services import payment as payment_svc
 from app.services import project_stage
 
 
@@ -151,6 +152,8 @@ def confirm(
                 continue
             if project.stage != target:
                 project.stage = target
+        # ★ G2：验收通过 → **催商务部收「验收款」+「质保金」**（只提醒，不卡流程）
+        payment_svc.trigger_for_acceptance(session, project.project_no)
     return acc
 
 

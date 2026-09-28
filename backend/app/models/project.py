@@ -127,6 +127,14 @@ class Project(Base, TimestampMixin):
     created_by: Mapped[int | None] = mapped_column(ForeignKey("app_user.id"))
 
 
+# ★ G2（09 卷 §3）：付款节点要**跟业务/物流节点对上** —— 客户：“我发了之后，就必须要催商务部的人去把这个款拿下来”
+PAY_TRIGGER_SHIP = "发货"
+PAY_TRIGGER_ARRIVE = "到货"
+PAY_TRIGGER_ACCEPT = "验收"
+PAY_TRIGGER_WARRANTY = "质保"
+PAYMENT_TRIGGERS = (PAY_TRIGGER_SHIP, PAY_TRIGGER_ARRIVE, PAY_TRIGGER_ACCEPT, PAY_TRIGGER_WARRANTY)
+
+
 class PaymentTerm(Base, TimestampMixin):
     """付款节点（成交时登记）+ 回款跟踪。"""
 
@@ -136,6 +144,8 @@ class PaymentTerm(Base, TimestampMixin):
     project_no: Mapped[str] = mapped_column(ForeignKey("project.project_no", ondelete="CASCADE"))
     seq: Mapped[int] = mapped_column(Integer)
     node_name: Mapped[str] = mapped_column(String(64))
+    # ★ G2：这个款由哪个**业务节点**触发提醒（发货/到货/验收/质保）；预收款等无节点为 NULL
+    trigger_node: Mapped[str | None] = mapped_column(String(16))
     percent: Mapped[float | None] = mapped_column(Numeric(6, 2))
     amount: Mapped[float | None] = mapped_column(Numeric(14, 2))
     expect_date: Mapped[date | None] = mapped_column(Date)

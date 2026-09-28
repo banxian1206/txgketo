@@ -252,6 +252,13 @@ deploy/          docker-compose.dev.yml
 | # | 事项 | 说明 |
 |---|---|---|
 | **0** | ★★ **采购域重构 · 第 0 期（地基）** | ★ **进度（2026-09-28）**：★ **第 0 期 ✅ 全部完成**（① `bom_math.py` 六通道统一数量口径 + ② `_cover` 四项抵扣 + ③ 领料冻结/替代行过滤 + ④ 缺料显式化/超锁/负库存 + ⑤ 齐套率含直发件+项目过滤 + ⑥ e2e 基线入库）。**基线实测（`scripts/e2e_baseline.py`）：S0→S11 中断 0、问题 27→5（余 B1 拆单=一期 / B9 税口径=二三期）、通过 75；`scripts/probe_bom_math.py` 重复进池 8/8 全绿；`pytest 68 passed`。**<br>**方案：`docs/08-采购域重构方案.md` §8 / §13；实证：`docs/99-E2E测试报告-2026-09-28-…基线.md`。不依赖建表，可立即单独开工。**<br>① ★ **同一个「要几个」五个通道五种答案**：发布进池✓ / 手动补跑（图纸分支 **qty 平方**：实测 18 vs 真 6）/ 排产✓ / 齐套率（**不乘父级累计**，实测 4 项全少一半，rate=1.0 而真实约 54%）/ 领料（标准件分支**完全不乘**）→ 抽 `services/bom_math.py` 六处共用（**含发运清单 `shipping`——文档初稿漏的第 6 个通道**）<br>② ★ **净需求缺「已完成量」抵扣** → 四种场景重复进池（已隔离实证：直发件现场验收后新增 18 / 待入库窗口新增 8 / 已入库+已领走新增 5 / 发布后立刻补跑新增 4 条）——**AGENTS §8.1 承诺的幂等只在「刚发布未执行」时成立**<br>③ `generate_issue` 不过滤 `已冻结`/`superseded_by_id` → 按草稿 BOM 领料、改版后旧行仍领料<br>④ 缺料行静默跳过（MI26005 实测：已领走但 `qty_issued=0`、审计日志谎报「1 种物料」、齐套率仍判 ready）——★ **修它会暴露备料超锁/负库存（两者都无保护），必须同时修**<br>⑤ 三处越权已实测落库：`site1` 登记长周期件 **HTTP 201**（凭空一张 ¥54,000 采购单 PO26009）、`site1` 删采购需求 **HTTP 200**（真硬删、无审计）、`wh_director` 裁决工程部改版 **HTTP 200**<br>⑥ ★ **`scripts/multiproj_walkthrough.py` 已失效**（缺 `expected_date` 被 O3-A 拦下，P1/P3 在 S3 就 halted，S4–S11 从未执行）——**“有 e2e 护栏”目前是假的**；把 `/tmp/txgk_e2e.py`+`/tmp/txgk_isolate.py` 提升为 `scripts/e2e_baseline.py`/`probe_bom_math.py` 作为回归基线<br>★ **开工前口径已定（2026-09，见 `08 §14`）**：A 要 / B 要 / C 比价分「含税/不含税」两列 + 存量标含税 / **乙 齐套率必须含直发件**（`ARRIVED_STATUS` 补「现场已验收」+ 按项目过滤，见 `08 §8.3-g`）/ 甲 已入库退货 **挂起**（另立需求） |
+| **0h** | 09 卷缺口第三批 · **G2 付款节点绑业务节点 + 收款提醒 ✅（2026-09-28）**（详见 `docs/09-从商机到归档-口径确认与缺口计划.md` §3-G2） |
+客户口径：“这些节点要跟物流能够对上。因为我**发了之后**，就必须要**催商务部**的人去把这个款给拿下来”；“（提醒）肯定**只是提醒商务，不能卡住流程**”。
+<br>`payment_term.trigger_node`（**发货/到货/验收/质保**，迁移 `x0d2f4b68c79`；存量按 `node_name` 关键词回填，与既有“名字含「质保」=质保金”同一套路）；
+`services/payment.py`：`infer_trigger()` 关键词推断（顺序敏感：质保＞验收＞到货＞发货，预付款等无节点=NULL）+ `normalize_trigger()`（显式优先）。
+节点达成 → **只发站内消息给商务部**（`remind()` 内**不允许 raise**，保证“只提醒不卡流程”；**已收满的节点不再提醒**）：
+`shipping.depart` → 发货款 · `shipping.arrive` → 到货款 · `acceptance.confirm(通过)` → 验收款 + 质保金。
+前端：项目详情付款方式表加「触发」列；成交登记表单加「对齐节点」下拉（不选则自动推断）。护栏 `tests/test_payment_trigger.py`(8，注入反例能红) |
 | **0g** | 09 卷缺口第二批 · **§2.2 发货指令跨部门 + 发货日 ✅（2026-09-28）**（详见 `docs/09-从商机到归档-口径确认与缺口计划.md` §2.2） |
 客户口径：“PM 发出指令需要**叫车服务**，**采购**就去采购车辆回来，**发运**就开始装车并进行交付。这相当于是一条指令，但是**指挥了两个部门**的人在干事情。同时这个指令也是需要有**时间**的：PM 定一个发货时间（如定在十几号）→ 采购按这个时间**当天**把车采购回来 → **装货的人就知道当天需要装几车**。”
 <br>**新增叫车环节**：`shipment` 加 `vehicle_status`（待叫车/已叫车）/`vehicle_count`（几车）/`vehicle_fee`（**本次**运费，**不进价格库**）/`vehicle_note`/`vehicle_by`/`vehicle_at`（迁移 `w9c1e3a57b68`，存量已装过车的回填为「已叫车」）。
@@ -442,9 +449,9 @@ POST /api/v1/warehouse/inbound                    其他入库（退料回库/�
 ### 8.6 当前环境
 
 - 后端 :8208 · 前端 :5207 · PG 35432（`docker compose -f deploy/docker-compose.dev.yml up -d`，compose 顶层写死了 `name: txgketo`）
-- 测试：`.venv/bin/python -m pytest -q` → **108 passed**；e2e 基线 `.venv/bin/python -m scripts.e2e_baseline`（★ 跑前复位业务数据；只清业务表，账户/组织/编号规则不动）→ **问题 0 / 中断 0 / 通过 126**；
+- 测试：`.venv/bin/python -m pytest -q` → **116 passed**；e2e 基线 `.venv/bin/python -m scripts.e2e_baseline`（★ 跑前复位业务数据；只清业务表，账户/组织/编号规则不动）→ **问题 0 / 中断 0 / 通过 126**；
   隔离探针 `scripts/probe_bom_math.py` → **8/8**、`scripts/probe_n24_n25.py` → **17/17**；前端 `e2e:static 22` / `e2e:api 10+4skip` / `e2e:ui 55+3skip`
-- alembic head：**`w9c1e3a57b68`**（§2.2 采购叫车）
+- alembic head：**`x0d2f4b68c79`**（G2 付款节点）
 - ★ 套件**执行顺序**：`e2e_baseline` → `probe_n24_n25` → `probe_bom_math`（最后一个会 TRUNCATE 业务表，放最后）
 - 账号：admin / admin12345；演示账号密码 `txgk@123`（采购链：`buyer1` 组员 / `purchase_manager` 经理 / `purchase_director` 总监 —— 三级都要有，缺经理会全程自动跳级、两级审批退化成一级）
 

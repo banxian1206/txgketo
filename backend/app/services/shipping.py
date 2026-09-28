@@ -32,6 +32,7 @@ from app.models.shipment import (
 )
 from app.services import notify
 from app.services import kitting as kt
+from app.services import payment as payment_svc
 from app.services.numbering import ObjectType, next_number, year_scope_key
 
 SHIP_OPEN = (SHIP_INSTRUCTED, SHIP_SHIPPING, SHIP_LOADED, SHIP_TRANSIT, SHIP_ARRIVED)
@@ -438,6 +439,8 @@ def depart(
         biz_id=sh.id,
         actor_id=actor_id,
     )
+    # ★ G2：发运 → **催商务部收「发货款」**（只提醒，不卡流程）
+    payment_svc.trigger_for_shipment(session, sh.project_no, actor_id=actor_id)
     # 发运即进入「交付中」阶段（执行中 → 交付中）
     project = session.get(Project, sh.project_no)
     if project is not None and project.stage not in (project_stage.DELIVERING, project_stage.WARRANTY, project_stage.CLOSED):
@@ -454,6 +457,8 @@ def arrive(session: Session, sh: Shipment) -> Shipment:
         raise ShippingError(f"当前状态「{sh.status}」，不能登记到货")
     sh.status = SHIP_ARRIVED
     sh.arrive_at = _now()
+    # ★ G2：到货 → **催商务部收「到货款」**（只提醒，不卡流程）
+    payment_svc.trigger_for_arrival(session, sh.project_no)
     return sh
 
 

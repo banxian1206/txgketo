@@ -23,7 +23,7 @@ from app.core.db import get_session
 from app.models.initiation import ProjectMember
 from app.models.platform import User
 from app.models.project import Attachment, Contact, Customer, PaymentTerm, Project
-from app.services import audit, project_stage
+from app.services import audit, payment as payment_svc, project_stage
 from app.services.reviewers import dept_code_of
 from app.services.numbering import ObjectType, next_number, peek_number, year_scope_key
 
@@ -288,6 +288,8 @@ def register_deal(
                 project_no=project_no,
                 seq=i,
                 node_name=t.node_name,
+                # ★ G2：把付款节点绑到业务节点（显式优先，否则按名字推断）
+                trigger_node=payment_svc.normalize_trigger(t.trigger_node, t.node_name),
                 percent=t.percent,
                 amount=amount or None,
                 expect_date=t.expect_date,
@@ -475,6 +477,7 @@ def get_project_detail(
             {
                 "seq": t.seq,
                 "node_name": t.node_name,
+                "trigger_node": t.trigger_node,  # ★ G2：这个款由哪个业务节点提醒
                 "percent": float(t.percent) if t.percent is not None else None,
                 "amount": float(t.amount) if t.amount is not None else None,
                 "expect_date": t.expect_date,

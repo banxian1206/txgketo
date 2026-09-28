@@ -164,7 +164,22 @@ export default function DealModals({
                         <InputNumber style={{ width: '100%' }} min={0} max={100} suffix="%" />
                       </Form.Item>
                     </Col>
-                    <Col span={12}>
+                    {/* ★ G2：这个款跟哪个业务节点对上（到了就提醒商务部收款）；不选则按节点名自动推断 */}
+                    <Col span={4}>
+                      <Form.Item name={[field.name, 'trigger_node']}>
+                        <Select
+                          allowClear
+                          placeholder="对齐节点"
+                          options={[
+                            { value: '发货', label: '发货' },
+                            { value: '到货', label: '到货' },
+                            { value: '验收', label: '验收' },
+                            { value: '质保', label: '质保' },
+                          ]}
+                        />
+                      </Form.Item>
+                    </Col>
+                    <Col span={8}>
                       <Form.Item name={[field.name, 'condition']}>
                         <Input placeholder="触发条件" />
                       </Form.Item>

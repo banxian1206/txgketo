@@ -138,6 +138,8 @@ class PaymentTermIn(BaseModel):
     amount: float | None = None
     expect_date: date | None = None
     condition: str | None = None
+    # ★ G2：该款由哪个业务节点触发提醒（发货/到货/验收/质保）；不传则按 node_name 推断
+    trigger_node: str | None = None
 
 
 class DealIn(BaseModel):

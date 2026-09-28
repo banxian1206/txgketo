@@ -112,6 +112,8 @@ export interface ProjectContact {
 export interface PaymentTerm {
   seq: number
   node_name: string
+  /** ★ G2：这个款由哪个**业务节点**触发提醒（发货/到货/验收/质保）；预收款为 null */
+  trigger_node?: string | null
   percent?: number | null
   amount?: number | null
   expect_date?: string | null
@@ -263,6 +265,7 @@ export interface DealIn {
   tech_agreement_frozen?: boolean
   payment_terms?: {
     node_name: string
+    trigger_node?: string | null
     percent?: number | null
     amount?: number | null
     expect_date?: string | null

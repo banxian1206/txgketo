@@ -162,6 +162,13 @@ export default function DealCard({
                   columns={[
                     { title: '#', dataIndex: 'seq', width: 46 },
                     { title: '节点', dataIndex: 'node_name', width: 110 },
+                    // ★ G2：跟上的是哪个业务节点（到了就提醒商务部收款）
+                    {
+                      title: '触发',
+                      dataIndex: 'trigger_node',
+                      width: 80,
+                      render: (v?: string | null) => (v ? <Tag>{v}</Tag> : '—'),
+                    },
                     {
                       title: '比例',
                       dataIndex: 'percent',
