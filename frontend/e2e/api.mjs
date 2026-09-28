@@ -4,14 +4,14 @@
  */
 import { check, summary, exitWith, apiLogin, apiGet, API, BASE } from './lib.mjs';
 
-const admin = await apiLogin('admin', 'admin12345');
+const [pm, buyer, sales] = await Promise.all([apiLogin('pm1', 'txgk@123'), apiLogin('buyer1', 'txgk@123'), apiLogin('sales1', 'txgk@123')]);   // ★ 不用 admin：超管绕过权限码且无部门（护栏 tests/test_no_admin_in_e2e.py）
 const wh1 = await apiLogin('wh1', 'txgk@123');
 
 // P-06：幽灵项目 → 400 友好文案（原 500 + 裸 axios）
 {
   const r = await fetch(`${API}/api/v1/acceptance/apply`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${admin}` },
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${pm}` },
     body: JSON.stringify({ project_no: 'TX99999' }),
   });
   const d = await r.json().catch(() => ({}));
@@ -21,14 +21,24 @@ const wh1 = await apiLogin('wh1', 'txgk@123');
 
 // P-07：无 project:amount 角色看详情金额 → null
 {
-  const r = await apiGet('/projects/TX26010', wh1);
-  const d = await r.json().catch(() => ({}));
-  check('P-07', d.amount === null && d.est_amount === null,
-    `wh1 amount=${d.amount} est=${d.est_amount}（应 null/null）`);
-  // 反向：admin 有权限应见金额
-  const r2 = await apiGet('/projects/TX26010', admin);
-  const d2 = await r2.json().catch(() => ({}));
-  check('P-07-rev', typeof d2.amount === 'number', `admin amount=${d2.amount}（有权限应可见）`);
+  // ★ 不再写死项目号（曾写死 TX26010，样本库重建后 404 → amount=undefined 误报 FAIL）
+  const list = await (await apiGet('/projects', pm)).json();
+  // 挑一个确实有金额的项目（否则 P-07-rev 无法验证"有权限应可见数字"）
+  const arr = Array.isArray(list) ? list : [];
+  const pno = (arr.find(p => p.amount != null) ?? arr[0])?.project_no;
+  if (!pno) {
+    check('P-07', true, '无项目可测，跳过', 'SKIP');
+  } else {
+    const r = await apiGet(`/projects/${pno}`, wh1);
+    const d = await r.json().catch(() => ({}));
+    check('P-07', d.amount === null && d.est_amount === null,
+      `${pno} wh1 amount=${d.amount} est=${d.est_amount}（应 null/null）`);
+    // 反向：sales（有 project:amount）应见金额
+    const r2 = await apiGet(`/projects/${pno}`, sales);
+    const d2 = await r2.json().catch(() => ({}));
+    check('P-07-rev', d2.amount !== undefined && d2.amount !== null,
+      `${pno} sales amount=${d2.amount}（有权限应可见真实数字，不被脱敏）`);
+  }
 }
 
 // P-05：验收门禁 —— 用一个肯定没有调试完成记录的幽灵之外的探针：
@@ -38,14 +48,14 @@ const wh1 = await apiLogin('wh1', 'txgk@123');
   // 走 API 找一个 stage 不在质保/执行尾期的项目太绕；直接断言：对不存在项目返回的是
   // 「项目不存在」而不是 500；对存在但未调试项目返回「现场调试还没完成」。
   // 动态找未调试项目：
-  const list = await (await apiGet('/projects', admin)).json();
+  const list = await (await apiGet('/projects', pm)).json();
   const probe = (Array.isArray(list) ? list : []).find(p => p.stage === '线索' || p.stage === '成交待立项' || p.stage === '执行中');
   if (!probe) {
     check('P-05', true, '当前无未调试阶段项目（门禁逻辑由 UI 写链回归覆盖）', 'SKIP');
   } else {
     const r = await fetch(`${API}/api/v1/acceptance/apply`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${admin}` },
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${pm}` },
       body: JSON.stringify({ project_no: probe.project_no }),
     });
     const d = await r.json().catch(() => ({}));
@@ -60,14 +70,14 @@ const wh1 = await apiLogin('wh1', 'txgk@123');
 // P-02：无项目（辅料）需求存在验收路由 —— 找一条 project_no 为 NULL 的在途需求，验收接口不应 404
 // （用 pool/incoming 探针：若无此类需求则 SKIP）
 {
-  const wb = await (await apiGet('/warehouse/workbench', admin)).json();
+  const wb = await (await apiGet('/warehouse/workbench', wh1)).json();
   const nullProj = (wb.incoming || []).find(x => !x.project_no);
   if (!nullProj) {
     check('P-02', true, '当前无辅料在途需求（P-02 路径由 UI 写链回归覆盖）', 'SKIP');
   } else {
     const r = await fetch(`${API}/api/v1/purchase-requests/${nullProj.id}/inspect`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${admin}` },
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${wh1}` },
       body: JSON.stringify({ receipt_date: new Date().toISOString().slice(0, 10), qty: 1, result: '合格' }),
     }).catch(e => ({ status: 0, json: async () => ({ detail: String(e) }) }));
     const d = await r.json().catch(() => ({}));
@@ -79,16 +89,20 @@ const wh1 = await apiLogin('wh1', 'txgk@123');
 
 // R2-01：直发客户现场 → 下单即建「现场待验收」到货单（现场立即可清点；仓库列表不含直发）
 {
-  const projects = await (await apiGet('/projects', admin)).json();
+  const projects = await (await apiGet('/projects', pm)).json();
   const proj = (Array.isArray(projects) ? projects : []).find(p => ['执行中', '交付中', '质保'].includes(p.stage)) || (Array.isArray(projects) ? projects[0] : null);
-  const suppliers = await (await apiGet('/suppliers', admin)).json();
+  const suppliers = await (await apiGet('/suppliers', buyer)).json();
   const sup = Array.isArray(suppliers) ? suppliers[0] : null;
-  const items = await (await apiGet('/library/items?limit=1', admin)).json();
+  const items = await (await apiGet('/library/items?limit=1', buyer)).json();
   const item = Array.isArray(items) ? items[0] : null;
   if (!proj || !sup || !item) {
     check('R2-01', true, '缺少造数前置（项目/供应商/物料），跳过', 'SKIP');
   } else {
-    const h = { 'Content-Type': 'application/json', Authorization: `Bearer ${admin}` };
+    // ★ 采购单要用真实采购员身份下（buyer1）：admin 无部门，审批链的
+    //   `director_for` 会全局兜底到「第一个总监」（往往是工程总监）而采购总监审不了 → 单卡死。
+    //   见本轮发现 N21（已另行报告，不属于本探针要测的 R2-01 口径）。
+    const buyer = await apiLogin('buyer1', 'txgk@123');
+    const h = { 'Content-Type': 'application/json', Authorization: `Bearer ${buyer}` };
     const mr = await (await fetch(`${API}/api/v1/purchase/manual-request`, {
       method: 'POST', headers: h,
       body: JSON.stringify({ attribution: '项目', project_no: proj.project_no, item_no: item.item_no, qty: 1,
@@ -99,20 +113,36 @@ const wh1 = await apiLogin('wh1', 'txgk@123');
       body: JSON.stringify({ supplier_id: sup.id, ordered_at: new Date().toISOString().slice(0, 10),
         // 客户口径 O3-A：手工单无采购周期 → 预计到货日必填（不填会被 400 拦，本探针要往下跑）
         expected_date: new Date(Date.now() + 86400000 * 7).toISOString().slice(0, 10),
-        deliver_to: '直发客户现场', deliver_address: 'E2E 探针地址', lines: [{ request_id: mr.id }] }),
+        deliver_to: '直发客户现场', deliver_address: 'E2E 探针地址',
+        // ★ tax_incl 重构后必填（08 §3.2 / 客户口径#10），不传会 422 而撞不到本探针要测的门禁
+        lines: [{ request_id: mr.id, tax_incl: true }] }),
     })).json();
-    const inc = await (await apiGet(`/site/incoming?project_no=${proj.project_no}`, admin)).json();
+    // ★ 08 §4.2：直发【现场待验收】到货单在审批通过后才建 —— 必须先把单推到已批准再查
+    let st = po.status;
+    const approverOf = { 待经理审: 'purchase_manager', 待总监审: 'purchase_director' };
+    for (let k = 0; k < 3 && approverOf[st]; k++) {
+      let tok = null;
+      try { tok = await apiLogin(approverOf[st], 'txgk@123'); } catch { /* 无该演示账号 */ }
+      if (!tok) break;
+      await fetch(`${API}/api/v1/purchase/orders/${po.po_no}/approve`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${tok}` },
+        body: JSON.stringify({ action: '通过', note: 'R2-01 探针自动通过' }),
+      });
+      const cur = await (await apiGet('/purchase/orders', buyer)).json();
+      st = (Array.isArray(cur) ? cur : []).find(o => o.po_no === po.po_no)?.po_status;
+    }
+    const inc = await (await apiGet(`/site/incoming?project_no=${proj.project_no}`, pm)).json();
     const hit = (inc.pending || []).some(x => x.item_no === item.item_no && x.status === '现场待验收');
-    const wb = await (await apiGet('/warehouse/workbench', admin)).json();
+    const wb = await (await apiGet('/warehouse/workbench', wh1)).json();
     const notInWh = !(wb.incoming || []).some(x => x.id === mr.id);
     check('R2-01', hit && notInWh,
-      `PO=${po.po_no ?? '?'} · 现场待清点=${hit} · 仓库不含直发=${notInWh}（本探针会留一条待清点数据）`);
+      `PO=${po.po_no ?? '?'} · 审批后=${st} · 现场待清点=${hit} · 仓库不含直发=${notInWh}（本探针会留一条待清点数据）`);
   }
 }
 
 // 观察-02：通知「接收方视角」—— 不只看发出，还要看该收的人真收到（用便宜的售后报修触发）
 {
-  const projects = await (await apiGet('/projects', admin)).json();
+  const projects = await (await apiGet('/projects', pm)).json();
   const proj = (Array.isArray(projects) ? projects : []).find(p => ['执行中', '交付中', '质保'].includes(p.stage)) || (Array.isArray(projects) ? projects[0] : null);
   if (!proj) {
     check('RCPT-售后报修→项目经理', true, '无项目可探', 'SKIP');
@@ -144,18 +174,18 @@ const wh1 = await apiLogin('wh1', 'txgk@123');
 
 // P-17：演示数据采购行有价格（单价非空，价格参考才有意义）
 {
-  const orders = await (await apiGet('/purchase/orders', admin)).json();
+  const orders = await (await apiGet('/purchase/orders', buyer)).json();
   const withPrice = (Array.isArray(orders) ? orders : []).some(o => (o.total_amount ?? 0) > 0);
   check('P-17', withPrice, withPrice ? '存在带金额的采购单' : '所有采购单金额为 0/空');
 }
 
 // ── O3-A（客户口径）：预计到货日必须有 —— 无采购周期又不填 → 400 ──
 {
-  const h = { 'Content-Type': 'application/json', Authorization: `Bearer ${admin}` };
-  const projects = await (await apiGet('/projects', admin)).json();
+  const h = { 'Content-Type': 'application/json', Authorization: `Bearer ${buyer}` };
+  const projects = await (await apiGet('/projects', pm)).json();
   const proj = (Array.isArray(projects) ? projects : []).find(p => ['执行中', '交付中', '质保'].includes(p.stage));
-  const sup = ((await (await apiGet('/suppliers', admin)).json()) ?? [])[0];
-  const item = ((await (await apiGet('/library/items?limit=1', admin)).json()) ?? [])[0];
+  const sup = ((await (await apiGet('/suppliers', buyer)).json()) ?? [])[0];
+  const item = ((await (await apiGet('/library/items?limit=1', buyer)).json()) ?? [])[0];
   if (!proj || !sup || !item) {
     check('O3A-预计到货必填', true, '缺造数前置，跳过', 'SKIP');
   } else {
@@ -166,14 +196,15 @@ const wh1 = await apiLogin('wh1', 'txgk@123');
     const ordered = new Date().toISOString().slice(0, 10);
     const noDate = await fetch(`${API}/api/v1/purchase/merge-order`, {
       method: 'POST', headers: h,
-      body: JSON.stringify({ supplier_id: sup.id, ordered_at: ordered, deliver_to: '公司仓库', lines: [{ request_id: mr.id }] }),
+      body: JSON.stringify({ supplier_id: sup.id, ordered_at: ordered, deliver_to: '公司仓库',
+        lines: [{ request_id: mr.id, tax_incl: true }] }),
     });
     const d1 = await noDate.json().catch(() => ({}));
     const withDate = await fetch(`${API}/api/v1/purchase/merge-order`, {
       method: 'POST', headers: h,
       body: JSON.stringify({ supplier_id: sup.id, ordered_at: ordered,
         expected_date: new Date(Date.now() + 86400000 * 7).toISOString().slice(0, 10),
-        deliver_to: '公司仓库', lines: [{ request_id: mr.id }] }),
+        deliver_to: '公司仓库', lines: [{ request_id: mr.id, tax_incl: true }] }),
     });
     check('O3A-预计到货必填',
       noDate.status === 400 && /预计到货/.test(String(d1.detail)) && withDate.status < 300,
@@ -184,16 +215,16 @@ const wh1 = await apiLogin('wh1', 'txgk@123');
 // ── R5-01/R5-02：装车与发运双门禁 · 已装车可补勾 · 发运后清单锁死 ──
 {
   const H = (t) => ({ 'Content-Type': 'application/json', Authorization: `Bearer ${t}` });
-  const post = async (url, body, token = admin) => {
+  const post = async (url, body, token = pm) => {
     const r = await fetch(`${API}/api/v1${url}`, { method: 'POST', headers: H(token), body: JSON.stringify(body ?? {}) });
     let j = null; try { j = await r.json(); } catch { /* noop */ }
     return { code: r.status, j };
   };
   const PH = ['e2e-guard-probe.png'];
   let target = null;
-  const ps = (await (await apiGet('/projects', admin)).json()) ?? [];
+  const ps = (await (await apiGet('/projects', pm)).json()) ?? [];
   for (const p of (Array.isArray(ps) ? ps : [])) {
-    const ts = await (await apiGet(`/shipping/to-ship?project_no=${p.project_no}`, admin)).json();
+    const ts = await (await apiGet(`/shipping/to-ship?project_no=${p.project_no}`, pm)).json();
     const rows = (Array.isArray(ts) ? ts : (ts.items ?? [])).filter(r => r.ready && !r.in_open_shipment);
     if (rows.length) { target = { pno: p.project_no, equip: rows[0].equip_no }; break; }
   }
@@ -205,14 +236,14 @@ const wh1 = await apiLogin('wh1', 'txgk@123');
     const ins = await post('/shipping/instructions', { project_no: target.pno, equip_nos: [target.equip] });
     const sid = ins.j?.id;
     await post(`/shipping/${sid}/items/generate`, {});
-    const its = (await (await apiGet(`/shipping/${sid}/items`, admin)).json()) ?? [];
+    const its = (await (await apiGet(`/shipping/${sid}/items`, pm)).json()) ?? [];
     if (!sid || its.length === 0) {
       check('R5-01-装车硬拦', true, `批次 ${ins.j?.shipment_no ?? '?'} 清单为空（结构未发布），跳过`, 'SKIP');
       check('R5-01-已装车可补勾', true, '同上', 'SKIP');
       check('R5-02-锁死报400非500', true, '同上', 'SKIP');
       check('R5-探针自清理', true, '同上', 'SKIP');
     } else {
-    const shot = async () => (await (await apiGet(`/shipping/${sid}`, admin)).json()).status;
+    const shot = async () => (await (await apiGet(`/shipping/${sid}`, pm)).json()).status;
     // ① 0 项已发：装车与发运都必须 400
     const ld0 = await post(`/shipping/${sid}/load`, { photos: PH });
     const dp0 = await post(`/shipping/${sid}/depart`, {});
@@ -234,7 +265,7 @@ const wh1 = await apiLogin('wh1', 'txgk@123');
       `在途后补勾→${lock.code}「${String(lock.j?.detail ?? '').slice(0, 34)}」`);
     // ④ 探针自清理：到货 + 清点 → 已签收（不留未完成批次）
     await post(`/shipping/${sid}/arrive`, {});
-    const shipped = (((await (await apiGet(`/shipping/${sid}`, admin)).json()) ?? {}).items ?? []).filter(i => i.shipped);
+    const shipped = (((await (await apiGet(`/shipping/${sid}`, pm)).json()) ?? {}).items ?? []).filter(i => i.shipped);
     const rec = await post(`/shipping/${sid}/receipt`, {
       checks: shipped.map(i => ({ item_id: i.id, result: '到', received_qty: i.qty })), photos: PH, remark: 'R5 护栏探针自清理',
     });

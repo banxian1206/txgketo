@@ -6,7 +6,7 @@
  *  Part 4 本轮口径：O1 侧栏不再重名 · R4-01 移动端已下线 PC-only 卡
  *  注意：本脚本会创建 1 个测试商机（E2E回归-*）并走完 建图/下单/验收，属护栏正常代价
  */
-import { newCtx, login, body, shot, check, summary, exitWith, results, BASE, FILES, apiLogin, apiGet } from './lib.mjs';
+import { newCtx, login, body, shot, check, summary, exitWith, results, BASE, API, FILES, apiLogin, apiGet } from './lib.mjs';
 import path from 'node:path';
 
 const PHOTO = path.join(FILES, 'photo.png');
@@ -19,43 +19,63 @@ const PC_ROUTES = [
 ];
 const M_ROUTES = ['/m', '/m/warehouse', '/m/issues', '/m/production', '/m/assembly', '/m/shipping', '/m/site', '/m/service', '/m/me'];
 
-// ═════════ Part 1 · PC 冒烟 ═════════
-{
-  const c = await newCtx(); const { page, errs } = c;
-  await login(page, 'admin', 'admin12345');
-  const bad = [];
-  for (const r of PC_ROUTES) {
-    errs.length = 0;
-    await page.goto(BASE + r, { waitUntil: 'networkidle', timeout: 20000 }).catch(() => {});
-    await page.waitForTimeout(500);
-    const len = (await body(page)).length;
-    if (len < 40) bad.push(`${r} 空页(${len})`);
-    const e = errs.filter(x => !x.includes('favicon'));
-    if (e.length) bad.push(`${r}: ${e.slice(0, 2).join(' ')}`);
-  }
-  check('SMOKE-pc', bad.length === 0, bad.length ? bad.join(' | ').slice(0, 400) : `25 路由零异常零空页`);
+// ★ 冒烟不得用 admin（超管绕过所有权限码 → 等于权限层没测；且无部门会造出 N21 假象）。
+//   改为「路由 → 用哪个角色跑」：一个角色只走它有权看的页，否则会因 403 误报。
+const PC_ROLE_ROUTES = [
+  ['pm1', ['/workbench', '/workbench/pm', '/projects', '/projects/new', '/my-tasks', '/reviews',
+    '/changes', '/manufacturing', '/assembly', '/shipping', '/site', '/acceptance']],
+  ['buyer1', ['/purchase', '/suppliers', '/library', '/warehouse']],
+  ['sales1', ['/workbench/sales']],
+  ['shop1', ['/workbench/shop']],
+  ['eng_director', ['/workbench/eng', '/numbering', '/users']],
+  ['service1', ['/service']],
+];
+const M_ROLE_ROUTES = [
+  ['wh1', ['/m', '/m/warehouse', '/m/issues']],
+  ['shop1', ['/m/production', '/m/assembly']],
+  ['pm1', ['/m/shipping', '/m/site']],
+  ['service1', ['/m/service']],
+  ['sales1', ['/m/me']],
+];
 
-  // P-16 动态：全程 console 无 antd 弃用警告
+/** 逐个角色登录，只走它被分配的路由；返回异常清单。 */
+async function smokeByRole(ctx, groups, waitMs) {
+  const { page, errs } = ctx;
+  const bad = [];
+  for (const [who, routes] of groups) {
+    await login(page, who, 'txgk@123');
+    for (const r of routes) {
+      errs.length = 0;
+      await page.goto(BASE + r, { waitUntil: 'networkidle', timeout: 20000 }).catch(() => {});
+      await page.waitForTimeout(waitMs);
+      const len = (await body(page)).length;
+      if (len < 40) bad.push(`${who}${r} 空页(${len})`);
+      const e = errs.filter(x => !x.includes('favicon'));
+      if (e.length) bad.push(`${who}${r}: ${e.slice(0, 2).join(' ')}`);
+    }
+  }
+  return bad;
+}
+
+// ═════════ Part 1 · PC 冒烟（按角色分组，共 25 路由）═════════
+{
+  const c = await newCtx(); const { errs } = c;
+  const bad = await smokeByRole(c, PC_ROLE_ROUTES, 500);
+  const n = PC_ROLE_ROUTES.reduce((a, [, rs]) => a + rs.length, 0);
+  check('SMOKE-pc', bad.length === 0, bad.length ? bad.join(' | ').slice(0, 400) : `${n} 路由零异常零空页（${PC_ROLE_ROUTES.length} 角色）`);
+
+  // P-16 动态：console 无 antd 弃用警告
   const antdWarn = errs.filter(x => /antd/.test(x));
   check('P-16-dyn', antdWarn.length === 0, antdWarn.length ? antdWarn[0] : 'console antd 警告 0');
   await c.browser.close();
 }
 
-// ═════════ Part 1b · 移动冒烟 ═════════
+// ═════════ Part 1b · 移动冒烟（按角色分组，共 9 页）═════════
 {
-  const c = await newCtx({ mobile: true }); const { page, errs } = c;
-  await login(page, 'admin', 'admin12345');
-  const bad = [];
-  for (const r of M_ROUTES) {
-    errs.length = 0;
-    await page.goto(BASE + r, { waitUntil: 'networkidle', timeout: 20000 }).catch(() => {});
-    await page.waitForTimeout(400);
-    const len = (await body(page)).length;
-    if (len < 40) bad.push(`${r} 空页(${len})`);
-    const e = errs.filter(x => !x.includes('favicon'));
-    if (e.length) bad.push(`${r}: ${e.slice(0, 2).join(' ')}`);
-  }
-  check('SMOKE-mobile', bad.length === 0, bad.length ? bad.join(' | ').slice(0, 400) : '9 移动页零异常');
+  const c = await newCtx({ mobile: true });
+  const bad = await smokeByRole(c, M_ROLE_ROUTES, 400);
+  const n = M_ROLE_ROUTES.reduce((a, [, rs]) => a + rs.length, 0);
+  check('SMOKE-mobile', bad.length === 0, bad.length ? bad.join(' | ').slice(0, 400) : `${n} 移动页零异常（${M_ROLE_ROUTES.length} 角色）`);
   await c.browser.close();
 }
 
@@ -63,7 +83,9 @@ const M_ROUTES = ['/m', '/m/warehouse', '/m/issues', '/m/production', '/m/assemb
 const c = await newCtx(); const { page, errs } = c;
 let newNo = null;
 try {
-  await login(page, 'admin', 'admin12345');
+  // ★ 本段前 300 行是只读 IA 断言，其中「A3：反向裁剪（super 全卡）」**必须用超管**才能验证 ——
+  //   故显式声明例外。其后的写链已按责任角色逐段重新登录（见下方 login 调用）。
+  await login(page, 'admin', 'admin12345', { system: true });   // admin-ok: 本段含「A3 反向裁剪(super 全卡)」与写链 IA 断言，须超管；写链下单已由 N21 修复后可走采购链
 
   // ── P0 全站 IA：侧栏 7 项三分类 + 一级图标 + 旧平铺收进右侧 ──
   {
@@ -410,12 +432,22 @@ try {
   await mm.locator('.ant-form-item').filter({ hasText: '数量' }).locator('input').fill('3');
   await mm.getByRole('button', { name: /提\s*交\s*进\s*池/ }).click();
   await page.waitForTimeout(1600);
-  const rowCb = page.locator('.ant-table-row').first().locator('.ant-checkbox-input');
+  // ★ 选「刚申请的那一条」（按物料名定位）而不是表格第一行：
+  //   池里可能有别的历史待采购需求，
+  //   而 merge-order 会拒绝非「待采购/部分下单/审批中」的行 → 400 “不能合并下单”（探针旧假设=空池）
+  const poolRow = page.locator('.ant-table-row', { hasText: '方通' }).first();
+  const rowCb = (await poolRow.count() ? poolRow : page.locator('.ant-table-row').first())
+    .locator('.ant-checkbox-input');
   if (await rowCb.count()) await rowCb.check().catch(() => {});
   await page.waitForTimeout(400);
   const mergeBtn = page.getByRole('button', { name: /合\s*并\s*下\s*单/ }).first();
   const wasDisabled = await mergeBtn.isDisabled().catch(() => false);
   check('P-21', !wasDisabled, wasDisabled ? '勾选后仍禁用（异常）' : '勾选后合并下单可用');
+  // ★ 用「下单前后单号差集」定位本次新建的单：原来取「页面第一个 PO 号」会抓到旧单（列表按
+  //   ordered_at desc 排序，而本探针把下单日填成过去的 2026-09-22 → 新单排在后面）
+  const buyerTok = await apiLogin('buyer1', 'txgk@123');
+  const poSet = async () => new Set(((await (await apiGet('/purchase/orders', buyerTok)).json()) ?? []).map(o => o.po_no));
+  const poBefore = await poSet();
   await mergeBtn.click();
   await page.waitForTimeout(700);
   const om = page.locator('.ant-modal:visible').filter({ hasText: /下单/ });
@@ -436,7 +468,25 @@ try {
   if ((await numInputs.count()) >= 2) await numInputs.nth(1).fill('9.9');
   await om.getByRole('button', { name: /确\s*认\s*合\s*并\s*下\s*单/ }).click();
   await page.waitForTimeout(2200);
-  const poNo = ((await body(page)).match(/PO\d{5}/g) || [])[0];
+  const after = await poSet();
+  const poNo = [...after].find(n => !poBefore.has(n)) ?? ((await body(page)).match(/PO\d{5}/g) || [])[0];
+  // ★ 08 §4.2：审批通过后需求才转「在途」，仓库才会出验收按钮 —— 探针必须先把单推到已批准
+  {
+    const stOf = async () =>
+      ((await (await apiGet('/purchase/orders', buyerTok)).json()) ?? []).find(o => o.po_no === poNo)?.po_status;
+    let st = poNo ? await stOf() : null;
+    const approverOf = { 待经理审: 'purchase_manager', 待总监审: 'purchase_director' };
+    for (let k = 0; k < 3 && approverOf[st]; k++) {
+      let tok = null;
+      try { tok = await apiLogin(approverOf[st], 'txgk@123'); } catch { /* 无该演示账号 */ }
+      if (!tok) break;
+      await fetch(`${API}/api/v1/purchase/orders/${poNo}/approve`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${tok}` },
+        body: JSON.stringify({ action: '通过', note: 'P-02 探针自动通过' }),
+      });
+      st = await stOf();
+    }
+  }
   check('P-02a', !!poNo, poNo ? `${poNo} 已下单` : '未见采购单号');
 
   // 仓库验收（辅料 = project_no NULL 的旧 404 路径）
@@ -539,7 +589,7 @@ try {
   await page.waitForTimeout(900);
   let p08 = 'SKIP', p08note = '当前无「已装车」批次（软提示由 UI 探针 Z 系列 + API R5 链覆盖）';
   {
-    const tok = await apiLogin('admin', 'admin12345');
+    const tok = await apiLogin('pm1', 'txgk@123');
     const all = await (await apiGet('/shipping/list', tok)).json();
     // D3 收紧后「发运」只在「已装车」档出现（勾已发 → 装车 → 发运）
     const open = (Array.isArray(all) ? all : []).find((x) => x.status === '已装车');
@@ -704,7 +754,7 @@ try {
   const c = await newCtx(); const { page } = c;
   const closeModal = async () => { await page.locator('.ant-modal-close').last().click().catch(() => {}); await page.waitForTimeout(400); };
   try {
-    await login(page, 'admin', 'admin12345');
+    await login(page, 'eng_director', 'txgk@123');
 
     // 用户编辑
     await page.goto(BASE + '/users', { waitUntil: 'networkidle' }); await page.waitForTimeout(1200);
@@ -748,7 +798,7 @@ try {
     } else check('PREFILL-装配开始', true, '无开始装配入口', 'SKIP');
     // 现场来货清点（PC）：默认结论「齐」必须预选（曾先设后开丢值，护栏也只认 destroyOnHidden 而漏扫）
     let projWithIncoming = null;
-    const toks = await apiLogin('admin', 'admin12345');
+    const toks = await apiLogin('pm1', 'txgk@123');
     const ps = (await (await apiGet('/projects', toks)).json()) ?? [];
     // 有活儿的阶段优先（/projects 按号倒序，测试项目会把真正在跑的项目挤出前 40 个）
     const ACT = ['执行中', '交付中', '质保'];
@@ -786,7 +836,7 @@ try {
 {
   const c = await newCtx(); const { page } = c;
   try {
-    await login(page, 'admin', 'admin12345');
+    await login(page, 'eng_director', 'txgk@123');
     await page.goto(BASE + '/admin/users', { waitUntil: 'networkidle' }); await page.waitForTimeout(1500);
     const dup = await page.locator('.ant-layout-sider').getByText('系统管理', { exact: true }).count();
     const item = await page.locator('.ant-layout-sider').getByText('用户与权限', { exact: true }).count();

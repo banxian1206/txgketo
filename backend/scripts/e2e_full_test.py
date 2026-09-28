@@ -66,7 +66,7 @@ def main() -> None:
         return [x["token"] for x in req("post", f"/api/v1/{area}/photos", who, (201,),
                                         params={"project_no": pno, "ref": ref}, files=files)]
 
-    users = {u["username"]: u["id"] for u in req("get", "/api/v1/users", "admin")}
+    users = {u["username"]: u["id"] for u in req("get", "/api/v1/users", "admin")  # admin-ok: 读用户列表（仅 system:admin/总监）}
 
     # ================= 基础数据：标准库物料（接口建，重复容错） =================
     stage("准备：标准库物料（admin 通过接口建档）")
@@ -82,11 +82,11 @@ def main() -> None:
     ]
     created = 0
     for cls, spec, unit in ITEMS:
-        r = c.post("/api/v1/library/items", headers=login("admin"),
+        r = c.post("/api/v1/library/items", headers=login("craft1"),
                    json={"std_class_code": cls, "spec": spec, "unit": unit})
         if r.status_code == 201:
             created += 1
-    all_items = req("get", "/api/v1/library/items", "admin", params={"limit": 50})
+    all_items = req("get", "/api/v1/library/items", "craft1", params={"limit": 50})
     print(f"  新建 {created} 条；库内共 {len(all_items)} 条物料")
 
     # ================= S0 商机 =================
@@ -130,7 +130,7 @@ def main() -> None:
 
     # ================= S1 立项 =================
     stage("S1 立项（pm1）")
-    users = {u["username"]: u["id"] for u in req("get", "/api/v1/users", "admin")}
+    users = {u["username"]: u["id"] for u in req("get", "/api/v1/users", "admin")  # admin-ok: 读用户列表（仅 system:admin/总监）}
     for u, role in [("pm1", "项目经理"), ("mech_manager", "机械负责人"), ("elec_manager", "电气负责人"),
                     ("prog_manager", "程序负责人"), ("craft_manager", "工艺负责人"), ("buyer1", "采购负责人"),
                     ("shop1", "生产负责人"), ("assy1", "装配负责人"), ("site1", "现场负责人"),

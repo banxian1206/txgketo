@@ -187,5 +187,82 @@ check('SUBMIT-无裸validate', bareValidate.length === 0,
     bad.length ? `移动端又链到 PC-only 路由: ${bad.join(', ')}` : '移动首页/我的页已无 PC-only 入口（任务/评审/改版）');
 }
 
+// ══ 双端一致性护栏（本轮起：PC 与移动端不再各改各的）══════════════════
+const FEATS = path.join(SRC, 'features');
+
+// T-1 数据同源：同模块若 PC 用了共享看板 hook，移动端必须用同一个（防两端各拉各的数据）
+{
+  const bad = [];
+  for (const f of fs.readdirSync(FEATS)) {
+    const pc = path.join(FEATS, f, 'Page.tsx'), mo = path.join(FEATS, f, 'MobilePage.tsx');
+    if (!fs.existsSync(pc) || !fs.existsSync(mo)) continue;
+    const pick = p => (fs.readFileSync(p, 'utf8').match(/use\w+Board/g) ?? []);
+    const a = [...new Set(pick(pc))], b = [...new Set(pick(mo))];
+    if (a.length && !a.every(h => b.includes(h))) bad.push(`${f}: PC=${a.join('|')} 移动=${b.join('|') || '无'}`);
+  }
+  check('TERM-双端数据同源', bad.length === 0, bad.length ? `移动端未复用 PC 的看板 hook: ${bad.join('; ')}` : '双端模块均复用同一 use*Board（一份数据两个壳）');
+}
+
+// T-2 门禁文案双端齐备：同一业务门禁不能只写在一端（历史上 PC 有 0 项硬拦、移动没有）
+{
+  const GATES = [
+    ['features/shipping', ['一项都没勾', '装车要拍照']],
+    ['features/warehouse', ['验收', '入库']],
+    ['features/site', ['拍照']],
+  ];
+  const bad = [];
+  for (const [dir, keys] of GATES) {
+    const pc = path.join(SRC, dir, 'Page.tsx'), mo = path.join(SRC, dir, 'MobilePage.tsx');
+    if (!fs.existsSync(pc) || !fs.existsSync(mo)) continue;
+    const a = fs.readFileSync(pc, 'utf8'), b = fs.readFileSync(mo, 'utf8');
+    for (const k of keys) {
+      const inA = a.includes(k), inB = b.includes(k);
+      if (inA !== inB) bad.push(`${dir} 「${k}」 ${inA ? '只在PC' : '只在移动'}`);
+    }
+  }
+  check('TERM-门禁双端齐备', bad.length === 0, bad.join('; ') || '关键门禁/动作文案两端都在（不再一端修一端漏）');
+}
+
+// T-3 D3 收紧后：发运入口只能挂在「已装车」，两端都不得再放行 发货中/已指令
+{
+  const bad = [];
+  for (const rel of ['features/shipping/Page.tsx', 'features/shipping/MobilePage.tsx']) {
+    const src = fs.readFileSync(path.join(SRC, rel), 'utf8');
+    const line = src.split('\n').find(l => /doDepart\)?\(?/.test(l) && /发\s*运/.test(l) && /includes\(/.test(l)) ?? '';
+    if (/发货中|已指令/.test(line)) bad.push(`${rel}: ${line.trim().slice(0, 60)}`);
+  }
+  check('TERM-发运入口仅已装车', bad.length === 0, bad.join(' | ') || '两端「发运」入口都只在「已装车」档出现（S7 顺序：勾已发→装车→发运）');
+}
+
+// T-4 redirect 只做兼容层：站内导航不得再引用旧路径（新路径为准）
+{
+  const dom = fs.readFileSync(path.join(SRC, 'configs/domain.tsx'), 'utf8');
+  const fromList = [...new Set([...dom.matchAll(/\[\s*'(\/[^']+)',\s*'\/[^']+'\s*\]/g)].map(m => m[1]))].filter(x => x !== '/');
+  const nav = /(?:nav|navigate|goTo)\(\s*['"`](\/[^'"`]+)['"`]|to=\{?['"`](\/[^'"`]+)['"`]|location\.href = ['"`](\/[^'"`]+)['"`]|to: ['"`](\/[^'"`]+)['"`]/g;
+  const bad = [];
+  const walk = d => {
+    for (const f of fs.readdirSync(d)) {
+      const p = path.join(d, f);
+      if (fs.statSync(p).isDirectory()) { if (f !== 'configs') walk(p); continue; }
+      if (!/\.tsx$/.test(f)) continue;
+      const src = fs.readFileSync(p, 'utf8');
+      src.split('\n').forEach((l, i) => {
+        const t = l.trim();
+        if (t.startsWith('//') || t.startsWith('*')) return;
+        let m;
+        nav.lastIndex = 0;
+        while ((m = nav.exec(l))) {
+          const used = m.slice(1).find(Boolean);
+          if (used && fromList.includes(used)) bad.push(`${p.replace(SRC, 'src')}:${i + 1} → ${used}`);
+        }
+      });
+    }
+  };
+  walk(SRC);
+  check('NAV-导航不用旧路径', bad.length === 0,
+    bad.length ? `站内仍引用 redirect 旧路径（应换新路径，redirect 只留兼容）: ${bad.slice(0, 6).join(', ')}`
+      : `站内导航引用零处命中 ROUTE_REDIRECTS 的 ${fromList.length} 条旧路径`);
+}
+
 const fails = summary('静态回归');
 exitWith(fails);

@@ -228,7 +228,7 @@ def main():
         c.execute(text("DELETE FROM item"))
     print("🧹 业务数据已清空（含全局库存）")
     for cls, spec, unit in LIB_SEED:
-        call("post", "/library/items", "admin", (201,),
+        call("post", "/library/items", "craft1", (201,),   # craft1=工艺(std:edit)，不需要超管
              json={"std_class_code": cls, "spec": spec, "unit": unit})
     for nm, kd in [("甲钢材", "原材料"), ("乙标准件", "标准件")]:
         call("post", "/suppliers", "buyer1", (201,), json={

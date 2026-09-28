@@ -75,7 +75,7 @@ def main() -> None:
             req("post", f"/api/v1/programs/{ref}/draft", who, (200,),
                 data={"change_reason": "初稿"}, files={"file": ("p.st", b"LD M0\n", "text/plain")})
 
-    users = {u["username"]: u["id"] for u in req("get", "/api/v1/users", "admin")}
+    users = {u["username"]: u["id"] for u in req("get", "/api/v1/users", "admin")  # admin-ok: 读用户列表（仅 system:admin/总监）}
 
     # 标准库物料（接口建档，重复容错）
     ITEMS = [
@@ -89,10 +89,10 @@ def main() -> None:
         ("ZCT", {"brand": "NSK", "model": "6204DDU"}, "个"),
     ]
     for cls, spec, unit in ITEMS:
-        c.post("/api/v1/library/items", headers=login("admin"),
+        c.post("/api/v1/library/items", headers=login("craft1"),
                json={"std_class_code": cls, "spec": spec, "unit": unit})
     lib = {}
-    for x in req("get", "/api/v1/library/items", "admin", params={"limit": 50}):
+    for x in req("get", "/api/v1/library/items", "craft1", params={"limit": 50}):
         lib[x["display_name"].split(" ")[0]] = x["item_no"]
     print(f"账号 {len(users)} 个；标准库物料 {len(lib)} 种")
 

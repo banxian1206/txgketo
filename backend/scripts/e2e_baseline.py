@@ -196,10 +196,10 @@ LIB_SEED = [
 
 def setup_library() -> None:
     for cls, spec, unit in LIB_SEED:
-        api.req("post", "/library/items", "admin", (201,),
+        api.req("post", "/library/items", "craft1", (201,),   # craft1=工艺(std:edit)，不需要超管
                 json={"std_class_code": cls, "spec": spec, "unit": unit})
     for key, kw in [("zct", "轴承"), ("ft", "方通"), ("bc", "板材"), ("dj", "电机"), ("plc", "PLC")]:
-        rows = api.req("get", "/library/items", "admin", params={"q": kw})
+        rows = api.req("get", "/library/items", "craft1", params={"q": kw})
         LIB[key] = rows[0]
     note("标准库：" + ", ".join(f"{k}={v['item_no']}" for k, v in LIB.items()))
 
@@ -1371,7 +1371,7 @@ def c_authz_codes() -> None:
             f"★ 仓库总监(wh_director) 裁决工程部改版 → HTTP {sc2}（应 403：非本部门）",
             f"返回：{str(bd2)[:260]}\nchange_flow.decide 只判 `user.position != 总监`，"
             "**不限部门**；而 review_flow 二级审核用 director_for(submitter) 精确到人且限部门 —— 两套标准")
-        cr = [x for x in api.req("get", "/change-requests", "admin", params={"scope": "all"})
+        cr = [x for x in api.req("get", "/change-requests", "eng_director", params={"scope": "all"})
               if x["id"] == crid]
         if cr:
             note(f"该 ECN 最终状态={cr[0]['status']}（被谁裁决：decided_by={cr[0].get('decided_by')}）")
@@ -1385,7 +1385,7 @@ def c_authz_codes() -> None:
 def c_review_authz() -> None:
     probe("C2 评审审核的授权码")
     # 找一张审核中的评审单，用非审核人去过
-    tks = api.req("get", "/review-tickets", "admin", params={"scope": "all"})
+    tks = api.req("get", "/review-tickets", "eng_director", params={"scope": "all"})
     pend = [t for t in tks if t["status"] in ("待经理审", "待总监审")]
     note(f"审核中的评审单 {len(pend)} 张")
     if pend:

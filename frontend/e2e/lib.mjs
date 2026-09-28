@@ -53,7 +53,28 @@ export async function newCtx({ mobile = false } = {}) {
   return { browser, ctx, page, errs, resetErrs: () => { errs.length = 0; } };
 }
 
-export async function login(page, username, password) {
+/**
+ * 断言：测试**不得用 admin 执行业务操作**（客户口径 2026-09-28）。
+ *
+ * 为什么写死：`has_permission()` 是 `user.is_superuser or ...` —— 超管**绕过所有权限码**，
+ * 用它跑 e2e 等于权限层与审批链完全没被覆盖；而且 admin 无部门，会造出「单卡死在待总监审」
+ * 这类**只有超管能复现**的假象（N21）。
+ *
+ * 例外（必须显式声明 `{ system: true }`）：① 造账号（/demo-users、POST /users）
+ * ② 系统管理读（/audit-logs 等仅 system:admin 可读）。
+ */
+function assertNotAdmin(username, system) {
+  if (username === 'admin' && !system) {
+    throw new Error(
+      `e2e 不得用 admin 执行业务操作（${username}）。` +
+      `请改用责任角色（buyer1/wh1/pm1/eng_director…）；` +
+      `确需超管（造账号 / 系统管理读）请显式传 { system: true }。`,
+    );
+  }
+}
+
+export async function login(page, username, password, opts = {}) {
+  assertNotAdmin(username, opts.system);
   await page.goto(BASE + '/login', { waitUntil: 'domcontentloaded' });
   await page.fill('input#username, input[placeholder="admin"]', username);
   await page.fill('input[type="password"]', password);
@@ -70,7 +91,8 @@ export async function shot(page, name) {
 }
 
 // ── API 小工具（回归里少量只读断言走 API，更快）─────────────
-export async function apiLogin(username, password) {
+export async function apiLogin(username, password, opts = {}) {
+  assertNotAdmin(username, opts.system);
   const r = await fetch(`${API}/api/v1/auth/login`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ username, password }),
