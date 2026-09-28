@@ -2160,46 +2160,6 @@ def merge_order(
 # ============================================================================
 
 
-# 可继续操作的行：未到货部分（取消 / 改供应商）；到货落地后不能动
-ORDER_ACTIVE_STATUS = ("待采购", "在途", "部分到货")
-# 验收不合格：由采购协商 → 换货（回在途）/ 退货（结束）
-ORDER_FAILED_STATUS = ("不合格",)
-# 已落地（验收中/已入库/已退）：取消、改供应商都动不了
-ORDER_BLOCKED_STATUS = ("待入库", "现场待验收", "已入库", "现场已验收", "已退货", "已取消")
-
-
-def _order_rows(session: Session, key: str) -> list[PurchaseRequest]:
-    """key 是采购单号；历史遗留的单条单没发号，用 R{id} 兜底。"""
-    if key.startswith("R") and key[1:].isdigit():
-        row = session.get(PurchaseRequest, int(key[1:]))
-        return [row] if row is not None else []
-    return list(
-        session.scalars(
-            select(PurchaseRequest).where(PurchaseRequest.po_no == key).order_by(PurchaseRequest.id)
-        ).all()
-    )
-
-
-def _order_status(rows: list[PurchaseRequest]) -> str:
-    """一张单的状态由行汇总：不合格 > 待入库 > 部分到货 > 已完成 > 在途。"""
-    active = [r for r in rows if r.status not in ("已取消", "已退货")]
-    if not active:
-        return "已取消" if any(r.status == "已取消" for r in rows) else "已退货"
-    st = {r.status for r in active}
-    if "不合格" in st:
-        return "不合格"
-    if "待入库" in st:
-        return "待入库"
-    if "现场待验收" in st:
-        return "现场待验收"
-    done = {"已入库", "现场已验收"}
-    if st <= done:
-        return "已完成"
-    if st & done or "部分到货" in st:
-        return "部分到货"
-    return "在途"
-
-
 def _receipt_qty_map(session: Session, request_ids: list[int]) -> dict[int, dict[str, float]]:
     """每行的到货情况汇总：已验收 / 已换货 / 已退货 数量（退换货记录用）。"""
     out: dict[int, dict[str, float]] = {}
@@ -2231,60 +2191,6 @@ def _retry_map(session: Session, request_ids: list[int]) -> dict[int, list[Purch
 
 def _retry_brief(rs: list[PurchaseRequest]) -> list[dict]:
     return [{"id": r.id, "status": r.status, "po_no": r.po_no} for r in rs]
-
-
-def _order_summary(
-    key: str,
-    rows: list[PurchaseRequest],
-    items: dict,
-    projects: dict,
-    equips: dict,
-    agg: dict[int, dict[str, float]] | None = None,
-) -> dict:
-    agg = agg or {}
-    active = [r for r in rows if r.status != "已取消"] or rows
-    first = active[0]
-    ordered = [r.ordered_at for r in rows if r.ordered_at]
-    expected = [r.expected_date for r in active if r.expected_date]
-    suppliers = {r.supplier_name for r in active if r.supplier_name}
-    projs = []
-    for r in rows:
-        if r.project_no not in [p["project_no"] for p in projs]:
-            projs.append({"project_no": r.project_no, "project_name": projects.get(r.project_no)})
-    eqs = []
-    for r in rows:
-        if not r.equip_no:
-            continue
-        if any(e["project_no"] == r.project_no and e["equip_no"] == r.equip_no for e in eqs):
-            continue
-        eqs.append(
-            {
-                "project_no": r.project_no,
-                "equip_no": r.equip_no,
-                "equip_name": equips.get((r.project_no, r.equip_no)),
-            }
-        )
-    return {
-        "key": key,
-        "po_no": first.po_no,
-        "supplier_id": first.supplier_id if len(suppliers) <= 1 else None,
-        "supplier_name": (
-            next(iter(suppliers)) if len(suppliers) == 1 else (f"{len(suppliers)} 家供应商" if suppliers else None)
-        ),
-        "ordered_at": max(ordered) if ordered else None,
-        "expected_date": min(expected) if expected else None,
-        "deliver_to": first.deliver_to,
-        "deliver_address": first.deliver_address,
-        "status": _order_status(rows),
-        "line_count": len(rows),
-        "item_kinds": len({r.item_no for r in rows}),
-        "total_amount": round(sum(float(r.amount or 0) for r in rows), 2),
-        "exchanged_qty": round(sum(agg.get(r.id, {}).get("exchanged", 0.0) for r in rows), 3),
-        "returned_qty": round(sum(agg.get(r.id, {}).get("returned", 0.0) for r in rows), 3),
-        "projects": projs,
-        "equipments": eqs,
-        "request_ids": [r.id for r in rows],
-    }
 
 
 def _order_maps(session: Session):
@@ -2568,39 +2474,48 @@ def cancel_purchase_order(
     session: Session = Depends(get_session),
     current: User = Depends(require_permission("purchase:edit")),
 ):
-    """取消采购：没到货的可以取消；已到货/入库的部分按实际留着，不合格的走换货/退货。"""
-    rows = _order_rows(session, key)
-    if not rows:
+    """取消采购（行级，08 §10）：取消「还没到」的部分；已到货的按实际留着。
+
+    ★ 行级：一条需求拆到多张单时，只取消本单这一行，不影响别的单。
+    """
+    from app.services import purchase_order as po_svc
+
+    po = session.scalar(select(PurchaseOrder).where(PurchaseOrder.po_no == key))
+    if po is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "采购单不存在")
-    eligible = [r for r in rows if r.status in ORDER_ACTIVE_STATUS]
+    lines = _po_lines(session, po.id)
+    eligible = [ln for ln in lines if ln.status in ("在途", "部分到货")]
     want = set(body.request_ids) if body.request_ids else None
-    target = [r for r in eligible if want is None or r.id in want]
+    target = [ln for ln in eligible if want is None or ln.request_id in want]
     if not target:
         raise HTTPException(
             status.HTTP_400_BAD_REQUEST,
             "这张单没有可取消的行（已到货、待入库、已入库的要走换货/退货或入库）",
         )
 
-    for r in target:
-        # 已经到货/入库的部分不能被「取消」抹掉：取消的是还没到的，数量收到货量
-        gs = _request_receipts(session, r.id)
-        delivered = sum(
-            float(g.qty or 0)
-            for g in gs
-            if g.status in ("待入库", "已入库", "现场已验收")
-        )
-        if delivered > 0:
-            r.qty = delivered
-            if r.unit_price:
-                r.amount = float(r.unit_price) * delivered
-            session.flush()
-            _recalc_request_status(session, r)
-            _sync_purchase_task(
-                session, r, "进行中", f"取消未到的部分，已到 {delivered:g} 按实际留着"
-            )
+    affected: set[int] = set()
+    for ln in target:
+        keep = float(ln.received_qty or 0)
+        cancel_qty = max(0.0, float(ln.qty or 0) - keep)
+        if ln.request_id:
+            req = session.get(PurchaseRequest, ln.request_id)
+            req.qty = max(0.0, float(req.qty or 0) - cancel_qty)  # 取消的是「还没到的部分」
+            affected.add(ln.request_id)
+        if keep <= 1e-9:
+            ln.qty = 0.0
+            ln.status = "已取消"
         else:
-            r.status = "已取消"
-            _sync_purchase_task(session, r, "已取消", f"采购取消：{body.reason or '—'}")
+            ln.qty = keep
+            ln.status = "部分到货"
+    session.flush()
+    for rid in affected:
+        row = session.get(PurchaseRequest, rid)
+        row.qty_ordered = po_svc.ordered_qty(session, rid)
+        session.flush()
+        _recalc_request_status(session, row)
+        _sync_purchase_task(session, row, "进行中", f"取消未到的部分（{key}），已到的按实际留着")
+    session.flush()
+    po_svc.recalc_order_status(session, po)
     audit.log(
         session,
         user=current,
@@ -2609,11 +2524,11 @@ def cancel_purchase_order(
         object_ref=key,
         summary=f"取消采购 {key}：{len(target)} 行"
         + (f"（{body.reason}）" if body.reason else ""),
-        detail={"request_ids": [r.id for r in target], "skipped": len(rows) - len(target)},
+        detail={"line_ids": [ln.id for ln in target], "skipped": len(lines) - len(target)},
         ip=client_ip(request),
     )
     session.commit()
-    return {"cancelled": len(target), "skipped": len(rows) - len(target)}
+    return {"cancelled": len(target), "skipped": len(lines) - len(target)}
 
 
 class VoidOrderIn(BaseModel):
@@ -2769,48 +2684,63 @@ def change_order_supplier(
     session: Session = Depends(get_session),
     current: User = Depends(require_permission("purchase:edit")),
 ):
+    """更改供应商（08 §10）：改**单头**一个字段（一单一供应商）；已有到货的行不能换。"""
+    from app.models.purchase_order import compute_line_amounts
     from app.models.purchasing import Supplier, SupplierQuote
+    from app.services import purchase_order as po_svc
 
     sup = session.get(Supplier, body.supplier_id)
     if sup is None:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "供应商不存在")
-    rows = _order_rows(session, key)
-    if not rows:
+    po = session.scalar(select(PurchaseOrder).where(PurchaseOrder.po_no == key))
+    if po is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "采购单不存在")
+    if po.status in ("已作废", "已关闭", "已完成"):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, f"当前状态是「{po.status}」，不能更改供应商")
+    lines = _po_lines(session, po.id)
+    if any(float(ln.received_qty or 0) > 0 for ln in lines):
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST, "这张单已经有到货的行，不能整单改供应商（请走换货/退货）"
+        )
 
     price_map = {ln.request_id: ln.unit_price for ln in (body.lines or [])}
     only = set(price_map) if body.lines else None
-    eligible = [r for r in rows if r.status in ("在途",)]
-    target = [r for r in eligible if only is None or r.id in only]
+    target = [ln for ln in lines if only is None or ln.request_id in only]
     if not target:
-        raise HTTPException(
-            status.HTTP_400_BAD_REQUEST, "这张单没有可换供应商的行（只有还没到的货能换）"
-        )
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "这张单没有可换供应商的行")
 
+    po.supplier_id = sup.id
+    po.supplier_name = sup.name
     quote_at = date.today()
-    for r in target:
-        r.supplier_id = sup.id
-        r.supplier_name = sup.name
-        if price_map.get(r.id):
-            r.unit_price = price_map[r.id]
-            if r.qty:
-                r.amount = float(price_map[r.id]) * float(r.qty)
+    for ln in target:
+        if price_map.get(ln.request_id):
+            ln.unit_price = price_map[ln.request_id]
+            incl, excl = compute_line_amounts(
+                float(ln.qty or 0), ln.unit_price, ln.tax_incl, ln.tax_rate
+            )
+            ln.amount_tax_incl = incl
+            ln.amount_tax_excl = excl
+            req0 = session.get(PurchaseRequest, ln.request_id) if ln.request_id else None
             session.add(
                 SupplierQuote(
-                    item_no=r.item_no,
+                    item_no=ln.item_no,
                     supplier_id=sup.id,
-                    project_no=r.project_no,
-                    price=price_map[r.id],
-                    unit=r.unit,
-                    lead_days=r.lead_days,
+                    project_no=ln.project_no,
+                    price=ln.unit_price,
+                    unit=ln.unit,
+                    lead_days=req0.lead_days if req0 else None,
                     price_type="成交",
                     quote_date=quote_at,
-                    source=r.po_no or key,
+                    source=po.po_no,
                     recorded_by=current.id,
                 )
             )
-        _sync_purchase_task(session, r, "进行中", f"更改供应商 → {sup.name}，等货")
-
+        if ln.request_id:
+            row = session.get(PurchaseRequest, ln.request_id)
+            po_svc.sync_request_snapshot(session, row)
+            _sync_purchase_task(session, row, "进行中", f"更改供应商 → {sup.name}，等货")
+    session.flush()
+    po_svc.recalc_order_total(session, po)
     audit.log(
         session,
         user=current,
@@ -2819,7 +2749,7 @@ def change_order_supplier(
         object_ref=key,
         summary=f"采购单 {key} 更改供应商 → {sup.name}：{len(target)} 行"
         + (f"（{body.note}）" if body.note else ""),
-        detail={"request_ids": [r.id for r in target], "supplier_id": sup.id},
+        detail={"line_ids": [ln.id for ln in target], "supplier_id": sup.id},
         ip=client_ip(request),
     )
     session.commit()
@@ -2843,92 +2773,100 @@ def negotiate_failed_lines(
     session: Session = Depends(get_session),
     current: User = Depends(require_permission("purchase:edit")),
 ):
-    """验收不合格的回采购处理：换货（回「在途」等补发）或退货（数量减掉、结束）。"""
-    rows = _order_rows(session, key)
-    if not rows:
+    """验收不合格的回采购处理（行级）：换货（行回等补发）或退货（行减量、需求回池重采）。"""
+    from app.services import purchase_order as po_svc
+
+    po = session.scalar(select(PurchaseOrder).where(PurchaseOrder.po_no == key))
+    if po is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "采购单不存在")
     if body.action not in ("换货", "退货"):
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "处理方式只能是 换货 / 退货")
+    lines = _po_lines(session, po.id)
     want = set(body.request_ids)
-    target = [r for r in rows if r.id in want]
+    target = [ln for ln in lines if ln.request_id in want]
     if not target:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "没有要处理的行")
-    bad = [r for r in target if r.status not in ORDER_FAILED_STATUS]
+    bad = [ln for ln in target if ln.status != "不合格"]
     if bad:
-        names = "、".join(f"{r.item_no}#{r.id}" for r in bad)
+        names = "、".join(f"{ln.item_no}#{ln.id}" for ln in bad)
         raise HTTPException(status.HTTP_400_BAD_REQUEST, f"这些行不是「验收不合格」，不能这样处理：{names}")
 
     today = date.today()
     replaced = returned = 0
     retry_ids: list[int] = []
-    for r in target:
-        failed = [g for g in _request_receipts(session, r.id) if g.status == "不合格"]
+    for ln in target:
+        req = session.get(PurchaseRequest, ln.request_id)
+        failed = [g for g in _request_receipts(session, req.id) if g.status == "不合格"]
         if not failed:
-            raise HTTPException(status.HTTP_400_BAD_REQUEST, f"{r.item_no} 没有「不合格」的到货单")
-        failed_qty = sum(float(g.qty or 0) for g in failed)
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, f"{ln.item_no} 没有「不合格」的到货单")
+        failed_qty = sum(
+            float(g.qty_rejected if g.qty_rejected is not None else (g.qty or 0)) for g in failed
+        )
         for g in failed:
             g.status = "已换货" if body.action == "换货" else "已退货"
             g.resolve_note = body.note
             g.resolved_by = current.id
             g.resolved_at = datetime.now(UTC)
-        session.flush()  # 到货单处理结果先落库，状态重算才看得到
         if body.action == "换货":
-            r.expected_date = _resolve_expected(body.expected_date, None, r.lead_days, base=today)
-            _recalc_request_status(session, r)
+            ln.status = "部分到货"
+            ln.expect_date = _resolve_expected(body.expected_date, None, req.lead_days, base=today)
+            session.flush()
+            _recalc_request_status(session, req)
             _sync_purchase_task(
                 session,
-                r,
+                req,
                 "进行中",
-                f"换货中：{body.note or '等供应商补发'}（预计 {r.expected_date or '—'}）",
+                f"换货中：{body.note or '等供应商补发'}（预计 {ln.expect_date or '—'}）",
             )
             replaced += 1
         else:
             # ★ 退货：这家供应商的货退回去，不再等他；但需求不能丢 ——
             #   新建一条「待采购」需求回到采购池（换供应商重买，可再合并）
-            origin_no = r.po_no or f"R{r.id}"
-            r.qty = max(0.0, float(r.qty or 0) - failed_qty)
-            if r.unit_price:
-                r.amount = float(r.unit_price) * r.qty if r.qty else 0.0
+            ln.status = "已退货"
+            ln.qty = max(0.0, float(ln.qty or 0) - failed_qty)
+            req.qty = max(0.0, float(req.qty or 0) - failed_qty)
+            session.flush()
+            _recalc_request_status(session, req)
             retry = PurchaseRequest(
-                project_no=r.project_no,
-                equip_no=r.equip_no,
-                attribution=r.attribution,
-                item_no=r.item_no,
+                project_no=req.project_no,
+                equip_no=req.equip_no,
+                attribution=req.attribution,
+                item_no=req.item_no,
                 qty=failed_qty,
-                unit=r.unit,
+                unit=req.unit,
                 source=SOURCE_RETRY,
-                lead_days=r.lead_days,
-                need_date=r.need_date,
+                lead_days=req.lead_days,
+                need_date=req.need_date,
                 status="待采购",
-                is_long_lead=r.is_long_lead,
-                origin_request_id=r.id,
-                remark=f"退货重采（原 {origin_no} / {'、'.join(g.receipt_no for g in failed)}）"
+                is_long_lead=req.is_long_lead,
+                origin_request_id=req.id,
+                remark=f"退货重采（原 {po.po_no} / {'、'.join(g.receipt_no for g in failed)}）"
                 + (f"：{body.note}" if body.note else ""),
             )
             session.add(retry)
             session.flush()
             retry_ids.append(retry.id)
-            _recalc_request_status(session, r)
-            if r.status == "已退货":
+            if req.status == "已退货":
                 _sync_purchase_task(
-                    session, r, "已完成", f"已退货，需求已回采购池重采（新需求 #{retry.id}）"
+                    session, req, "已完成", f"已退货，需求已回采购池重采（新需求 #{retry.id}）"
                 )
-            elif r.status in REQUEST_DONE:
+            elif req.status in REQUEST_DONE:
                 _sync_purchase_task(
                     session,
-                    r,
+                    req,
                     "已完成",
-                    f"部分退货 {failed_qty:g}（已回池重采 #{retry.id}），剩余 {r.qty:g} 已验收入库",
+                    f"部分退货 {failed_qty:g}（已回池重采 #{retry.id}），剩余 {req.qty:g} 已验收入库",
                 )
             else:
                 _sync_purchase_task(
                     session,
-                    r,
+                    req,
                     "进行中",
-                    f"部分退货 {failed_qty:g}（已回池重采 #{retry.id}），剩余 {r.qty:g} 继续",
+                    f"部分退货 {failed_qty:g}（已回池重采 #{retry.id}），剩余 {req.qty:g} 继续",
                 )
             returned += 1
-
+    session.flush()
+    po_svc.recalc_order_status(session, po)
     audit.log(
         session,
         user=current,
@@ -2938,7 +2876,11 @@ def negotiate_failed_lines(
         summary=f"采购单 {key} 验收不合格处理：{body.action} {len(target)} 行"
         + (f"（{body.note}）" if body.note else "")
         + (f"；退货 {len(retry_ids)} 份需求已回采购池重采" if retry_ids else ""),
-        detail={"request_ids": [r.id for r in target], "action": body.action, "retry_request_ids": retry_ids},
+        detail={
+            "line_ids": [ln.id for ln in target],
+            "action": body.action,
+            "retry_request_ids": retry_ids,
+        },
         ip=client_ip(request),
     )
     session.commit()

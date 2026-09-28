@@ -836,6 +836,27 @@ def b_close_return() -> None:
         f"到货单应全转 已退货，实际={[g['status'] for g in gs]}")
 
 
+def b_split_line_cancel() -> None:
+    """B2b 拆单后按行取消：只影响本单这一行，不动另一张单（行级）。"""
+    probe("B2b 拆单后按行取消")
+    rid = _new_demand("bc", 100)["id"]
+    mo1 = api.req("post", "/purchase/merge-order", "buyer1", (200, 201), json={
+        "supplier_id": SUP["甲钢材"]["id"], "ordered_at": d(0), "expected_date": d(10),
+        "deliver_to": "公司仓库", "lines": [{"request_id": rid, "qty": 60, "unit_price": 200.0}]})
+    api.req("post", "/purchase/merge-order", "buyer1", (200, 201), json={
+        "supplier_id": SUP["乙标准件"]["id"], "ordered_at": d(0), "expected_date": d(10),
+        "deliver_to": "公司仓库", "lines": [{"request_id": rid, "qty": 40, "unit_price": 210.0}]})
+    api.req("post", f"/purchase/orders/{mo1.get('po_no')}/cancel", "buyer1", (200,),
+            json={"reason": "只取消第一张"})
+    row = _find_by_id(rid)
+    rec(abs(float(row["qty_ordered"] or 0) - 40) < 1e-6 and row["status"] == "在途",
+        f"★ 只取消第一张单后：qty_ordered=40/在途（需求减到 40），实际={row['qty_ordered']}/{row['status']}",
+        "行级取消：不能影响第二张单的 40")
+    n = q("select count(*) as c from purchase_order_line "
+          "where request_id=:i and status <> '已取消'", i=rid)[0]["c"]
+    rec(n == 1, f"第二张单的行还在（应剩 1 条未取消行），实际={n}")
+
+
 def _new_demand(item_key: str, qty: float, who: str = "buyer1") -> dict:
     """建一条干净的「待采购」需求（手工申请通道，免审核直入池）。"""
     r = api.req("post", "/purchase/manual-request", who, (201,), json={
@@ -1233,7 +1254,7 @@ def main() -> None:
             traceback.print_exc()
 
     part("Part B · 采购域专项探针")
-    for fn in (b_split, b_partial_ok, b_void_order, b_close_return, b_idempotent_after_release, b_pending_window, b_pending_repool,
+    for fn in (b_split, b_partial_ok, b_split_line_cancel, b_void_order, b_close_return, b_idempotent_after_release, b_pending_window, b_pending_repool,
                b_direct_repool, b_delete_authz, b_kitting_inflate, b_issue_draft_bom,
                b_stock_conservation, b_price_reference):
         try:

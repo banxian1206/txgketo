@@ -160,6 +160,32 @@ def create_order(
     return po
 
 
+def recalc_order_total(session: Session, po: PurchaseOrder) -> None:
+    """按单行重算单头含税/不含税合计（+ 运费 − 折扣）。"""
+    lines = session.scalars(
+        select(PurchaseOrderLine).where(PurchaseOrderLine.po_id == po.id)
+    ).all()
+    incl = sum(float(x.amount_tax_incl or 0) for x in lines)
+    excl = sum(float(x.amount_tax_excl or 0) for x in lines)
+    extra = float(po.freight or 0) - float(po.discount or 0)
+    po.total_tax_incl = round(incl + extra, 2)
+    po.total_tax_excl = round(excl + extra, 2)
+
+
+def recalc_order_status(session: Session, po: PurchaseOrder) -> None:
+    """按单行状态重算单头状态（已作废/已关闭 不动）。"""
+    if po.status in ("已作废", "已关闭"):
+        return
+    lines = session.scalars(
+        select(PurchaseOrderLine).where(PurchaseOrderLine.po_id == po.id)
+    ).all()
+    st = {x.status for x in lines}
+    if st and st <= {"已入库", "已退货", "已取消"}:
+        po.status = "已完成"
+    elif any(float(x.received_qty or 0) > 0 for x in lines) or "不合格" in st:
+        po.status = "执行中"
+
+
 def sync_request_snapshot(session: Session, row: PurchaseRequest) -> None:
     """把需求上的「单头快照」列同步成它当前订单的样子（过渡兼容层）。
 
