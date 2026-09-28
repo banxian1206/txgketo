@@ -23,9 +23,11 @@ import ReceiptNegotiateModal from './ReceiptNegotiateModal'
 import {
   cancelPurchaseOrder,
   changeOrderSupplier,
+  closeReturnPurchaseOrder,
   errMsg,
   listSuppliers,
   purchaseOrderDetail,
+  voidPurchaseOrder,
   type PurchaseOrderDetail,
   type PurchaseOrderLine,
   type SupplierRow,
@@ -164,6 +166,30 @@ export default function PurchaseOrderDrawer({
     }
   }
 
+  const doVoid = async () => {
+    if (!orderKey) return
+    try {
+      await voidPurchaseOrder(orderKey, { reason: '整单作废' })
+      message.success('已作废，需求已回采购池')
+      await load()
+      onChanged()
+    } catch (e) {
+      message.error(errMsg(e))
+    }
+  }
+
+  const doCloseReturn = async () => {
+    if (!orderKey) return
+    try {
+      const res = await closeReturnPurchaseOrder(orderKey, { note: '整批退货' })
+      message.success(`已关闭，新建 ${res.retry_ids?.length ?? 0} 条待采购回池`)
+      await load()
+      onChanged()
+    } catch (e) {
+      message.error(errMsg(e))
+    }
+  }
+
   const cancelLine = async (l: PurchaseOrderLine) => {
     if (!orderKey) return
     try {
@@ -210,6 +236,24 @@ export default function PurchaseOrderDrawer({
           >
             取消未到的部分
           </Button>
+          <Popconfirm
+            title="作废整单？需求全部回采购池，可重新下单"
+            disabled={!o || ['执行中', '已完成', '已作废', '已关闭'].includes(o.po_status ?? '')}
+            onConfirm={() => void doVoid()}
+          >
+            <Button disabled={!o || ['执行中', '已完成', '已作废', '已关闭'].includes(o.po_status ?? '')}>
+              作废整单
+            </Button>
+          </Popconfirm>
+          <Popconfirm
+            title="整批退货关闭？到货单全转已退货，需求回池重采"
+            disabled={!o || !['已批准', '执行中'].includes(o.po_status ?? '')}
+            onConfirm={() => void doCloseReturn()}
+          >
+            <Button disabled={!o || !['已批准', '执行中'].includes(o.po_status ?? '')}>
+              整批退货关闭
+            </Button>
+          </Popconfirm>
         </Space>
       }
     >

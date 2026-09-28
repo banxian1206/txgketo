@@ -21,6 +21,8 @@ export interface PurchaseOrderSummary {
   deliver_to?: string | null
   deliver_address?: string | null
   status: string
+  po_status?: string | null
+  pay_status?: string | null
   line_count: number
   item_kinds: number
   total_amount: number
@@ -85,6 +87,24 @@ export async function purchaseOrderDetail(key: string) {
 export async function cancelPurchaseOrder(key: string, body: { request_ids?: number[]; reason?: string }) {
   const { data } = await api.post<{ cancelled: number; skipped: number }>(
     `/purchase/orders/${encodeURIComponent(key)}/cancel`,
+    body,
+  )
+  return data
+}
+
+/** 作废整单（未执行）：需求全部回采购池，可重下 */
+export async function voidPurchaseOrder(key: string, body: { reason?: string }) {
+  const { data } = await api.post<{ voided: number; status: string }>(
+    `/purchase/orders/${encodeURIComponent(key)}/void`,
+    body,
+  )
+  return data
+}
+
+/** 整批退货关闭：到货单全转已退货，需求回池重采 */
+export async function closeReturnPurchaseOrder(key: string, body: { note?: string }) {
+  const { data } = await api.post<{ closed: number; retry_ids: number[]; status: string }>(
+    `/purchase/orders/${encodeURIComponent(key)}/close-return`,
     body,
   )
   return data

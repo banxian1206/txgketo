@@ -797,6 +797,45 @@ def b_partial_ok() -> None:
         f"换货补发+入库后应 qty_received=100/已入库，实际={row['status']}/{row['qty_received']}")
 
 
+def b_void_order() -> None:
+    """B4 作废采购单 → 需求回池可再下单（PU-13）。"""
+    probe("B4 作废采购单 → 需求回池")
+    rid = _new_demand("bc", 30)["id"]
+    mo = api.req("post", "/purchase/merge-order", "buyer1", (200, 201), json={
+        "supplier_id": SUP["甲钢材"]["id"], "ordered_at": d(0), "expected_date": d(10),
+        "deliver_to": "公司仓库", "lines": [{"request_id": rid, "qty": 30, "unit_price": 200.0}]})
+    po = mo.get("po_no")
+    rec(_find_by_id(rid)["status"] == "在途", f"下单后应 在途，实际={_find_by_id(rid)['status']}")
+    api.req("post", f"/purchase/orders/{po}/void", "buyer1", (200,), json={"reason": "作废测试"})
+    rec(_find_by_id(rid)["status"] == "待采购",
+        f"★ 作废后需求应回「待采购」，实际={_find_by_id(rid)['status']}",
+        "死单：作废后需求卡在在途，池子里买不了")
+    mo2 = api.req("post", "/purchase/merge-order", "buyer1", (200, 201), json={
+        "supplier_id": SUP["乙标准件"]["id"], "ordered_at": d(0), "expected_date": d(10),
+        "deliver_to": "公司仓库", "lines": [{"request_id": rid, "qty": 30, "unit_price": 205.0}]})
+    rec(bool(mo2.get("po_no")), "作废后能重新下单（回池生效）")
+
+
+def b_close_return() -> None:
+    """B4 整批退货关闭 → 到货单全 已退货 + 需求回池重采（PU-14）。"""
+    probe("B4 整批退货关闭 → 需求回池重采")
+    rid = _new_demand("bc", 25)["id"]
+    mo = api.req("post", "/purchase/merge-order", "buyer1", (200, 201), json={
+        "supplier_id": SUP["甲钢材"]["id"], "ordered_at": d(0), "expected_date": d(10),
+        "deliver_to": "公司仓库", "lines": [{"request_id": rid, "qty": 25, "unit_price": 200.0}]})
+    po = mo.get("po_no")
+    _inspect_store(_find_by_id(rid), 25, do_store=False)  # 造一个「有到货」的执行中单
+    api.req("post", f"/purchase/orders/{po}/close-return", "buyer1", (200,), json={"note": "不再合作"})
+    rec(_find_by_id(rid)["status"] == "已退货",
+        f"原需求应转 已退货，实际={_find_by_id(rid)['status']}")
+    retries = [r for r in _reqs("待采购") if r.get("origin_request_id") == rid]
+    rec(len(retries) == 1 and abs(float(retries[0]["qty"]) - 25) < 1e-9,
+        f"应新建 1 条待采购回池（qty 25），实际={[(r['id'], r['qty']) for r in retries]}")
+    gs = q("select status from goods_receipt where request_id=:i", i=rid)
+    rec(bool(gs) and all(g["status"] == "已退货" for g in gs),
+        f"到货单应全转 已退货，实际={[g['status'] for g in gs]}")
+
+
 def _new_demand(item_key: str, qty: float, who: str = "buyer1") -> dict:
     """建一条干净的「待采购」需求（手工申请通道，免审核直入池）。"""
     r = api.req("post", "/purchase/manual-request", who, (201,), json={
@@ -1194,7 +1233,7 @@ def main() -> None:
             traceback.print_exc()
 
     part("Part B · 采购域专项探针")
-    for fn in (b_split, b_partial_ok, b_idempotent_after_release, b_pending_window, b_pending_repool,
+    for fn in (b_split, b_partial_ok, b_void_order, b_close_return, b_idempotent_after_release, b_pending_window, b_pending_repool,
                b_direct_repool, b_delete_authz, b_kitting_inflate, b_issue_draft_bom,
                b_stock_conservation, b_price_reference):
         try:

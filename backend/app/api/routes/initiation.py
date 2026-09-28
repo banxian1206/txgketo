@@ -2616,6 +2616,138 @@ def cancel_purchase_order(
     return {"cancelled": len(target), "skipped": len(rows) - len(target)}
 
 
+class VoidOrderIn(BaseModel):
+    reason: str | None = None
+
+
+@purchase_router.post("/purchase/orders/{key}/void")
+def void_purchase_order(
+    key: str,
+    body: VoidOrderIn,
+    request: Request,
+    session: Session = Depends(get_session),
+    current: User = Depends(require_permission("purchase:edit")),
+):
+    """作废采购单（08 §4.1）：还没执行的整单作废，★ 需求全部回「待采购」回池（PU-13）。"""
+    from app.services import purchase_order as po_svc
+
+    po = session.scalar(select(PurchaseOrder).where(PurchaseOrder.po_no == key))
+    if po is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "采购单不存在")
+    if po.status in ("执行中", "已完成", "已作废", "已关闭"):
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            f"当前状态是「{po.status}」，不能作废（已有到货的请走「整批退货关闭」）",
+        )
+    lines = _po_lines(session, po.id)
+    for ln in lines:
+        if ln.request_id and _request_receipts(session, ln.request_id):
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST, "这张单已经有到货单，不能作废；请走「整批退货关闭」"
+            )
+    po.status = "已作废"
+    for ln in lines:
+        ln.status = "已取消"
+    session.flush()
+    for rid in {ln.request_id for ln in lines if ln.request_id}:
+        row = session.get(PurchaseRequest, rid)
+        row.qty_ordered = po_svc.ordered_qty(session, rid)
+        need = float(row.qty or 0)
+        if row.qty_ordered <= 1e-9:
+            row.status = "待采购"
+        elif row.qty_ordered + 1e-9 >= need:
+            row.status = "在途"
+        else:
+            row.status = "部分下单"
+        _sync_purchase_task(
+            session, row, "待采购", f"采购单 {key} 作废（{body.reason or '—'}），需求已回采购池"
+        )
+    audit.log(
+        session,
+        user=current,
+        action="void_order",
+        object_type="purchase_order",
+        object_ref=key,
+        summary=f"作废采购单 {key}：{len(lines)} 行，需求已回池"
+        + (f"（{body.reason}）" if body.reason else ""),
+        ip=client_ip(request),
+    )
+    session.commit()
+    return {"voided": len(lines), "status": po.status}
+
+
+class CloseReturnIn(BaseModel):
+    note: str | None = None
+
+
+@purchase_router.post("/purchase/orders/{key}/close-return")
+def close_return_purchase_order(
+    key: str,
+    body: CloseReturnIn,
+    request: Request,
+    session: Session = Depends(get_session),
+    current: User = Depends(require_permission("purchase:edit")),
+):
+    """整批退货关闭（08 §4.1）：跟供应商不合作了，到货单全转「已退货」，★ 需求回池重采（PU-14）。"""
+    po = session.scalar(select(PurchaseOrder).where(PurchaseOrder.po_no == key))
+    if po is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "采购单不存在")
+    if po.status in ("已作废", "已关闭", "已完成"):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, f"当前状态是「{po.status}」，不能关闭")
+    now = datetime.now(UTC)
+    lines = _po_lines(session, po.id)
+    retry_ids: list[int] = []
+    for ln in lines:
+        ln.status = "已退货"
+        if not ln.request_id:
+            continue
+        req = session.get(PurchaseRequest, ln.request_id)
+        for g in _request_receipts(session, req.id):
+            g.status = "已退货"
+            g.resolve_note = body.note
+            g.resolved_by = current.id
+            g.resolved_at = now
+        qty_back = float(ln.qty or 0)
+        req.qty = 0.0
+        session.flush()
+        _recalc_request_status(session, req)
+        retry = PurchaseRequest(
+            project_no=req.project_no,
+            equip_no=req.equip_no,
+            attribution=req.attribution,
+            item_no=req.item_no,
+            qty=qty_back,
+            unit=req.unit,
+            source=SOURCE_RETRY,
+            lead_days=req.lead_days,
+            need_date=req.need_date,
+            status="待采购",
+            is_long_lead=req.is_long_lead,
+            origin_request_id=req.id,
+            remark=f"整批退货关闭重采（原 {key}）" + (f"：{body.note}" if body.note else ""),
+        )
+        session.add(retry)
+        session.flush()
+        retry_ids.append(retry.id)
+        _sync_purchase_task(
+            session, req, "已完成", f"整批退货关闭，需求已回池重采（新需求 #{retry.id}）"
+        )
+    po.status = "已关闭"
+    audit.log(
+        session,
+        user=current,
+        action="close_return",
+        object_type="purchase_order",
+        object_ref=key,
+        summary=f"整批退货关闭 {key}：{len(lines)} 行，新建 {len(retry_ids)} 条待采购回池"
+        + (f"（{body.note}）" if body.note else ""),
+        detail={"retry_ids": retry_ids},
+        ip=client_ip(request),
+    )
+    session.commit()
+    return {"closed": len(lines), "retry_ids": retry_ids, "status": po.status}
+
+
 class SupplierPriceLine(BaseModel):
     request_id: int
     unit_price: float | None = Field(default=None, gt=0, description="改供应商时顺便改价（可选）")
