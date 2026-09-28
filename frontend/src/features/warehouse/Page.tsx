@@ -179,10 +179,13 @@ export default function Warehouse() {
   const acceptSubmit = useSubmit(acceptForm, {
     request: (v) => {
       if (!acceptTarget) throw new Error('无验收目标')
+      const qtyOk = v.result === '合格' && typeof v.qty_ok === 'number' ? v.qty_ok : undefined
       return inspectPurchase(acceptTarget.project_no, acceptTarget.id, {
         receipt_date: v.receipt_date.format('YYYY-MM-DD'),
         qty: v.qty,
         result: v.result,
+        qty_ok: qtyOk,
+        qty_rejected: qtyOk !== undefined ? Math.max(0, v.qty - qtyOk) : undefined,
         note: v.note,
       })
     },
@@ -704,6 +707,20 @@ export default function Warehouse() {
               />
             </Form.Item>
           </Space>
+          {acceptResult === '合格' && (
+            <Form.Item
+              name="qty_ok"
+              label="其中合格数（不填 = 全部合格）"
+              tooltip="部分合格：填合格数，剩余算不合格，会另生成一张「不合格」到货单回采购协商换货/退货"
+            >
+              <InputNumber
+                style={{ width: 200 }}
+                min={0}
+                max={acceptTarget ? Math.max(0.001, acceptTarget.qty - acceptTarget.qty_received) : undefined}
+                suffix={acceptTarget?.unit ?? undefined}
+              />
+            </Form.Item>
+          )}
           <Form.Item
             name="note"
             label="说明"

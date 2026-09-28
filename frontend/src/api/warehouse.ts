@@ -44,7 +44,7 @@ export async function listGoodsReceipts(params: { deliver_to?: string; status?: 
 export async function inspectPurchase(
   projectNo: string | null | undefined,
   requestId: number,
-  body: { receipt_date: string; qty: number; result: string; note?: string },
+  body: { receipt_date: string; qty: number; result: string; qty_ok?: number; qty_rejected?: number; note?: string },
 ) {
   // 辅料 / 办公用品 / 其他类采购没有项目号（P-02）→ 走不依赖项目号的验收接口
   const url = projectNo

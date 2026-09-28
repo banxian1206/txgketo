@@ -42,6 +42,7 @@ export default function AcceptM() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [qty, setQty] = useState<number>(1)
+  const [qtyOk, setQtyOk] = useState<number | null>(null)
   const [result, setResult] = useState<'合格' | '不合格'>('合格')
   const [note, setNote] = useState('')
   const [receiptDate, setReceiptDate] = useState(dayjs())
@@ -93,10 +94,13 @@ export default function AcceptM() {
     if (!data) return
     setSaving(true)
     try {
+      const qtyOkVal = result === '合格' && qtyOk !== null ? qtyOk : undefined
       const res = await inspectPurchase(data.project_no, data.id, {
         receipt_date: receiptDate.format('YYYY-MM-DD'),
         qty,
         result,
+        qty_ok: qtyOkVal,
+        qty_rejected: qtyOkVal !== undefined ? Math.max(0, qty - qtyOkVal) : undefined,
         note: note || undefined,
       })
       if (photos.length) await uploadReceiptPhotos(res.receipt_id, photos)
@@ -219,6 +223,18 @@ export default function AcceptM() {
             <Radio.Button value="合格">合格</Radio.Button>
             <Radio.Button value="不合格">不合格</Radio.Button>
           </Radio.Group>
+          {result === '合格' && (
+            <Space>
+              <span>其中合格数（不填 = 全部合格）</span>
+              <InputNumber
+                min={0}
+                max={qty}
+                value={qtyOk}
+                onChange={(v) => setQtyOk(v === null || v === undefined ? null : Number(v))}
+                style={{ width: 120 }}
+              />
+            </Space>
+          )}
           <Input.TextArea
             rows={2}
             placeholder={result === '不合格' ? '不合格原因（如：尺寸不对、少发 2 个）' : '备注（可留空）'}

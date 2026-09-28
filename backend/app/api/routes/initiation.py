@@ -573,6 +573,8 @@ def _request_dict(r: PurchaseRequest, item: Item | None = None) -> dict:
         "deliver_address": r.deliver_address,
         "arrived_at": r.arrived_at,
         "qty_received": float(r.qty_received) if r.qty_received is not None else None,
+        "qty_ordered": float(r.qty_ordered) if r.qty_ordered is not None else None,
+        "qty_rejected": float(r.qty_rejected) if r.qty_rejected is not None else None,
         "project_no": r.project_no,
         "equip_no": r.equip_no,
         "part_no": r.part_no,
@@ -1071,15 +1073,27 @@ def _request_receipts(session: Session, request_id: int) -> list[GoodsReceipt]:
     )
 
 
+def _ok_qty(g: GoodsReceipt) -> float:
+    """到货单的合格数（部分合格时用 qty_ok；旧数据没有就取 qty）。"""
+    return float(g.qty_ok if g.qty_ok is not None else (g.qty or 0))
+
+
+def _rejected_qty_of(g: GoodsReceipt) -> float:
+    """到货单的不合格数。"""
+    return float(g.qty_rejected if g.qty_rejected is not None else (g.qty or 0))
+
+
 def _recalc_request_status(session: Session, row: PurchaseRequest) -> str:
     """由到货单反推采购需求状态（分批到货时看「已验收多少、还差多少」）。"""
     if row.status in ("已取消", "已退货", "待采购"):
         return row.status
     gs = _request_receipts(session, row.id)
-    stored = sum(float(g.qty or 0) for g in gs if g.status == "已入库")
-    site = sum(float(g.qty or 0) for g in gs if g.status == "现场已验收")
-    pending = sum(float(g.qty or 0) for g in gs if g.status in ("待入库", "现场待验收"))
-    row.qty_received = stored + site + pending  # 有效到货（不合格/退回的不算）
+    stored = sum(_ok_qty(g) for g in gs if g.status == "已入库")
+    site = sum(_ok_qty(g) for g in gs if g.status == "现场已验收")
+    pending = sum(_ok_qty(g) for g in gs if g.status in ("待入库", "现场待验收"))
+    rejected = sum(_rejected_qty_of(g) for g in gs if g.status in ("不合格", "已换货", "已退货"))
+    row.qty_received = stored + site + pending  # 有效到货（合格部分；不合格/退回的不算）
+    row.qty_rejected = rejected
     qty = float(row.qty or 0)
     if any(g.status == "不合格" for g in gs):
         row.status = "不合格"
@@ -1125,6 +1139,7 @@ def _ensure_site_pending_receipt(session: Session, row: PurchaseRequest, actor_i
         request_id=row.id,
         item_no=row.item_no,
         qty=row.qty,
+        qty_ok=row.qty,
         unit=row.unit or (item.unit if item else None),
         receipt_date=None,
         deliver_to="直发客户现场",
@@ -1176,12 +1191,57 @@ def _resolve_location(session: Session, location: str | None):
 
 
 class AcceptanceIn(BaseModel):
-    """验收：货到了就验，只有合格 / 不合格。合格 → 待入库，不合格 → 采购协商换货/退货。"""
+    """验收：货到了就验。
+
+    ★ 部分合格（08 §2 洞②）：填 `qty_ok`/`qty_rejected`（两者之和 = `qty`）→ 生成两条到货单
+    （合格→待入库、不合格→不合格，同 `batch_no`）；不填则按整批 `result` 处理。
+    """
 
     receipt_date: date = Field(..., description="到货日期")
-    qty: float = Field(..., gt=0, description="本次到货数量（分批到货就填这一批）")
-    result: str = Field(..., description="合格 / 不合格")
+    qty: float = Field(..., gt=0, description="本次到货总数（= 合格数 + 不合格数）")
+    result: str = Field(..., description="合格 / 不合格（整批口径）")
+    qty_ok: float | None = Field(default=None, ge=0, description="合格数（部分合格时填）")
+    qty_rejected: float | None = Field(default=None, ge=0, description="不合格数（部分合格时填）")
     note: str | None = Field(default=None, description="不合格时说明原因")
+
+
+def _attach_po_refs(session: Session, receipts: list[GoodsReceipt]) -> None:
+    """把到货单挂到实体采购单/单行（一期：不再靠 request_id 反查聚合）。"""
+    for g in receipts:
+        if not g.request_id:
+            continue
+        line = session.scalar(
+            select(PurchaseOrderLine)
+            .where(PurchaseOrderLine.request_id == g.request_id)
+            .order_by(PurchaseOrderLine.id.desc())
+        )
+        if line is not None:
+            g.po_id = line.po_id
+            g.po_line_id = line.id
+
+
+def _bump_line_on_receipt(
+    session: Session, row: PurchaseRequest, *, ok: float, rejected: float
+) -> None:
+    """到货验收后同步采购单行的已收/不合格与状态（派生字段）。"""
+    line = session.scalar(
+        select(PurchaseOrderLine)
+        .where(PurchaseOrderLine.request_id == row.id)
+        .order_by(PurchaseOrderLine.id.desc())
+    )
+    if line is None:
+        return
+    line.received_qty = float(line.received_qty or 0) + float(ok)
+    line.rejected_qty = float(line.rejected_qty or 0) + float(rejected)
+    if rejected > 0:
+        line.status = "不合格"
+    elif line.received_qty + 1e-9 >= float(line.qty or 0):
+        line.status = "已入库"
+    elif line.received_qty > 0:
+        line.status = "部分到货"
+    po = session.get(PurchaseOrder, line.po_id)
+    if po is not None and po.status in ("已批准",):
+        po.status = "执行中"
 
 
 def _perform_inspect(
@@ -1239,114 +1299,139 @@ def _perform_inspect(
 
     to = row.deliver_to or "公司仓库"
     item = session.get(Item, row.item_no)
-    if body.result == "不合格":
-        receipt_status = "不合格"
-    elif to == "直发客户现场":
-        receipt_status = "现场待验收"  # 直发的由现场清点验收（S8 现场域）
+    # ★ 部分合格（08 §2 洞②）：本批 = 合格数 + 不合格数，拆成两条到货单（同 batch_no）
+    if body.qty_ok is None and body.qty_rejected is None:
+        ok = float(body.qty) if body.result == "合格" else 0.0
+        rejected = 0.0 if body.result == "合格" else float(body.qty)
     else:
-        receipt_status = "待入库"
-    receipt_no = next_number(session, "RECEIPT", scope_key=year_scope_key())
-    gr = GoodsReceipt(
-        receipt_no=receipt_no,
-        project_no=project_no,
-        request_id=row.id,
-        item_no=row.item_no,
-        qty=body.qty,
-        unit=row.unit or (item.unit if item else None),
-        receipt_date=body.receipt_date,
-        deliver_to=to,
-        status=receipt_status,
-        inspected_by=current.id,
-        inspected_at=datetime.now(UTC),
-        inspect_note=body.note,
-    )
-    session.add(gr)
+        ok = float(body.qty_ok or 0)
+        rejected = float(body.qty_rejected or 0)
+        if abs(ok + rejected - float(body.qty)) > 1e-6:
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST, "合格数 + 不合格数 必须等于本批到货数"
+            )
+    if rejected > 0 and not (body.note or "").strip():
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "有不合格的必须写明原因")
+
+    batch_no = next_number(session, "RECEIPT", scope_key=year_scope_key())
+    created: list[GoodsReceipt] = []
+    if ok > 0:
+        st = "现场待验收" if to == "直发客户现场" else "待入库"
+        created.append(
+            GoodsReceipt(
+                receipt_no=batch_no if rejected == 0 else f"{batch_no}-A",
+                project_no=project_no,
+                request_id=row.id,
+                item_no=row.item_no,
+                qty=ok,
+                qty_ok=ok,
+                unit=row.unit or (item.unit if item else None),
+                receipt_date=body.receipt_date,
+                deliver_to=to,
+                status=st,
+                inspected_by=current.id,
+                inspected_at=datetime.now(UTC),
+                batch_no=batch_no,
+            )
+        )
+    if rejected > 0:
+        created.append(
+            GoodsReceipt(
+                receipt_no=batch_no if ok == 0 else f"{batch_no}-B",
+                project_no=project_no,
+                request_id=row.id,
+                item_no=row.item_no,
+                qty=rejected,
+                qty_rejected=rejected,
+                unit=row.unit or (item.unit if item else None),
+                receipt_date=body.receipt_date,
+                deliver_to=to,
+                status="不合格",
+                inspected_by=current.id,
+                inspected_at=datetime.now(UTC),
+                inspect_note=body.note,
+                batch_no=batch_no,
+            )
+        )
+    for g in created:
+        session.add(g)
+    _attach_po_refs(session, created)
     row.arrived_at = body.receipt_date
     session.flush()  # autoflush=False：先把到货单落库，状态重算才看得到
     _recalc_request_status(session, row)
+    _bump_line_on_receipt(session, row, ok=ok, rejected=rejected)
+    gr = created[0]
     if row.status in REQUEST_DONE:
-        _sync_purchase_task(session, row, "已完成", f"验收合格并办完（{receipt_no}）")
-    elif body.result == "合格":
-        _sync_purchase_task(session, row, "进行中", f"验收合格 {body.qty:g}，待入库")
-    else:
+        _sync_purchase_task(session, row, "已完成", f"验收合格并办完（{gr.receipt_no}）")
+    elif ok > 0:
+        _sync_purchase_task(session, row, "进行中", f"验收合格 {ok:g}，待入库")
+    if rejected > 0:
         _sync_purchase_task(
-            session, row, "进行中", f"验收不合格：{body.note or '等采购协商换货/退货'}"
+            session, row, "进行中", f"验收不合格 {rejected:g}：{body.note or '等采购协商换货/退货'}"
         )
     audit.log(
         session,
         user=current,
         action="acceptance",
         object_type="goods_receipt",
-        object_ref=receipt_no,
-        summary=f"到货验收 {receipt_no}（{row.item_no} × {body.qty:g}）：{body.result}"
-        + ("，待入库" if receipt_status == "待入库" else "")
-        + ("，现场待验收" if receipt_status == "现场待验收" else "")
-        + ("，现场已验收" if receipt_status == "现场已验收" else "")
-        + ("，等采购协商" if body.result == "不合格" else "")
-        + (f"，说明：{body.note}" if body.note else ""),
+        object_ref=batch_no,
+        summary=f"到货验收 {batch_no}（{row.item_no} × {body.qty:g}）：合格 {ok:g} / 不合格 {rejected:g}"
+        + ("，待入库" if ok > 0 and to != "直发客户现场" else "")
+        + ("，现场待验收" if ok > 0 and to == "直发客户现场" else "")
+        + (f"，不合格原因：{body.note}" if rejected > 0 and body.note else ""),
         ip=client_ip(request),
     )
-    # ★ 站内消息（06 卷 §9）：合格提醒仓库入库；不合格提醒采购协商
-    if receipt_status == "待入库":
-        notify.notify_role(
-            session,
-            "WAREHOUSE",
-            type_=notify.TYPE_WAREHOUSE,
-            title=f"有货待入库：{row.item_no} × {body.qty:g}",
-            body=f"{receipt_no}（{project_no}）",
-            link="/warehouse",
-            biz_type="goods_receipt",
-            biz_id=gr.id,
-            actor_id=current.id,
-        )
-    elif body.result == "不合格":
-        notify.notify_role(
-            session,
-            "PURCHASE",
-            type_=notify.TYPE_PURCHASE,
-            title=f"验收不合格：{receipt_no}（{row.item_no} × {body.qty:g}）",
-            body=body.note,
-            link="/purchase",
-            biz_type="goods_receipt",
-            biz_id=gr.id,
-            actor_id=current.id,
-        )
-    elif receipt_status == "现场待验收":
-        # 直发客户现场：先登记到货，等现场清点验收（S8）
+    if ok > 0 and to == "直发客户现场":
         project = session.get(Project, project_no)
         if project is not None and project.pm_id:
             notify.notify(
                 session,
                 [project.pm_id],
                 type_=notify.TYPE_WAREHOUSE,
-                title=f"直发现场已到货待清点：{row.item_no} × {body.qty:g}",
-                body=f"{project_no} {row.equip_no or ''}（{receipt_no}）—— 请现场清点验收",
+                title=f"直发现场已到货待清点：{row.item_no} × {ok:g}",
+                body=f"{project_no} {row.equip_no or ''}（{gr.receipt_no}）—— 请现场清点验收",
                 link="/site",
                 biz_type="goods_receipt",
                 biz_id=gr.id,
                 actor_id=current.id,
             )
-    elif receipt_status == "现场已验收":
-        project = session.get(Project, project_no)
-        if project is not None and project.pm_id:
-            notify.notify(
-                session,
-                [project.pm_id],
-                type_=notify.TYPE_WAREHOUSE,
-                title=f"直发现场已验收：{row.item_no} × {body.qty:g}",
-                body=f"{project_no} {row.equip_no or ''}（{receipt_no}）",
-                link="/projects",
-                biz_type="goods_receipt",
-                biz_id=gr.id,
-                actor_id=current.id,
-            )
+    elif ok > 0:
+        notify.notify_role(
+            session,
+            "WAREHOUSE",
+            type_=notify.TYPE_WAREHOUSE,
+            title=f"有货待入库：{row.item_no} × {ok:g}",
+            body=f"{gr.receipt_no}（{project_no}）",
+            link="/warehouse",
+            biz_type="goods_receipt",
+            biz_id=gr.id,
+            actor_id=current.id,
+        )
+    if rejected > 0:
+        notify.notify_role(
+            session,
+            "PURCHASE",
+            type_=notify.TYPE_PURCHASE,
+            title=f"验收不合格：{batch_no}（{row.item_no} × {rejected:g}）",
+            body=body.note,
+            link="/purchase",
+            biz_type="goods_receipt",
+            biz_id=created[-1].id,
+            actor_id=current.id,
+        )
     session.commit()
     return {
         "receipt_id": gr.id,
-        "receipt_no": receipt_no,
+        "receipt_no": gr.receipt_no,
         "receipt_status": gr.status,
         "request_status": row.status,
         "qty_received": float(row.qty_received or 0),
+        "qty_rejected": float(row.qty_rejected or 0),
+        "batch_no": batch_no,
+        "receipts": [
+            {"receipt_no": x.receipt_no, "status": x.status, "qty": float(x.qty or 0)}
+            for x in created
+        ],
     }
 
 

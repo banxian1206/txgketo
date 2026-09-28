@@ -758,6 +758,45 @@ def b_split() -> None:
     CTX["split_rid"] = rid
 
 
+def b_partial_ok() -> None:
+    """B3 部分合格（08 §2 洞②）：一批 100 = 合格 80 + 不合格 20 → 两条到货单（同 batch_no）。"""
+    probe("B3 部分合格（一批拆合格/不合格）")
+    p = CTX["p"]
+    rid = _new_demand("bc", 100)["id"]
+    mo = api.req("post", "/purchase/merge-order", "buyer1", (200, 201), json={
+        "supplier_id": SUP["甲钢材"]["id"], "ordered_at": d(0), "expected_date": d(15),
+        "deliver_to": "公司仓库",
+        "lines": [{"request_id": rid, "qty": 100, "unit_price": 200.0}]})
+    po = mo.get("po_no")
+    api.req("post", f"/projects/{p}/purchase-requests/{rid}/inspect", "wh1", (200,), json={
+        "qty": 100, "result": "合格", "qty_ok": 80, "qty_rejected": 20,
+        "receipt_date": d(0), "note": "20 张边角弯曲"})
+    rs = q("select status, qty, qty_ok, qty_rejected, batch_no from goods_receipt "
+           "where request_id=:i order by id", i=rid)
+    rec(len(rs) == 2 and len({r["batch_no"] for r in rs}) == 1,
+        f"一批 100 → 2 条到货单、同 batch_no：{[(r['status'], float(r['qty'])) for r in rs]}",
+        "洞②：整批二选一表达不了 80 合格 + 20 不合格")
+    rec({r["status"] for r in rs} == {"待入库", "不合格"},
+        f"两条状态应为 待入库 + 不合格，实际={[r['status'] for r in rs]}")
+    row = _find_by_id(rid)
+    rec(abs(float(row["qty_received"] or 0) - 80) < 1e-6,
+        f"需求 qty_received 应=80（只算合格），实际={row['qty_received']}")
+    rec(abs(float(row.get("qty_rejected") or 0) - 20) < 1e-6,
+        f"需求 qty_rejected 应=20，实际={row.get('qty_rejected')}")
+
+    # PU-06 换货闭环：20 不合格 → 换货 → 补发 20 → 全合格入库 → 已入库 / 累计 100
+    api.req("post", f"/purchase/orders/{po}/negotiate", "buyer1", (200, 201), json={
+        "request_ids": [rid], "action": "换货", "expected_date": d(10), "note": "原供应商补发"})
+    api.req("post", f"/projects/{p}/purchase-requests/{rid}/inspect", "wh1", (200,), json={
+        "qty": 20, "result": "合格", "receipt_date": d(1)})
+    for g in q("select id from goods_receipt where request_id=:i and status='待入库'", i=rid):
+        api.req("post", f"/goods-receipts/{g['id']}/store", "wh1",
+                json={"location": "深圳仓 A-01-01"})
+    row = _find_by_id(rid)
+    rec(row["status"] == "已入库" and abs(float(row["qty_received"] or 0) - 100) < 1e-6,
+        f"换货补发+入库后应 qty_received=100/已入库，实际={row['status']}/{row['qty_received']}")
+
+
 def _new_demand(item_key: str, qty: float, who: str = "buyer1") -> dict:
     """建一条干净的「待采购」需求（手工申请通道，免审核直入池）。"""
     r = api.req("post", "/purchase/manual-request", who, (201,), json={
@@ -1155,7 +1194,7 @@ def main() -> None:
             traceback.print_exc()
 
     part("Part B · 采购域专项探针")
-    for fn in (b_split, b_idempotent_after_release, b_pending_window, b_pending_repool,
+    for fn in (b_split, b_partial_ok, b_idempotent_after_release, b_pending_window, b_pending_repool,
                b_direct_repool, b_delete_authz, b_kitting_inflate, b_issue_draft_bom,
                b_stock_conservation, b_price_reference):
         try:
