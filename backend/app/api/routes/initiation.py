@@ -8,7 +8,7 @@ from pathlib import Path
 from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile, status
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
-from sqlalchemy import delete, or_, select
+from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from app.api.deps import (
@@ -45,6 +45,7 @@ from app.models.library import Item
 from app.models.platform import User
 from app.models.project import Equipment, Project
 from app.models.review import DesignRelease
+from app.models.purchase_order import PurchaseOrder, PurchaseOrderLine
 from app.services import audit, bom_demand, notify, project_stage
 from app.services.numbering import (
     make_equip_no,
@@ -2211,22 +2212,199 @@ def _order_maps(session: Session):
     return items, projects, equips
 
 
+def _po_lines(session: Session, po_id: int) -> list[PurchaseOrderLine]:
+    return list(
+        session.scalars(
+            select(PurchaseOrderLine)
+            .where(PurchaseOrderLine.po_id == po_id)
+            .order_by(PurchaseOrderLine.id)
+        ).all()
+    )
+
+
+def _po_display_status(po: PurchaseOrder, lines: list[PurchaseOrderLine]) -> str:
+    """单头状态的**展示口径**（沿用旧词表，前端无需改色）：由单行状态汇总。"""
+    if po.status in ("已作废",):
+        return "已取消"
+    active = [ln for ln in lines if ln.status != "已取消"] or lines
+    st = {ln.status for ln in active}
+    if "不合格" in st:
+        return "不合格"
+    if st and st <= {"已入库"}:
+        return "已完成"
+    if st & {"已入库", "部分到货"}:
+        return "部分到货"
+    if st and st <= {"已退货"}:
+        return "已退货"
+    return "在途"
+
+
+def _po_order_summary(
+    po: PurchaseOrder,
+    lines: list[PurchaseOrderLine],
+    projects: dict,
+    equips: dict,
+    agg: dict[int, dict[str, float]],
+) -> dict:
+    projs: list[dict] = []
+    eqs: list[dict] = []
+    for ln in lines:
+        if ln.project_no and ln.project_no not in [p["project_no"] for p in projs]:
+            projs.append({"project_no": ln.project_no, "project_name": projects.get(ln.project_no)})
+        if ln.equip_no and not any(
+            e["project_no"] == ln.project_no and e["equip_no"] == ln.equip_no for e in eqs
+        ):
+            eqs.append(
+                {
+                    "project_no": ln.project_no,
+                    "equip_no": ln.equip_no,
+                    "equip_name": equips.get((ln.project_no, ln.equip_no)),
+                }
+            )
+    rids = [ln.request_id for ln in lines if ln.request_id]
+    return {
+        "id": po.id,
+        "key": po.po_no,
+        "po_no": po.po_no,
+        "supplier_id": po.supplier_id,
+        "supplier_name": po.supplier_name,
+        "ordered_at": po.order_date,
+        "expected_date": po.expect_date,
+        "deliver_to": po.deliver_to,
+        "deliver_address": po.deliver_address,
+        "status": _po_display_status(po, lines),
+        "po_status": po.status,
+        "pay_status": po.pay_status,
+        "line_count": len(lines),
+        "item_kinds": len({ln.item_no for ln in lines}),
+        "total_amount": float(po.total_tax_incl or 0),
+        "exchanged_qty": round(sum(agg.get(r, {}).get("exchanged", 0.0) for r in rids), 3),
+        "returned_qty": round(sum(agg.get(r, {}).get("returned", 0.0) for r in rids), 3),
+        "projects": projs,
+        "equipments": eqs,
+        "request_ids": rids,
+    }
+
+
+def _po_line_payload(
+    ln: PurchaseOrderLine,
+    req: PurchaseRequest | None,
+    item: Item | None,
+    projects: dict,
+    equips: dict,
+    part_titles: dict,
+    by_req: dict[int, list[GoodsReceipt]],
+    agg: dict[int, dict[str, float]],
+    retries: dict[int, list[PurchaseRequest]],
+    names: dict[int, str],
+) -> dict:
+    rid = ln.request_id
+    a = agg.get(rid, {}) if rid else {}
+    receipts = by_req.get(rid or 0, [])
+    if req is not None:
+        base = _request_dict(req, item)
+    else:
+        base = {
+            "id": None,
+            "po_no": None,
+            "unit_price": None,
+            "amount": None,
+            "shipped_at": None,
+            "deliver_to": None,
+            "deliver_address": None,
+            "arrived_at": None,
+            "qty_received": None,
+            "project_no": ln.project_no,
+            "equip_no": ln.equip_no,
+            "part_no": ln.part_no,
+            "item_no": ln.item_no,
+            "item_name": item.display_name if item else ln.item_no,
+            "model": None,
+            "brand": item.brand if item else None,
+            "spec_text": item.spec_text if item else None,
+            "qty": None,
+            "unit": ln.unit,
+            "source": None,
+            "lead_days": None,
+            "supplier_id": None,
+            "supplier_name": None,
+            "need_date": None,
+            "expected_date": None,
+            "ordered_at": None,
+            "status": None,
+            "is_long_lead": False,
+            "origin_request_id": None,
+            "remark": ln.remark,
+        }
+    base.update(
+        {
+            "id": ln.id,
+            "po_line_id": ln.id,
+            "request_id": rid,
+            "project_no": ln.project_no,
+            "equip_no": ln.equip_no,
+            "part_no": ln.part_no,
+            "item_no": ln.item_no,
+            "item_name": item.display_name if item else ln.item_no,
+            "model": (item.mfr_model or (item.spec or {}).get("model")) if item else None,
+            "brand": item.brand if item else None,
+            "spec_text": item.spec_text if item else None,
+            "qty": float(ln.qty) if ln.qty is not None else None,
+            "unit": ln.unit,
+            "unit_price": float(ln.unit_price) if ln.unit_price is not None else None,
+            "amount": float(ln.amount_tax_incl) if ln.amount_tax_incl is not None else None,
+            "tax_incl": ln.tax_incl,
+            "expected_date": ln.expect_date,
+            "status": ln.status,
+            "qty_received": float(ln.received_qty or 0),
+            "project_name": projects.get(ln.project_no),
+            "equip_name": equips.get((ln.project_no, ln.equip_no)),
+            "part_title": part_titles.get(ln.part_no),
+            "qty_original": float(ln.qty or 0) + a.get("returned", 0.0),
+            "qty_returned": a.get("returned", 0.0),
+            "qty_exchanged": a.get("exchanged", 0.0),
+            "receipts": [
+                {
+                    "receipt_no": g.receipt_no,
+                    "status": g.status,
+                    "qty": float(g.qty) if g.qty is not None else None,
+                    "qty_ok": float(g.qty_ok) if g.qty_ok is not None else None,
+                    "qty_rejected": float(g.qty_rejected) if g.qty_rejected is not None else None,
+                    "batch_no": g.batch_no,
+                    "unit": g.unit,
+                    "receipt_date": g.receipt_date,
+                    "deliver_to": g.deliver_to,
+                    "location": g.location,
+                    "inspect_note": g.inspect_note,
+                    "inspected_by": names.get(g.inspected_by) if g.inspected_by else None,
+                    "inspected_at": g.inspected_at,
+                    "stored_by": names.get(g.stored_by) if g.stored_by else None,
+                    "stored_at": g.stored_at,
+                    "resolve_note": g.resolve_note,
+                    "resolved_by": names.get(g.resolved_by) if g.resolved_by else None,
+                    "resolved_at": g.resolved_at,
+                    "retries": _retry_brief(retries.get(rid, [])) if rid else [],
+                }
+                for g in receipts
+            ],
+        }
+    )
+    return base
+
+
 @purchase_router.get("/purchase/orders")
 def list_purchase_orders(
     session: Session = Depends(get_session), current: User = Depends(get_current_user)
 ):
-    """采购单列表（合并单按 po_no 归拢；没号的历史单条单各自成单）。"""
-    rows = session.scalars(
-        select(PurchaseRequest)
-        .where(or_(PurchaseRequest.po_no.isnot(None), PurchaseRequest.ordered_at.isnot(None)))
-        .order_by(PurchaseRequest.id.desc())
-    ).all()
-    items, projects, equips = _order_maps(session)
-    groups: dict[str, list[PurchaseRequest]] = {}
-    for r in rows:
-        groups.setdefault(r.po_no or f"R{r.id}", []).append(r)
-    agg = _receipt_qty_map(session, [r.id for r in rows])
-    out = [_order_summary(key, mrs, items, projects, equips, agg) for key, mrs in groups.items()]
+    """采购单列表（真表：按 purchase_order 单头；一条需求可拆多单）。"""
+    _, projects, equips = _order_maps(session)
+    pos = session.scalars(select(PurchaseOrder).order_by(PurchaseOrder.id.desc())).all()
+    by_po: dict[int, list[PurchaseOrderLine]] = {}
+    for ln in session.scalars(select(PurchaseOrderLine)).all():
+        by_po.setdefault(ln.po_id, []).append(ln)
+    rids = [ln.request_id for lns in by_po.values() for ln in lns if ln.request_id]
+    agg = _receipt_qty_map(session, rids)
+    out = [_po_order_summary(po, by_po.get(po.id, []), projects, equips, agg) for po in pos]
     out.sort(key=lambda o: (o["ordered_at"] or date.min, o["key"]), reverse=True)
     if not has_permission(current, "purchase:price"):
         return scrub_money(out)
@@ -2237,21 +2415,30 @@ def list_purchase_orders(
 def get_purchase_order(
     key: str, session: Session = Depends(get_session), current: User = Depends(get_current_user)
 ):
-    """采购单详情：单头 + 每行需求（项目/设备/物料/价格/状态/到货单）。"""
-    rows = _order_rows(session, key)
-    if not rows:
+    """采购单详情（真表）：单头 + 每行（项目/设备/物料/价格/状态/到货单）。"""
+    po = session.scalar(select(PurchaseOrder).where(PurchaseOrder.po_no == key))
+    if po is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "采购单不存在")
     items, projects, equips = _order_maps(session)
     names = {u.id: u.name for u in session.scalars(select(User)).all()}
-    receipts = session.scalars(
-        select(GoodsReceipt).where(GoodsReceipt.request_id.in_([r.id for r in rows]))
-    ).all()
+    po_lines = _po_lines(session, po.id)
+    rids = [ln.request_id for ln in po_lines if ln.request_id]
+    reqs = (
+        {r.id: r for r in session.scalars(select(PurchaseRequest).where(PurchaseRequest.id.in_(rids)))}
+        if rids
+        else {}
+    )
+    receipts = (
+        session.scalars(select(GoodsReceipt).where(GoodsReceipt.request_id.in_(rids))).all()
+        if rids
+        else []
+    )
     by_req: dict[int, list[GoodsReceipt]] = {}
     for g in receipts:
         by_req.setdefault(g.request_id or 0, []).append(g)
-    agg = _receipt_qty_map(session, [r.id for r in rows])
-    retries = _retry_map(session, [r.id for r in rows])
-    part_nos = {r.part_no for r in rows if r.part_no}
+    agg = _receipt_qty_map(session, rids)
+    retries = _retry_map(session, rids)
+    part_nos = {ln.part_no for ln in po_lines if ln.part_no}
     part_titles = (
         {
             d.drawing_no: d.title
@@ -2260,47 +2447,23 @@ def get_purchase_order(
         if part_nos
         else {}
     )
-
-    lines = []
-    for r in rows:
-        item = items.get(r.item_no)
-        a = agg.get(r.id, {})
-        lines.append(
-            {
-                **_request_dict(r, item),
-                "project_name": projects.get(r.project_no),
-                "equip_name": equips.get((r.project_no, r.equip_no)),
-                "part_title": part_titles.get(r.part_no),
-                # ★ 退换货留痕：原订购多少、退了多少、换过多少（当前 qty 是退货后的有效数）
-                "qty_original": float(r.qty or 0) + a.get("returned", 0.0),
-                "qty_returned": a.get("returned", 0.0),
-                "qty_exchanged": a.get("exchanged", 0.0),
-                "receipts": [
-                    {
-                        "receipt_no": g.receipt_no,
-                        "status": g.status,
-                        "qty": float(g.qty) if g.qty is not None else None,
-                        "unit": g.unit,
-                        "receipt_date": g.receipt_date,
-                        "deliver_to": g.deliver_to,
-                        "location": g.location,
-                        "inspect_note": g.inspect_note,
-                        "inspected_by": names.get(g.inspected_by) if g.inspected_by else None,
-                        "inspected_at": g.inspected_at,
-                        "stored_by": names.get(g.stored_by) if g.stored_by else None,
-                        "stored_at": g.stored_at,
-                        "resolve_note": g.resolve_note,
-                        "resolved_by": names.get(g.resolved_by) if g.resolved_by else None,
-                        "resolved_at": g.resolved_at,
-                        "retries": _retry_brief(retries.get(r.id, [])),
-                    }
-                    for g in by_req.get(r.id, [])
-                ],
-            }
-        )
     result = {
-        "order": _order_summary(key, rows, items, projects, equips, agg),
-        "lines": lines,
+        "order": _po_order_summary(po, po_lines, projects, equips, agg),
+        "lines": [
+            _po_line_payload(
+                ln,
+                reqs.get(ln.request_id),
+                items.get(ln.item_no),
+                projects,
+                equips,
+                part_titles,
+                by_req,
+                agg,
+                retries,
+                names,
+            )
+            for ln in po_lines
+        ],
     }
     if not has_permission(current, "purchase:price"):
         return scrub_money(result)
