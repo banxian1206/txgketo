@@ -12,6 +12,7 @@ export async function purchaseWorkbench() {
 // 到货验收由仓库推：仓库登记到货 → 验收 → 入库，需求状态自己变。
 
 export interface PurchaseOrderSummary {
+  id?: number
   key: string
   po_no?: string | null
   supplier_id?: number | null
@@ -330,6 +331,63 @@ export async function mergeOrder(body: MergeOrderIn) {
 }
 
 // ============================== 供应商 / 价格 =====================================
+
+export async function markOrdersPaid(body: {
+  po_ids: number[]
+  paid_at?: string
+  paid_amount?: number
+  note?: string
+  vouchers?: string[]
+}) {
+  const { data } = await api.post<{ paid: number }>('/purchase/orders/mark-paid', body)
+  return data
+}
+
+export async function uploadPoVouchers(key: string, files: File[]) {
+  const fd = new FormData()
+  files.forEach((f) => fd.append('files', f))
+  const { data } = await api.post<{ count: number }>(
+    `/purchase/orders/${encodeURIComponent(key)}/vouchers`,
+    fd,
+  )
+  return data
+}
+
+export interface StatementPo {
+  id: number
+  po_no: string
+  order_date?: string | null
+  expect_date?: string | null
+  status: string
+  pay_status: string
+  total_tax_incl: number
+  actual_arrive_date?: string | null
+  delay_days?: number | null
+  paid_at?: string | null
+  paid_amount?: number | null
+  paid_by?: string | null
+  paid_marked_at?: string | null
+  voucher_count: number
+  paid_note?: string | null
+}
+
+export interface SupplierStatement {
+  supplier: { id: number; name: string; tax_rate?: number | null }
+  summary: {
+    total_orders: number
+    paid_count: number
+    unpaid_count: number
+    total_amount: number
+    paid_amount: number
+  }
+  unpaid: StatementPo[]
+  paid: StatementPo[]
+}
+
+export async function supplierStatement(id: number) {
+  const { data } = await api.get<SupplierStatement>(`/suppliers/${id}/statement`)
+  return data
+}
 
 export interface SupplierRow {
   id: number

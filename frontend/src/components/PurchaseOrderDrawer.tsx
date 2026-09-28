@@ -27,6 +27,7 @@ import {
   closeReturnPurchaseOrder,
   errMsg,
   listSuppliers,
+  markOrdersPaid,
   purchaseOrderDetail,
   submitPurchaseOrder,
   voidPurchaseOrder,
@@ -194,6 +195,18 @@ export default function PurchaseOrderDrawer({
     }
   }
 
+  const doMarkPaid = async () => {
+    if (!detail?.order.id) return
+    try {
+      await markOrdersPaid({ po_ids: [detail.order.id], note: '采购台标记' })
+      message.success('已标记付款')
+      await load()
+      onChanged()
+    } catch (e) {
+      message.error(errMsg(e))
+    }
+  }
+
   const doVoid = async () => {
     if (!orderKey) return
     try {
@@ -263,6 +276,11 @@ export default function PurchaseOrderDrawer({
           )}
           {o && ['待经理审', '待总监审'].includes(o.po_status ?? '') && (
             <Button onClick={() => void doWithdraw()}>撤回</Button>
+          )}
+          {o && o.pay_status !== '已付款' && (
+            <Popconfirm title="标记这张单已付款？" onConfirm={() => void doMarkPaid()}>
+              <Button>标记已付款</Button>
+            </Popconfirm>
           )}
           <Button disabled={changeable.length === 0} onClick={() => void openSupplier()}>
             更改供应商

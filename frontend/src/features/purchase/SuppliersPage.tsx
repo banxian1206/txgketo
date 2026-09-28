@@ -38,6 +38,7 @@ import {
   type SupplierRow,
 } from '../../api/client'
 import AppModal from '../../components/AppModal'
+import SupplierStatementModal from '../../components/SupplierStatementModal'
 
 const KINDS = ['原材料', '标准件', '机加工', '外协', '电气', '气动', '其他']
 
@@ -50,6 +51,7 @@ export default function Suppliers() {
   const [open, setOpen] = useState(false)
   const [initial, setInitial] = useState<Record<string, unknown>>({})
   const [editing, setEditing] = useState<SupplierRow | null>(null)
+  const [statementFor, setStatementFor] = useState<number | null>(null)
   const [saving, setSaving] = useState(false)
   const [form] = Form.useForm()
 
@@ -203,8 +205,13 @@ export default function Suppliers() {
             {
               title: '',
               key: 'e',
-              width: 60,
-              render: (_: unknown, r: SupplierRow) => <a onClick={() => openForm(r)}>编辑</a>,
+              width: 110,
+              render: (_: unknown, r: SupplierRow) => (
+                <Space size="middle">
+                  <a onClick={() => setStatementFor(r.id)}>往来</a>
+                  <a onClick={() => openForm(r)}>编辑</a>
+                </Space>
+              ),
             },
           ]}
         />
@@ -480,6 +487,12 @@ export default function Suppliers() {
           ]}
         />
       </Drawer>
+
+      <SupplierStatementModal
+        open={statementFor !== null}
+        supplierId={statementFor}
+        onClose={() => setStatementFor(null)}
+      />
     </>
   )
 }
