@@ -10,12 +10,19 @@ from datetime import UTC, date, datetime
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models.initiation import GoodsReceipt, ProjectMember, PurchaseRequest
+from app.models.initiation import (
+    GoodsReceipt,
+    ProjectMember,
+    PurchaseRequest,
+    SOURCE_SITE_DAMAGED,
+    SOURCE_SITE_SHORTAGE,
+)
 from app.models.site import (
     COMMISSION_DONE,
     COMMISSION_ONSITE,
     COMMISSION_STARTED,
     ISSUE_CLOSED,
+    SITE_RECEIPT_DAMAGED,
     SITE_RECEIPT_OK,
     SiteCommission,
     SiteDaily,
@@ -27,8 +34,6 @@ from app.services import notify
 
 SITE_RECEIPT_PENDING = "现场待验收"
 SITE_RECEIPT_DONE = "现场已验收"
-# 现场缺件/破损产生的补采需求来源（与仓库侧「退货重采」同构）
-SOURCE_SITE_SHORTAGE = "现场缺件"
 
 
 class SiteError(Exception):
@@ -272,7 +277,7 @@ def accept_incoming(
                     item_no=req.item_no,
                     qty=shortage_qty,
                     unit=req.unit,
-                    source=SOURCE_SITE_SHORTAGE,
+                    source=(SOURCE_SITE_DAMAGED if result == SITE_RECEIPT_DAMAGED else SOURCE_SITE_SHORTAGE),
                     lead_days=req.lead_days,
                     need_date=req.need_date,
                     status="待采购",

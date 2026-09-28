@@ -60,8 +60,7 @@ DEFAULT_MILESTONES = (
 
 MILESTONE_STATUS = ("未开始", "进行中", "已完成", "延期")
 
-# 采购需求来源与状态
-REQUEST_SOURCES = ("常规", "长周期", "退货重采")  # 退货重采：退货后回池重新买的需求
+# 采购需求状态
 # 采购状态线（客户口径）：
 #   待采购 --合并/单条下单--> 在途（等货，可分多批）
 #     --仓库验收合格--> 待入库 --仓库入库--> 已入库（直发现场：现场已验收）
@@ -146,6 +145,19 @@ SOURCE_DESIGN_RELEASE = "设计发布"  # 机械/电气评审发布触发
 SOURCE_CRAFT_RELEASE = "工艺发布"  # 工艺评审发布触发
 SOURCE_MANUAL = "手工"  # 手工申请（免审核）
 SOURCE_RETRY = "退货重采"
+SOURCE_SITE_SHORTAGE = "现场缺件"  # 现场清点缺件 → 回池补采
+SOURCE_SITE_DAMAGED = "现场破损"  # 现场清点破损 → 回池补采
+# ★ 采购需求来源全集（N17：以前是写死的 3 个值、还漂移了；现收全所有 SOURCE_*，并有契约断言）
+REQUEST_SOURCES = (
+    SOURCE_REGULAR,
+    SOURCE_LONG_LEAD,
+    SOURCE_MANUAL,
+    SOURCE_DESIGN_RELEASE,
+    SOURCE_CRAFT_RELEASE,
+    SOURCE_RETRY,
+    SOURCE_SITE_SHORTAGE,
+    SOURCE_SITE_DAMAGED,
+)
 
 
 class PurchaseRequest(Base, TimestampMixin):

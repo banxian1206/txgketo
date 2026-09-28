@@ -91,3 +91,16 @@ class Test状态字面量护栏:
         from app.models.warehouse import ISSUE_PARTIAL, ISSUE_STATUS
 
         assert ISSUE_PARTIAL in ISSUE_STATUS
+
+
+class Test需求来源词表:
+    def test_所有SOURCE常量都在REQUEST_SOURCES里(self):
+        """N17：`REQUEST_SOURCES` 必须收全所有 `SOURCE_*`（以前写死 3 个值、漂移了）。"""
+        import app.models.initiation as m
+
+        sources = {
+            v for k, v in vars(m).items() if k.startswith("SOURCE_") and isinstance(v, str)
+        }
+        assert sources, "没有找到 SOURCE_* 常量"
+        missing = sources - set(m.REQUEST_SOURCES)
+        assert missing == set(), f"这些 SOURCE_* 不在 REQUEST_SOURCES 里：{missing}"

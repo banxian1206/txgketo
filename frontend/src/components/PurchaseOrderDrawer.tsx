@@ -479,9 +479,9 @@ export default function PurchaseOrderDrawer({
                 render: (_: unknown, l) => (
                   <>
                     <b>{l.item_name}</b>
-                    {l.source === '退货重采' && (
+                    {['退货重采', '现场缺件', '现场破损'].includes(l.source) && (
                       <Tag color="orange" style={{ marginLeft: 4 }}>
-                        退货重采
+                        {l.source}
                       </Tag>
                     )}
                     <div style={{ fontSize: 12, color: T.textSecondary }}>

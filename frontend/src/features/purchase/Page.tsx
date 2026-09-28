@@ -318,7 +318,7 @@ export default function PurchaseWorkbench() {
                             dataIndex: 'source',
                             width: 150,
                             render: (v: string, r) =>
-                              v === '退货重采' ? (
+                              ['退货重采', '现场缺件', '现场破损'].includes(v) ? (
                                 <>
                                   <Tag color="orange">退货重采</Tag>
                                   {r.origin_po_no && (

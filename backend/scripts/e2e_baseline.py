@@ -1073,8 +1073,24 @@ def b_site_shortage() -> None:
     rec(float(row["qty_ok"] or 0) == 25.0 and float(row["qty_rejected"] or 0) == 15.0,
         f"到货单应记 实到25/缺口15，实际={row['qty_ok']}/{row['qty_rejected']}")
     retry = q("select id, qty, source from purchase_request where origin_request_id=:i", i=rid)
-    rec(len(retry) == 1 and abs(float(retry[0]["qty"]) - 15.0) < 1e-6,
-        f"应新建 1 条待采购 15 回池，实际={[(r['id'], float(r['qty']), r['source']) for r in retry]}")
+    rec(len(retry) == 1 and abs(float(retry[0]["qty"]) - 15.0) < 1e-6
+        and retry[0]["source"] == "现场缺件",
+        f"应新建 1 条待采购 15 回池（source=现场缺件），实际={[(r['id'], float(r['qty']), r['source']) for r in retry]}")
+    # N19：破损 → source=现场破损（与缺件分开）
+    rid_b = _new_demand("ft", 20)["id"]
+    api.req("post", "/purchase/merge-order", "buyer1", (200, 201), json={
+        "supplier_id": SUP["甲钢材"]["id"], "ordered_at": d(0), "expected_date": d(10),
+        "deliver_to": "直发客户现场", "deliver_address": "深圳客户现场",
+        "lines": [{"request_id": rid_b, "qty": 20, "unit_price": 10.0, "tax_incl": True}]})
+    gr_b = q("select id from goods_receipt where request_id=:i and status='现场待验收' "
+             "order by id desc limit 1", i=rid_b)[0]["id"]
+    api.req("post", f"/site/incoming/{gr_b}/accept", "site1", (200,),
+            json={"result": "破损",
+                  "shortage_detail": [{"item": "YL-FT-0001", "qty": 8, "reason": "外壳压瘪"}],
+                  "photos": ["probe.png"], "remark": "破损8"})
+    rb = q("select source from purchase_request where origin_request_id=:i", i=rid_b)
+    rec(len(rb) == 1 and rb[0]["source"] == "现场破损",
+        f"破损补采 source 应为「现场破损」，实际={[r['source'] for r in rb]}")
 
 
 def _new_demand(item_key: str, qty: float, who: str = "buyer1") -> dict:
