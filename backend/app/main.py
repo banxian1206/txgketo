@@ -2,8 +2,9 @@
 
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from app.api.routes import (
     acceptance,
@@ -31,16 +32,21 @@ from app.api.routes import (
     workbench,
 )
 from app.core.config import settings
+from app.core.errors import ForbiddenOperation
 
 app = FastAPI(title=settings.app_name, version="0.1.0")
+
+
+@app.exception_handler(ForbiddenOperation)
+async def _forbidden_operation(request: Request, exc: ForbiddenOperation):
+    """服务层识别的越权 → 403（与业务规则的 400 区分；AZ-04）。"""
+    return JSONResponse(status_code=403, content={"detail": str(exc)})
 
 
 @app.middleware("http")
 async def _block_impersonated_writes(request, call_next):
     """「以某人身份查看」只能看（06 卷 §4）：带 X-Impersonate 头的写操作一律 403。"""
     if request.headers.get("x-impersonate") and request.method not in ("GET", "HEAD", "OPTIONS"):
-        from fastapi.responses import JSONResponse
-
         return JSONResponse(status_code=403, content={"detail": "以他人身份查看时只能看，不能操作"})
     return await call_next(request)
 

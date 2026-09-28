@@ -610,9 +610,13 @@ def add_purchase_request(
     body: LongLeadIn,
     request: Request,
     session: Session = Depends(get_session),
-    current: User = Depends(get_current_user),
+    current: User = Depends(require_permission("purchase:edit")),
 ):
-    """登记长周期采购件（从标准库选）。填下单日期 → 已下单，预计到货 = 下单 + 周期。"""
+    """登记长周期采购件（从标准库选）。填下单日期 → 已下单，预计到货 = 下单 + 周期。
+
+    ★ AZ-01：这是「立即下单 + 发号 + 置在途」的写动作，必须 `purchase:edit`
+      （此前只校验登录，现场账号 `site1` 能凭空下一张 ¥54,000 采购单）。
+    """
     _get_project(session, project_no)
     # 合理性校验：下单 + 周期 必须早于「需要到货」，否则这条需求一开始就是不可能完成的
     ordered_at = body.ordered_at
@@ -738,12 +742,37 @@ def update_purchase_request(
 def remove_purchase_request(
     project_no: str,
     request_id: int,
+    request: Request,
     session: Session = Depends(get_session),
-    _: User = Depends(get_current_user),
+    current: User = Depends(require_permission("purchase:edit")),
 ):
+    """删除一条采购需求：**只允许还没进入采购流程的需求**。
+
+    ★ AZ-02：此前只校验登录、无审计、无状态守卫 —— 任何账号可硬删（含已下单/在途）。
+      三重修复：① `purchase:edit`；② 状态守卫；③ 落 `audit_log`（铁律 5）。
+      已下单的需求不再提供删除，如需终止请走采购单「取消 / 退货」。
+    """
     row = session.get(PurchaseRequest, request_id)
     if row is None or row.project_no != project_no:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "采购需求不存在")
+    if row.status not in ("待采购", "已取消"):
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            f"{row.item_no} 当前状态是「{row.status}」，不能删除（已进入采购流程）。"
+            "如不再需要，请在采购单上「取消」或走退货。",
+        )
+    if session.scalar(select(GoodsReceipt.id).where(GoodsReceipt.request_id == row.id).limit(1)):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "这条需求已有到货单，不能删除")
+    audit.log(
+        session,
+        user=current,
+        action="delete",
+        object_type="purchase_request",
+        object_ref=project_no,
+        summary=f"删除采购需求 {row.item_no} × {float(row.qty or 0):g}（{row.status}）",
+        detail={"request_id": row.id, "item_no": row.item_no, "qty": float(row.qty or 0)},
+        ip=client_ip(request),
+    )
     session.delete(row)
     session.commit()
     return {"ok": True}

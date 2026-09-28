@@ -687,17 +687,19 @@ export function LongLeadEditor({ projectNo, onChanged }: Omit<Props, 'users'>) {
             render: (_: unknown, r: PurchaseRequestItem) => (
               <Space size="middle">
                 <a onClick={() => openForm(r)}>编辑</a>
-                <Popconfirm
-                  title="删除？"
-                  onConfirm={() =>
-                    void removePurchaseRequest(projectNo, r.id)
-                      .then(load)
-                      .then(() => onChanged?.())
-                      .catch((e) => message.error(errMsg(e)))
-                  }
-                >
-                  <a>删除</a>
-                </Popconfirm>
+                {(r.status === '待采购' || r.status === '已取消') && (
+                  <Popconfirm
+                    title="删除？"
+                    onConfirm={() =>
+                      void removePurchaseRequest(projectNo, r.id)
+                        .then(load)
+                        .then(() => onChanged?.())
+                        .catch((e) => message.error(errMsg(e)))
+                    }
+                  >
+                    <a>删除</a>
+                  </Popconfirm>
+                )}
               </Space>
             ),
           },

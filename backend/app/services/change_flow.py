@@ -13,6 +13,7 @@ from datetime import UTC, datetime
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
+from app.core.errors import ForbiddenOperation
 from app.models.change import (
     CR_ACTIVE,
     CR_APPROVED,
@@ -42,7 +43,7 @@ from app.models.task import Task
 from app.models.warehouse import MaterialIssue, MaterialIssueLine
 from app.services import audit, notify
 from app.services.numbering import next_number, year_scope_key
-from app.services.reviewers import director_for
+from app.services.reviewers import director, director_for
 
 
 class ChangeFlowError(ValueError):
@@ -141,7 +142,7 @@ def approved_for(session: Session, target_type: str, target_ref: str) -> ChangeR
 def _ensure_task_owner(session: Session, cr: ChangeRequest, user: User) -> Task | None:
     task = session.get(Task, cr.change_task_id) if cr.change_task_id else None
     if not user.is_superuser and (task is None or task.owner_id != user.id):
-        raise ChangeFlowError("只有这条改版任务的负责人能改")
+        raise ForbiddenOperation("只有这条改版任务的负责人能改")
     return task
 
 
@@ -239,8 +240,14 @@ def decide(
     """总监裁决（05 卷 §7②）：批准 / 否决（否决必须给替代方案）。"""
     if cr.status != CR_PENDING:
         raise ChangeFlowError(f"这张申请当前是「{cr.status}」，不在待裁决")
-    if user.position != POSITION_DIRECTOR and not user.is_superuser:
-        raise ChangeFlowError("只有工程部总监能裁决")
+    # ★ AZ-03：限【申请人所在部门】的总监（对齐 review_flow 二级审核）；此前只判 position，
+    #   任何部门的总监都能裁决工程部的图纸改版。
+    applicant = session.get(User, cr.applicant_id) if cr.applicant_id else None
+    boss = director_for(session, applicant) if applicant else director(session)
+    if boss is None:
+        raise ChangeFlowError("申请人所在部门还没配总监——先到「用户与权限」配审核人")
+    if not user.is_superuser and boss.id != user.id:
+        raise ForbiddenOperation("只有申请人所在部门的总监能裁决")
     now = datetime.now(UTC)
     if decision == "批准":
         cr.status = CR_APPROVED
@@ -290,8 +297,13 @@ def dispatch(
     """批准后下发改版任务给对应设计师（05 卷 §7③）。"""
     if cr.status != CR_APPROVED:
         raise ChangeFlowError(f"只有「已批准」的申请能下发（当前：{cr.status}）")
-    if user.position != POSITION_DIRECTOR and not user.is_superuser:
-        raise ChangeFlowError("只有工程部总监能下发")
+    # ★ AZ-03：下发同样限申请人所在部门的总监
+    applicant = session.get(User, cr.applicant_id) if cr.applicant_id else None
+    boss = director_for(session, applicant) if applicant else director(session)
+    if boss is None:
+        raise ChangeFlowError("申请人所在部门还没配总监——先到「用户与权限」配审核人")
+    if not user.is_superuser and boss.id != user.id:
+        raise ForbiddenOperation("只有申请人所在部门的总监能下发")
     assignee = session.get(User, assignee_id)
     if assignee is None:
         raise ChangeFlowError(f"用户不存在：{assignee_id}")

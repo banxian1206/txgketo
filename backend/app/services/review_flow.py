@@ -14,6 +14,7 @@ from datetime import UTC, datetime
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.errors import ForbiddenOperation
 from app.models.engineering import (
     BOM_DESIGN,
     BOM_MATERIAL,
@@ -463,14 +464,14 @@ def review_ticket(
         if lead is None:
             raise ReviewFlowError("经理空缺（提交时应已自动跳级）；请让总监审核")
         if lead.id != user.id:
-            raise ReviewFlowError("只有本专业经理能审这一级")
+            raise ForbiddenOperation("只有本专业经理能审这一级")
     else:
         submitter = session.get(User, ticket.submitter_id) if ticket.submitter_id else None
         boss = director_for(session, submitter) if submitter else director(session)
         if boss is None:
             raise ReviewFlowError("本部门还没配总监——先到「用户与权限」配审核人")
         if boss.id != user.id:
-            raise ReviewFlowError("只有本部门的总监能审这一级")
+            raise ForbiddenOperation("只有本部门的总监能审这一级")
 
     now = datetime.now(UTC)
     round_no = ticket.current_round
@@ -556,7 +557,7 @@ def withdraw_round(
     if ticket.status not in TICKET_PENDING:
         raise ReviewFlowError(f"只有审核中的单能撤回（当前：{ticket.status}）")
     if ticket.submitter_id != user.id and not user.is_superuser:
-        raise ReviewFlowError("只有提交人能撤回")
+        raise ForbiddenOperation("只有提交人能撤回")
     now = datetime.now(UTC)
     session.add(
         ReviewAction(
