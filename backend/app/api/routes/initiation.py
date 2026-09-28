@@ -968,62 +968,76 @@ def order(
     session: Session = Depends(get_session),
     current: User = Depends(require_permission("purchase:edit")),
 ):
-    """采购员下单 → 状态「已下单」，并同步采购任务。"""
+    """采购员下单 → 建采购单 + 行，需求转在途/部分下单，并同步采购任务。"""
+    from app.models.purchasing import Supplier, SupplierQuote
+    from app.services import purchase_order as po_svc
+
     row = session.get(PurchaseRequest, request_id)
     if row is None or row.project_no != project_no:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "采购需求不存在")
-    if row.status not in ("待采购",):
+    if row.status not in ("待采购", "部分下单"):
         raise HTTPException(status.HTTP_400_BAD_REQUEST, f"当前状态是「{row.status}」，不能重复下单")
-
-    item = session.get(Item, row.item_no)
-    if body.supplier_id:
-        from app.models.purchasing import Supplier
-
-        sup = session.get(Supplier, body.supplier_id)
-        if sup is None:
-            raise HTTPException(status.HTTP_400_BAD_REQUEST, "供应商不存在")
-        row.supplier_id = sup.id
-        row.supplier_name = sup.name
-    elif body.supplier_name:
-        row.supplier_name = body.supplier_name
-    row.po_no = body.po_no or row.po_no or next_number(session, "PURCHASE_ORDER")
-    row.unit_price = body.unit_price or row.unit_price
-    row.qty = body.qty or row.qty
-    if row.unit_price and row.qty:
-        row.amount = float(row.unit_price) * float(row.qty)
-    row.ordered_at = body.ordered_at
-    row.expected_date = _resolve_expected(body.expected_date, body.ordered_at, row.lead_days)
     if body.deliver_to not in DELIVER_TO:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, f"收货地点只能是：{'/'.join(DELIVER_TO)}")
     if body.deliver_to == "直发客户现场" and not body.deliver_address:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "直发客户现场必须填送货地址")
     if not body.supplier_id and not body.supplier_name:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "下单必须写供应商（从供应商主数据选或填名称）")
-    row.deliver_to = body.deliver_to
-    row.deliver_address = body.deliver_address
-    row.status = "在途"  # 下完单就是在途（等货）
+    sup = session.get(Supplier, body.supplier_id) if body.supplier_id else None
+    if body.supplier_id and sup is None:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "供应商不存在")
+
+    remaining = float(row.qty or 0) - po_svc.ordered_qty(session, row.id)
+    qty = float(body.qty) if body.qty else remaining
+    if qty <= 1e-9:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, f"{row.item_no} 没有可下单的剩余量")
+    try:
+        po_svc.assert_no_over_order(session, row.id, qty)
+    except po_svc.PurchaseOrderError as exc:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
+    expect = _resolve_expected(body.expected_date, body.ordered_at, row.lead_days)
+
+    po = po_svc.create_order(
+        session,
+        supplier_id=sup.id if sup else None,
+        supplier_name=sup.name if sup else body.supplier_name,
+        order_date=body.ordered_at,
+        expect_date=body.expected_date or expect,
+        deliver_to=body.deliver_to,
+        deliver_address=body.deliver_address,
+        lines=[
+            {
+                "request_id": row.id,
+                "qty": qty,
+                "unit_price": body.unit_price,
+                "tax_incl": True,
+                "expect_date": expect,
+            }
+        ],
+        actor_id=current.id,
+        po_no=body.po_no,
+    )
+    po_svc.sync_request_snapshot(session, row)
     # ★ R2-01：直发客户现场 → 下单即建「现场待验收」到货单（现场立即可清点）
     _ensure_site_pending_receipt(session, row, current.id)
     # ★ 成交价落进价格库 —— 下次买同一个东西就能看到"上次多少钱"
-    if row.unit_price:
-        from app.models.purchasing import SupplierQuote
-
-        if row.supplier_id:
-            session.add(
-                SupplierQuote(
-                    item_no=row.item_no,
-                    supplier_id=row.supplier_id,
-                    project_no=project_no,
-                    price=row.unit_price,
-                    unit=row.unit,
-                    lead_days=row.lead_days,
-                    price_type="成交",
-                    quote_date=body.ordered_at,
-                    source=row.po_no,
-                    recorded_by=current.id,
-                )
+    if body.unit_price and po.supplier_id:
+        session.add(
+            SupplierQuote(
+                item_no=row.item_no,
+                supplier_id=po.supplier_id,
+                project_no=project_no,
+                price=body.unit_price,
+                unit=row.unit,
+                lead_days=row.lead_days,
+                price_type="成交",
+                quote_date=body.ordered_at,
+                source=po.po_no,
+                recorded_by=current.id,
             )
-    _sync_purchase_task(session, row, "进行中", f"已下单 {row.ordered_at}，供应商 {row.supplier_name or '—'}")
+        )
+    _sync_purchase_task(session, row, "进行中", f"已下单 {body.ordered_at}，供应商 {po.supplier_name or '—'}")
+    item = session.get(Item, row.item_no)
     audit.log(
         session,
         user=current,
@@ -1031,9 +1045,9 @@ def order(
         object_type="purchase_request",
         object_ref=f"{project_no}/{row.item_no}",
         summary=f"采购下单 {item.display_name if item else row.item_no}："
-        f"供应商 {row.supplier_name or '—'} · 单号 {row.po_no or '—'} · "
-        f"单价 ¥{row.unit_price or '—'} × {row.qty or '—'} = ¥{row.amount or '—'} · "
-        f"下单 {row.ordered_at} · 预计到货 {row.expected_date or '—'}",
+        f"供应商 {po.supplier_name or '—'} · 单号 {po.po_no} · "
+        f"数量 {qty:g} · 单价 ¥{body.unit_price or '—'} · "
+        f"下单 {body.ordered_at} · 预计到货 {row.expected_date or '—'}",
         ip=client_ip(request),
     )
     session.commit()
@@ -1949,8 +1963,9 @@ def merge_order(
     session: Session = Depends(get_session),
     current: User = Depends(require_permission("purchase:edit")),
 ):
-    """合并下单：一次把多条需求下给同一个供应商，共用一张采购单号。"""
+    """合并下单：多条需求下给同一个供应商，共用一张采购单（支持一条需求拆多行/多单）。"""
     from app.models.purchasing import Supplier, SupplierQuote
+    from app.services import purchase_order as po_svc
 
     sup = session.get(Supplier, body.supplier_id)
     if sup is None:
@@ -1962,73 +1977,95 @@ def merge_order(
     if not body.lines:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "至少要勾一条需求")
 
-    po_no = body.po_no or next_number(session, "PURCHASE_ORDER")
-    total = 0.0
-    done: list[str] = []
+    # 组装下单行：qty 缺省 = 剩余待下单量；★ 不再改写需求 qty（08 §2 洞①）
+    lines_in: list[dict] = []
     for ln in body.lines:
         row = session.get(PurchaseRequest, ln.request_id)
         if row is None:
             raise HTTPException(status.HTTP_404_NOT_FOUND, f"需求不存在：{ln.request_id}")
-        if row.status != "待采购":
+        if row.status not in ("待采购", "部分下单"):
             raise HTTPException(
                 status.HTTP_400_BAD_REQUEST,
                 f"{row.item_no} 当前状态是「{row.status}」，不能合并下单",
             )
+        remaining = float(row.qty or 0) - po_svc.ordered_qty(session, row.id)
+        qty = float(ln.qty) if ln.qty else remaining
+        if qty <= 1e-9:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, f"{row.item_no} 没有可下单的剩余量")
+        try:
+            po_svc.assert_no_over_order(session, row.id, qty)
+        except po_svc.PurchaseOrderError as exc:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
+        lines_in.append(
+            {
+                "request_id": row.id,
+                "qty": qty,
+                "unit_price": ln.unit_price,
+                "tax_incl": True,
+                "expect_date": _resolve_expected(body.expected_date, body.ordered_at, row.lead_days),
+            }
+        )
+
+    po = po_svc.create_order(
+        session,
+        supplier_id=sup.id,
+        supplier_name=sup.name,
+        order_date=body.ordered_at,
+        expect_date=body.expected_date or lines_in[0]["expect_date"],
+        deliver_to=body.deliver_to,
+        deliver_address=body.deliver_address,
+        lines=lines_in,
+        actor_id=current.id,
+        po_no=body.po_no,
+        remark=body.remark,
+    )
+
+    done: list[str] = []
+    for x in lines_in:
+        row = session.get(PurchaseRequest, x["request_id"])
+        po_svc.sync_request_snapshot(session, row)
         item = session.get(Item, row.item_no)
-        if ln.qty:
-            row.qty = ln.qty
-        row.supplier_id = sup.id
-        row.supplier_name = sup.name
-        row.po_no = po_no
-        row.ordered_at = body.ordered_at
-        row.unit_price = ln.unit_price
-        if ln.unit_price and row.qty:
-            row.amount = float(ln.unit_price) * float(row.qty)
-            total += float(row.amount)
-        row.expected_date = _resolve_expected(body.expected_date, body.ordered_at, row.lead_days)
-        row.deliver_to = body.deliver_to
-        row.deliver_address = body.deliver_address
-        row.status = "在途"
         # ★ R2-01：直发客户现场 → 下单即建「现场待验收」到货单（现场立即可清点）
         _ensure_site_pending_receipt(session, row, current.id)
         _sync_purchase_task(
-            session, row, "进行中", f"已合并下单 {po_no}（{sup.name}），{body.deliver_to}，等货"
+            session, row, "进行中", f"已合并下单 {po.po_no}（{sup.name}），{body.deliver_to}，等货"
         )
         # 成交价落进价格库
-        if ln.unit_price:
+        if x["unit_price"]:
             session.add(
                 SupplierQuote(
                     item_no=row.item_no,
                     supplier_id=sup.id,
                     project_no=row.project_no,
-                    price=ln.unit_price,
+                    price=x["unit_price"],
                     unit=row.unit,
                     lead_days=row.lead_days,
                     price_type="成交",
                     quote_date=body.ordered_at,
-                    source=po_no,
+                    source=po.po_no,
                     recorded_by=current.id,
                 )
             )
-        done.append(f"{item.display_name if item else row.item_no} × {row.qty:g}")
+        done.append(f"{item.display_name if item else row.item_no} × {x['qty']:g}")
 
+    total = float(po.total_tax_incl or 0)
     session.flush()
     audit.log(
         session,
         user=current,
         action="merge_order",
         object_type="purchase_order",
-        object_ref=po_no,
-        summary=f"合并下单 {po_no} → {sup.name}：{len(done)} 条需求合并，"
+        object_ref=po.po_no,
+        summary=f"合并下单 {po.po_no} → {sup.name}：{len(done)} 条需求合并，"
         f"合计 ¥{total:,.0f}，收货 {body.deliver_to}"
         + (f"（{body.deliver_address}）" if body.deliver_address else "")
         + "；" + "、".join(done[:4])
         + ("…" if len(done) > 4 else ""),
-        detail={"po_no": po_no, "request_ids": [x.request_id for x in body.lines], "total": total},
+        detail={"po_no": po.po_no, "request_ids": [x["request_id"] for x in lines_in], "total": total},
         ip=client_ip(request),
     )
     session.commit()
-    return {"po_no": po_no, "count": len(done), "total": total, "supplier": sup.name}
+    return {"po_no": po.po_no, "count": len(done), "total": total, "supplier": sup.name}
 
 
 # ============================================================================

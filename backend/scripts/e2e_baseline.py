@@ -752,9 +752,9 @@ def b_split() -> None:
         f"返回：{str(bd2)[:260]}\n预期：应能成功（客户口径#1「很有可能会拆给多个供应商」）")
     after = _find_by_id(rid)
     note(f"最终：qty={after['qty']} status={after['status']} po_no={after.get('po_no')}")
-    pos = {x.get("po_no") for x in _reqs() if x["id"] == rid}
-    rec(len(pos) >= 2, f"一条需求应能落在 ≥2 张采购单上，实际={pos}",
-        "现模型 purchase_request.po_no 是单值字段，一条需求只能属于一张单 → 结构上无法拆单")
+    n_pos = q("select count(distinct po_id) as c from purchase_order_line where request_id=:i", i=rid)[0]["c"]
+    rec(n_pos >= 2, f"一条需求应能落在 ≥2 张采购单上，实际={n_pos} 张",
+        "★ 一期已修：purchase_order_line 支持一条需求拆多单；旧模型 purchase_request.po_no 单值做不到")
     CTX["split_rid"] = rid
 
 
