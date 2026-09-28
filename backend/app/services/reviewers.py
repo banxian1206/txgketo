@@ -69,6 +69,24 @@ def _subtree_ids(session: Session, root_id: int) -> set[int]:
     return ids
 
 
+def lead_for_dept(session: Session, user: User) -> User | None:
+    """提交人所在部门的经理（对标 `director_for`）。采购员没有 profession，不能复用 `team_lead_for`。"""
+    dept = _department_root(session, user.org_id)
+    if dept is not None:
+        lead = session.scalar(
+            select(User)
+            .where(
+                User.position == POSITION_LEAD,
+                User.is_active.is_(True),
+                User.org_id.in_(_subtree_ids(session, dept.id)),
+            )
+            .order_by(User.id)
+        )
+        if lead is not None:
+            return lead
+    return None
+
+
 def director_for(session: Session, user: User) -> User | None:
     """提交人所在部门的总监（06 卷 §3）；部门没配就全局兜底。"""
     dept = _department_root(session, user.org_id)

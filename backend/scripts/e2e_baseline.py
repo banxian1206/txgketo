@@ -119,16 +119,27 @@ class Api:
                                   "status": r.status_code, "body": r.text[:400]})
             raise ApiError(method, path, who, r.status_code, r.text)
         if "application/json" in r.headers.get("content-type", ""):
-            return r.json()
-        return r.content
+            body = r.json()
+        else:
+            body = r.content
+        # ★ 二期：下单即提交审批 → 脚本自动用采购总监审批通过，否则后续验收/入库会被拦
+        if method.lower() == "post" and "merge-order" in path and isinstance(body, dict) and body.get("po_no"):
+            self.raw("post", f"/purchase/orders/{body['po_no']}/approve", "purchase_director",
+                     json={"action": "通过"})
+        return body
 
     def try_(self, method, path, who, **kw):
         """不抛异常，返回 (status, body)。"""
         r = self.raw(method, path, who, **kw)
         try:
-            return r.status_code, r.json()
+            status, body = r.status_code, r.json()
         except Exception:
             return r.status_code, r.text
+        # ★ 二期：merge-order 后自动审批通过（同 req）
+        if method.lower() == "post" and "merge-order" in path and status in (200, 201) and isinstance(body, dict) and body.get("po_no"):
+            self.raw("post", f"/purchase/orders/{body['po_no']}/approve", "purchase_director",
+                     json={"action": "通过"})
+        return status, body
 
 
 api = Api()
@@ -142,6 +153,7 @@ BUSINESS_TABLES = [
     "shipment_item", "shipment_line", "shipment", "kitting_snapshot", "assembly_record",
     "prod_acceptance", "prod_task", "prod_order", "outsource_task", "material_issue_line",
     "material_issue", "stock_move", "stock_item", "warehouse_location", "goods_receipt",
+    "purchase_approval", "purchase_order_line", "purchase_order",
     "purchase_request", "supplier_quote", "supplier_catalog", "supplier", "task",
     "review_ticket_item", "review_action", "review_ticket", "design_release", "change_request",
     "equipment_program_version", "equipment_program", "drawing_version", "drawing", "bom_item",
@@ -734,6 +746,9 @@ def b_split() -> None:
         "supplier_id": SUP["甲钢材"]["id"], "ordered_at": d(0), "expected_date": d(15),
         "deliver_to": "公司仓库",
         "lines": [{"request_id": rid, "tax_incl": True, "qty": 60, "unit_price": 200.0}]})
+    if isinstance(bd1, dict) and bd1.get("po_no"):
+        api.try_("post", f"/purchase/orders/{bd1['po_no']}/approve", "purchase_director",
+                json={"action": "通过"})
     rec(sc1 in (200, 201), f"第一张单（甲钢材 60）HTTP {sc1}", str(bd1)[:200])
     mid = _find_by_id(rid)
     note(f"第一张单后：qty={mid['qty']} status={mid['status']} po_no={mid.get('po_no')}")
@@ -747,6 +762,9 @@ def b_split() -> None:
         "supplier_id": SUP["乙标准件"]["id"], "ordered_at": d(0), "expected_date": d(15),
         "deliver_to": "公司仓库",
         "lines": [{"request_id": rid, "tax_incl": True, "qty": 40, "unit_price": 210.0}]})
+    if isinstance(bd2, dict) and bd2.get("po_no"):
+        api.try_("post", f"/purchase/orders/{bd2['po_no']}/approve", "purchase_director",
+                json={"action": "通过"})
     rec(sc2 in (200, 201),
         f"★ 第二张单（乙标准件 40）HTTP {sc2} —— 拆单给第二家供应商",
         f"返回：{str(bd2)[:260]}\n预期：应能成功（客户口径#1「很有可能会拆给多个供应商」）")

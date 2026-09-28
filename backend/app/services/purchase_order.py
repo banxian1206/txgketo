@@ -8,25 +8,45 @@
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import UTC, date, datetime
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.core.errors import ForbiddenOperation
 from app.models.initiation import PurchaseRequest
+from app.models.platform import POSITION_DIRECTOR, POSITION_LEAD, User
 from app.models.purchase_order import (
+    APPR_LEVEL_DIRECTOR,
+    APPR_LEVEL_LEAD,
     PAY_UNPAID,
     PO_APPROVED,
+    PO_DONE,
+    PO_DRAFT,
+    PO_EXECUTING,
     PO_LINE_OPEN,
+    PO_PENDING_DIRECTOR,
+    PO_PENDING_LEAD,
+    PO_RETURNED,
+    PurchaseApproval,
     PurchaseOrder,
     PurchaseOrderLine,
     compute_line_amounts,
 )
 from app.services.numbering import next_number
+from app.services.reviewers import director_for, lead_for_dept
 
 
 class PurchaseOrderError(ValueError):
     """采购单业务规则错误（路由转 400）。"""
+
+
+# 已生效（供应商即接单）
+PO_LIVE_STATUS = (PO_APPROVED, PO_EXECUTING, PO_DONE)
+
+
+def _now() -> datetime:
+    return datetime.now(UTC)
 
 
 def ordered_qty(session: Session, request_id: int) -> float:
@@ -40,21 +60,146 @@ def ordered_qty(session: Session, request_id: int) -> float:
     return float(total or 0)
 
 
-def sync_request_order_state(session: Session, row: PurchaseRequest) -> float:
-    """重算「已下单量」与下单相关状态（待采购 / 部分下单 / 在途）。
+def _ordered_and_approved(session: Session, request_id: int) -> tuple[float, bool]:
+    rows = session.execute(
+        select(PurchaseOrderLine.qty, PurchaseOrder.status)
+        .join(PurchaseOrder, PurchaseOrder.id == PurchaseOrderLine.po_id)
+        .where(
+            PurchaseOrderLine.request_id == request_id,
+            PurchaseOrderLine.status.not_in(("已退货", "已取消")),
+        )
+    ).all()
+    ordered = sum(float(q or 0) for q, _ in rows)
+    approved = any(st in PO_LIVE_STATUS for _, st in rows)
+    return ordered, approved
 
-    只在需求还处于下单阶段时改状态；已进入收货流程的状态由 `_recalc_request_status` 负责。
+
+def sync_request_order_state(session: Session, row: PurchaseRequest) -> float:
+    """重算需求状态：待采购 / 审批中（有单未批）/ 在途 / 部分下单（已批未下满）。
+
+    只在需求还处于下单阶段时改状态；已进入收货流程的由 `_recalc_request_status` 负责。
     """
-    row.qty_ordered = ordered_qty(session, row.id)
-    if row.status in ("待采购", "部分下单", "审批中"):
+    ordered, approved = _ordered_and_approved(session, row.id)
+    row.qty_ordered = ordered
+    if row.status in ("待采购", "部分下单", "审批中", "在途"):
         need = float(row.qty or 0)
-        if row.qty_ordered <= 1e-9:
+        if ordered <= 1e-9:
             row.status = "待采购"
-        elif row.qty_ordered + 1e-9 >= need:
+        elif not approved:
+            row.status = "审批中"
+        elif ordered + 1e-9 >= need:
             row.status = "在途"
         else:
             row.status = "部分下单"
-    return row.qty_ordered
+    return ordered
+
+
+def resolve_po_chain(session: Session, submitter: User) -> tuple[User | None, User]:
+    """返回（一级采购经理 | None, 二级采购总监）。一级 None = 提交人是经理，跳过。"""
+    if submitter.position == POSITION_DIRECTOR:
+        raise PurchaseOrderError("总监不提交采购单（他负责审批）；请用采购员/经理的账号提交")
+    lead = None if submitter.position == POSITION_LEAD else lead_for_dept(session, submitter)
+    boss = director_for(session, submitter)
+    if boss is None:
+        raise PurchaseOrderError("没找到采购总监，先到「用户与权限」配审核人")
+    return lead, boss
+
+
+def submit_order(session: Session, po: PurchaseOrder, submitter: User) -> str:
+    """提交审批：草稿 / 已退回 → 待经理审（经理本人提交则直接待总监审，留一条「跳过」）。"""
+    if po.status not in (PO_DRAFT, PO_RETURNED):
+        raise PurchaseOrderError(f"当前状态是「{po.status}」，不能提交")
+    lead, _ = resolve_po_chain(session, submitter)
+    if lead is None:
+        session.add(
+            PurchaseApproval(
+                po_id=po.id,
+                round_no=po.round,
+                level=APPR_LEVEL_LEAD,
+                reviewer_id=None,
+                action="跳过",
+                note="无采购经理，自动跳级给总监",
+                acted_at=_now(),
+            )
+        )
+        po.status = PO_PENDING_DIRECTOR
+    else:
+        po.status = PO_PENDING_LEAD
+    session.flush()
+    return po.status
+
+
+def approve_order(
+    session: Session,
+    po: PurchaseOrder,
+    user: User,
+    action: str,
+    note: str | None,
+    price_snapshot: dict | None = None,
+) -> str:
+    """两级审批：通过 / 退回（退回必填说明，round+1，全部留档）。审批通过 → 已批准。"""
+    submitter = session.get(User, po.created_by) if po.created_by else None
+    if po.status == PO_PENDING_LEAD:
+        lead, _ = resolve_po_chain(session, submitter) if submitter else (None, None)
+        if lead is None:
+            raise PurchaseOrderError("经理空缺（提交时应已自动跳级）；请让总监审核")
+        if lead.id != user.id:
+            raise ForbiddenOperation("只有本部门采购经理能审这一级")
+        level = APPR_LEVEL_LEAD
+    elif po.status == PO_PENDING_DIRECTOR:
+        _, boss = resolve_po_chain(session, submitter) if submitter else (None, None)
+        if boss is None:
+            raise PurchaseOrderError("本部门还没配采购总监——先到「用户与权限」配审核人")
+        if boss.id != user.id:
+            raise ForbiddenOperation("只有本部门采购总监能审这一级")
+        level = APPR_LEVEL_DIRECTOR
+    else:
+        raise PurchaseOrderError(f"当前状态是「{po.status}」，不在审批中")
+
+    if action == "退回":
+        if not (note or "").strip():
+            raise PurchaseOrderError("退回必须填写说明")
+        po.status = PO_RETURNED
+        po.round = int(po.round or 1) + 1
+    elif action == "通过":
+        po.status = PO_APPROVED if level == APPR_LEVEL_DIRECTOR else PO_PENDING_DIRECTOR
+    else:
+        raise PurchaseOrderError("审批动作只能是 通过 / 退回")
+    session.add(
+        PurchaseApproval(
+            po_id=po.id,
+            round_no=po.round,
+            level=level,
+            reviewer_id=user.id,
+            action=action,
+            note=(note or "").strip() or None,
+            price_flags=price_snapshot,
+            acted_at=_now(),
+        )
+    )
+    session.flush()
+    return po.status
+
+
+def withdraw_order(session: Session, po: PurchaseOrder, user: User) -> str:
+    """提交人撤回（待经理审/待总监审 → 草稿，解锁可改）。"""
+    if po.status not in (PO_PENDING_LEAD, PO_PENDING_DIRECTOR):
+        raise PurchaseOrderError(f"当前状态是「{po.status}」，不能撤回")
+    if po.created_by != user.id and not user.is_superuser:
+        raise ForbiddenOperation("只有提交人能撤回")
+    po.status = PO_DRAFT
+    session.add(
+        PurchaseApproval(
+            po_id=po.id,
+            round_no=po.round,
+            level=0,
+            reviewer_id=user.id,
+            action="撤回",
+            acted_at=_now(),
+        )
+    )
+    session.flush()
+    return po.status
 
 
 def assert_no_over_order(session: Session, request_id: int, add_qty: float) -> float:

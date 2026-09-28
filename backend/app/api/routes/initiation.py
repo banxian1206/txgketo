@@ -45,7 +45,7 @@ from app.models.library import Item
 from app.models.platform import User
 from app.models.project import Equipment, Project
 from app.models.review import DesignRelease
-from app.models.purchase_order import PurchaseOrder, PurchaseOrderLine
+from app.models.purchase_order import PurchaseApproval, PurchaseOrder, PurchaseOrderLine
 from app.services import audit, bom_demand, notify, project_stage
 from app.services.numbering import (
     make_equip_no,
@@ -972,8 +972,8 @@ def order(
     session: Session = Depends(get_session),
     current: User = Depends(require_permission("purchase:edit")),
 ):
-    """采购员下单 → 建采购单 + 行，需求转在途/部分下单，并同步采购任务。"""
-    from app.models.purchasing import Supplier, SupplierQuote
+    """采购员下单 → 建采购单（草稿）+ 提交审批，需求转「审批中」，并同步采购任务。"""
+    from app.models.purchasing import Supplier
     from app.services import purchase_order as po_svc
 
     row = session.get(PurchaseRequest, request_id)
@@ -1020,29 +1020,10 @@ def order(
         ],
         actor_id=current.id,
         po_no=body.po_no,
+        status="草稿",
     )
+    po_svc.submit_order(session, po, current)  # ★ 二期：下单即提交审批
     po_svc.sync_request_snapshot(session, row)
-    # ★ R2-01：直发客户现场 → 下单即建「现场待验收」到货单（现场立即可清点）
-    _ensure_site_pending_receipt(session, row, current.id)
-    # ★ 成交价落进价格库 —— 下次买同一个东西就能看到"上次多少钱"
-    if body.unit_price and po.supplier_id:
-        session.add(
-            SupplierQuote(
-                item_no=row.item_no,
-                supplier_id=po.supplier_id,
-                project_no=project_no,
-                price=body.unit_price,
-                tax_incl=body.tax_incl,
-                qty=qty,
-                unit=row.unit,
-                lead_days=row.lead_days,
-                price_type="成交",
-                quote_date=body.ordered_at,
-                source=po.po_no,
-                recorded_by=current.id,
-            )
-        )
-    _sync_purchase_task(session, row, "进行中", f"已下单 {body.ordered_at}，供应商 {po.supplier_name or '—'}")
     item = session.get(Item, row.item_no)
     audit.log(
         session,
@@ -1051,7 +1032,7 @@ def order(
         object_type="purchase_request",
         object_ref=f"{project_no}/{row.item_no}",
         summary=f"采购下单 {item.display_name if item else row.item_no}："
-        f"供应商 {po.supplier_name or '—'} · 单号 {po.po_no} · "
+        f"供应商 {po.supplier_name or '—'} · 单号 {po.po_no}（{po.status}）· "
         f"数量 {qty:g} · 单价 ¥{body.unit_price or '—'} · "
         f"下单 {body.ordered_at} · 预计到货 {row.expected_date or '—'}",
         ip=client_ip(request),
@@ -2113,37 +2094,17 @@ def merge_order(
         tax_rate=body.tax_rate,
         freight=body.freight,
         discount=body.discount,
+        status="草稿",
         remark=body.remark,
     )
+    # ★ 二期：下单即提交审批（采购经理 → 采购总监）；需求转「审批中」，通过后才在途
+    po_svc.submit_order(session, po, current)
 
     done: list[str] = []
     for x in lines_in:
         row = session.get(PurchaseRequest, x["request_id"])
         po_svc.sync_request_snapshot(session, row)
         item = session.get(Item, row.item_no)
-        # ★ R2-01：直发客户现场 → 下单即建「现场待验收」到货单（现场立即可清点）
-        _ensure_site_pending_receipt(session, row, current.id)
-        _sync_purchase_task(
-            session, row, "进行中", f"已合并下单 {po.po_no}（{sup.name}），{body.deliver_to}，等货"
-        )
-        # 成交价落进价格库
-        if x["unit_price"]:
-            session.add(
-                SupplierQuote(
-                    item_no=row.item_no,
-                    supplier_id=sup.id,
-                    project_no=row.project_no,
-                    price=x["unit_price"],
-                    tax_incl=x["tax_incl"],
-                    qty=x["qty"],
-                    unit=row.unit,
-                    lead_days=row.lead_days,
-                    price_type="成交",
-                    quote_date=body.ordered_at,
-                    source=po.po_no,
-                    recorded_by=current.id,
-                )
-            )
         done.append(f"{item.display_name if item else row.item_no} × {x['qty']:g}")
 
     total = float(po.total_tax_incl or 0)
@@ -2154,7 +2115,7 @@ def merge_order(
         action="merge_order",
         object_type="purchase_order",
         object_ref=po.po_no,
-        summary=f"合并下单 {po.po_no} → {sup.name}：{len(done)} 条需求合并，"
+        summary=f"合并下单 {po.po_no} → {sup.name}：{len(done)} 条需求已提交审批（{po.status}），"
         f"合计 ¥{total:,.0f}，收货 {body.deliver_to}"
         + (f"（{body.deliver_address}）" if body.deliver_address else "")
         + "；" + "、".join(done[:4])
@@ -2163,7 +2124,172 @@ def merge_order(
         ip=client_ip(request),
     )
     session.commit()
-    return {"po_no": po.po_no, "count": len(done), "total": total, "supplier": sup.name}
+    return {
+        "po_no": po.po_no,
+        "count": len(done),
+        "total": total,
+        "supplier": sup.name,
+        "status": po.status,
+    }
+
+
+class ApproveOrderIn(BaseModel):
+    action: str = Field(..., description="通过 / 退回")
+    note: str | None = Field(default=None, description="退回必填说明")
+
+
+def _activate_order(session: Session, po: PurchaseOrder, actor: User) -> None:
+    """审批通过后才发生（08 §4.2）：需求转在途/部分下单、直发建到货单、成交价落库、任务联动。"""
+    from app.models.purchasing import SupplierQuote
+    from app.services import purchase_order as po_svc
+
+    for ln in _po_lines(session, po.id):
+        if not ln.request_id:
+            continue
+        row = session.get(PurchaseRequest, ln.request_id)
+        po_svc.sync_request_order_state(session, row)
+        po_svc.sync_request_snapshot(session, row)
+        # ★ R2-01：直发客户现场 → 通过后建「现场待验收」到货单
+        _ensure_site_pending_receipt(session, row, actor.id)
+        if ln.unit_price and po.supplier_id:
+            session.add(
+                SupplierQuote(
+                    item_no=ln.item_no,
+                    supplier_id=po.supplier_id,
+                    project_no=ln.project_no,
+                    price=ln.unit_price,
+                    tax_incl=ln.tax_incl,
+                    qty=ln.qty,
+                    unit=ln.unit,
+                    lead_days=row.lead_days,
+                    price_type="成交",
+                    quote_date=po.order_date or date.today(),
+                    source=po.po_no,
+                    recorded_by=actor.id,
+                )
+            )
+        _sync_purchase_task(session, row, "进行中", f"已批准 {po.po_no}（{po.supplier_name or '—'}），等货")
+    session.flush()
+
+
+@purchase_router.post("/purchase/orders/{key}/submit")
+def submit_purchase_order(
+    key: str,
+    request: Request,
+    session: Session = Depends(get_session),
+    current: User = Depends(require_permission("purchase:edit")),
+):
+    """提交审批（草稿/已退回 → 待经理审；经理本人提交则跳过一级）。"""
+    from app.services import purchase_order as po_svc
+
+    po = session.scalar(select(PurchaseOrder).where(PurchaseOrder.po_no == key))
+    if po is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "采购单不存在")
+    try:
+        po_svc.submit_order(session, po, current)
+    except po_svc.PurchaseOrderError as exc:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
+    audit.log(
+        session,
+        user=current,
+        action="submit_order",
+        object_type="purchase_order",
+        object_ref=key,
+        summary=f"采购单 {key} 提交审批 → {po.status}",
+        ip=client_ip(request),
+    )
+    session.commit()
+    return {"status": po.status}
+
+
+@purchase_router.post("/purchase/orders/{key}/approve")
+def approve_purchase_order(
+    key: str,
+    body: ApproveOrderIn,
+    request: Request,
+    session: Session = Depends(get_session),
+    current: User = Depends(require_permission("purchase:edit")),
+):
+    """两级审批：通过 / 退回（退回必填说明）。总监通过 → 已批准 → ★ 激活（三件事才发生）。"""
+    from app.services import purchase_order as po_svc
+
+    po = session.scalar(select(PurchaseOrder).where(PurchaseOrder.po_no == key))
+    if po is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "采购单不存在")
+    try:
+        new_status = po_svc.approve_order(session, po, current, body.action, body.note)
+    except po_svc.PurchaseOrderError as exc:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
+    if new_status == "已批准":
+        _activate_order(session, po, current)
+    audit.log(
+        session,
+        user=current,
+        action="approve_order",
+        object_type="purchase_order",
+        object_ref=key,
+        summary=f"采购单 {key} 审批「{body.action}」→ {po.status}"
+        + (f"：{body.note}" if body.note else ""),
+        ip=client_ip(request),
+    )
+    session.commit()
+    return {"status": po.status}
+
+
+@purchase_router.post("/purchase/orders/{key}/withdraw")
+def withdraw_purchase_order(
+    key: str,
+    request: Request,
+    session: Session = Depends(get_session),
+    current: User = Depends(require_permission("purchase:edit")),
+):
+    """提交人撤回（待经理审/待总监审 → 草稿，解锁可改）。"""
+    from app.services import purchase_order as po_svc
+
+    po = session.scalar(select(PurchaseOrder).where(PurchaseOrder.po_no == key))
+    if po is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "采购单不存在")
+    try:
+        po_svc.withdraw_order(session, po, current)
+    except po_svc.PurchaseOrderError as exc:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
+    audit.log(
+        session,
+        user=current,
+        action="withdraw_order",
+        object_type="purchase_order",
+        object_ref=key,
+        summary=f"采购单 {key} 撤回 → {po.status}",
+        ip=client_ip(request),
+    )
+    session.commit()
+    return {"status": po.status}
+
+
+@purchase_router.get("/purchase/orders/{key}/approvals")
+def list_po_approvals(
+    key: str, session: Session = Depends(get_session), _: User = Depends(get_current_user)
+):
+    """审批留档（多轮多级）。"""
+    po = session.scalar(select(PurchaseOrder).where(PurchaseOrder.po_no == key))
+    if po is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "采购单不存在")
+    names = {u.id: u.name for u in session.scalars(select(User)).all()}
+    rows = session.scalars(
+        select(PurchaseApproval).where(PurchaseApproval.po_id == po.id).order_by(PurchaseApproval.id)
+    ).all()
+    return [
+        {
+            "round_no": r.round_no,
+            "level": r.level,
+            "reviewer_id": r.reviewer_id,
+            "reviewer_name": names.get(r.reviewer_id),
+            "action": r.action,
+            "note": r.note,
+            "acted_at": r.acted_at,
+        }
+        for r in rows
+    ]
 
 
 # ============================================================================
