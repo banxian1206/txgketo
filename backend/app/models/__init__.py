@@ -25,6 +25,11 @@ from app.models.warehouse import (
     WarehouseLocation,
 )
 from app.models.purchasing import Supplier, SupplierCatalog, SupplierQuote
+from app.models.purchase_order import (
+    PurchaseOrder,
+    PurchaseOrderLine,
+    compute_line_amounts,
+)
 from app.models.task import Task
 from app.models.library import Item, StdCategory, StdClass
 from app.models.initiation import (
@@ -82,6 +87,9 @@ __all__ = [
     "Milestone",
     "ProjectMember",
     "PurchaseRequest",
+    "PurchaseOrder",
+    "PurchaseOrderLine",
+    "compute_line_amounts",
     "ChangeRequest",
     "Notification",
     "DesignRelease",

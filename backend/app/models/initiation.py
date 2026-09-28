@@ -69,6 +69,8 @@ REQUEST_SOURCES = ("常规", "长周期", "退货重采")  # 退货重采：退�
 #   仓库只有两个动作：验收（合格/不合格）、入库；到货/验收/入库都是分批的
 REQUEST_STATUS = (
     "待采购",
+    "审批中",
+    "部分下单",
     "在途",
     "现场待验收",
     "待入库",
@@ -188,6 +190,9 @@ class PurchaseRequest(Base, TimestampMixin):
     deliver_address: Mapped[str | None] = mapped_column(String(255))
     arrived_at: Mapped[date | None] = mapped_column(Date)  # 到货日
     qty_received: Mapped[float | None] = mapped_column(Numeric(14, 3))  # 实收数量
+    # ★ 一期拆单：已下单量 = Σ 有效 po_line.qty（派生，落库便于查询/算剩余）
+    qty_ordered: Mapped[float | None] = mapped_column(Numeric(14, 3))
+    qty_rejected: Mapped[float | None] = mapped_column(Numeric(14, 3))  # 累计不合格数（部分合格）
     status: Mapped[str] = mapped_column(String(16), default="待采购", server_default="待采购")
     is_long_lead: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
     remark: Mapped[str | None] = mapped_column(Text)
@@ -208,8 +213,15 @@ class GoodsReceipt(Base, TimestampMixin):
         ForeignKey("project.project_no", ondelete="CASCADE")
     )
     request_id: Mapped[int | None] = mapped_column(ForeignKey("purchase_request.id"))
+    # ★ 一期：挂到实体采购单/单行（不再靠 request_id 反查聚合）
+    po_id: Mapped[int | None] = mapped_column(ForeignKey("purchase_order.id"))
+    po_line_id: Mapped[int | None] = mapped_column(ForeignKey("purchase_order_line.id"))
     item_no: Mapped[str | None] = mapped_column(String(32))
     qty: Mapped[float | None] = mapped_column(Numeric(14, 3))
+    # ★ 部分合格（08 §3.5）：一批到货 = 合格数 + 不合格数
+    qty_ok: Mapped[float | None] = mapped_column(Numeric(14, 3))
+    qty_rejected: Mapped[float | None] = mapped_column(Numeric(14, 3))
+    batch_no: Mapped[str | None] = mapped_column(String(32))  # 同一次送货的多条记录用同一批号串联
     unit: Mapped[str | None] = mapped_column(String(16))
     receipt_date: Mapped[date | None] = mapped_column(Date)
     deliver_to: Mapped[str] = mapped_column(String(16), default="公司仓库", server_default="公司仓库")
