@@ -257,6 +257,7 @@ export interface MergeOrderLineIn {
   request_id: number
   qty?: number
   unit_price?: number
+  tax_incl: boolean
 }
 
 export interface MergeOrderIn {
@@ -266,6 +267,9 @@ export interface MergeOrderIn {
   deliver_to: string
   deliver_address?: string
   po_no?: string
+  tax_rate?: number
+  freight?: number
+  discount?: number
   lines: MergeOrderLineIn[]
   remark?: string
 }

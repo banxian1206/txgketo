@@ -7,6 +7,7 @@ import {
   Input,
   InputNumber,
   Modal,
+  Radio,
   Select,
   Space,
   Table,
@@ -108,6 +109,10 @@ export default function MergeOrderModal({
       expected_date: undefined,
       deliver_to: '公司仓库',
       deliver_address: undefined,
+      tax_incl: true,
+      tax_rate: undefined,
+      freight: undefined,
+      discount: undefined,
       remark: undefined,
     })
     setRecos([])
@@ -200,6 +205,10 @@ export default function MergeOrderModal({
       expected_date?: dayjs.Dayjs
       deliver_to: string
       deliver_address?: string
+      tax_incl: boolean
+      tax_rate?: number | null
+      freight?: number | null
+      discount?: number | null
       remark?: string
     }
     try {
@@ -220,11 +229,15 @@ export default function MergeOrderModal({
         deliver_to: v.deliver_to,
         deliver_address: v.deliver_to === '直发客户现场' ? v.deliver_address : undefined,
         po_no: v.po_no || undefined,
+        tax_rate: v.tax_rate ?? undefined,
+        freight: v.freight ?? undefined,
+        discount: v.discount ?? undefined,
         remark: v.remark || undefined,
         lines: lines.map((l) => ({
           request_id: l.request_id,
           qty: l.qty,
           unit_price: l.unit_price ?? undefined,
+          tax_incl: v.tax_incl,
         })),
       })
       message.success(
@@ -529,6 +542,30 @@ export default function MergeOrderModal({
               }
               disabled={deliverTo !== '直发客户现场'}
             />
+          </Form.Item>
+        </Space>
+
+        <Space style={{ display: 'flex' }} size="middle" align="start">
+          <Form.Item
+            name="tax_incl"
+            label="价格口径"
+            style={{ minWidth: 200 }}
+            rules={[{ required: true, message: '请选含税/不含税' }]}
+            tooltip="必选：填的价格是含税还是不含税 —— 决定金额换算，以及审批时跟哪一组历史价比"
+          >
+            <Radio.Group optionType="button" buttonStyle="solid">
+              <Radio.Button value={true}>含税</Radio.Button>
+              <Radio.Button value={false}>不含税</Radio.Button>
+            </Radio.Group>
+          </Form.Item>
+          <Form.Item name="tax_rate" label="税率 %" style={{ minWidth: 120 }}>
+            <InputNumber style={{ width: '100%' }} min={0} max={100} />
+          </Form.Item>
+          <Form.Item name="freight" label="运费" style={{ minWidth: 120 }}>
+            <InputNumber style={{ width: '100%' }} min={0} />
+          </Form.Item>
+          <Form.Item name="discount" label="整单折扣" style={{ minWidth: 120 }}>
+            <InputNumber style={{ width: '100%' }} min={0} />
           </Form.Item>
         </Space>
 
