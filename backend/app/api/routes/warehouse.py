@@ -204,7 +204,7 @@ def _apply_stock(
             )
         )
         if s:
-            s.qty_on_hand = _qty(s.qty_on_hand) - qty
+            s.qty_on_hand = max(0.0, _qty(s.qty_on_hand) - qty)  # 出库不得为负（BM-14）
     elif move_type in (MOVE_IN,) and to_location_id:
         s = session.scalar(
             select(StockItem).where(
@@ -466,11 +466,21 @@ def pick_issue(
         raise HTTPException(status.HTTP_400_BAD_REQUEST, f"当前状态是「{issue.status}」，不能备料")
     lines = session.scalars(select(MaterialIssueLine).where(MaterialIssueLine.issue_id == issue.id)).all()
     for ln in lines:
+        if not ln.location_id:
+            continue
         s = session.scalar(
             select(StockItem).where(StockItem.item_no == ln.item_no, StockItem.location_id == ln.location_id)
-        ) if ln.location_id else None
-        if s:
-            s.qty_locked = _qty(s.qty_locked) + _qty(ln.qty_required)
+        )
+        if s is None:
+            continue
+        available = _qty(s.qty_on_hand) - _qty(s.qty_locked)
+        if available + 1e-9 < _qty(ln.qty_required):
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST,
+                f"{ln.item_no} 在库位可用 {available:g}，不够备料 {_qty(ln.qty_required):g}"
+                "（先补货或调整数量）",
+            )
+        s.qty_locked = _qty(s.qty_locked) + _qty(ln.qty_required)
     issue.status = "已备料"
     issue.picked_by = current.id
     issue.picked_at = datetime.now(UTC)
@@ -501,21 +511,27 @@ def hand_over_issue(
     issue = session.get(MaterialIssue, issue_id)
     if issue is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "领料单不存在")
-    if issue.status != "已备料":
+    if issue.status not in ("已备料", "部分领料"):
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "要先备料才能领走")
     lines = session.scalars(select(MaterialIssueLine).where(MaterialIssueLine.issue_id == issue.id)).all()
+    issued = 0
+    pending: list[str] = []
     for ln in lines:
+        remaining = _qty(ln.qty_required) - _qty(ln.qty_issued)
+        if remaining <= 1e-9:
+            continue  # 这一行已经领过（分批领料的第二部分）
         if not ln.location_id:
+            pending.append(ln.item_no)  # ★ 缺料：显式记下，不静默跳过（BM-09）
             continue
         s = session.scalar(
             select(StockItem).where(StockItem.item_no == ln.item_no, StockItem.location_id == ln.location_id)
         )
-        if s:
-            s.qty_locked = max(0.0, _qty(s.qty_locked) - _qty(ln.qty_required))
+        if s is not None:
+            s.qty_locked = max(0.0, _qty(s.qty_locked) - remaining)
         _apply_stock(
             session,
             item_no=ln.item_no,
-            qty=_qty(ln.qty_required),
+            qty=remaining,
             move_type=MOVE_OUT,
             from_location_id=ln.location_id,
             project_no=issue.project_no,
@@ -525,17 +541,30 @@ def hand_over_issue(
             operator_id=current.id,
             remark=f"领料给车间（{body.issued_to or '—'}）",
         )
-        ln.qty_issued = ln.qty_required
-    issue.status = "已领走"
+        ln.qty_issued = _qty(ln.qty_issued) + remaining
+        issued += 1
+    if issued == 0:
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            "没有可领的料："
+            + ("、".join(pending) + " 缺料未备齐" if pending else "所有行都已领过"),
+        )
+    fully = all(_qty(x.qty_issued) + 1e-9 >= _qty(x.qty_required) for x in lines)
+    issue.status = "已领走" if fully else "部分领料"
     issue.issued_to = body.issued_to
     issue.issued_at = datetime.now(UTC)
+    summary = f"领料出库 {issue.issue_no}：{issued} 种物料，领料人 {body.issued_to or '—'}"
+    if pending:
+        summary += f"；★ {len(pending)} 种缺料未发：{'、'.join(pending[:4])}" + (
+            "…" if len(pending) > 4 else ""
+        )
     audit.log(
         session,
         user=current,
         action="issue",
         object_type="material_issue",
         object_ref=issue.issue_no,
-        summary=f"领料出库 {issue.issue_no}：{len(lines)} 种物料，领料人 {body.issued_to or '—'}",
+        summary=summary,
         ip=client_ip(request),
     )
     session.commit()
@@ -572,7 +601,7 @@ def workbench(session: Session = Depends(get_session), _: User = Depends(get_cur
     ).all()
 
     issues = session.scalars(
-        select(MaterialIssue).where(MaterialIssue.status.in_(("待备料", "已备料")))
+        select(MaterialIssue).where(MaterialIssue.status.in_(("待备料", "已备料", "部分领料")))
     ).all()
     lines = session.scalars(select(MaterialIssueLine)).all()
 

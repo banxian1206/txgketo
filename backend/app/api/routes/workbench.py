@@ -464,7 +464,7 @@ def workbench_me(session: Session = Depends(get_session), current: User = Depend
         session,
         select(func.count())
         .select_from(MaterialIssue)
-        .where(MaterialIssue.status.in_(("待备料", "已备料"))),
+        .where(MaterialIssue.status.in_(("待备料", "已备料", "部分领料"))),
     ) if is_warehouse else 0
     to_purchase = _count(
         session,

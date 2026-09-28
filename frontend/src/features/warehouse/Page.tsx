@@ -480,7 +480,7 @@ export default function Warehouse() {
                       render: (_: unknown, r: IssueRow) => (
                         <Space>
                           {r.status === '待备料' && <Button size="small" type="primary" disabled={!canStore} onClick={() => void issueAction(r.id, 'pick')}>备料完成</Button>}
-                          {r.status === '已备料' && <Button size="small" type="primary" disabled={!canStore} onClick={() => void issueAction(r.id, 'hand-over')}>车间领走</Button>}
+                          {(r.status === '已备料' || r.status === '部分领料') && <Button size="small" type="primary" disabled={!canStore} onClick={() => void issueAction(r.id, 'hand-over')}>车间领走</Button>}
                         </Space>
                       ),
                     },

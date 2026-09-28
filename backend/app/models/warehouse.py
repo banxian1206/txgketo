@@ -26,8 +26,9 @@ MOVE_TYPES = (MOVE_IN, MOVE_OUT, MOVE_TRANSFER, MOVE_CHECK)
 # 领料单状态
 ISSUE_DRAFT = "待备料"
 ISSUE_PICKED = "已备料"
+ISSUE_PARTIAL = "部分领料"  # ★ 只是部分行有货、先领一部分（缺料的留在单上，不静默跳过）
 ISSUE_DONE = "已领走"
-ISSUE_STATUS = (ISSUE_DRAFT, ISSUE_PICKED, ISSUE_DONE, "已取消")
+ISSUE_STATUS = (ISSUE_DRAFT, ISSUE_PICKED, ISSUE_PARTIAL, ISSUE_DONE, "已取消")
 
 
 class WarehouseLocation(Base, TimestampMixin):
@@ -83,7 +84,7 @@ class StockMove(Base, TimestampMixin):
 class MaterialIssue(Base, TimestampMixin):
     """领料单：车间要做的活，先来仓库领料。
 
-    状态：待备料 → 已备料 → 已领走
+    状态：待备料 → 已备料 →（可多次）已领走 / 部分领料（缺料留在单上，不静默跳过）
     """
 
     __tablename__ = "material_issue"

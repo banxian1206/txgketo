@@ -90,7 +90,7 @@ export default function IssuesM() {
     }
   }
 
-  const open = rows.filter((r) => r.status === '待备料' || r.status === '已备料')
+  const open = rows.filter((r) => r.status === '待备料' || r.status === '已备料' || r.status === '部分领料')
 
   return (
     <>
@@ -122,7 +122,7 @@ export default function IssuesM() {
                 备料完成
               </Button>
             )}
-            {r.status === '已备料' && (
+            {(r.status === '已备料' || r.status === '部分领料') && (
               <Button size="small" type="primary" loading={busyId === r.id} onClick={() => void act(r.id, 'hand-over')}>
                 车间领走
               </Button>

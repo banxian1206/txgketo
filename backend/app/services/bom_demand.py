@@ -96,7 +96,10 @@ def _issued_to_workshop(
     stmt = (
         select(MaterialIssueLine.item_no, func.sum(MaterialIssueLine.qty_issued))
         .join(MaterialIssue, MaterialIssue.id == MaterialIssueLine.issue_id)
-        .where(MaterialIssue.project_no == project_no, MaterialIssue.status == "已领走")
+        .where(
+            MaterialIssue.project_no == project_no,
+            MaterialIssue.status.in_(("已领走", "部分领料")),
+        )
         .group_by(MaterialIssueLine.item_no)
     )
     if equip_no is not None:

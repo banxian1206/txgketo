@@ -75,7 +75,7 @@ def mobile_home(session: Session = Depends(get_session), current: User = Depends
         session,
         select(func.count())
         .select_from(MaterialIssue)
-        .where(MaterialIssue.status.in_(("待备料", "已备料"))),
+        .where(MaterialIssue.status.in_(("待备料", "已备料", "部分领料"))),
     )
     my_tasks = _count(
         session,

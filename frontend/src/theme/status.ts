@@ -44,7 +44,7 @@ export const SITE_ISSUE_STATUS: Record<string, string> = { 已转变更: 'proces
 
 export const SITE_COMMISSION_STATUS: Record<string, string> = { 已到现场: 'processing', 已开始调试: 'success', 已申请: 'gold' }
 
-export const WH_ISSUE_STATUS: Record<string, string> = { 已备料: 'processing', 已领走: 'success', 待备料: 'gold' }
+export const WH_ISSUE_STATUS: Record<string, string> = { 已备料: 'processing', 部分领料: 'warning', 已领走: 'success', 待备料: 'gold' }
 
 export const ENG_BOARD_STATE: Record<string, string> = { 审核中: 'processing', 已发布: 'success', 已退回: 'error', 待开始: 'default', 未派: 'default', 进行中: 'blue' }
 
