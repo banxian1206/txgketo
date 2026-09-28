@@ -33,14 +33,47 @@ from app.api.routes import (
 )
 from app.core.config import settings
 from app.core.errors import ForbiddenOperation
+from app.services.acceptance import AcceptanceError
+from app.services.change_flow import ChangeFlowError
+from app.services.manufacturing import ManufacturingError
+from app.services.numbering import NumberingError
+from app.services.project_stage import StageError
+from app.services.purchase_order import PurchaseOrderError
+from app.services.review_flow import ReviewFlowError
+from app.services.reviewers import ReviewerError
+from app.services.shipping import ShippingError
+from app.services.site import SiteError
 
 app = FastAPI(title=settings.app_name, version="0.1.0")
+
+# ★ 业务域错误 → 400（统一处理，别再让路由逐个 try/except）
+#   踩过的坑：merge_order(N2)、acceptance.confirm(N25)、site.add_issue(G3) 都因为
+#   路由没接住域异常 → **500 空响应**。下面这些处理器一次性盖住整类。
 
 
 @app.exception_handler(ForbiddenOperation)
 async def _forbidden_operation(request: Request, exc: ForbiddenOperation):
     """服务层识别的越权 → 403（与业务规则的 400 区分；AZ-04）。"""
     return JSONResponse(status_code=403, content={"detail": str(exc)})
+
+
+@app.exception_handler(SiteError)
+@app.exception_handler(AcceptanceError)
+@app.exception_handler(PurchaseOrderError)
+@app.exception_handler(ChangeFlowError)
+@app.exception_handler(ReviewFlowError)
+@app.exception_handler(ReviewerError)
+@app.exception_handler(StageError)
+@app.exception_handler(ShippingError)
+@app.exception_handler(ManufacturingError)
+@app.exception_handler(NumberingError)
+async def _domain_error(request: Request, exc: Exception):
+    """业务规则错误 → 400（前端能直接展示 `detail`）。
+
+    ★ 全量覆盖 10 个域错误类（2026-09-28 G1）：逐个 route 去 try/except 已经漏过三次
+    （N2 merge_order / N25 confirm / G3 add_issue），**不再靠人工记得捕**。
+    """
+    return JSONResponse(status_code=400, content={"detail": str(exc)})
 
 
 @app.middleware("http")

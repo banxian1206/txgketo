@@ -10,6 +10,7 @@ from datetime import UTC, date, datetime
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.models.engineering import Drawing
 from app.models.initiation import (
     GoodsReceipt,
     ProjectMember,
@@ -17,6 +18,7 @@ from app.models.initiation import (
     SOURCE_SITE_DAMAGED,
     SOURCE_SITE_SHORTAGE,
 )
+from app.models.library import Item
 from app.models.site import (
     COMMISSION_DONE,
     COMMISSION_ONSITE,
@@ -121,10 +123,45 @@ def add_daily(session: Session, *, project_no: str, actor_id: int, body: dict) -
 # --------------------------------------------------------------------------
 
 
+def _resolve_part(
+    session: Session, project_no: str, equip_no: str | None, drawing_no, item_no
+) -> tuple[str | None, str | None, str | None]:
+    """★ G3（09 卷 §3）：把问题挂到**具体零件**，并校验**归属**。
+
+    客户口径 2026-09-28：“他肯定是反映这个零件…它是有归属的噱。”
+    所以：图号必须属于**这个项目 + 这台设备**；物料号必须真实存在。
+    :returns (drawing_no, item_no, part_name) —— part_name 自动补全（免回查）。
+    """
+    dn = (drawing_no or "").strip() or None
+    itn = (item_no or "").strip() or None
+    name: str | None = None
+    if dn:
+        d = session.get(Drawing, dn)
+        if d is None:
+            raise SiteError(f"零件不存在：图号 {dn}")
+        if d.project_no != project_no:
+            raise SiteError(f"这个零件不属于本项目：{dn}（属于 {d.project_no}）")
+        if equip_no and d.equip_no != equip_no:
+            raise SiteError(f"这个零件不属于这台设备：{dn}（属于 {d.equip_no}）")
+        name = d.title
+    if itn:
+        item = session.get(Item, itn)
+        if item is None:
+            raise SiteError(f"零件不存在：物料号 {itn}")
+        name = name or item.display_name
+    return dn, itn, name
+
+
 def add_issue(session: Session, *, project_no: str, actor_id: int, body: dict) -> SiteIssue:
+    dn, itn, part_name = _resolve_part(
+        session, project_no, body.get("equip_no"), body.get("drawing_no"), body.get("item_no")
+    )
     row = SiteIssue(
         project_no=project_no,
         equip_no=body.get("equip_no"),
+        drawing_no=dn,
+        item_no=itn,
+        part_name=body.get("part_name") or part_name,
         title=body["title"],
         desc=body.get("desc"),
         photos=body.get("photos") or [],
@@ -372,6 +409,9 @@ def issue_dict(r: SiteIssue) -> dict:
         "id": r.id,
         "project_no": r.project_no,
         "equip_no": r.equip_no,
+        "drawing_no": r.drawing_no,
+        "item_no": r.item_no,
+        "part_name": r.part_name,
         "title": r.title,
         "desc": r.desc,
         "photos": r.photos or [],

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -227,5 +227,6 @@ class ProjectOut(BaseModel):
     close_note: str | None = None
     warranty_start: date | None = None  # 质保起（客户验收确认日，S10 自动写）
     warranty_end: date | None = None  # 质保止（验收日 + 质保月数）
+    archived_at: datetime | None = None  # ★ G1：自动归档时间（质保期过 → 惰性扫描写入）
     pm_id: int | None = None
     created_at: object | None = None

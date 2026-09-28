@@ -83,6 +83,14 @@ npm run build && npx tsc --noEmit
     例外只有三类：**造账号**（`/demo-users`、`POST /users`）、**系统管理读**（`/audit-logs` 等仅 `system:admin`）、
     `seed.py` 首次初始化。确需超管的行必须显式标 `# admin-ok: <原因>`（`.mjs` 用 `// admin-ok:`）。
     护栏：`tests/test_no_admin_in_e2e.py`（静态，已验证能红）+ `frontend/e2e/lib.mjs` 的 `apiLogin/login` 运行时 guard。
+12. ★ **审评口只有两处：工程 + 采购**（客户口径 2026-09-28，09 卷 §3-G7）——
+    **工程**：设计评审（图纸/设计BOM/材料BOM/程序），二级到**工程总监**；
+    **采购**：下单前的**价格审批**，二级到**采购总监**。
+    ★ **生产没有审评**、也没有“生产总监”这个审批角色（客户原话：“生产不需要审评…没有必要去审评”）。
+    警戒：旧需求草案《从商机到归档》里写着“工程BOM/整机BOM/采购价分别由工程总监、生产总监、采购总监审批”——**那句已作废**，别再按它加人。
+13. ★ **审批链/评审链都按「单据归属部门」找人**（N21 + M-01，2026-09-28）——采购单→`PURCHASE`、设计评审→`ENG`，
+    **不按提交人部门**、**绝不做全局兜底**（`director()` 无部门就是“随机抓一个总监”，会抓到无设计权限的人 → 单据永久卡死）。
+    新增单据类型先问自己：“它归哪个部门批？”，再找那个部门的人。
 
 ## 7. 目录结构
 
@@ -151,9 +159,14 @@ deploy/          docker-compose.dev.yml
   原因：5 个总监里**只有工程总监**有 `design:audit`；`director()` 无 `ORDER BY` 地取一个会落到
   销售/采购/仓库/总经理 → **单据永久没人能审**（“跨部门审批卡死”）。`director()` 只留作老数据兼容且已确定性。
   铁律：**审批必须在本部门之内走**；新的单据类型一律先定“它归哪个部门批”，再找那个部门的人。
-- ★ **领料单三量（N24，2026-09-28）**：`qty_required`（需求）/ `qty_picked`（已备）/ `qty_issued`（已领）。
-  `pick` 按库位可用量**部分备料**（不再整单 400）；`hand-over` **只领【已备到】的量**（绝不按“还差多少”出库，那是负库存的根因）；
+- ★ **领料单三量（N24，2026-09-28）**：`qty_required`（需求）/ `qty_picked`（已备）/ `qty_issued`（已领）。  `pick` 按库位可用量**部分备料**（不再整单 400）；`hand-over` **只领【已备到】的量**（绝不按“还差多少”出库，那是负库存的根因）；
   缺料行显式标 `shortage` 留在单上，**补货后可在「部分领料」状态再备**，直到「已领走」——不再造死单。
+- ★ **项目终态 = 已归档（自动）**（G1，2026-09-28）：`质保期过（warranty_end < 今天）→ `已归档`，
+  由 `project_stage.archive_due_projects()` 在 **`GET /projects` / `GET /projects/{no}` 时惰性扫描**写入（幂等 + 写审计）；
+  **已归档 = 只读**（`assert_writable` 拦字段编辑；阶段机里 `ARCHIVED→∅` 拦阶段回退）。
+- ★ **现场问题要挂到具体零件**（G3，2026-09-28）：`site_issue.drawing_no`/`item_no` + `part_name` 快照，
+  服务层**校验归属**（图号必须属于该项目 + 该设备，否则 400）；手机端按设备拉设计面**供勾选**。
+  问题 → （`related_change_id`）→ 改版 ECN 链路不变，只是粒度从“设备”细到“零件”。
   一个采购单可以分多次送 → 分批验收、分批入库，剩下的算未到货（`部分到货`）。
   验收合格 → 待入库；不合格 → 退到采购的「**验收不合格**」
 - **采购只有三个动作：下单 · 取消（未到的部分）· 更改供应商**；
@@ -231,6 +244,10 @@ deploy/          docker-compose.dev.yml
 | # | 事项 | 说明 |
 |---|---|---|
 | **0** | ★★ **采购域重构 · 第 0 期（地基）** | ★ **进度（2026-09-28）**：★ **第 0 期 ✅ 全部完成**（① `bom_math.py` 六通道统一数量口径 + ② `_cover` 四项抵扣 + ③ 领料冻结/替代行过滤 + ④ 缺料显式化/超锁/负库存 + ⑤ 齐套率含直发件+项目过滤 + ⑥ e2e 基线入库）。**基线实测（`scripts/e2e_baseline.py`）：S0→S11 中断 0、问题 27→5（余 B1 拆单=一期 / B9 税口径=二三期）、通过 75；`scripts/probe_bom_math.py` 重复进池 8/8 全绿；`pytest 68 passed`。**<br>**方案：`docs/08-采购域重构方案.md` §8 / §13；实证：`docs/99-E2E测试报告-2026-09-28-…基线.md`。不依赖建表，可立即单独开工。**<br>① ★ **同一个「要几个」五个通道五种答案**：发布进池✓ / 手动补跑（图纸分支 **qty 平方**：实测 18 vs 真 6）/ 排产✓ / 齐套率（**不乘父级累计**，实测 4 项全少一半，rate=1.0 而真实约 54%）/ 领料（标准件分支**完全不乘**）→ 抽 `services/bom_math.py` 六处共用（**含发运清单 `shipping`——文档初稿漏的第 6 个通道**）<br>② ★ **净需求缺「已完成量」抵扣** → 四种场景重复进池（已隔离实证：直发件现场验收后新增 18 / 待入库窗口新增 8 / 已入库+已领走新增 5 / 发布后立刻补跑新增 4 条）——**AGENTS §8.1 承诺的幂等只在「刚发布未执行」时成立**<br>③ `generate_issue` 不过滤 `已冻结`/`superseded_by_id` → 按草稿 BOM 领料、改版后旧行仍领料<br>④ 缺料行静默跳过（MI26005 实测：已领走但 `qty_issued=0`、审计日志谎报「1 种物料」、齐套率仍判 ready）——★ **修它会暴露备料超锁/负库存（两者都无保护），必须同时修**<br>⑤ 三处越权已实测落库：`site1` 登记长周期件 **HTTP 201**（凭空一张 ¥54,000 采购单 PO26009）、`site1` 删采购需求 **HTTP 200**（真硬删、无审计）、`wh_director` 裁决工程部改版 **HTTP 200**<br>⑥ ★ **`scripts/multiproj_walkthrough.py` 已失效**（缺 `expected_date` 被 O3-A 拦下，P1/P3 在 S3 就 halted，S4–S11 从未执行）——**“有 e2e 护栏”目前是假的**；把 `/tmp/txgk_e2e.py`+`/tmp/txgk_isolate.py` 提升为 `scripts/e2e_baseline.py`/`probe_bom_math.py` 作为回归基线<br>★ **开工前口径已定（2026-09，见 `08 §14`）**：A 要 / B 要 / C 比价分「含税/不含税」两列 + 存量标含税 / **乙 齐套率必须含直发件**（`ARRIVED_STATUS` 补「现场已验收」+ 按项目过滤，见 `08 §8.3-g`）/ 甲 已入库退货 **挂起**（另立需求） |
+| **0e** | 09 卷缺口第一批 · **G1 项目自动归档 + G3 问题关联零件 ✅（2026-09-28）**（详见 `docs/09-从商机到归档-口径确认与缺口计划.md`） |
+**G1 自动归档**：新增阶段「**已归档**」（终态、只读）+ `project.archived_at`（迁移 `v8b0d2f46a57`）；
+`services/project_stage.archive_due_projects()` —— **惰性扫描**（本系统不用 Redis/MQ/调度器，与现有“超期”同一套路）：
+`GET /projects` / `GET /projects/{no}` 时顺手把 `stage=质保 且 warranty_end<今天` 的置归档，幂等 + 写审计。已归档只读（`assert_writable`）。<br>**G3 问题关联零件**：`site_issue` 加 `drawing_no`/`item_no`/`part_name`（迁移 `u7a9c1e35f46`）；服务层 **校验归属**（图号必须属于本项目+本设备，否则 400）；零件名自动补全；手机端“上报问题”按设备拉设计面（图号+标准件/原材料）**供勾选**，不是手填。<br>**附带治本**：`main.py` 把**10 个域错误类**全部注册为全局 400 处理器 —— 同一个坑踩过三次（N2 `merge_order` / N25 `confirm` / G3 `add_issue`）都是“路由忘了 try/except → 500 空响应”，现在**结构上不可能再漏**（护栏 `tests/test_project_archive.py`，注入反例能红） |
 | **0d** | 第八轮报告修复 · **M-01~M-05 ✅ 全部完成（2026-09-28）**（详见 `docs/99-全局端到端测试报告-2026-09-28-第八轮.md` §6） |
 **M-04**（P1，我上一轮 N22 改出来的回归）：`PATCH /tasks` 原来扁平要 `project:edit`，而 DESIGN/DESIGN_AUDIT/CRAFT 三个角色都**没有**这个码 → 设计师连自己名下任务的「开始/完成」都 403。改为 `_can_act_on_task()` 按「能不能动**这张**任务」判（负责人本人 / 同专业经理 / 总监 / 有 project:edit 任一）。<br>**M-05** 前端跟上门禁：任务页 `canActOn()`（与后端同口径）+ 「关闭订单」按 `hasPerm('project:close')`。<br>**M-03** 零库存领料行不再永久死单：`pick` 用 `_best_stock_row()` **动态解析/回填库位**（原来 `location_id` 为 NULL 就永远跳过；换库位时先释放旧占用再补锁，保持 `lock(loc)==picked−issued`）；报错文案改「没有可用库存」；**补上作废口** `POST /warehouse/issues/{id}/cancel`（`ISSUE_STATUS` 里的「已取消」原来没任何接口能置），`已取消` 提升为 `ISSUE_CANCELLED`。<br>**M-01** 评审链不再全局随机兜底（N21 在设计域的孪生）：新增 `DESIGN_DEPT="ENG"` + `design_director()`，按**工程部**归属找总监（5 个总监里只有工程总监有 `design:audit`），`review_flow` 3 处 + `resolve_chain` 全改；`director()` 补 `order_by`。`change_flow` 限「申请人所在部门总监」（AZ-03）意图未改。<br>**M-02** `PATCH /projects` 改 `pm_id` 同步项目角色「项目经理」（`_sync_pm_member`）：原来一个项目两个真相（通知靠新的 `pm_id`，团队里挂的是旧人）。<br>护栏：`tests/test_task_act_permission.py`(8) + `tests/test_m_report_guardrails.py`(8) + `probe_n24_n25` 新增 M-03 段（**均注入反例自证能红**）。修后全量：`pytest 88` · 基线 `0/0/124` · `probe_n24_n25 17/17` · `txgk_adv 71/71` · 前端 `static 22`/`api 10+4skip`/`ui 55+3skip` |
 | **0c** | 全局扫描后修复 · **N21–N25 ✅ 全部完成（2026-09-28）**（详见 `docs/99-全局测试报告-2026-09-28.md` §9） |
@@ -240,7 +257,8 @@ deploy/          docker-compose.dev.yml
 | 2 | 制造 / 装配 / 发运 / 现场 / 验收 / 售后 | 流程上还没做（见 `docs/00-方案-业务与建设.md` §3 S5–S11） |
 | 3 | 领料单数量算法对齐 | `warehouse/generate-issue` 还是旧算法（材料只乘直接父件、标准件不乘）；建议改成 `bom_demand` 那套按树累计 |
 | 4 | 移动端离线队列 + Capacitor 打包 | 03 卷：现场弱网「拍完先存本地、有网再传」；需要时再打包 APK/ipa（同一份代码） |
-| 6 | **超期扫描（任务/交期到期提醒）** | 本期只展示“超期”，**自动扫描下期**。注：**没有“到货登记”这个动作**（新流程已废弃，AGENTS §8.1：采购侧不登记到货/发货，状态由仓库验收/入库推着变）——所以不存在“到货提醒”，仓库是主动看「待验收」清单收货；验收/入库的通知已接 |
+| 6 | **超期扫描（任务/交期到期提醒）** | **惰性扫描已落地一个样板**：G1 项目自动归档（`project_stage.archive_due_projects`，在 `GET /projects` / 详情时顺手扫）—— 任务/交期提醒可照这个套路扩（本系统不用 Redis/MQ，就做“读时扫”）。注：**没有“到货登记”这个动作**（新流程已废弃，AGENTS §8.1：采购侧不登记到货/发货，状态由仓库验收/入库推着变）——所以不存在“到货提醒” |
+| 7 | **09 卷缺口第二批~**（`docs/09-从商机到归档-口径确认与缺口计划.md`） | 已裁口径、待排期：**§2.2 发货指令跨部门（采购叫车 + 发货日）** · **§2.1 组装体清单** · **G5 多视角齐套率（含「已做成成品」）** · **G2 款项节点提醒** · **G6 入库拍照识别库位（大模型）**。G1/G3/G7 已完成（§8.2 行 0e） |
 
 > 本轮顺手修复：`update_purchase_request` 漏导入 `REQUEST_STATUS`，改采购需求状态会 500。
 
@@ -399,7 +417,10 @@ POST /api/v1/warehouse/inbound                    其他入库（退料回库/�
 ### 8.6 当前环境
 
 - 后端 :8208 · 前端 :5207 · PG 35432（`docker compose -f deploy/docker-compose.dev.yml up -d`，compose 顶层写死了 `name: txgketo`）
-- 测试：`.venv/bin/python -m pytest -q` → **70 passed**；e2e 基线 `.venv/bin/python -m scripts.e2e_baseline`（★ 跑前复位业务数据；只清业务表，账户/组织/编号规则不动）→ **问题 0 / 中断 0 / 通过 124**；隔离探针 `scripts/probe_bom_math.py` → **8/8**
+- 测试：`.venv/bin/python -m pytest -q` → **95 passed**；e2e 基线 `.venv/bin/python -m scripts.e2e_baseline`（★ 跑前复位业务数据；只清业务表，账户/组织/编号规则不动）→ **问题 0 / 中断 0 / 通过 124**；
+  隔离探针 `scripts/probe_bom_math.py` → **8/8**、`scripts/probe_n24_n25.py` → **17/17**；前端 `e2e:static 22` / `e2e:api 10+4skip` / `e2e:ui 55+3skip`
+- alembic head：**`v8b0d2f46a57`**（G1 项目归档）
+- ★ 套件**执行顺序**：`e2e_baseline` → `probe_n24_n25` → `probe_bom_math`（最后一个会 TRUNCATE 业务表，放最后）
 - 账号：admin / admin12345；演示账号密码 `txgk@123`（采购链：`buyer1` 组员 / `purchase_manager` 经理 / `purchase_director` 总监 —— 三级都要有，缺经理会全程自动跳级、两级审批退化成一级）
 
 ### 8.7 产品决策（2026-09-22，客户确认）

@@ -34,6 +34,10 @@ export interface SiteIssueRow {
   id: number
   project_no: string
   equip_no?: string | null
+  /** ★ G3：问题归属的零件（图号 / 物料号 + 名称快照） */
+  drawing_no?: string | null
+  item_no?: string | null
+  part_name?: string | null
   title: string
   desc?: string | null
   photos: string[]
@@ -120,6 +124,10 @@ export async function listSiteIssues(projectNo: string) {
 export async function addSiteIssue(body: {
   project_no: string
   equip_no?: string
+  /** ★ G3：挂到具体零件（图号，或标准件/原材料的物料号） */
+  drawing_no?: string
+  item_no?: string
+  part_name?: string
   title: string
   desc?: string
   photos?: string[]

@@ -3,7 +3,7 @@ import IncomingCheckFields from './components/IncomingCheckFields'
 import { App, Button, Card, DatePicker, Empty, Form, Input, InputNumber, Radio, Select, Space, Tabs, Tag, Typography } from 'antd'
 import { MinusCircleOutlined, PlusOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
-import {useState} from 'react'
+import {useEffect, useState} from 'react'
 
 import {
   acceptSiteIncoming,
@@ -29,6 +29,7 @@ import {
 } from '../../api/client'
 import MfgPhotoPicker from '../../components/MfgPhotoPicker'
 import AppModal from '../../components/AppModal'
+import { getDesignTree } from '../../api/design'
 import { SITE_ISSUE_STATUS as ISSUE_COLOR } from '../../theme/status'
 import { SITE_COMMISSION_STATUS as COMMISSION_COLOR } from '../../theme/status'
 import { T } from '../../theme/tokens'
@@ -48,6 +49,30 @@ export default function SiteM() {
 
   // 重构 2.1：看板数据走共享 hook（与 PC 同源）
   const { projectNo, setProjectNo, projects, wb, incoming, accs, reload: load } = useSiteBoard({ withAcceptance: true })
+
+  // ★ G3（09 卷 §3）：现场问题要能挂到**具体零件**（不是只到设备）
+  //   客户口径：“他肯定是反映这个零件…它是有归属的噱。”
+  //   零件列表按“当前填的设备”拉设计面（图号 + 标准件/原材料），供勾选。
+  const equipNo = Form.useWatch('equip_no', form) as string | undefined
+  const [parts, setParts] = useState<{ value: string; label: string; kind: '图号' | '物料' }[]>([])
+  useEffect(() => {
+    let alive = true
+    if (!projectNo || !equipNo) { setParts([]); return }
+    getDesignTree(projectNo, equipNo)
+      .then((t) => {
+        if (!alive) return
+        const ds = (t.tree ?? []).map((d) => ({
+          value: d.drawing_no, label: `${d.drawing_no}　${d.title}`, kind: '图号' as const,
+        }))
+        const its = [...(t.std_bom ?? []), ...(t.material_bom ?? [])].map((b) => ({
+          value: b.child_item_no, label: `${b.child_item_no}　${b.display_name ?? ''}`, kind: '物料' as const,
+        }))
+        setParts([...ds, ...its])
+      })
+      .catch(() => { if (alive) setParts([]) })
+    return () => { alive = false }
+  }, [projectNo, equipNo])
+
   const pick = (pno?: string) => {
     setProjectNo(pno)
     void load(pno)
@@ -85,7 +110,7 @@ export default function SiteM() {
           people: v.people, photos, videos, problem: v.problem, remark: v.remark,
         })
       } else if (modal.kind === 'issue') {
-        await addSiteIssue({ project_no: projectNo, equip_no: v.equip_no, title: v.title, desc: v.desc, photos })
+        await addSiteIssue({ project_no: projectNo, equip_no: v.equip_no, drawing_no: v.drawing_no, title: v.title, desc: v.desc, photos })
       } else if (modal.kind === 'commission') {
         await requestCommission({ project_no: projectNo, dispatch_to: v.dispatch_to, plan_date: v.plan_date?.format('YYYY-MM-DD'), remark: v.remark })
       } else if (modal.kind === 'incoming' && modal.target) {
@@ -336,6 +361,16 @@ export default function SiteM() {
           {modal?.kind === 'issue' && (
             <>
               <Form.Item name="equip_no" label="设备"><Input style={{ width: 120 }} /></Form.Item>
+              <Form.Item name="drawing_no" label="哪个零件（可选）" extra={equipNo ? '选到具体零件，问题归属才清楚（也会带上零件名）' : '先填设备号，再选零件'}>
+                <Select
+                  allowClear
+                  showSearch
+                  disabled={!equipNo}
+                  placeholder={equipNo ? '选这台设备的零件' : '先填设备号'}
+                  optionFilterProp="label"
+                  options={parts.map((p) => ({ value: p.value, label: `${p.label}（${p.kind}）` }))}
+                />
+              </Form.Item>
               <Form.Item name="title" label="问题标题" rules={[{ required: true }]}><Input placeholder="如 转接件尺寸不符" /></Form.Item>
               <Form.Item name="desc" label="说明"><Input.TextArea rows={2} /></Form.Item>
               <Form.Item label="照片">

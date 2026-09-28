@@ -150,6 +150,8 @@ def list_projects(
     session: Session = Depends(get_session),
     current: User = Depends(get_current_user),
 ):
+    # ★ G1：惰性扫描 —— 质保期过的项目顺手自动归档（客户口径：“质保期过了就自动归档”）
+    project_stage.archive_due_projects(session)
     stmt = select(Project).order_by(Project.created_at.desc())
     if stage:
         stmt = stmt.where(Project.stage == stage)
@@ -193,6 +195,8 @@ def get_project(
     session: Session = Depends(get_session),
     current: User = Depends(get_current_user),
 ):
+    # ★ G1：惰性扫描（看详情时也顺手归档一次，保证任何入口看到的阶段都是最新）
+    project_stage.archive_due_projects(session)
     row = session.get(Project, project_no)
     if row is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "项目不存在")
@@ -661,6 +665,7 @@ def update_project(
         raise HTTPException(status.HTTP_404_NOT_FOUND, "项目不存在")
 
     payload = body.model_dump(exclude_unset=True)
+    project_stage.assert_writable(project)  # ★ G1：已归档项目只读
     assert_sales_owned(session, current, set(payload))   # ★ N22：商机/合同类字段只能商务部改
     customer = session.get(Customer, project.customer_id)
     changes: list[dict] = []

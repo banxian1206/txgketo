@@ -22,7 +22,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 from app.models.base import Base, TimestampMixin
 
 # 项目阶段（商机→订单→合同→项目，一号到底，只是阶段在推进）
-PROJECT_STAGES = ("线索", "成交待立项", "执行中", "交付中", "质保", "已关闭")
+PROJECT_STAGES = ("线索", "成交待立项", "执行中", "交付中", "质保", "已归档", "已关闭")
 CLOSE_REASONS = ("价格", "交期", "技术不满足", "客户取消", "对手中标", "其他")
 DEAL_MODES = ("投标", "直签")
 
@@ -120,6 +120,8 @@ class Project(Base, TimestampMixin):
     close_note: Mapped[str | None] = mapped_column(String(255))
     warranty_start: Mapped[date | None] = mapped_column(Date)  # 验收确认日
     warranty_end: Mapped[date | None] = mapped_column(Date)  # 自动算出
+    # ★ G1（09 卷 §3）：质保期过 → 自动归档（惰性扫描写入）
+    archived_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     pm_id: Mapped[int | None] = mapped_column(ForeignKey("app_user.id"))
     created_by: Mapped[int | None] = mapped_column(ForeignKey("app_user.id"))

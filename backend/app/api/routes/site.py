@@ -175,6 +175,10 @@ def list_daily(
 class IssueIn(BaseModel):
     project_no: str
     equip_no: str | None = None
+    # ★ G3：挂到具体零件（图号 / 物料号），服务层会校验**归属**
+    drawing_no: str | None = None
+    item_no: str | None = None
+    part_name: str | None = None
     title: str
     desc: str | None = None
     photos: list = Field(default_factory=list)
@@ -190,7 +194,9 @@ def add_issue(
     row = site_svc.add_issue(session, project_no=body.project_no, actor_id=current.id, body=body.model_dump())
     audit.log(
         session, user=current, action="site_issue", object_type="project", object_ref=body.project_no,
-        summary=f"现场问题：{body.project_no} —— {body.title}", ip=client_ip(request),
+        summary=f"现场问题：{body.project_no} —— {body.title}"
+        + (f"（零件 {row.drawing_no or row.item_no}）" if (row.drawing_no or row.item_no) else ""),
+        ip=client_ip(request),
     )
     session.commit()
     return site_svc.issue_dict(row)

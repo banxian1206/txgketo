@@ -91,6 +91,11 @@ class SiteIssue(Base, TimestampMixin):
     id: Mapped[int] = mapped_column(primary_key=True)
     project_no: Mapped[str] = mapped_column(ForeignKey("project.project_no", ondelete="CASCADE"))
     equip_no: Mapped[str | None] = mapped_column(String(16))
+    # ★ G3（09 卷 §3）：问题要能挂到**具体零件**，不是只到设备级。
+    #   客户口径：“他肯定是反映这个零件…它是有归属的噱。”图号=物料号（铁律 2），一般只填一个。
+    drawing_no: Mapped[str | None] = mapped_column(String(64))  # 图号（自制/定制件）
+    item_no: Mapped[str | None] = mapped_column(String(64))  # 物料号（标准件/原材料）
+    part_name: Mapped[str | None] = mapped_column(String(128))  # 零件名称快照（展示用，免回查）
     title: Mapped[str] = mapped_column(String(128))
     desc: Mapped[str | None] = mapped_column(Text)
     photos: Mapped[list | None] = mapped_column(JSONB)
