@@ -14,6 +14,8 @@ import {
 } from 'antd'
 import {useNavigate} from 'react-router-dom'
 
+import { hasPerm } from '../../api/user'
+
 import {
   type DesignOverviewRow,
   type ProjectDetail as Detail,
@@ -89,7 +91,9 @@ export default function ProjectHeader({
                   立项
                 </Button>
               )}
-              {p.stage !== '已关闭' && (
+              {/* ★ M-05：关闭订单归商务部（权限码 project:close）—— 没权限就不展示，
+                  否则点了必 403（铁律：前端必须反映后端门禁） */}
+              {p.stage !== '已关闭' && hasPerm('project:close') && (
                 <Dropdown
                   menu={{
                     items: [{ key: 'close', label: '关闭订单', danger: true }],

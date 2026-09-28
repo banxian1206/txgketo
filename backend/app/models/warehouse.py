@@ -28,7 +28,8 @@ ISSUE_DRAFT = "待备料"
 ISSUE_PICKED = "已备料"
 ISSUE_PARTIAL = "部分领料"  # ★ 只是部分行有货、先领一部分（缺料的留在单上，不静默跳过）
 ISSUE_DONE = "已领走"
-ISSUE_STATUS = (ISSUE_DRAFT, ISSUE_PICKED, ISSUE_PARTIAL, ISSUE_DONE, "已取消")
+ISSUE_CANCELLED = "已取消"  # ★ M-03：具名常量（原来在 ISSUE_STATUS 里裸写字符串，且没有接口能置）
+ISSUE_STATUS = (ISSUE_DRAFT, ISSUE_PICKED, ISSUE_PARTIAL, ISSUE_DONE, ISSUE_CANCELLED)
 
 
 class WarehouseLocation(Base, TimestampMixin):
@@ -112,6 +113,9 @@ class MaterialIssueLine(Base, TimestampMixin):
     issue_id: Mapped[int] = mapped_column(ForeignKey("material_issue.id", ondelete="CASCADE"))
     item_no: Mapped[str] = mapped_column(ForeignKey("item.item_no"))
     qty_required: Mapped[float] = mapped_column(Numeric(14, 3))
+    # ★ N24：已备料量（备了多少）；与 qty_required / qty_issued 三量分离
+    #   pick 按库位可用量备（有多少备多少，不再整单 400）；hand-over 只领已备到的量
+    qty_picked: Mapped[float] = mapped_column(Numeric(14, 3), default=0, server_default="0")
     qty_issued: Mapped[float] = mapped_column(Numeric(14, 3), default=0, server_default="0")
     location_id: Mapped[int | None] = mapped_column(ForeignKey("warehouse_location.id"))
     shortage: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")

@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import and_, or_, select
 from sqlalchemy.orm import Session
 
-from app.api.deps import client_ip, get_current_user
+from app.api.deps import client_ip, get_current_user, has_permission, require_permission
 from app.core.db import get_session
 from app.models.engineering import Drawing
 from app.models.initiation import Milestone, ProjectMember, PurchaseRequest
@@ -132,7 +132,7 @@ def generate_tasks(
     body: GenerateTasksIn,
     request: Request,
     session: Session = Depends(get_session),
-    current: User = Depends(get_current_user),
+    current: User = Depends(require_permission("project:edit")),
 ):
     """立项后生成并行任务：设备 × 专业 → 设计任务；长周期件 → 采购任务。
 
@@ -371,6 +371,23 @@ class TaskPatch(BaseModel):
     remark: str | None = None
 
 
+def _can_act_on_task(user: User, row: Task) -> bool:
+    """★ M-04：门禁按「能不能动**这张**任务」判，而不是扁平要求 project:edit。
+
+    放行（任一）：超管 · 有 project:edit（PM/商务…）· **任务负责人本人** ·
+    同专业的经理（POSITION_LEAD）· 总监。
+    修正前 designer（mech_manager/craft1…）没有 project:edit → 连自己名下任务的
+    「开始/完成」都 403，S2 设计推进走不动。
+    """
+    if user.is_superuser or has_permission(user, "project:edit"):
+        return True
+    if row.owner_id is not None and row.owner_id == user.id:
+        return True
+    if user.position == POSITION_LEAD and user.profession and user.profession == row.profession:
+        return True
+    return user.position == POSITION_DIRECTOR
+
+
 @router.patch("/tasks/{task_id}")
 def update_task(
     task_id: int,
@@ -382,6 +399,11 @@ def update_task(
     row = session.get(Task, task_id)
     if row is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "任务不存在")
+    if not _can_act_on_task(current, row):
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN,
+            "没有权限：只有任务负责人本人、本专业经理/总监，或有「项目编辑」权限的人能改这张任务",
+        )
     if body.status and body.status not in TASK_STATUS:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, f"任务状态必须是：{'/'.join(TASK_STATUS)}")
 

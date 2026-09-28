@@ -67,7 +67,7 @@ def list_suppliers(
     q: str | None = None,
     kind: str | None = None,
     session: Session = Depends(get_session),
-    _: User = Depends(get_current_user),
+    current: User = Depends(get_current_user),
 ):
     stmt = select(Supplier).order_by(Supplier.id)
     if kind:
@@ -105,7 +105,7 @@ def list_suppliers(
             .group_by(SupplierQuote.supplier_id)
         ).all()
     )
-    return [
+    out_ = [
         _supplier_dict(
             s,
             {
@@ -119,6 +119,8 @@ def list_suppliers(
         )
         for s in rows
     ]
+
+    return out_ if has_permission(current, "purchase:price") else scrub_money(out_)
 
 
 class SupplierIn(BaseModel):
@@ -156,7 +158,7 @@ def create_supplier(
     body: SupplierIn,
     request: Request,
     session: Session = Depends(get_session),
-    current: User = Depends(get_current_user),
+    current: User = Depends(require_permission("purchase:edit")),
 ):
     if session.scalar(select(Supplier).where(Supplier.name == body.name)):
         raise HTTPException(status.HTTP_400_BAD_REQUEST, f"供应商「{body.name}」已存在")
@@ -187,7 +189,7 @@ def update_supplier(
     body: SupplierPatch,
     request: Request,
     session: Session = Depends(get_session),
-    current: User = Depends(get_current_user),
+    current: User = Depends(require_permission("purchase:edit")),
 ):
     row = session.get(Supplier, supplier_id)
     if row is None:
@@ -292,7 +294,7 @@ def add_quote(
     body: QuoteIn,
     request: Request,
     session: Session = Depends(get_session),
-    current: User = Depends(get_current_user),
+    current: User = Depends(require_permission("purchase:edit")),
 ):
     sup = session.get(Supplier, supplier_id)
     if sup is None:
@@ -503,14 +505,14 @@ class CatalogIn(BaseModel):
 
 @router.get("/suppliers/{supplier_id}/catalog")
 def list_catalog(
-    supplier_id: int, session: Session = Depends(get_session), _: User = Depends(get_current_user)
+    supplier_id: int, session: Session = Depends(get_session), current: User = Depends(get_current_user)
 ):
     rows = session.scalars(
         select(SupplierCatalog).where(SupplierCatalog.supplier_id == supplier_id)
     ).all()
     classes = {k.code: k.name for k in session.scalars(select(StdClass)).all()}
     items = {i.item_no: i for i in session.scalars(select(Item)).all()}
-    return [
+    out_ = [
         {
             "id": c.id,
             "std_class_code": c.std_class_code,
@@ -526,6 +528,8 @@ def list_catalog(
         for c in rows
     ]
 
+    return out_ if has_permission(current, "purchase:price") else scrub_money(out_)
+
 
 @router.post("/suppliers/{supplier_id}/catalog", status_code=status.HTTP_201_CREATED)
 def add_catalog(
@@ -533,7 +537,7 @@ def add_catalog(
     body: CatalogIn,
     request: Request,
     session: Session = Depends(get_session),
-    current: User = Depends(get_current_user),
+    current: User = Depends(require_permission("purchase:edit")),
 ):
     """声明这家供应商能供哪些品类 / 型号。"""
     sup = session.get(Supplier, supplier_id)
@@ -608,7 +612,7 @@ def recommend_suppliers(
     item_no: str,
     need_date: date | None = Query(default=None, description="需要到货日期，用来判断交期赶不赶得上"),
     session: Session = Depends(get_session),
-    _: User = Depends(get_current_user),
+    current: User = Depends(get_current_user),
 ):
     item = session.get(Item, item_no)
     if item is None:
@@ -811,7 +815,7 @@ def recommend_suppliers(
         )
 
     recos.sort(key=lambda x: -x["score"])
-    return {
+    out_ = {
         "item_no": item_no,
         "display_name": item.display_name,
         "spec_text": item.spec_text,
@@ -824,3 +828,4 @@ def recommend_suppliers(
         "recommendations": recos,
         "note": "只声明了「大类」的供应商排在后面并标注 —— 建议补上能供的具体品类",
     }
+    return out_ if has_permission(current, "purchase:price") else scrub_money(out_)

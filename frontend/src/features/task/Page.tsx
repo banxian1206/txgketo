@@ -31,6 +31,7 @@ import {
   type User,
   type UserRow,
 } from '../../api/client'
+import { hasPerm } from '../../api/user'
 import { TASK_STATUS as STATUS_COLOR } from '../../theme/status'
 import { TASK_TYPE as TYPE_COLOR } from '../../theme/status'
 
@@ -52,6 +53,17 @@ export default function MyTasks() {
   const isLead =
     ['经理', '组长', '设计组长', '主管'].includes(profile?.position ?? '') ||
     ['总监', '部门负责人', '工程总监'].includes(profile?.position ?? '')
+
+  /** ★ M-04/M-05：与后端 `tasks._can_act_on_task` 同一口径 ——
+   * 「能不能动**这张**任务」而不是看有没有 `project:edit`。
+   * 不是负责人却看得到「开始/完成」→ 点了必 403（铁律：前端必须反映后端门禁）。 */
+  const canActOn = (r: TaskItem) =>
+    hasPerm('project:edit') ||
+    (profile?.id != null && r.owner_id === profile.id) ||
+    (['经理', '组长', '设计组长', '主管'].includes(profile?.position ?? '') &&
+      !!profile?.profession &&
+      profile.profession === r.profession) ||
+    profile?.position === '总监'
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -240,10 +252,10 @@ export default function MyTasks() {
                   等前置
                 </Typography.Text>
               </Tooltip>
-            ) : (
+            ) : canActOn(r) ? (
               <a onClick={() => void setStatus(r.id, '进行中')}>开始</a>
-            ))}
-          {r.task_type !== '采购' && r.status !== '已完成' && (
+            ) : null)}
+          {r.task_type !== '采购' && r.status !== '已完成' && canActOn(r) && (
             <a onClick={() => void setStatus(r.id, '已完成')}>完成</a>
           )}
           {isLead &&

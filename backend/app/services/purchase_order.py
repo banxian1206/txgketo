@@ -34,7 +34,7 @@ from app.models.purchase_order import (
     compute_line_amounts,
 )
 from app.services.numbering import next_number
-from app.services.reviewers import director_for, lead_for_dept
+from app.services.reviewers import director_in_dept, lead_in_dept
 
 
 class PurchaseOrderError(ValueError):
@@ -106,14 +106,29 @@ def _sync_po_requests(session: Session, po: PurchaseOrder) -> None:
     session.flush()
 
 
+PURCHASE_DEPT = "PURCHASE"  # 采购单的归属部门（审批链固定走它）
+
+
 def resolve_po_chain(session: Session, submitter: User) -> tuple[User | None, User]:
-    """返回（一级采购经理 | None, 二级采购总监）。一级 None = 提交人是经理，跳过。"""
-    if submitter.position == POSITION_DIRECTOR:
+    """返回（一级采购经理 | None, 二级采购总监）。一级 None = 提交人是经理，跳过。
+
+    ★ 固定按**采购部**（`PURCHASE`）找经理/总监，不再按提交人所在部门：
+      · 单据归哪个部门批，取决于“这是采购”，与谁提交无关
+        （客户口径 2026-09-28：**审批流程都是在本部门之内走的**）
+      · 提交人无部门时**不再全局兜底**到别的部门总监 —— 那会让采购总监反而审不了
+        （“只有本部门采购总监能审这一级”），单据永久卡在「待总监审」（N21，已实测）
+    提交人本人是采购经理 → 跳过一级，直送总监。
+    """
+    if submitter is not None and submitter.position == POSITION_DIRECTOR:
         raise PurchaseOrderError("总监不提交采购单（他负责审批）；请用采购员/经理的账号提交")
-    lead = None if submitter.position == POSITION_LEAD else lead_for_dept(session, submitter)
-    boss = director_for(session, submitter)
+    lead = (
+        None
+        if (submitter is not None and submitter.position == POSITION_LEAD)
+        else lead_in_dept(session, PURCHASE_DEPT)
+    )
+    boss = director_in_dept(session, PURCHASE_DEPT)
     if boss is None:
-        raise PurchaseOrderError("没找到采购总监，先到「用户与权限」配审核人")
+        raise PurchaseOrderError("采购部没有总监 —— 先到「用户与权限」把采购部的总监配上")
     return lead, boss
 
 
@@ -130,7 +145,7 @@ def submit_order(session: Session, po: PurchaseOrder, submitter: User) -> str:
                 level=APPR_LEVEL_LEAD,
                 reviewer_id=None,
                 action="跳过",
-                note="无采购经理，自动跳级给总监",
+                note="采购部未配经理（或提交人本人是经理），自动跳级给采购总监",
                 acted_at=_now(),
             )
         )

@@ -53,7 +53,7 @@ from app.models.review import (
 from app.models.task import Task
 from app.services import audit, notify, bom_demand, change_flow, equipment_clone
 from app.services.numbering import EMPTY, compose_mech_drawing_no, next_number, year_scope_key
-from app.services.reviewers import chain_levels, director, director_for, team_lead_for
+from app.services.reviewers import chain_levels, design_director, team_lead_for
 
 LEVEL_LABEL = {1: "经理", 2: "总监"}
 KIND_BY_PROFESSION = {"机械": "机械", "电气": "电气"}
@@ -370,9 +370,9 @@ def submit_round(
     # 审核链（06 卷 §2/#2）：经理空缺自动跳级；总监必须有，否则不让提交
     need_lead, _ = chain_levels(user.position)
     lead = team_lead_for(session, task.profession) if need_lead else None
-    boss = director_for(session, user)
+    boss = design_director(session, user)
     if boss is None:
-        raise ReviewFlowError("本部门还没配「总监」—— 先到「用户与权限」把审核人配好再提交")
+        raise ReviewFlowError("工程部还没配「总监」—— 先到「用户与权限」把审核人配好再提交")
 
     if need_lead and lead is not None:
         ticket.status = TICKET_PENDING_LEAD
@@ -467,11 +467,11 @@ def review_ticket(
             raise ForbiddenOperation("只有本专业经理能审这一级")
     else:
         submitter = session.get(User, ticket.submitter_id) if ticket.submitter_id else None
-        boss = director_for(session, submitter) if submitter else director(session)
+        boss = design_director(session, submitter)
         if boss is None:
-            raise ReviewFlowError("本部门还没配总监——先到「用户与权限」配审核人")
+            raise ReviewFlowError("工程部还没配总监——先到「用户与权限」配审核人")
         if boss.id != user.id:
-            raise ForbiddenOperation("只有本部门的总监能审这一级")
+            raise ForbiddenOperation("只有工程部的总监能审这一级")
 
     now = datetime.now(UTC)
     round_no = ticket.current_round
@@ -512,7 +512,7 @@ def review_ticket(
             actor_id=user.id,
         )
     elif level == 1:
-        boss = director_for(session, submitter) if submitter else None
+        boss = design_director(session, submitter)
         if boss is not None:
             notify.notify(
                 session,

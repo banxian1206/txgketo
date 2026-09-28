@@ -22,6 +22,7 @@ import dayjs from 'dayjs'
 import ReceiptNegotiateModal from './ReceiptNegotiateModal'
 import MarkPaidModal from './MarkPaidModal'
 import PoApproveModal from './PoApproveModal'
+import { REBUY_SOURCES } from '../configs/domain'
 import {
   cancelPurchaseOrder,
   changeOrderSupplier,
@@ -479,7 +480,7 @@ export default function PurchaseOrderDrawer({
                 render: (_: unknown, l) => (
                   <>
                     <b>{l.item_name}</b>
-                    {['退货重采', '现场缺件', '现场破损'].includes(l.source) && (
+                    {REBUY_SOURCES.includes(l.source) && (
                       <Tag color="orange" style={{ marginLeft: 4 }}>
                         {l.source}
                       </Tag>

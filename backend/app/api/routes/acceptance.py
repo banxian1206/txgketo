@@ -163,10 +163,13 @@ def confirm(
         raise HTTPException(status.HTTP_404_NOT_FOUND, "验收单不存在")
     if body.result not in ("通过", "不通过"):
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "结论只能是 通过 / 不通过")
-    acc_svc.confirm(
-        session, acc, actor_id=current.id, result=body.result,
-        signed_by=body.signed_by, accepted_at=body.accepted_at, remark=body.remark,
-    )
+    try:
+        acc_svc.confirm(
+            session, acc, actor_id=current.id, result=body.result,
+            signed_by=body.signed_by, accepted_at=body.accepted_at, remark=body.remark,
+        )
+    except acc_svc.AcceptanceError as e:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, str(e)) from e
     audit.log(
         session, user=current, action="acceptance_confirm", object_type="acceptance", object_ref=str(acc.id),
         summary=f"客户验收 {acc.project_no}：{body.result}"

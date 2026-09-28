@@ -55,6 +55,17 @@ def apply_acceptance(
     )
     if existing is not None:
         raise AcceptanceError("这个项目已经在申请验收中")
+    # ★ N25：已通过验收的项目禁止重复申请 —— 重复确认会**覆盖质保起算日**（无留痕）
+    passed = session.scalar(
+        select(Acceptance.id)
+        .where(Acceptance.project_no == project_no, Acceptance.status == ACC_PASSED)
+        .limit(1)
+    )
+    if passed is not None:
+        raise AcceptanceError(
+            "这个项目已经通过客户验收（质保期已开始）—— 要重新验收请走变更/重开流程；"
+            "重复申请会覆盖质保起算日"
+        )
     project = session.get(Project, project_no)
     if project is None:
         raise AcceptanceError(f"项目不存在：{project_no}")
@@ -112,6 +123,9 @@ def confirm(
     remark: str | None = None,
 ) -> Acceptance:
     """客户确认验收。通过 → 自动进入质保期 + 项目阶段推进到「质保」。"""
+    # ★ N25：已确认过的单不再重复确认（幂等拒绝），避免重复改写质保起算日
+    if acc.status in (ACC_PASSED, ACC_REJECTED):
+        raise AcceptanceError(f"这张验收单已经确认过（{acc.status}），不能重复确认")
     if result == "通过" and not (signed_by or "").strip():
         raise AcceptanceError("验收通过必须记录客户签字人")
     project = session.get(Project, acc.project_no)

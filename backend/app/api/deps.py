@@ -99,6 +99,9 @@ MONEY_KEYS = {
     "received_amount",
     "performance_deposit",
     "warranty_amount",
+    # ★ N23：供应商品类常规价 / 推荐价提示 / 税率——也属「我们买多少钱」
+    "price_hint",
+    "tax_rate",
 }
 
 

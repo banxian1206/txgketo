@@ -31,6 +31,18 @@ export const ADMIN_TABS: TabItem[] = [
   // P3 追加：{ path: '/admin/audit', label: '操作日志' }
 ]
 
+/**
+ * 补采类来源（采购池/采购单里需要橙色高亮 + 显示「原 POxxxx」溯源的那几种）。
+ *
+ * 三种都是「货没成 → 数量减回原行 + 新建一条待采购需求回池」（08 §4.1 / §19）：
+ *   退货重采 = 仓库验收不合格后采购协商退货
+ *   现场缺件 / 现场破损 = 现场清点缺件或破损后回池（site.py SOURCE_SITE_*）
+ *
+ * ★ 单一事实源：以前两个文件各写一份字面量数组，加新来源就会漏一处（N18/N20 的成因）。
+ *   新增来源请改这里，并同步后端 `models/initiation.py` 的 `REQUEST_SOURCES`（有契约断言拦）。
+ */
+export const REBUY_SOURCES: string[] = ['退货重采', '现场缺件', '现场破损']
+
 /** 旧路径 → 新路径（通知 link / 书签 / 外部引用不断 —— e2e 只增不改的前提） */
 export const ROUTE_REDIRECTS: [string, string][] = [
   ['/my-tasks', '/workbench/tasks'],

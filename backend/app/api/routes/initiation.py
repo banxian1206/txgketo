@@ -446,7 +446,7 @@ def add_milestone(
     project_no: str,
     body: MilestoneIn,
     session: Session = Depends(get_session),
-    _: User = Depends(get_current_user),
+    _: User = Depends(require_permission("project:edit")),
 ):
     _get_project(session, project_no)
     seq = len(session.scalars(select(Milestone).where(Milestone.project_no == project_no)).all()) + 1

@@ -18,6 +18,11 @@ from app.models.library import Item
 from app.models.platform import User
 from app.models.project import Equipment, Project
 from app.models.warehouse import (
+    ISSUE_CANCELLED,
+    ISSUE_DRAFT,
+    ISSUE_DONE,
+    ISSUE_PARTIAL,
+    ISSUE_PICKED,
     ISSUE_STATUS,
     MOVE_IN,
     MOVE_OUT,
@@ -36,6 +41,39 @@ router = APIRouter(prefix="/warehouse", tags=["仓库"])
 
 def _qty(v) -> float:
     return float(v) if v is not None else 0.0
+
+
+_EPS = 1e-9
+
+
+def _avail(s: StockItem | None) -> float:
+    """该库存行的可用量 = 现存 − 占用。"""
+    if s is None:
+        return 0.0
+    return max(0.0, _qty(s.qty_on_hand) - _qty(s.qty_locked))
+
+
+def _stock_row(session: Session, item_no: str, location_id: int | None) -> StockItem | None:
+    if location_id is None:
+        return None
+    return session.scalar(
+        select(StockItem).where(StockItem.item_no == item_no, StockItem.location_id == location_id)
+    )
+
+
+def _best_stock_row(session: Session, item_no: str, prefer: int | None = None) -> StockItem | None:
+    """找一行【真有可用量】的库存：优先调用方指定的库位，否则可用量最大的库位。
+
+    ★ M-03：领料行建单时库存=0 → `location_id` 为 NULL；补货后原来永远备不出来
+    （pick 遇到 NULL 直接跳过）。现在在 pick 时动态解析/回填库位，就靠这个函数。
+    """
+    rows = session.scalars(select(StockItem).where(StockItem.item_no == item_no)).all()
+    if prefer is not None:
+        for s in rows:
+            if s.location_id == prefer and _avail(s) > _EPS:
+                return s
+    got = [s for s in rows if _avail(s) > _EPS]
+    return max(got, key=_avail) if got else None
 
 
 def _loc_name(loc: WarehouseLocation | None) -> str | None:
@@ -314,6 +352,7 @@ def _issue_dict(i: MaterialIssue, lines: list[MaterialIssueLine], items: dict[st
                 "spec_text": items[x.item_no].spec_text if x.item_no in items else None,
                 "unit": items[x.item_no].unit if x.item_no in items else None,
                 "qty_required": _qty(x.qty_required),
+                "qty_picked": _qty(x.qty_picked),
                 "qty_issued": _qty(x.qty_issued),
                 "location_id": x.location_id,
                 "location_name": _loc_name(locs.get(x.location_id)) if x.location_id else None,
@@ -459,39 +498,80 @@ def pick_issue(
     session: Session = Depends(get_session),
     current: User = Depends(require_permission("warehouse:edit")),
 ):
-    """仓库备料完成：锁定库存（qty_locked += 需求）。"""
+    """仓库备料：按**库位可用量**备 —— 有多少备多少（N24 部分备料）。
+
+    · 每行 `need = 需求 − 已领 − 已备`；`take = min(need, 该库位可用)` → 锁 take、`qty_picked += take`
+    · 备不满的行标 `shortage=True` 留在单上（**不再整单 400**）；补货后可再 pick 补差额
+    · 全部备齐 → 「已备料」；仍有缺口 → 「部分领料」
+    """
     issue = session.get(MaterialIssue, issue_id)
     if issue is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "领料单不存在")
-    if issue.status != "待备料":
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, f"当前状态是「{issue.status}」，不能备料")
-    lines = session.scalars(select(MaterialIssueLine).where(MaterialIssueLine.issue_id == issue.id)).all()
-    for ln in lines:
-        if not ln.location_id:
-            continue
-        s = session.scalar(
-            select(StockItem).where(StockItem.item_no == ln.item_no, StockItem.location_id == ln.location_id)
+    if issue.status not in (ISSUE_DRAFT, ISSUE_PARTIAL):
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            f"当前状态是「{issue.status}」，不能备料（只有「待备料 / 部分领料」可备）",
         )
-        if s is None:
+    lines = session.scalars(select(MaterialIssueLine).where(MaterialIssueLine.issue_id == issue.id)).all()
+    prepared = 0
+    short: list[str] = []
+    for ln in lines:
+        # 还差多少要备 = 需求 − 累计已备（picked 已含已领走的部分；领走只释放锁，不减 picked）
+        need = _qty(ln.qty_required) - _qty(ln.qty_picked)
+        if need <= 1e-9:
+            ln.shortage = False
             continue
-        available = _qty(s.qty_on_hand) - _qty(s.qty_locked)
-        if available + 1e-9 < _qty(ln.qty_required):
-            raise HTTPException(
-                status.HTTP_400_BAD_REQUEST,
-                f"{ln.item_no} 在库位可用 {available:g}，不够备料 {_qty(ln.qty_required):g}"
-                "（先补货或调整数量）",
-            )
-        s.qty_locked = _qty(s.qty_locked) + _qty(ln.qty_required)
-    issue.status = "已备料"
+        # ★ M-03：解析 /（重）绑定源库位。
+        #   原来 `if not ln.location_id: continue` → 建单时库存=0 的行库位为 NULL，
+        #   补货后**永远备不出来**（缺料最常见的形态就是没货，所以 N24 治不到这条）。
+        s = _stock_row(session, ln.item_no, ln.location_id)
+        if _avail(s) <= _EPS:
+            cand = _best_stock_row(session, ln.item_no, prefer=body.location_id)
+            held = max(0.0, _qty(ln.qty_picked) - _qty(ln.qty_issued))  # 本行已锁、尚未领走的量
+            if cand is not None and cand.location_id != ln.location_id and _avail(cand) >= held + _EPS:
+                # 换库位：先释放旧库位占用，再在新库位补锁 ——
+                # 以保持不变量「lock(ln.location_id) == qty_picked − qty_issued」
+                if held > _EPS and s is not None:
+                    s.qty_locked = max(0.0, _qty(s.qty_locked) - held)
+                ln.location_id = cand.location_id
+                s = cand
+                if held > _EPS:
+                    s.qty_locked = _qty(s.qty_locked) + held
+        if _avail(s) <= _EPS:
+            ln.shortage = True
+            short.append(ln.item_no)
+            continue
+        take = min(need, _avail(s))  # ★ 有多少备多少
+        if take > 1e-9:
+            s.qty_locked = _qty(s.qty_locked) + take
+            ln.qty_picked = _qty(ln.qty_picked) + take
+            prepared += 1
+        ln.shortage = _qty(ln.qty_picked) + 1e-9 < _qty(ln.qty_required)
+        if ln.shortage:
+            short.append(ln.item_no)
+    if prepared == 0 and short:
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            f"没有可用库存，无法备料：{'、'.join(sorted(set(short))[:4])}（先补货 / 或先入库到库位）",
+        )
+    all_ready = all(_qty(x.qty_picked) + 1e-9 >= _qty(x.qty_required) for x in lines)
+    issue.status = ISSUE_PICKED if all_ready else ISSUE_PARTIAL
     issue.picked_by = current.id
     issue.picked_at = datetime.now(UTC)
+    uniq_short = sorted(set(short))
     audit.log(
         session,
         user=current,
         action="pick",
         object_type="material_issue",
         object_ref=issue.issue_no,
-        summary=f"备料完成 {issue.issue_no}",
+        summary=f"备料 {issue.issue_no}：{prepared} 行，状态 {issue.status}"
+        + (
+            f"；★ {len(uniq_short)} 种未备齐：{'、'.join(uniq_short[:4])}"
+            + ("…" if len(uniq_short) > 4 else "")
+            if uniq_short
+            else ""
+        ),
         ip=client_ip(request),
     )
     session.commit()
@@ -518,21 +598,24 @@ def hand_over_issue(
     issued = 0
     pending: list[str] = []
     for ln in lines:
-        remaining = _qty(ln.qty_required) - _qty(ln.qty_issued)
-        if remaining <= 1e-9:
-            continue  # 这一行已经领过（分批领料的第二部分）
+        # ★ N24：只领【已备到】的量 = min(需求, 已备料) − 已领走；绝不按「还差多少」出库（会变负库存）
+        q = min(_qty(ln.qty_required), _qty(ln.qty_picked)) - _qty(ln.qty_issued)
+        if q <= 1e-9:
+            if _qty(ln.qty_issued) + 1e-9 < _qty(ln.qty_required):
+                pending.append(ln.item_no)  # ★ 还没备到（缺料）：显式记下，不静默跳过
+            continue
         if not ln.location_id:
-            pending.append(ln.item_no)  # ★ 缺料：显式记下，不静默跳过（BM-09）
+            pending.append(ln.item_no)
             continue
         s = session.scalar(
             select(StockItem).where(StockItem.item_no == ln.item_no, StockItem.location_id == ln.location_id)
         )
         if s is not None:
-            s.qty_locked = max(0.0, _qty(s.qty_locked) - remaining)
+            s.qty_locked = max(0.0, _qty(s.qty_locked) - q)
         _apply_stock(
             session,
             item_no=ln.item_no,
-            qty=remaining,
+            qty=q,
             move_type=MOVE_OUT,
             from_location_id=ln.location_id,
             project_no=issue.project_no,
@@ -542,7 +625,7 @@ def hand_over_issue(
             operator_id=current.id,
             remark=f"领料给车间（{body.issued_to or '—'}）",
         )
-        ln.qty_issued = _qty(ln.qty_issued) + remaining
+        ln.qty_issued = _qty(ln.qty_issued) + q
         issued += 1
     if issued == 0:
         raise HTTPException(
@@ -570,6 +653,56 @@ def hand_over_issue(
     )
     session.commit()
     return {"ok": True, "status": issue.status}
+
+
+@router.post("/issues/{issue_id}/cancel")
+def cancel_issue(
+    issue_id: int,
+    body: IssueActionIn,
+    request: Request,
+    session: Session = Depends(get_session),
+    current: User = Depends(require_permission("warehouse:edit")),
+):
+    """★ M-03：作废领料单（补 `ISSUE_STATUS` 里承诺了的「已取消」）。
+
+    原来 `已取消` 只作为过滤条件被读到一次，**没有任何接口能置** ——
+    即「作废口」在枚举里承诺、实现里没有（AGENTS §8.1：没有取消/作废口 → 造出永久死单据）。
+
+    行为：释放本单【已备未领】的库存占用（`qty_locked`）回库；已领走的量不动。
+    """
+    issue = session.get(MaterialIssue, issue_id)
+    if issue is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "领料单不存在")
+    if issue.status == ISSUE_DONE:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "已领走的领料单不能作废")
+    if issue.status == ISSUE_CANCELLED:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "这张领料单已经是「已取消」了")
+    lines = session.scalars(select(MaterialIssueLine).where(MaterialIssueLine.issue_id == issue.id)).all()
+    released = 0.0
+    for ln in lines:
+        # 只释放【已备未领】的占用（已领走的不退）
+        held = max(0.0, _qty(ln.qty_picked) - _qty(ln.qty_issued))
+        if held > _EPS:
+            s = _stock_row(session, ln.item_no, ln.location_id)
+            if s is not None:
+                s.qty_locked = max(0.0, _qty(s.qty_locked) - held)
+            ln.qty_picked = _qty(ln.qty_issued)  # 备料量回落到已领走量
+            released += held
+        ln.shortage = _qty(ln.qty_issued) + _EPS < _qty(ln.qty_required)
+    issue.status = ISSUE_CANCELLED
+    issue.remark = body.remark or issue.remark
+    audit.log(
+        session,
+        user=current,
+        action="cancel",
+        object_type="material_issue",
+        object_ref=issue.issue_no,
+        summary=f"作废领料单 {issue.issue_no}：释放占用 {released:g}"
+        + (f"；原因：{body.remark}" if body.remark else ""),
+        ip=client_ip(request),
+    )
+    session.commit()
+    return {"ok": True, "status": issue.status, "released": released}
 
 
 # ============================================================================

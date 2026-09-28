@@ -20,9 +20,11 @@ from app.api.schemas import (
 )
 from app.core.config import settings
 from app.core.db import get_session
+from app.models.initiation import ProjectMember
 from app.models.platform import User
 from app.models.project import Attachment, Contact, Customer, PaymentTerm, Project
 from app.services import audit, project_stage
+from app.services.reviewers import dept_code_of
 from app.services.numbering import ObjectType, next_number, peek_number, year_scope_key
 
 router = APIRouter(tags=["商机/项目"])
@@ -338,12 +340,13 @@ def close_project(
     body: CloseIn,
     request: Request,
     session: Session = Depends(get_session),
-    current: User = Depends(get_current_user),
+    current: User = Depends(require_permission("project:close")),
 ) -> dict:
-    """关闭订单（需填关闭原因），阶段 → 已关闭。"""
+    """关闭订单（需填关闭原因），阶段 → 已关闭。**仅商务部**（客户口径 2026-09-28）。"""
     project = session.get(Project, project_no)
     if project is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "项目不存在")
+    assert_sales_owned(session, current, {"stage", "close_reason", "close_note"})
     if body.close_reason not in project_stage.CLOSE_REASONS:
         raise HTTPException(
             status.HTTP_400_BAD_REQUEST,
@@ -578,13 +581,79 @@ def _diff(changes: list[dict], source: object, payload: dict, labels: dict[str, 
         setattr(source, field, new_value)
 
 
+def _sync_pm_member(session: Session, project: Project, pm_id: int | None) -> str | None:
+    """★ M-02（第八轮 §3）：`project.pm_id` 必须与项目角色「项目经理」同步（AGENTS §8.1）。
+
+    任命/解绑走团队成员接口时会同步，但通用 `PATCH /projects {pm_id}` 以前漏了
+    → 一个项目两个真相：通知发给新 `pm_id`，团队里挂的还是旧人。
+    返回一句审计说明（没变化返回 None）。
+    """
+    row = session.scalar(
+        select(ProjectMember).where(
+            ProjectMember.project_no == project.project_no,
+            ProjectMember.project_role == "项目经理",
+        )
+    )
+    if pm_id is None:
+        if row is not None:
+            session.delete(row)
+            return "解除「项目经理」项目角色"
+        return None
+    if row is not None and row.user_id == pm_id:
+        return None
+    if row is None:
+        session.add(
+            ProjectMember(project_no=project.project_no, user_id=pm_id, project_role="项目经理")
+        )
+        return f"任命 {pm_id} 为「项目经理」"
+    old = row.user_id
+    row.user_id = pm_id
+    return f"「项目经理」{old} → {pm_id}"
+
+
+# ★ 商务部专属字段（商机 + 成交/合同 + 阶段/关闭）—— 其他部门不得修改
+#   客户口径 2026-09-28：“商务部写的商机内容，其他部门的人就不可以去修改”；关闭项目权限也在商务部。
+#   注：执行类（pm_id、等）不在内 —— 项目管理仍可改。
+SALES_OWNED_FIELDS = frozenset({
+    # 商机
+    "customer_name", "project_name", "project_desc", "deadline", "delivery_days", "deal_mode",
+    "source", "site_address", "is_retrofit", "product_type", "required_cycle",
+    "required_capacity", "est_amount", "expect_sign_date", "competitor",
+    "related_project_no", "risk_note", "sales_id", "received_docs",
+    "performance_deposit", "performance_deposit_return_date", "performance_deposit_returned",
+    # 成交 / 合同
+    "amount", "amount_tax_incl", "period_start", "period_end", "contract_no_customer",
+    "warranty_months", "warranty_amount", "penalty_note", "acceptance_standard",
+    "designated_brand", "delivery_mode", "site_condition", "is_batch_delivery",
+    "tech_agreement_frozen",
+    # 阶段 / 关闭
+    "stage", "close_reason", "close_note",
+})
+
+
+def assert_sales_owned(session: Session, user: User, touched: set[str]) -> None:
+    """跟部门硬拦：商机/合同类字段只能**商务部**改（客户口径 2026-09-28）。
+
+    `contract:edit` 只有 SALES 拥有，作为等价的放行条件（避免把部门树写死）。
+    """
+    bad = sorted(touched & SALES_OWNED_FIELDS)
+    if not bad:
+        return
+    if has_permission(user, "contract:edit") or dept_code_of(session, user) == "SALES":
+        return
+    raise HTTPException(
+        status.HTTP_403_FORBIDDEN,
+        f"这些内容属商务部：{'、'.join(bad)} —— 其他部门不能改（找商务/销售负责人）",
+    )
+
+
 @router.patch("/projects/{project_no}", response_model=ProjectOut)
 def update_project(
     project_no: str,
     body: ProjectUpdateIn,
     request: Request,
     session: Session = Depends(get_session),
-    current: User = Depends(get_current_user),
+    current: User = Depends(require_permission("project:edit")),
 ):
     """编辑项目（部分更新）。每次修改都落操作记录，含 旧值 → 新值。"""
     project = session.get(Project, project_no)
@@ -592,6 +661,7 @@ def update_project(
         raise HTTPException(status.HTTP_404_NOT_FOUND, "项目不存在")
 
     payload = body.model_dump(exclude_unset=True)
+    assert_sales_owned(session, current, set(payload))   # ★ N22：商机/合同类字段只能商务部改
     customer = session.get(Customer, project.customer_id)
     changes: list[dict] = []
 
@@ -615,6 +685,14 @@ def update_project(
         customer = target
 
     _diff(changes, project, payload, PROJECT_FIELD_LABELS)
+
+    # ★ M-02：pm_id 变了要把项目角色「项目经理」一起换（否则两个真相）
+    if "pm_id" in payload:
+        sync = _sync_pm_member(session, project, project.pm_id)
+        if sync:
+            changes.append(
+                {"field": "project_role_pm", "label": "项目角色·项目经理", "old": "—", "new": sync}
+            )
 
     if not changes:
         return _out(project, customer.name if customer else None)
@@ -642,7 +720,7 @@ def create_contact(
     body: ContactIn,
     request: Request,
     session: Session = Depends(get_session),
-    current: User = Depends(get_current_user),
+    current: User = Depends(require_permission("project:edit")),
 ) -> dict:
     """新增联系人（挂在项目的客户下）。"""
     project = session.get(Project, project_no)

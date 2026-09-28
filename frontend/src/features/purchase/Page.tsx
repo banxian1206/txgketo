@@ -8,6 +8,7 @@ import ManualPurchaseModal from '../../components/ManualPurchaseModal'
 import PoApproveModal from '../../components/PoApproveModal'
 import MergeOrderModal from '../../components/MergeOrderModal'
 import PriceReferencePanel from '../../components/PriceReferencePanel'
+import { REBUY_SOURCES } from '../../configs/domain'
 import PurchaseOrderDrawer from '../../components/PurchaseOrderDrawer'
 import ReceiptNegotiateModal from '../../components/ReceiptNegotiateModal'
 import {
@@ -318,9 +319,11 @@ export default function PurchaseWorkbench() {
                             dataIndex: 'source',
                             width: 150,
                             render: (v: string, r) =>
-                              ['退货重采', '现场缺件', '现场破损'].includes(v) ? (
+                              REBUY_SOURCES.includes(v) ? (
                                 <>
-                                  <Tag color="orange">退货重采</Tag>
+                                  {/* ★ 文案取真实来源（N20：条件已泛化而文案曾写死「退货重采」，
+                                      会把现场缺件/破损标成仓库退货，责任方与处理动作都不同） */}
+                                  <Tag color="orange">{v}</Tag>
                                   {r.origin_po_no && (
                                     <div style={{ fontSize: 12, color: T.textSecondary }}>
                                       原 {r.origin_po_no}
