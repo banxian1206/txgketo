@@ -1,5 +1,6 @@
 // features/warehouse/types.ts —— 仓库域共享类型（重构 2.0：原 PC/移动各写一份，统一为超集）
 import type { GoodsReceiptRow } from '../../api/client'
+import type { PoLineBrief } from '../../api/warehouse'
 
 export interface IncomingRow {
   id: number
@@ -16,6 +17,7 @@ export interface IncomingRow {
   unit?: string | null
   po_no?: string | null
   supplier_name?: string | null
+  lines?: PoLineBrief[]
   need_date?: string | null
   expected_date?: string | null
   overdue: boolean

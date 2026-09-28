@@ -10,6 +10,7 @@ import {
   InputNumber,
   Modal,
   Radio,
+  Select,
   Space,
   Spin,
   Tag,
@@ -43,6 +44,7 @@ export default function AcceptM() {
   const [saving, setSaving] = useState(false)
   const [qty, setQty] = useState<number>(1)
   const [qtyOk, setQtyOk] = useState<number | null>(null)
+  const [poLineId, setPoLineId] = useState<number | null>(null)
   const [result, setResult] = useState<'合格' | '不合格'>('合格')
   const [note, setNote] = useState('')
   const [receiptDate, setReceiptDate] = useState(dayjs())
@@ -61,6 +63,8 @@ export default function AcceptM() {
       const d = await mobileMaterial(Number(requestId))
       setData(d)
       setQty(Math.max(0.001, d.qty - d.qty_received))
+      // ★ N12：拆单时默认选唯一一行；多行让仓库自己选
+      setPoLineId(d.lines && d.lines.length === 1 ? d.lines[0].po_line_id : null)
     } catch (e) {
       message.error(errMsg(e))
     } finally {
@@ -101,6 +105,7 @@ export default function AcceptM() {
         result,
         qty_ok: qtyOkVal,
         qty_rejected: qtyOkVal !== undefined ? Math.max(0, qty - qtyOkVal) : undefined,
+        po_line_id: poLineId ?? undefined,
         note: note || undefined,
       })
       if (photos.length) await uploadReceiptPhotos(res.receipt_id, photos)
@@ -215,6 +220,21 @@ export default function AcceptM() {
             <span>到货日期</span>
             <DatePicker value={receiptDate} onChange={(d) => d && setReceiptDate(d)} allowClear={false} />
           </Space>
+          {data && (data.lines?.length ?? 0) > 1 && (
+            <Space>
+              <span>这批货是哪张采购单的</span>
+              <Select
+                style={{ minWidth: 220 }}
+                placeholder="请指明哪张单"
+                value={poLineId ?? undefined}
+                onChange={(v) => setPoLineId(Number(v))}
+                options={(data.lines ?? []).map((l) => ({
+                  value: l.po_line_id,
+                  label: `${l.po_no ?? '—'} · ${l.supplier_name ?? '—'} · 订 ${l.qty}（已到 ${l.received_qty}）`,
+                }))}
+              />
+            </Space>
+          )}
           <Space>
             <span>本次到货数量</span>
             <InputNumber min={0.001} max={data ? Math.max(0.001, data.qty - data.qty_received) : undefined} value={qty} onChange={(v) => setQty(Number(v ?? 1))} style={{ width: 120 }} />

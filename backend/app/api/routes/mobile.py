@@ -20,6 +20,7 @@ from app.models.acceptance import Acceptance
 from app.models.assembly import AssemblyRecord
 from app.models.engineering import Drawing
 from app.models.initiation import GoodsReceipt, PurchaseRequest
+from app.models.purchase_order import PurchaseOrder, PurchaseOrderLine
 from app.models.library import Item
 from app.models.platform import POSITION_DIRECTOR, POSITION_LEAD, User
 from app.models.production import PROD_DISPATCHED, PROD_DONE, PROD_RUNNING, PROD_WAIT, ProdOrder
@@ -206,6 +207,24 @@ def mobile_material_detail(
             select(GoodsReceipt).where(GoodsReceipt.request_id == request_id).order_by(GoodsReceipt.id)
         ).all()
     )
+    # ★ N12：拆单时指明这批货是哪张采购单的（不猜）
+    po_lines = session.scalars(
+        select(PurchaseOrderLine).where(
+            PurchaseOrderLine.request_id == request_id,
+            PurchaseOrderLine.status.not_in(("已退货", "已取消")),
+        )
+    ).all()
+    po_map = {p.id: p for p in session.scalars(select(PurchaseOrder)).all()}
+    order_lines = [
+        {
+            "po_line_id": ln.id,
+            "po_no": po_map[ln.po_id].po_no if ln.po_id in po_map else None,
+            "supplier_name": po_map[ln.po_id].supplier_name if ln.po_id in po_map else None,
+            "qty": float(ln.qty or 0),
+            "received_qty": float(ln.received_qty or 0),
+        }
+        for ln in po_lines
+    ]
     return {
         "id": r.id,
         "project_no": r.project_no,
@@ -221,6 +240,7 @@ def mobile_material_detail(
         "unit": r.unit,
         "po_no": r.po_no,
         "supplier_name": r.supplier_name,
+        "lines": order_lines,
         "need_date": r.need_date,
         "expected_date": r.expected_date,
         "status": r.status,

@@ -999,6 +999,40 @@ def b_fixes() -> None:
         api.raw("post", f"/purchase/orders/{pno}/void", "buyer1", json={"reason": "探针清理"})
 
 
+def b_split_receive() -> None:
+    """N12 交叉护栏：拆单 → 只让一张到货 → 另一张仍在途/可作废，不能串记。"""
+    probe("N12 拆单 × 到货 交叉护栏")
+    p = CTX["p"]
+    rid = _new_demand("ft", 100)["id"]
+    api.req("post", "/purchase/merge-order", "buyer1", (200, 201), json={
+        "supplier_id": SUP["甲钢材"]["id"], "ordered_at": d(0), "expected_date": d(10),
+        "deliver_to": "公司仓库",
+        "lines": [{"request_id": rid, "qty": 60, "unit_price": 80.0, "tax_incl": True}]})
+    api.req("post", "/purchase/merge-order", "buyer1", (200, 201), json={
+        "supplier_id": SUP["乙标准件"]["id"], "ordered_at": d(0), "expected_date": d(10),
+        "deliver_to": "公司仓库",
+        "lines": [{"request_id": rid, "qty": 40, "unit_price": 85.0, "tax_incl": True}]})
+    la = q("select l.id, l.qty, o.supplier_id, o.po_no from purchase_order_line l "
+           "join purchase_order o on o.id=l.po_id where l.request_id=:i", i=rid)
+    a = next(x for x in la if x["supplier_id"] == SUP["甲钢材"]["id"])
+    b = next(x for x in la if x["supplier_id"] == SUP["乙标准件"]["id"])
+    # 拆单没指明单行 → 400
+    sc0, _ = api.try_("post", f"/projects/{p}/purchase-requests/{rid}/inspect", "wh1",
+                      json={"receipt_date": d(0), "qty": 60, "result": "合格"})
+    rec(sc0 == 400, f"拆单未指明单行验收应 400，实际={sc0}")
+    # 指明甲的单行 → 记到甲
+    res = api.req("post", f"/projects/{p}/purchase-requests/{rid}/inspect", "wh1", (200,),
+                  json={"receipt_date": d(0), "qty": 60, "result": "合格", "po_line_id": a["id"]})
+    api.req("post", f"/goods-receipts/{res['receipt_id']}/store", "wh1", json={"location": "深圳仓 A-01-01"})
+    la2 = q("select l.received_qty from purchase_order_line l where l.id in (:a,:b)", a=a["id"], b=b["id"])
+    got = {x["received_qty"] for x in la2}
+    rec(float(a["qty"]) == 60.0, "甲订购 60")
+    rec(any(x is not None and float(x) == 60.0 for x in got), f"甲行应记到货 60，实际={got}")
+    rec(any(x is None or float(x) == 0.0 for x in got), f"乙行不应记到货，实际={got}")
+    scv, _ = api.try_("post", f"/purchase/orders/{b['po_no']}/void", "buyer1", json={"reason": "未到货作废"})
+    rec(scv == 200, f"未到货的乙单应可作废，实际={scv}")
+
+
 def _new_demand(item_key: str, qty: float, who: str = "buyer1") -> dict:
     """建一条干净的「待采购」需求（手工申请通道，免审核直入池）。"""
     r = api.req("post", "/purchase/manual-request", who, (201,), json={
@@ -1396,7 +1430,7 @@ def main() -> None:
             traceback.print_exc()
 
     part("Part B · 采购域专项探针")
-    for fn in (b_split, b_partial_ok, b_split_line_cancel, b_void_order, b_close_return, b_approval_chain, b_payment, b_fixes, b_idempotent_after_release, b_pending_window, b_pending_repool,
+    for fn in (b_split, b_split_receive, b_partial_ok, b_split_line_cancel, b_void_order, b_close_return, b_approval_chain, b_payment, b_fixes, b_idempotent_after_release, b_pending_window, b_pending_repool,
                b_direct_repool, b_delete_authz, b_kitting_inflate, b_issue_draft_bom,
                b_stock_conservation, b_price_reference):
         try:

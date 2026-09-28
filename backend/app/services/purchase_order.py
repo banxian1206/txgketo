@@ -169,11 +169,12 @@ def approve_order(
     else:
         raise PurchaseOrderError(f"当前状态是「{po.status}」，不在审批中")
 
+    record_round = int(po.round or 1)
     if action == "退回":
         if not (note or "").strip():
             raise PurchaseOrderError("退回必须填写说明")
         po.status = PO_RETURNED
-        po.round = int(po.round or 1) + 1
+        po.round = record_round + 1  # ★ 下一轮的编号；本次留档仍记当前轮（N11）
     elif action == "通过":
         po.status = PO_APPROVED if level == APPR_LEVEL_DIRECTOR else PO_PENDING_DIRECTOR
     else:
@@ -181,7 +182,7 @@ def approve_order(
     session.add(
         PurchaseApproval(
             po_id=po.id,
-            round_no=po.round,
+            round_no=record_round,
             level=level,
             reviewer_id=user.id,
             action=action,

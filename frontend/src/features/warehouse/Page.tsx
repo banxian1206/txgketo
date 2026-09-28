@@ -186,6 +186,7 @@ export default function Warehouse() {
         result: v.result,
         qty_ok: qtyOk,
         qty_rejected: qtyOk !== undefined ? Math.max(0, v.qty - qtyOk) : undefined,
+        po_line_id: v.po_line_id,
         note: v.note,
       })
     },
@@ -669,6 +670,10 @@ export default function Warehouse() {
                 receipt_date: dayjs(),
                 qty: Math.max(acceptTarget.qty - acceptTarget.qty_received, 0.001),
                 result: '合格',
+                po_line_id:
+                  acceptTarget.lines && acceptTarget.lines.length === 1
+                    ? acceptTarget.lines[0].po_line_id
+                    : undefined,
               }
             : {}
         }
@@ -707,6 +712,21 @@ export default function Warehouse() {
               />
             </Form.Item>
           </Space>
+          {acceptTarget && (acceptTarget.lines?.length ?? 0) > 1 && (
+            <Form.Item
+              name="po_line_id"
+              label="这批货是哪张采购单的"
+              rules={[{ required: true, message: '拆给了多家，请指明是哪张单' }]}
+              tooltip="一条需求拆给了多家供应商 —— 系统不猜，必须指明这批货是谁送的"
+            >
+              <Select
+                options={(acceptTarget.lines ?? []).map((l) => ({
+                  value: l.po_line_id,
+                  label: `${l.po_no ?? '—'} · ${l.supplier_name ?? '—'} · 订 ${l.qty}（已到 ${l.received_qty}）`,
+                }))}
+              />
+            </Form.Item>
+          )}
           {acceptResult === '合格' && (
             <Form.Item
               name="qty_ok"

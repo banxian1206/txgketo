@@ -13,6 +13,7 @@ from app.api.deps import client_ip, get_current_user, require_permission
 from app.core.db import get_session
 from app.models.engineering import BOM_ROW_FROZEN, Drawing
 from app.models.initiation import GoodsReceipt, PurchaseRequest
+from app.models.purchase_order import PurchaseOrder, PurchaseOrderLine
 from app.models.library import Item
 from app.models.platform import User
 from app.models.project import Equipment, Project
@@ -610,6 +611,31 @@ def workbench(session: Session = Depends(get_session), _: User = Depends(get_cur
         select(StockItem).where(StockItem.qty_on_hand <= StockItem.qty_locked)
     ).all()
 
+    # ★ N12：拆单时一条需求可能挂在多张采购单上 —— 验收要指明是哪张（不能猜）
+    req_ids = [r.id for r in incoming]
+    po_lines = (
+        session.scalars(
+            select(PurchaseOrderLine).where(PurchaseOrderLine.request_id.in_(req_ids))
+        ).all()
+        if req_ids
+        else []
+    )
+    po_map = {p.id: p for p in session.scalars(select(PurchaseOrder)).all()}
+    lines_by_req: dict[int, list[dict]] = {}
+    for ln in po_lines:
+        if ln.status in ("已退货", "已取消"):
+            continue
+        po = po_map.get(ln.po_id)
+        lines_by_req.setdefault(ln.request_id, []).append(
+            {
+                "po_line_id": ln.id,
+                "po_no": po.po_no if po else None,
+                "supplier_name": po.supplier_name if po else None,
+                "qty": _qty(ln.qty),
+                "received_qty": _qty(ln.received_qty),
+            }
+        )
+
     return {
         # ☆ 待验收：货到了就验；合格 → 待入库，不合格 → 采购协商
         "incoming": [
@@ -628,6 +654,7 @@ def workbench(session: Session = Depends(get_session), _: User = Depends(get_cur
                 "unit": r.unit,
                 "po_no": r.po_no,
                 "supplier_name": r.supplier_name,
+                "lines": lines_by_req.get(r.id, []),
                 "need_date": r.need_date,
                 "expected_date": r.expected_date,
                 "overdue": bool(

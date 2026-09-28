@@ -1060,6 +1060,16 @@ def _request_receipts(session: Session, request_id: int) -> list[GoodsReceipt]:
     )
 
 
+def _line_failed_receipts(session: Session, ln: PurchaseOrderLine) -> list[GoodsReceipt]:
+    """本行的「不合格」到货单（优先按 `po_line_id`；旧数据为空时按 `request_id` 兜底）。"""
+    gs = session.scalars(select(GoodsReceipt).where(GoodsReceipt.status == "不合格")).all()
+    return [
+        g
+        for g in gs
+        if g.po_line_id == ln.id or (g.po_line_id is None and g.request_id == ln.request_id)
+    ]
+
+
 def _ok_qty(g: GoodsReceipt) -> float:
     """到货单的合格数（部分合格时用 qty_ok；旧数据没有就取 qty）。"""
     return float(g.qty_ok if g.qty_ok is not None else (g.qty or 0))
@@ -1103,19 +1113,23 @@ def _recalc_request_status(session: Session, row: PurchaseRequest) -> str:
     return row.status
 
 
-def _ensure_site_pending_receipt(session: Session, row: PurchaseRequest, actor_id: int) -> GoodsReceipt | None:
+def _ensure_site_pending_receipt(
+    session: Session, row: PurchaseRequest, actor_id: int, line: PurchaseOrderLine | None = None
+) -> GoodsReceipt | None:
     """R2-01（口径①）：直发客户现场下单即建「现场待验收」到货单，现场立即可清点。
 
-    - 幂等：同一条需求已有「现场待验收」单就不再建。
-    - 需求状态保持「在途」：货还没到现场，且「在途」在净需求 OPEN_STATUS 里，
-      不会因建单而把在跑需求算漏（避免重复采购）。
+    - 幂等：同一条**采购单行**已有「现场待验收」单就不再建（拆单时每行各一张）。
+    - 需求状态保持「在途」：「在途」在净需求 OPEN_STATUS 里，不会算漏（避免重复采购）。
     """
     if (row.deliver_to or "") != "直发客户现场":
         return None
+    cond = (
+        (GoodsReceipt.po_line_id == line.id)
+        if line is not None
+        else (GoodsReceipt.request_id == row.id)
+    )
     existing = session.scalar(
-        select(GoodsReceipt)
-        .where(GoodsReceipt.request_id == row.id, GoodsReceipt.status == "现场待验收")
-        .limit(1)
+        select(GoodsReceipt).where(cond, GoodsReceipt.status == "现场待验收").limit(1)
     )
     if existing is not None:
         return existing
@@ -1135,7 +1149,7 @@ def _ensure_site_pending_receipt(session: Session, row: PurchaseRequest, actor_i
     )
     session.add(gr)
     session.flush()
-    _attach_po_refs(session, [gr])  # 挂到采购单/行（交期留痕/对账靠它）
+    _attach_po(session, [gr], line)  # 挂到采购单/行（交期留痕/对账靠它）
     project = session.get(Project, row.project_no) if row.project_no else None
     if project is not None and project.pm_id:
         notify.notify(
@@ -1190,22 +1204,58 @@ class AcceptanceIn(BaseModel):
     result: str = Field(..., description="合格 / 不合格（整批口径）")
     qty_ok: float | None = Field(default=None, ge=0, description="合格数（部分合格时填）")
     qty_rejected: float | None = Field(default=None, ge=0, description="不合格数（部分合格时填）")
+    po_line_id: int | None = Field(
+        default=None, description="这批货是哪张采购单的行（一条需求拆给多家时必填）"
+    )
     note: str | None = Field(default=None, description="不合格时说明原因")
 
 
-def _attach_po_refs(session: Session, receipts: list[GoodsReceipt]) -> None:
-    """把到货单挂到实体采购单/单行（一期：不再靠 request_id 反查聚合）。"""
-    for g in receipts:
-        if not g.request_id:
-            continue
-        line = session.scalar(
+def _resolve_po_line(
+    session: Session, row: PurchaseRequest, po_line_id: int | None
+) -> PurchaseOrderLine | None:
+    """确定这批货属于哪张采购单的行（★ 系统不猜实物归属，与「OCR 只作候选」同一哲学）。
+
+    - 传了 `po_line_id`：校验它属于本需求
+    - 未传且只有一行：用那一行（非拆单，前端不用改）
+    - 未传但拆成多行：400，让仓库指明是哪张单
+    - 一行都没有（长周期件登记未建 PO）：None（照旧只记需求）
+    """
+    lines = list(
+        session.scalars(
             select(PurchaseOrderLine)
-            .where(PurchaseOrderLine.request_id == g.request_id)
-            .order_by(PurchaseOrderLine.id.desc())
+            .where(
+                PurchaseOrderLine.request_id == row.id,
+                PurchaseOrderLine.status.not_in(("已退货", "已取消")),
+            )
+            .order_by(PurchaseOrderLine.id)
+        ).all()
+    )
+    if po_line_id is not None:
+        match = next((x for x in lines if x.id == po_line_id), None)
+        if match is None:
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST, "指定的采购单行不属于这条需求（或已取消）"
+            )
+        return match
+    if len(lines) == 1:
+        return lines[0]
+    if len(lines) > 1:
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            "这条需求拆给了多家供应商 —— 请指明这批货是哪张采购单的（传 po_line_id）",
         )
-        if line is not None:
-            g.po_id = line.po_id
-            g.po_line_id = line.id
+    return None
+
+
+def _attach_po(
+    session: Session, receipts: list[GoodsReceipt], line: PurchaseOrderLine | None
+) -> None:
+    """把到货单挂到**确定的**采购单行（不再猜「最新一行」；line 为空则不挂）。"""
+    if line is None:
+        return
+    for g in receipts:
+        g.po_id = line.po_id
+        g.po_line_id = line.id
 
 
 def _recalc_po_delivery(session: Session, po_id: int) -> None:
@@ -1219,14 +1269,9 @@ def _recalc_po_delivery(session: Session, po_id: int) -> None:
 
 
 def _bump_line_on_receipt(
-    session: Session, row: PurchaseRequest, *, ok: float, rejected: float
+    session: Session, line: PurchaseOrderLine | None, *, ok: float, rejected: float
 ) -> None:
-    """到货验收后同步采购单行的已收/不合格与状态（派生字段）。"""
-    line = session.scalar(
-        select(PurchaseOrderLine)
-        .where(PurchaseOrderLine.request_id == row.id)
-        .order_by(PurchaseOrderLine.id.desc())
-    )
+    """到货验收后同步**指定**采购单行的已收/不合格与状态（不再猜行）。"""
     if line is None:
         return
     line.received_qty = float(line.received_qty or 0) + float(ok)
@@ -1279,6 +1324,17 @@ def _perform_inspect(
                 "request_status": row.status,
                 "qty_received": float(row.qty_received or 0),
             }
+
+    # ★ N12：先确定这批货属于哪张采购单的行（拆单时如果没指明就 400，不再猜）
+    line = _resolve_po_line(session, row, body.po_line_id)
+    if line is not None:
+        line_remaining = float(line.qty or 0) - float(line.received_qty or 0)
+        if float(body.qty) > line_remaining + 1e-6:
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST,
+                f"本批到货 {body.qty:g} 超过该采购单行（{line.po_id}）的未到数量 {line_remaining:g}"
+                f"（订购 {float(line.qty or 0):g}，已到 {float(line.received_qty or 0):g}）",
+            )
 
     # ★ 超额验收硬拦（2026-09-22 产品决策）：到货数量不得超过「订购 − 有效到货」
     receipts = _request_receipts(session, row.id)
@@ -1354,11 +1410,11 @@ def _perform_inspect(
         )
     for g in created:
         session.add(g)
-    _attach_po_refs(session, created)
+    _attach_po(session, created, line)
     row.arrived_at = body.receipt_date
     session.flush()  # autoflush=False：先把到货单落库，状态重算才看得到
     _recalc_request_status(session, row)
-    _bump_line_on_receipt(session, row, ok=ok, rejected=rejected)
+    _bump_line_on_receipt(session, line, ok=ok, rejected=rejected)
     gr = created[0]
     if row.status in REQUEST_DONE:
         _sync_purchase_task(session, row, "已完成", f"验收合格并办完（{gr.receipt_no}）")
@@ -1427,6 +1483,7 @@ def _perform_inspect(
         "qty_received": float(row.qty_received or 0),
         "qty_rejected": float(row.qty_rejected or 0),
         "batch_no": batch_no,
+        "po_line_id": line.id if line is not None else None,
         "receipts": [
             {"receipt_no": x.receipt_no, "status": x.status, "qty": float(x.qty or 0)}
             for x in created
@@ -2169,8 +2226,8 @@ def _activate_order(session: Session, po: PurchaseOrder, actor: User) -> None:
         row = session.get(PurchaseRequest, ln.request_id)
         po_svc.sync_request_order_state(session, row)
         po_svc.sync_request_snapshot(session, row)
-        # ★ R2-01：直发客户现场 → 通过后建「现场待验收」到货单
-        _ensure_site_pending_receipt(session, row, actor.id)
+        # ★ R2-01：直发客户现场 → 通过后建「现场待验收」到货单（挂到本行）
+        _ensure_site_pending_receipt(session, row, actor.id, ln)
         if ln.unit_price and po.supplier_id:
             session.add(
                 SupplierQuote(
@@ -2908,9 +2965,11 @@ def void_purchase_order(
         )
     lines = _po_lines(session, po.id)
     for ln in lines:
-        if ln.request_id and _request_receipts(session, ln.request_id):
+        # ★ N12：只拦「本行真有到货」的，不能拿兄弟行的到货挡住（已按行判定）
+        if float(ln.received_qty or 0) > 0:
             raise HTTPException(
-                status.HTTP_400_BAD_REQUEST, "这张单已经有到货单，不能作废；请走「整批退货关闭」"
+                status.HTTP_400_BAD_REQUEST,
+                f"{ln.item_no} 这张单已经有到货，不能作废；请走「整批退货关闭」",
             )
     po.status = "已作废"
     for ln in lines:
@@ -3135,20 +3194,17 @@ def negotiate_failed_lines(
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "处理方式只能是 换货 / 退货")
     lines = _po_lines(session, po.id)
     want = set(body.request_ids)
-    target = [ln for ln in lines if ln.request_id in want]
+    # ★ N12：只处理「本行真有不合格到货」的行（拆单时不能把兄弟行一起拉进来）
+    target = [ln for ln in lines if ln.request_id in want and _line_failed_receipts(session, ln)]
     if not target:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "没有要处理的行")
-    bad = [ln for ln in target if ln.status != "不合格"]
-    if bad:
-        names = "、".join(f"{ln.item_no}#{ln.id}" for ln in bad)
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, f"这些行不是「验收不合格」，不能这样处理：{names}")
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "这张单没有可处理的不合格行")
 
     today = date.today()
     replaced = returned = 0
     retry_ids: list[int] = []
     for ln in target:
         req = session.get(PurchaseRequest, ln.request_id)
-        failed = [g for g in _request_receipts(session, req.id) if g.status == "不合格"]
+        failed = _line_failed_receipts(session, ln)
         if not failed:
             raise HTTPException(status.HTTP_400_BAD_REQUEST, f"{ln.item_no} 没有「不合格」的到货单")
         failed_qty = sum(
