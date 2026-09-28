@@ -5,6 +5,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 
 import SuppliersPage from './SuppliersPage'
 import ManualPurchaseModal from '../../components/ManualPurchaseModal'
+import PoApproveModal from '../../components/PoApproveModal'
 import MergeOrderModal from '../../components/MergeOrderModal'
 import PriceReferencePanel from '../../components/PriceReferencePanel'
 import PurchaseOrderDrawer from '../../components/PurchaseOrderDrawer'
@@ -48,6 +49,7 @@ export default function PurchaseWorkbench() {
   const [manualOpen, setManualOpen] = useState(false)
   const [mergeOpen, setMergeOpen] = useState(false)
   const [orderKey, setOrderKey] = useState<string | null>(null)
+  const [approveKey, setApproveKey] = useState<string | null>(null)
   // A4：到货跟踪行内带供应商联系方式（催货一屏可见 —— 方案 §2.0.4）
   const [supMap, setSupMap] = useState<Record<number, { contact_name?: string | null; phone?: string | null }>>({})
   useEffect(() => {
@@ -98,6 +100,7 @@ export default function PurchaseWorkbench() {
 
   const poolRequests = pool.reduce((s, g) => s + g.request_count, 0)
   const openOrders = orders.filter((o) => o.status !== '已取消' && o.status !== '已完成')
+  const toApprove = orders.filter((o) => ['待经理审', '待总监审'].includes(o.po_status ?? ''))
   // 到货跟踪 = 没到齐的单（在途/部分到货），按预计到货日升序；超期红、3天内临期黄
   const arrivals = orders
     .filter((o) => o.status === '在途' || o.status === '部分到货')
@@ -157,6 +160,47 @@ export default function PurchaseWorkbench() {
         activeKey={tab}
         onChange={setTab}
         items={[
+          // ---------------------------------------------------------------- ① 待我审批（二期）
+          {
+            key: 'approve',
+            label: `待我审批 (${toApprove.length})`,
+            children: (
+              <>
+                <Typography.Paragraph type="secondary" style={{ fontSize: 12 }}>
+                  采购单提交后走<b>两级审批</b>：采购经理 → 采购总监（08 §4/§5）。点「审批」一屏看单头 +
+                  每行价格对比（本次价 vs <b>同口径</b>历史），通过或退回（退回必填说明）。审批通过后供应商即接单。
+                </Typography.Paragraph>
+                <Table
+                  rowKey="key"
+                  size="small"
+                  dataSource={toApprove}
+                  locale={{ emptyText: '没有待我审批的采购单' }}
+                  columns={[
+                    { title: '单号', dataIndex: 'po_no', width: 130 },
+                    { title: '供应商', dataIndex: 'supplier_name', width: 170, render: (v) => v ?? '—' },
+                    { title: '行数', dataIndex: 'line_count', width: 70 },
+                    {
+                      title: '状态',
+                      dataIndex: 'po_status',
+                      width: 110,
+                      render: (v: string) => <Tag color={ORDER_STATUS_COLOR[v] ?? 'default'}>{v}</Tag>,
+                    },
+                    { title: '预计到货', dataIndex: 'expected_date', width: 110, render: (v) => v ?? '—' },
+                    {
+                      title: '',
+                      key: 'a',
+                      width: 90,
+                      render: (_: unknown, r: PurchaseOrderSummary) => (
+                        <Button type="primary" size="small" onClick={() => setApproveKey(r.key)}>
+                          审批
+                        </Button>
+                      ),
+                    },
+                  ]}
+                />
+              </>
+            ),
+          },
           // ---------------------------------------------------------------- ① 采购池
           {
             key: 'pool',
@@ -949,6 +993,12 @@ export default function PurchaseWorkbench() {
         ]}
       />
 
+      <PoApproveModal
+        open={approveKey !== null}
+        orderKey={approveKey}
+        onClose={() => setApproveKey(null)}
+        onDone={() => void load()}
+      />
       <ManualPurchaseModal
         open={manualOpen}
         onClose={() => setManualOpen(false)}

@@ -30,7 +30,7 @@ export const SHIP_STATUS: Record<string, string> = { 发货中: 'processing', �
 
 export const RECEIPT_STATUS: Record<string, string> = { 不合格: 'error', 已入库: 'success', 已换货: 'orange', 已退货: 'default', 待入库: 'processing', 现场已验收: 'purple' }
 
-export const ORDER_STATUS: Record<string, string> = { 不合格: 'error', 在途: 'gold', 已取消: 'default', 已完成: 'success', 已退货: 'default', 待入库: 'processing', 现场待验收: 'gold', 部分到货: 'cyan' }
+export const ORDER_STATUS: Record<string, string> = { 不合格: 'error', 在途: 'gold', 已取消: 'default', 已完成: 'success', 已退货: 'default', 待入库: 'processing', 现场待验收: 'gold', 部分到货: 'cyan', 草稿: 'default', 待经理审: 'processing', 待总监审: 'processing', 已退回: 'error', 已批准: 'blue', 执行中: 'cyan', 已作废: 'default', 已关闭: 'default' }
 
 export const PURCHASE_LINE_STATUS: Record<string, string> = { 不合格: 'error', 在途: 'gold', 已下单: 'blue', 已入库: 'success', 已取消: 'default', 已退货: 'default', 待入库: 'processing', 待采购: 'default', 现场已验收: 'purple', 部分到货: 'cyan' }
 

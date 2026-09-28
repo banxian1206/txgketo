@@ -241,7 +241,7 @@ export default function MergeOrderModal({
         })),
       })
       message.success(
-        `已合并下单 ${res.po_no} → ${res.supplier}：${res.count} 条需求` +
+        `已提交审批：${res.po_no} → ${res.supplier}：${res.count} 条需求（${res.status ?? '待审批'}）` +
           (res.total > 0 ? `，合计 ¥${res.total.toLocaleString()}` : ''),
       )
       onDone()

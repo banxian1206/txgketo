@@ -20,6 +20,7 @@ import { useCallback, useEffect, useState } from 'react'
 import dayjs from 'dayjs'
 
 import ReceiptNegotiateModal from './ReceiptNegotiateModal'
+import PoApproveModal from './PoApproveModal'
 import {
   cancelPurchaseOrder,
   changeOrderSupplier,
@@ -72,6 +73,7 @@ export default function PurchaseOrderDrawer({
   const [loading, setLoading] = useState(false)
   const [supplierOpen, setSupplierOpen] = useState(false)
   const [cancelOpen, setCancelOpen] = useState(false)
+  const [approveOpen, setApproveOpen] = useState(false)
   const [negotiateLine, setNegotiateLine] = useState<PurchaseOrderLine | null>(null)
   const [suppliers, setSuppliers] = useState<SupplierRow[]>([])
   const [saving, setSaving] = useState(false)
@@ -223,6 +225,11 @@ export default function PurchaseOrderDrawer({
       onClose={onClose}
       extra={
         <Space>
+          {o && ['待经理审', '待总监审'].includes(o.po_status ?? '') && (
+            <Button type="primary" onClick={() => setApproveOpen(true)}>
+              审批
+            </Button>
+          )}
           <Button disabled={changeable.length === 0} onClick={() => void openSupplier()}>
             更改供应商
           </Button>
@@ -688,6 +695,16 @@ export default function PurchaseOrderDrawer({
         leadDays={negotiateLine?.lead_days ?? null}
         onCancel={() => setNegotiateLine(null)}
         onDone={handleNegotiated}
+      />
+
+      <PoApproveModal
+        open={approveOpen}
+        orderKey={orderKey}
+        onClose={() => setApproveOpen(false)}
+        onDone={() => {
+          void load()
+          onChanged()
+        }}
       />
     </Drawer>
   )

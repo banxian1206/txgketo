@@ -56,6 +56,8 @@ export interface PurchaseOrderLine extends PurchaseRequestItem {
   project_name?: string | null
   equip_name?: string | null
   part_title?: string | null
+  po_line_id?: number | null
+  tax_incl?: boolean
   /** 退换货留痕：原订购 / 退货 / 换货 数量（qty 是退货后的有效数） */
   qty_original: number
   qty_returned: number
@@ -106,6 +108,49 @@ export async function closeReturnPurchaseOrder(key: string, body: { note?: strin
   const { data } = await api.post<{ closed: number; retry_ids: number[]; status: string }>(
     `/purchase/orders/${encodeURIComponent(key)}/close-return`,
     body,
+  )
+  return data
+}
+
+// ── 二级审批（08 §4/§5）───────────────────────────────────────────────
+export async function submitPurchaseOrder(key: string) {
+  const { data } = await api.post<{ status: string }>(
+    `/purchase/orders/${encodeURIComponent(key)}/submit`,
+  )
+  return data
+}
+
+export async function approvePurchaseOrder(
+  key: string,
+  body: { action: '通过' | '退回'; note?: string },
+) {
+  const { data } = await api.post<{ status: string }>(
+    `/purchase/orders/${encodeURIComponent(key)}/approve`,
+    body,
+  )
+  return data
+}
+
+export async function withdrawPurchaseOrder(key: string) {
+  const { data } = await api.post<{ status: string }>(
+    `/purchase/orders/${encodeURIComponent(key)}/withdraw`,
+  )
+  return data
+}
+
+export interface PoApprovalRow {
+  round_no: number
+  level: number
+  reviewer_id?: number | null
+  reviewer_name?: string | null
+  action: string
+  note?: string | null
+  acted_at?: string | null
+}
+
+export async function listPoApprovals(key: string) {
+  const { data } = await api.get<PoApprovalRow[]>(
+    `/purchase/orders/${encodeURIComponent(key)}/approvals`,
   )
   return data
 }
@@ -277,7 +322,7 @@ export interface MergeOrderIn {
 /** 合并下单：多条需求 → 一张采购单，共用一个 po_no */
 
 export async function mergeOrder(body: MergeOrderIn) {
-  const { data } = await api.post<{ po_no: string; count: number; total: number; supplier: string }>(
+  const { data } = await api.post<{ po_no: string; count: number; total: number; supplier: string; status?: string }>(
     '/purchase/merge-order',
     body,
   )
@@ -314,6 +359,8 @@ export interface QuoteRow {
   supplier_id: number
   supplier_name?: string | null
   price: number
+  tax_incl?: boolean
+  qty?: number | null
   unit?: string | null
   min_qty?: number | null
   lead_days?: number | null
@@ -322,6 +369,17 @@ export interface QuoteRow {
   valid_until?: string | null
   source?: string | null
   remark?: string | null
+}
+
+export interface PriceSegment {
+  last_price?: number | null
+  last_supplier?: string | null
+  last_date?: string | null
+  last_qty?: number | null
+  min_price?: number | null
+  max_price?: number | null
+  avg_price?: number | null
+  deal_count: number
 }
 
 export interface PriceReference {
@@ -338,15 +396,19 @@ export interface PriceReference {
     avg_price?: number | null
     deal_count: number
     quote_count: number
+    last_tax_incl?: boolean | null
   }
+  by_tax?: { 含税: PriceSegment; 不含税: PriceSegment }
   deals: QuoteRow[]
   quotes: QuoteRow[]
   ordered: {
-    project_no: string
+    project_no?: string | null
     unit_price?: number | null
+    qty?: number | null
+    tax_incl?: boolean
+    expect_date?: string | null
     supplier_name?: string | null
     ordered_at?: string | null
-    qty?: number | null
   }[]
 }
 
