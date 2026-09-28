@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import date, timedelta
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile, status
 from pydantic import BaseModel, Field
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
@@ -18,6 +18,7 @@ from app.api.deps import (
     scrub_money,
 )
 from app.core.db import get_session
+from app.services import excel_import
 from app.models.initiation import GoodsReceipt, PurchaseRequest
 from app.models.purchase_order import PurchaseOrder, PurchaseOrderLine
 from app.models.library import SOURCE_STANDARD, Item, StdCategory, StdClass
@@ -397,6 +398,59 @@ def supplier_statement(
         "unpaid": [brief(po) for po in unpaid],
         "paid": [brief(po) for po in paid],
     }
+
+
+class ImportHistoryOut(BaseModel):
+    ok: bool = True
+    imported: int
+    skipped_duplicate: int
+    created_items: list[str] = Field(default_factory=list)
+    created_suppliers: list[str] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)
+    warning_count: int = 0
+
+
+@router.post("/purchase/import-history", response_model=ImportHistoryOut)
+async def import_purchase_history(
+    request: Request,
+    file: UploadFile = File(..., description="历史采购台账：xlsx / csv"),
+    session: Session = Depends(get_session),
+    current: User = Depends(require_permission("purchase:edit")),
+):
+    """★ Excel/CSV **历史采购导入**（AGENTS §8.3 第 1 条，客户已确认要做）→ 写价格库。
+
+    表头（顺序不限，中英文都行）：**物料 / 供应商 / 单价 / 数量 / 日期**（含税可选）。
+    · 物料、供应商不在库里 → **自动建**（历史台账里常有我们还没有的），并在返回里列出来给你核对
+    · **幂等**：同一（物料, 供应商, 日期, 单价）已存在 → 跳过，重复传同一份不会翻倍
+    · 解析问题**逐行报**（第几行、哪个值不对），不整批失败
+    """
+    data = await file.read()
+    if not data:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "文件是空的")
+    if len(data) > 8 * 1024 * 1024:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "文件太大了（上限 8MB）—— 请分几次导")
+    try:
+        rows, warnings = excel_import.parse_table(data, file.filename or "")
+    except excel_import.ImportError_ as e:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, str(e)) from e
+    result = excel_import.import_history(session, rows, actor_id=current.id)
+    audit.log(
+        session,
+        user=current,
+        action="import_purchase_history",
+        object_type="supplier_quote",
+        object_ref=file.filename or "-",
+        summary=f"历史采购导入：{result['imported']} 条"
+        + (f"（跳过重复 {result['skipped_duplicate']}）" if result["skipped_duplicate"] else "")
+        + (f"，新建物料 {len(result['created_items'])} 个" if result["created_items"] else "")
+        + (f"，新建供应商 {len(result['created_suppliers'])} 家" if result["created_suppliers"] else "")
+        + (f"；{len(warnings)} 行有问题" if warnings else ""),
+        ip=client_ip(request),
+    )
+    session.commit()
+    return ImportHistoryOut(
+        **result, warnings=warnings[:50], warning_count=len(warnings)
+    )
 
 
 @router.get("/purchase/price-reference/{item_no}")

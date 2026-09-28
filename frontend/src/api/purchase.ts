@@ -605,3 +605,21 @@ export async function recommendSuppliers(itemNo: string, needDate?: string) {
   })
   return data
 }
+
+// ★ Excel/CSV 历史采购导入（AGENTS §8.3 第 1 条）→ 写价格库
+export interface ImportHistoryResult {
+  ok: boolean
+  imported: number
+  skipped_duplicate: number
+  created_items: string[]
+  created_suppliers: string[]
+  warnings: string[]
+  warning_count: number
+}
+
+export async function importPurchaseHistory(file: File) {
+  const form = new FormData()
+  form.append('file', file)
+  const { data } = await api.post<ImportHistoryResult>('/purchase/import-history', form)
+  return data
+}

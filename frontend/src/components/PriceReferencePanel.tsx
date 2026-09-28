@@ -1,14 +1,17 @@
-import { App, Alert, Card, Col, Empty, Row, Select, Space, Statistic, Table, Tag, Typography } from 'antd'
+import { App, Alert, Button, Card, Col, Empty, Modal, Row, Select, Space, Statistic, Table, Tag, Typography, Upload } from 'antd'
 import { useState } from 'react'
 
+import { hasPerm } from '../api/user'
 import {
   errMsg,
+  importPurchaseHistory,
   priceReference,
   recommendSuppliers,
   searchItems,
   type ItemLite,
   type PriceReference,
   type QuoteRow,
+  type ImportHistoryResult,
   type RecommendResult,
 } from '../api/client'
 
@@ -24,6 +27,24 @@ export default function PriceReferencePanel() {
   const [reco, setReco] = useState<RecommendResult | null>(null)
   const [err, setErr] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+  // ★ 历史采购导入（写价格库）
+  const [imp, setImp] = useState<ImportHistoryResult | null>(null)
+  const [importing, setImporting] = useState(false)
+  const canImport = hasPerm('purchase:edit')
+
+  const doImport = async (file: File) => {
+    setImporting(true)
+    try {
+      const r = await importPurchaseHistory(file)
+      setImp(r)
+      message.success(`导入完成：新增 ${r.imported} 条${r.skipped_duplicate ? `，跳过重复 ${r.skipped_duplicate}` : ''}`)
+    } catch (e) {
+      message.error(errMsg(e))
+    } finally {
+      setImporting(false)
+    }
+    return false
+  }
 
   const onSearch = (q: string) => {
     searchItems(q)
@@ -55,6 +76,69 @@ export default function PriceReferencePanel() {
 
   return (
     <>
+      {canImport && (
+        <Card
+          size="small"
+          style={{ marginBottom: 12 }}
+          title="历史采购导入（Excel / CSV → 价格库）"
+          extra={
+            <Upload
+              accept=".xlsx,.xlsm,.csv,.txt"
+              showUploadList={false}
+              beforeUpload={(f) => void doImport(f as File)}
+            >
+              <Button type="primary" loading={importing}>选择文件导入</Button>
+            </Upload>
+          }
+        >
+          <Typography.Paragraph type="secondary" style={{ fontSize: 12, marginBottom: 0 }}>
+            表头（顺序不限）：<b>物料 / 供应商 / 单价 / 数量 / 日期</b>，含税可选。
+            库里没有的物料和供应商会<b>自动建</b>；同一（物料·供应商·日期·单价）重复导入会跳过。
+          </Typography.Paragraph>
+        </Card>
+      )}
+
+      <Modal
+        open={!!imp}
+        title="导入结果"
+        onCancel={() => setImp(null)}
+        onOk={() => setImp(null)}
+        okText="知道了"
+        width={560}
+        destroyOnHidden
+      >
+        {imp && (
+          <>
+            <Space size="large" style={{ marginBottom: 8 }}>
+              <Statistic title="新增价格" value={imp.imported} />
+              <Statistic title="跳过重复" value={imp.skipped_duplicate} />
+              <Statistic title="有问题行" value={imp.warning_count} />
+            </Space>
+            {!!imp.created_items.length && (
+              <Typography.Paragraph style={{ fontSize: 12 }}>
+                <b>自动新建物料</b>（请核对）：{imp.created_items.join('、')}
+              </Typography.Paragraph>
+            )}
+            {!!imp.created_suppliers.length && (
+              <Typography.Paragraph style={{ fontSize: 12 }}>
+                <b>自动新建供应商</b>（请核对）：{imp.created_suppliers.join('、')}
+              </Typography.Paragraph>
+            )}
+            {!!imp.warnings.length && (
+              <Alert
+                type="warning"
+                message={`${imp.warning_count} 行没能导入`}
+                description={
+                  <div style={{ fontSize: 12, maxHeight: 160, overflow: 'auto' }}>
+                    {imp.warnings.map((w) => <div key={w}>{w}</div>)}
+                  </div>
+                }
+              />
+            )}
+          </>
+        )}
+      </Modal>
+
       {err && (
         <Alert
           type="warning"

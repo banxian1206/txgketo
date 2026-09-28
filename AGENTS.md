@@ -112,7 +112,7 @@ deploy/          docker-compose.dev.yml
 
 > 更新于：**06 卷 F 步（账号权限收尾）**落地：接口级权限强校验（`require_permission`，采购下单类→`purchase:edit`、验收/入库/领料→`warehouse:edit`）、金额分档（`purchase:price` 采购价 / `project:amount` 项目金额，无权限返回 null）、**离职/停用一键转交**（任务/待审/项目角色/图·程序·BOM 归属）。
 > **全部完成：S0 商机 → S1 立项 → S2 工程设计 → S3 采购 → S4 仓库 → S5 制造 → S6 装配与齐套率 → S7 发运 → S8 现场安装 → S9 现场调试 → S10 客户验收与质保 → S11 质保与售后。**
-> 后续可做：超期扫描自动提醒（已有 60 天质保到期看板）；经营驾驶舱/成本毛利（三期）；Excel 历史采购导入；离线队列 + Capacitor 打包。
+> 后续可做：经营驾驶舱/成本毛利（三期）；离线队列 + Capacitor 打包（03 卷）；入库拍照识别库位（G6，需先定 OCR 引擎）。
 
 ### 8.1 采购状态线（客户口径，别再改回去了）
 
@@ -254,6 +254,14 @@ deploy/          docker-compose.dev.yml
 | # | 事项 | 说明 |
 |---|---|---|
 | **0** | ★★ **采购域重构 · 第 0 期（地基）** | ★ **进度（2026-09-28）**：★ **第 0 期 ✅ 全部完成**（① `bom_math.py` 六通道统一数量口径 + ② `_cover` 四项抵扣 + ③ 领料冻结/替代行过滤 + ④ 缺料显式化/超锁/负库存 + ⑤ 齐套率含直发件+项目过滤 + ⑥ e2e 基线入库）。**基线实测（`scripts/e2e_baseline.py`）：S0→S11 中断 0、问题 27→5（余 B1 拆单=一期 / B9 税口径=二三期）、通过 75；`scripts/probe_bom_math.py` 重复进池 8/8 全绿；`pytest 68 passed`。**<br>**方案：`docs/08-采购域重构方案.md` §8 / §13；实证：`docs/99-E2E测试报告-2026-09-28-…基线.md`。不依赖建表，可立即单独开工。**<br>① ★ **同一个「要几个」五个通道五种答案**：发布进池✓ / 手动补跑（图纸分支 **qty 平方**：实测 18 vs 真 6）/ 排产✓ / 齐套率（**不乘父级累计**，实测 4 项全少一半，rate=1.0 而真实约 54%）/ 领料（标准件分支**完全不乘**）→ 抽 `services/bom_math.py` 六处共用（**含发运清单 `shipping`——文档初稿漏的第 6 个通道**）<br>② ★ **净需求缺「已完成量」抵扣** → 四种场景重复进池（已隔离实证：直发件现场验收后新增 18 / 待入库窗口新增 8 / 已入库+已领走新增 5 / 发布后立刻补跑新增 4 条）——**AGENTS §8.1 承诺的幂等只在「刚发布未执行」时成立**<br>③ `generate_issue` 不过滤 `已冻结`/`superseded_by_id` → 按草稿 BOM 领料、改版后旧行仍领料<br>④ 缺料行静默跳过（MI26005 实测：已领走但 `qty_issued=0`、审计日志谎报「1 种物料」、齐套率仍判 ready）——★ **修它会暴露备料超锁/负库存（两者都无保护），必须同时修**<br>⑤ 三处越权已实测落库：`site1` 登记长周期件 **HTTP 201**（凭空一张 ¥54,000 采购单 PO26009）、`site1` 删采购需求 **HTTP 200**（真硬删、无审计）、`wh_director` 裁决工程部改版 **HTTP 200**<br>⑥ ★ **`scripts/multiproj_walkthrough.py` 已失效**（缺 `expected_date` 被 O3-A 拦下，P1/P3 在 S3 就 halted，S4–S11 从未执行）——**“有 e2e 护栏”目前是假的**；把 `/tmp/txgk_e2e.py`+`/tmp/txgk_isolate.py` 提升为 `scripts/e2e_baseline.py`/`probe_bom_math.py` 作为回归基线<br>★ **开工前口径已定（2026-09，见 `08 §14`）**：A 要 / B 要 / C 比价分「含税/不含税」两列 + 存量标含税 / **乙 齐套率必须含直发件**（`ARRIVED_STATUS` 补「现场已验收」+ 按项目过滤，见 `08 §8.3-g`）/ 甲 已入库退货 **挂起**（另立需求） |
+| **0l** | ★ **Excel/CSV 历史采购导入 ✅（2026-09-28）**（原 §8.3 第 1 条，客户已确认要做） |
+`POST /purchase/import-history`（`purchase:edit`）→ 写**价格库**（`supplier_quote`，`price_type=成交`、`source=历史导入`）。
+表头（顺序不限，中英文都行）：**物料 / 供应商 / 单价 / 数量 / 日期**，含税可选。库里没有的物料/供应商**自动建**（并在返回里列出让你核对）。
+**幂等**：同一（物料·供应商·日期·单价）→ 跳过，重复传同一份不翻倍。解析问题**逐行报**（第几行哪个值不对），不整批失败。
+<br>★ **零新依赖**：`.xlsx` 用标准库 `zipfile`+`xml.etree` 读（`sharedStrings` + 第一个 sheet），**不引 openpyxl**（AGENTS §3 不得擅自新增依赖；xlsx 本质就是 zip 包）。
+另支持 `.csv`（UTF-8/GBK 自识）；老版 `.xls` **明确拒绝**并提示"另存为 .xlsx/.csv"（不装 xlrd）。
+<br>前端：采购台「价格参考」页签内新增「历史采购导入」卡（选文件 → 弹窗显示 新增/跳过/问题行 + 自动建的物料供应商）。
+护栏 `tests/test_excel_import.py`（14 条，注入反例能红） |
 | **0k** | ★ **写接口授权普查 + 权限护栏 ✅（2026-09-28）** | 普查发现：**40 个写接口只做了「登录」（`Depends(get_current_user)`）没做「授权」**——与 N22/M-04 同一类。其中 **4 条实测真能被低权账号 `site1` 越权**（已修）：`PATCH`/`DELETE /projects/{p}/milestones/{id}`（改/删项目里程碑）、`POST /projects/{p}/members`（**任命项目团队成员，甚至项目经理** —— 而任命 PM 会写 `project.pm_id`，**所有"通知项目经理"靠它定位**）、`PATCH /projects/{p}/equipment/{id}`（改设备）。<br>批量补齐：`project:edit`（项目/立项/团队/设备/里程碑/采购需求）· `contract:edit`（成交登记）· `design:edit`（图纸/程序/BOM/草稿）· `std:edit`（标准库）· `purchase:edit`（供应商品类）。写接口挂权限码 **→ 120/131**。<br>实测复核：13 条越权探针 → **越权成功 0**；基线 126 项全过（**没把干活的人拦死**，M-04 的教训）。<br>护栏 `tests/test_write_endpoint_permissions.py`（4 条，注入反例能红）：枚举所有写接口（递归展开 `_IncludedRouter`），**没声明权限又不在 `ALLOW` 里写理由的 → 红**；剩 11 条各有正当理由（登录白名单 / 本人数据 / 服务层校验） |
 | **0j** | ★ **到期扫描 / 超期提醒 ✅（2026-09-28）**（原 §8.3 第 6 条“自动扫描下期”） |
 原来只**展示**超期（车间台 `overdue` 是读时算的），超期了该找谁系统不吭声。现在 `services/deadline.py::scan_due()` 三条规则推给该负责的人：
@@ -301,7 +309,6 @@ deploy/          docker-compose.dev.yml
 | **0c** | 全局扫描后修复 · **N21–N25 ✅ 全部完成（2026-09-28）**（详见 `docs/99-全局测试报告-2026-09-28.md` §9） |
 **N21** 审批链固定按**采购部**（`reviewers.lead_in_dept/director_in_dept` + `resolve_po_chain`），不再按提交人部门、**不再全局兜底**——原来 admin（无部门）下单会被路由到工程总监，导致采购总监反被 403「只有本部门采购总监能审这一级」、单永久卡在待总监审。<br>**N22** 10 个写接口补权限码 + `PATCH /projects` **字段级** `SALES_OWNED_FIELDS`（商机/合同/阶段类只归商务部；执行类如 `pm_id` 仍 `project:edit`）；`project:close` 由 PM 移到 SALES（原来谁都关不了）。越权实测 **11→4**（剩 4 个为设计允许）。<br>**N23** `MONEY_KEYS` 补 `price_hint`/`tax_rate` + `/suppliers`·`/suppliers/{id}/catalog`·`/purchase/recommend` 三处 `scrub_money`。<br>**N24** ★ 领料单**三量模型**：新增 `material_issue_line.qty_picked`（迁移 `t6f8a0b24c35`，回填= qty_issued）→ `pick` **部分备料**（`take=min(需求−已备, 库位可用)`，不再整单 400）→ `hand-over` 只领 `min(需求,已备)−已领`（原来按“还差多少”出库会变负库存）→ 补货后可在「部分领料」状态再备，直到「已领走」。<br>**N25** 已通过验收禁止再 `apply`；`confirm` 对已确认单幂等 400（原来会覆盖质保起算日）。<br>附带修了两个 500（`list_suppliers` 的 `current` 未定义、`confirm` 未捕获 `AcceptanceError`）。护栏：新增 `scripts/probe_n24_n25.py`（**10/10**）。★ 执行顺序：`e2e_baseline` → `probe_n24_n25` → `probe_bom_math`（后者会复位业务数据） |
 | **0b** | 采购域重构 · 一~三期 | ★ **一/二/三期 ✅ 全部完成（2026-09-28）**：**一期** A 建表回填 / B1 下单建 PO+行 / B2a 视图真表 / B2b 行级动作 / B3 部分合格 / B4 作废·整批关闭 / 前端。**二期** A `purchase_approval`+`supplier_quote.tax_incl/qty`+价格参考分列 / B 两级审批状态机+§4.2 三件事后移 / C PATCH+提交撤回 / D 待我审批台+审批弹窗。**三期** A/B 付款标记·凭证+往来对账+交期留痕 / C 供应商绩效（准时率/合格率）接进推荐 / D 前端标记付款+对账弹窗。★ **验收（`docs/99-E2E测试报告-2026-09-28-采购域重构后验收.md`）后已修 N1–N10**（交期留痕死链/总监下单 500/重复付款/凭证必填/退回标签/拆单并行/展示/护栏/经理账号/catalog 路径）；★ **第二轮复验（`docs/99-E2E复验报告-2026-09-28-第二轮.md`）后已修 N11–N12**（审批 round 归属；★P0 拆单到货串记 —— 验收接口加 `po_line_id`，不猜实物归属）；★ **第三轮复验（`docs/99-E2E复验报告-2026-09-28-第三轮.md`）后已修 N13**（直发×拆单到货单数量改取行量 + 静态/交叉双护栏）；★ **第四轮复验（`docs/99-E2E复验报告-2026-09-28-第四轮.md`）后已修 N14–N16**（审批价格快照留档 + 逾期结构化字段 + 现场缺件回流采购）；★ **第五轮复验（`docs/99-E2E复验报告-2026-09-28-第五轮.md`）后已修 N17–N19**（来源词表收全+契约断言、前端补采溯源、破损拆独立 source）。★ 验收基线 `scripts/e2e_baseline.py`：**问题 27→0、中断 0、通过 124**；`probe_bom_math.py` 8/8；`pytest 70` |
-| 1 | Excel 历史采购导入 | 客户已确认后期要做（物料/供应商/单价/数量/日期 → 写价格库） |
 | 2 | 制造 / 装配 / 发运 / 现场 / 验收 / 售后 | 流程上还没做（见 `docs/00-方案-业务与建设.md` §3 S5–S11） |
 | 3 | 领料单数量算法对齐 | `warehouse/generate-issue` 还是旧算法（材料只乘直接父件、标准件不乘）；建议改成 `bom_demand` 那套按树累计 |
 | 4 | 移动端离线队列 + Capacitor 打包 | 03 卷：现场弱网「拍完先存本地、有网再传」；需要时再打包 APK/ipa（同一份代码） |
@@ -465,7 +472,7 @@ POST /api/v1/warehouse/inbound                    其他入库（退料回库/�
 ### 8.6 当前环境
 
 - 后端 :8208 · 前端 :5207 · PG 35432（`docker compose -f deploy/docker-compose.dev.yml up -d`，compose 顶层写死了 `name: txgketo`）
-- 测试：`.venv/bin/python -m pytest -q` → **136 passed**；e2e 基线 `.venv/bin/python -m scripts.e2e_baseline`（★ 跑前复位业务数据；只清业务表，账户/组织/编号规则不动）→ **问题 0 / 中断 0 / 通过 126**；
+- 测试：`.venv/bin/python -m pytest -q` → **150 passed**；e2e 基线 `.venv/bin/python -m scripts.e2e_baseline`（★ 跑前复位业务数据；只清业务表，账户/组织/编号规则不动）→ **问题 0 / 中断 0 / 通过 126**；
   隔离探针 `scripts/probe_bom_math.py` → **8/8**、`scripts/probe_n24_n25.py` → **17/17**；前端 `e2e:static 22` / **`e2e:api 15+0skip`**（自建靶，可单跑）/ `e2e:ui 55+3skip`
 - alembic head：**`z2f4b6d80e91`**（到期扫描去重键）
 - ★ 套件**执行顺序**：`e2e_baseline` → `probe_n24_n25` → `probe_bom_math`（最后一个会 TRUNCATE 业务表，放最后）
