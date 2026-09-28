@@ -2428,18 +2428,25 @@ def mark_orders_paid(
         if po.status == "已作废" or po.pay_status == "已付款":
             skipped += 1
             continue
+        # ★ 付款凭证必填（客户口径 #11：「标记已付款 + 上传付款截图」）：
+        #   本次带的 或 之前已传的，至少要有一张，否则不许标记
+        vouchers = list(po.paid_vouchers or [])
+        if body.vouchers:
+            vouchers.extend(
+                {"stored_path": v, "by": current.name, "at": now.isoformat()} for v in body.vouchers
+            )
+        if not vouchers:
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST,
+                f"{po.po_no} 必须上传付款凭证（截图）才能标记已付款",
+            )
+        po.paid_vouchers = vouchers
         po.pay_status = "已付款"
         po.paid_at = body.paid_at or date.today()
         po.paid_amount = body.paid_amount if body.paid_amount is not None else po.total_tax_incl
         po.paid_by = current.id
         po.paid_marked_at = now
         po.paid_note = body.note
-        if body.vouchers:
-            existing = list(po.paid_vouchers or [])
-            existing.extend(
-                {"stored_path": v, "by": current.name, "at": now.isoformat()} for v in body.vouchers
-            )
-            po.paid_vouchers = existing
         paid += 1
     audit.log(
         session,

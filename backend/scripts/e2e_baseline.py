@@ -924,8 +924,11 @@ def b_payment() -> None:
         return
     sc, _ = api.try_("post", "/purchase/orders/mark-paid", "wh1", json={"po_ids": [po["id"]]})
     rec(sc == 403, f"仓管标记付款应 403（无 purchase:payment），实际={sc}")
+    sc_nv, _ = api.try_("post", "/purchase/orders/mark-paid", "buyer1", json={"po_ids": [po["id"]]})
+    rec(sc_nv == 400, f"★ 付款凭证必填：不带凭证标记应 400，实际={sc_nv}")
     api.req("post", "/purchase/orders/mark-paid", "buyer1", (200,),
-            json={"po_ids": [po["id"]], "paid_at": d(0), "note": "月结"})
+            json={"po_ids": [po["id"]], "paid_at": d(0), "note": "月结",
+                  "vouchers": ["probe/receipt.png"]})
     st = api.req("get", f"/suppliers/{po['supplier_id']}/statement", "buyer1")
     rec(st["summary"]["paid_count"] >= 1, f"对账已付应 ≥1，实际={st['summary']['paid_count']}")
     paid_nos = {x["po_no"] for x in st["paid"]}
@@ -982,9 +985,11 @@ def b_fixes() -> None:
 
     # N3 重复标记付款 → 跳过、不覆盖付款日
     po_id = q("select id from purchase_order where po_no=:p", p=mo["po_no"])[0]["id"]
-    api.req("post", "/purchase/orders/mark-paid", "buyer1", (200,), json={"po_ids": [po_id], "paid_at": d(-1)})
+    api.req("post", "/purchase/orders/mark-paid", "buyer1", (200,),
+            json={"po_ids": [po_id], "paid_at": d(-1), "vouchers": ["probe/a.png"]})
     paid1 = q("select paid_at from purchase_order where id=:i", i=po_id)[0]["paid_at"]
-    res = api.req("post", "/purchase/orders/mark-paid", "buyer1", (200,), json={"po_ids": [po_id], "paid_at": d(0)})
+    res = api.req("post", "/purchase/orders/mark-paid", "buyer1", (200,),
+                  json={"po_ids": [po_id], "paid_at": d(0), "vouchers": ["probe/b.png"]})
     paid2 = q("select paid_at from purchase_order where id=:i", i=po_id)[0]["paid_at"]
     rec(paid1 == paid2 and res.get("skipped", 0) >= 1,
         f"N3 重复标记应跳过、付款日不变（{paid1}=={paid2}，skipped={res.get('skipped')}）")

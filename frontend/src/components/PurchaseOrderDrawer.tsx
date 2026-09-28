@@ -20,6 +20,7 @@ import { useCallback, useEffect, useState } from 'react'
 import dayjs from 'dayjs'
 
 import ReceiptNegotiateModal from './ReceiptNegotiateModal'
+import MarkPaidModal from './MarkPaidModal'
 import PoApproveModal from './PoApproveModal'
 import {
   cancelPurchaseOrder,
@@ -27,7 +28,6 @@ import {
   closeReturnPurchaseOrder,
   errMsg,
   listSuppliers,
-  markOrdersPaid,
   purchaseOrderDetail,
   submitPurchaseOrder,
   voidPurchaseOrder,
@@ -77,6 +77,7 @@ export default function PurchaseOrderDrawer({
   const [supplierOpen, setSupplierOpen] = useState(false)
   const [cancelOpen, setCancelOpen] = useState(false)
   const [approveOpen, setApproveOpen] = useState(false)
+  const [paidOpen, setPaidOpen] = useState(false)
   const [negotiateLine, setNegotiateLine] = useState<PurchaseOrderLine | null>(null)
   const [suppliers, setSuppliers] = useState<SupplierRow[]>([])
   const [saving, setSaving] = useState(false)
@@ -195,17 +196,7 @@ export default function PurchaseOrderDrawer({
     }
   }
 
-  const doMarkPaid = async () => {
-    if (!detail?.order.id) return
-    try {
-      await markOrdersPaid({ po_ids: [detail.order.id], note: '采购台标记' })
-      message.success('已标记付款')
-      await load()
-      onChanged()
-    } catch (e) {
-      message.error(errMsg(e))
-    }
-  }
+  const doMarkPaid = () => setPaidOpen(true)
 
   const doVoid = async () => {
     if (!orderKey) return
@@ -278,9 +269,7 @@ export default function PurchaseOrderDrawer({
             <Button onClick={() => void doWithdraw()}>撤回</Button>
           )}
           {o && o.pay_status !== '已付款' && (
-            <Popconfirm title="标记这张单已付款？" onConfirm={() => void doMarkPaid()}>
-              <Button>标记已付款</Button>
-            </Popconfirm>
+            <Button onClick={() => doMarkPaid()}>标记已付款</Button>
           )}
           <Button disabled={changeable.length === 0} onClick={() => void openSupplier()}>
             更改供应商
@@ -753,6 +742,17 @@ export default function PurchaseOrderDrawer({
         open={approveOpen}
         orderKey={orderKey}
         onClose={() => setApproveOpen(false)}
+        onDone={() => {
+          void load()
+          onChanged()
+        }}
+      />
+
+      <MarkPaidModal
+        open={paidOpen}
+        poId={detail?.order.id ?? null}
+        poNo={detail?.order.po_no ?? null}
+        onClose={() => setPaidOpen(false)}
         onDone={() => {
           void load()
           onChanged()
