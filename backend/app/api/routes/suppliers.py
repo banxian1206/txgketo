@@ -798,6 +798,13 @@ def recommend_suppliers(
                 "price_hint": price_hint,
                 "lead_days": lead,
                 "late": late,
+                # ★ N15：回顾语义（实际批次逾期/合格率）—— 与前瞻的 `late` 区分，前端可按它打「历史逾期」旗标
+                "delivered_batches": int(pf["delivered"]) if pf else 0,
+                "late_batches": int(pf["delivered"] - pf["ontime"]) if pf else 0,
+                "on_time_rate": (
+                    round(pf["ontime"] / pf["delivered"], 3) if pf and pf["delivered"] else None
+                ),
+                "pass_rate": round(pf["ok"] / pf["qty"], 3) if pf and pf["qty"] else None,
                 "last_deal_date": deals[0]["date"] if deals else None,
                 "deal_count": len(deals),
             }

@@ -912,6 +912,8 @@ def b_approval_chain() -> None:
     acts = [x["action"] for x in ap]
     rec({1, 2} <= levels and "退回" in acts and "通过" in acts,
         f"审批留档应含一级+二级（多轮），level={sorted(levels)} acts={acts}")
+    rec(any(x.get("price_flags") for x in ap),
+        "N14 审批留档应带 price_flags（当时参考价快照）")
 
 
 def b_payment() -> None:
@@ -1050,6 +1052,29 @@ def b_direct_split() -> None:
         f"★ 每张到货单 qty 应=本行订购量，实际={[(float(r['qty']), float(r['line_qty'] or 0)) for r in recs]}")
     rec(sum(float(r["qty"]) for r in recs) <= 60.0 + 1e-6,
         f"两份合计不应超需求，实际={sum(float(r['qty']) for r in recs)}")
+
+
+def b_site_shortage() -> None:
+    """N16 现场缺件 → 到货单记实到/缺口 + 缺口回池补采（与仓库侧同构）。"""
+    probe("N16 现场缺件回流采购")
+    rid = _new_demand("ft", 40)["id"]
+    api.req("post", "/purchase/merge-order", "buyer1", (200, 201), json={
+        "supplier_id": SUP["甲钢材"]["id"], "ordered_at": d(0), "expected_date": d(10),
+        "deliver_to": "直发客户现场", "deliver_address": "深圳客户现场",
+        "lines": [{"request_id": rid, "qty": 40, "unit_price": 10.0, "tax_incl": True}]})
+    gr = q("select id from goods_receipt where request_id=:i and status='现场待验收' "
+           "order by id desc limit 1", i=rid)[0]["id"]
+    sc, _ = api.try_("post", f"/site/incoming/{gr}/accept", "site1",
+                     json={"result": "缺件",
+                           "shortage_detail": [{"item": "YL-FT-0001", "qty": 15, "reason": "少发15"}],
+                           "photos": ["probe.png"], "remark": "实到25缺15"})
+    rec(sc == 200, f"现场清点缺件 → 200，实际={sc}")
+    row = q("select qty_ok, qty_rejected from goods_receipt where id=:i", i=gr)[0]
+    rec(float(row["qty_ok"] or 0) == 25.0 and float(row["qty_rejected"] or 0) == 15.0,
+        f"到货单应记 实到25/缺口15，实际={row['qty_ok']}/{row['qty_rejected']}")
+    retry = q("select id, qty, source from purchase_request where origin_request_id=:i", i=rid)
+    rec(len(retry) == 1 and abs(float(retry[0]["qty"]) - 15.0) < 1e-6,
+        f"应新建 1 条待采购 15 回池，实际={[(r['id'], float(r['qty']), r['source']) for r in retry]}")
 
 
 def _new_demand(item_key: str, qty: float, who: str = "buyer1") -> dict:
@@ -1449,7 +1474,7 @@ def main() -> None:
             traceback.print_exc()
 
     part("Part B · 采购域专项探针")
-    for fn in (b_split, b_split_receive, b_direct_split, b_partial_ok, b_split_line_cancel, b_void_order, b_close_return, b_approval_chain, b_payment, b_fixes, b_idempotent_after_release, b_pending_window, b_pending_repool,
+    for fn in (b_split, b_split_receive, b_direct_split, b_site_shortage, b_partial_ok, b_split_line_cancel, b_void_order, b_close_return, b_approval_chain, b_payment, b_fixes, b_idempotent_after_release, b_pending_window, b_pending_repool,
                b_direct_repool, b_delete_authz, b_kitting_inflate, b_issue_draft_bom,
                b_stock_conservation, b_price_reference):
         try:

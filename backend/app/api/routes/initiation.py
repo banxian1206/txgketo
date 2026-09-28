@@ -2281,6 +2281,35 @@ def submit_purchase_order(
     return {"status": po.status}
 
 
+def _po_price_snapshot(session: Session, po: PurchaseOrder) -> dict:
+    """审批时看到的价格参考快照（08 §3.3）：每行按同 `tax_incl` 口径取历史成交 stats。
+
+    留档后能回答「当时审核人参考的是什么价」，且历史库变了也不会失真。
+    """
+    from app.models.purchasing import SupplierQuote
+
+    out: dict = {}
+    for ln in _po_lines(session, po.id):
+        deals = list(
+            session.scalars(
+                select(SupplierQuote)
+                .where(SupplierQuote.item_no == ln.item_no, SupplierQuote.price_type == "成交")
+                .order_by(SupplierQuote.quote_date.desc())
+            ).all()
+        )
+        seg = [float(q.price) for q in deals if bool(q.tax_incl) == bool(ln.tax_incl)]
+        out[ln.item_no] = {
+            "tax_incl": ln.tax_incl,
+            "this_price": float(ln.unit_price) if ln.unit_price is not None else None,
+            "last_price": seg[0] if seg else None,
+            "min_price": min(seg) if seg else None,
+            "max_price": max(seg) if seg else None,
+            "avg_price": round(sum(seg) / len(seg), 2) if seg else None,
+            "deal_count": len(seg),
+        }
+    return out
+
+
 @purchase_router.post("/purchase/orders/{key}/approve")
 def approve_purchase_order(
     key: str,
@@ -2296,7 +2325,10 @@ def approve_purchase_order(
     if po is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "采购单不存在")
     try:
-        new_status = po_svc.approve_order(session, po, current, body.action, body.note)
+        new_status = po_svc.approve_order(
+            session, po, current, body.action, body.note,
+            price_snapshot=_po_price_snapshot(session, po),
+        )
     except po_svc.PurchaseOrderError as exc:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
     if new_status == "已批准":
@@ -2365,6 +2397,7 @@ def list_po_approvals(
             "reviewer_name": names.get(r.reviewer_id),
             "action": r.action,
             "note": r.note,
+            "price_flags": r.price_flags,
             "acted_at": r.acted_at,
         }
         for r in rows

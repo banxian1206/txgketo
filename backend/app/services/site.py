@@ -10,7 +10,7 @@ from datetime import UTC, date, datetime
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models.initiation import GoodsReceipt, ProjectMember
+from app.models.initiation import GoodsReceipt, ProjectMember, PurchaseRequest
 from app.models.site import (
     COMMISSION_DONE,
     COMMISSION_ONSITE,
@@ -27,6 +27,8 @@ from app.services import notify
 
 SITE_RECEIPT_PENDING = "现场待验收"
 SITE_RECEIPT_DONE = "现场已验收"
+# 现场缺件/破损产生的补采需求来源（与仓库侧「退货重采」同构）
+SOURCE_SITE_SHORTAGE = "现场缺件"
 
 
 class SiteError(Exception):
@@ -243,37 +245,80 @@ def accept_incoming(
         remark=remark,
     )
     session.add(row)
+    if receipt.receipt_date is None:
+        receipt.receipt_date = date.today()  # 现场清点完成即实际到货（08 §7）
     if result == SITE_RECEIPT_OK:
         receipt.status = SITE_RECEIPT_DONE
         receipt.inspect_note = remark or (receipt.inspect_note or "")
-        # ★ 交期留痕（08 §7）：现场清点「齐」= 实际到货
-        if receipt.receipt_date is None:
-            receipt.receipt_date = date.today()
-        from app.models.purchase_order import PurchaseOrderLine
-        from app.services.purchase_order import recalc_delivery
-
-        po_id = receipt.po_id
-        if po_id is None and receipt.request_id:
-            line = session.scalar(
-                select(PurchaseOrderLine)
-                .where(PurchaseOrderLine.request_id == receipt.request_id)
-                .order_by(PurchaseOrderLine.id.desc())
-            )
-            po_id = line.po_id if line else None
-        if po_id is not None:
-            recalc_delivery(session, po_id)
     else:
+        # ★ N16：缺件/破损 → 到货单记「实到/缺口」，缺口回流采购侧（与仓库侧同构，不漏采）
+        shortage_qty = sum(
+            float(x.get("qty") or 0) for x in (shortage_detail or []) if isinstance(x, dict)
+        )
+        if shortage_qty <= 0:
+            shortage_qty = float(receipt.qty or 0)
+        receipt.qty_ok = max(0.0, float(receipt.qty or 0) - shortage_qty)
+        receipt.qty_rejected = shortage_qty
+        receipt.status = SITE_RECEIPT_DONE
+        receipt.inspect_note = remark or (receipt.inspect_note or "")
+        if receipt.request_id and shortage_qty > 0:
+            req = session.get(PurchaseRequest, receipt.request_id)
+            if req is not None:
+                req.qty = max(0.0, float(req.qty or 0) - shortage_qty)
+                retry = PurchaseRequest(
+                    project_no=req.project_no,
+                    equip_no=req.equip_no,
+                    attribution=req.attribution,
+                    item_no=req.item_no,
+                    qty=shortage_qty,
+                    unit=req.unit,
+                    source=SOURCE_SITE_SHORTAGE,
+                    lead_days=req.lead_days,
+                    need_date=req.need_date,
+                    status="待采购",
+                    is_long_lead=req.is_long_lead,
+                    origin_request_id=req.id,
+                    remark=f"现场{result}重采（{receipt.receipt_no}）"
+                    + (f"：{remark}" if remark else ""),
+                )
+                session.add(retry)
+                session.flush()
+                notify.notify_role(
+                    session,
+                    "PURCHASE",
+                    type_=notify.TYPE_PURCHASE,
+                    title=f"现场{result}，需补采：{req.item_no} × {shortage_qty:g}",
+                    body=f"{req.project_no} {req.equip_no or ''}（{receipt.receipt_no}）",
+                    link="/purchase",
+                    biz_type="purchase_request",
+                    biz_id=retry.id,
+                    actor_id=actor_id,
+                )
         notify.notify(
             session,
             team_ids(session, receipt.project_no),
             type_="site",
             title=f"现场来货{result}：{receipt.project_no} {receipt.receipt_no}",
-            body=f"物料 {receipt.item_no}：{remark or '请核对补发'}",
+            body=f"物料 {receipt.item_no}：{remark or '请核对补发'}（缺口 {shortage_qty:g} 已回采购池）",
             link="/site",
             biz_type="goods_receipt",
             biz_id=receipt.id,
             actor_id=actor_id,
         )
+    # ★ 交期留痕（08 §7）：现场清点完成 = 实际到货
+    from app.models.purchase_order import PurchaseOrderLine
+    from app.services.purchase_order import recalc_delivery
+
+    po_id = receipt.po_id
+    if po_id is None and receipt.request_id:
+        line = session.scalar(
+            select(PurchaseOrderLine)
+            .where(PurchaseOrderLine.request_id == receipt.request_id)
+            .order_by(PurchaseOrderLine.id.desc())
+        )
+        po_id = line.po_id if line else None
+    if po_id is not None:
+        recalc_delivery(session, po_id)
     session.flush()
     return row
 
