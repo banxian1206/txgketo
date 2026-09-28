@@ -275,12 +275,12 @@ def main() -> None:
     wh_lines = [rid for (item, eq), rid in by_key.items() if item != d_cover["drawing_no"]]
     req("post", "/api/v1/purchase/merge-order", "buyer1", (200, 201),
         json={"supplier_id": sup1["id"], "ordered_at": d(0), "expected_date": d(18),
-              "deliver_to": "公司仓库", "lines": [{"request_id": rid} for rid in wh_lines]})
+              "deliver_to": "公司仓库", "lines": [{"request_id": rid, "tax_incl": True} for rid in wh_lines]})
 
     req("post", "/api/v1/purchase/merge-order", "buyer1", (200, 201),
         json={"supplier_id": sup2["id"], "ordered_at": d(0), "deliver_to": "直发客户现场",
               "deliver_address": "佛山顺德 美的全球创新中心",
-              "lines": [{"request_id": cover_id}]})
+              "lines": [{"request_id": cover_id, "tax_incl": True}]})
     prs = {(x["item_no"], x.get("equip_no") or ""): x
            for x in req("get", f"/api/v1/projects/{p}/purchase-requests", "buyer1")}
 

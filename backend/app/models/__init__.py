@@ -26,6 +26,7 @@ from app.models.warehouse import (
 )
 from app.models.purchasing import Supplier, SupplierCatalog, SupplierQuote
 from app.models.purchase_order import (
+    PurchaseApproval,
     PurchaseOrder,
     PurchaseOrderLine,
     compute_line_amounts,
@@ -89,6 +90,7 @@ __all__ = [
     "PurchaseRequest",
     "PurchaseOrder",
     "PurchaseOrderLine",
+    "PurchaseApproval",
     "compute_line_amounts",
     "ChangeRequest",
     "Notification",

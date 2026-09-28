@@ -601,7 +601,7 @@ def s3_cross(pjs: list[dict]) -> None:
     if len(picked) < 2:
         flag(False, f"跨项目合并前置不足：只找到 {len(picked)} 条待采购轴承")
         return
-    lines = [{"request_id": r["id"], "unit_price": price_of(r["item_no"])} for _, r in picked]
+    lines = [{"request_id": r["id"], "tax_incl": True, "unit_price": price_of(r["item_no"])} for _, r in picked]
     out = api.req("post", "/purchase/merge-order", "buyer1", (200, 201), json={
         "supplier_id": SUP["华信传动"]["id"], "ordered_at": d(0), "expected_date": d(20),
         "deliver_to": "公司仓库", "lines": lines, "remark": "跨项目合并下单（P1+P2 轴承）",
@@ -642,13 +642,13 @@ def s3(pj: dict) -> None:
     if wh:
         api.req("post", "/purchase/merge-order", "buyer1", (200, 201), json={
             "supplier_id": SUP["华南标准件"]["id"], "ordered_at": d(0), "expected_date": d(15),
-            "deliver_to": "公司仓库", "lines": [{"request_id": r["id"], "unit_price": price_of(r["item_no"])} for r in wh],
+            "deliver_to": "公司仓库", "lines": [{"request_id": r["id"], "tax_incl": True, "unit_price": price_of(r["item_no"])} for r in wh],
         })
     if dr:
         api.req("post", "/purchase/merge-order", "buyer1", (200, 201), json={
             "supplier_id": SUP["恒钲钣金"]["id"], "ordered_at": d(0), "expected_date": d(10),
             "deliver_to": "直发客户现场", "deliver_address": prof["site"],
-            "lines": [{"request_id": r["id"], "unit_price": price_of(r["item_no"])} for r in dr],
+            "lines": [{"request_id": r["id"], "tax_incl": True, "unit_price": price_of(r["item_no"])} for r in dr],
         })
 
     # ---- 收货：按品种做分批 / 不合格换货 / 退货重采 ----
@@ -699,7 +699,7 @@ def s3(pj: dict) -> None:
             nr = retry[0]
             api.req("post", "/purchase/merge-order", "buyer1", (200, 201), json={
                 "supplier_id": SUP["远东型材"]["id"], "ordered_at": d(0), "expected_date": d(12),
-                "deliver_to": "公司仓库", "lines": [{"request_id": nr["id"], "unit_price": price_of(nr["item_no"])}],
+                "deliver_to": "公司仓库", "lines": [{"request_id": nr["id"], "tax_incl": True, "unit_price": price_of(nr["item_no"])}],
             })
             nr2 = [x for x in api.req("get", f"/projects/{p}/purchase-requests", "buyer1")
                    if x["id"] == nr["id"]][0]
@@ -1193,7 +1193,7 @@ def deep_coverage(pjs: list[dict]) -> None:
         "need_date": d(10), "note": "车间辅料"})
     mo = api.req("post", "/purchase/merge-order", "buyer1", (200, 201), json={
         "supplier_id": SUP["华南标准件"]["id"], "ordered_at": d(0), "expected_date": d(15), "deliver_to": "公司仓库",
-        "lines": [{"request_id": mr["id"], "unit_price": price_of(mr["item_no"])}]})
+        "lines": [{"request_id": mr["id"], "tax_incl": True, "unit_price": price_of(mr["item_no"])}]})
     po = mo.get("po_no") if isinstance(mo, dict) else None
     probe("采购单详情", "get", f"/purchase/orders/{po}", "buyer1")
     probe("取消采购单", "post", f"/purchase/orders/{po}/cancel", "buyer1",
@@ -1202,7 +1202,7 @@ def deep_coverage(pjs: list[dict]) -> None:
         "attribution": "辅料", "item_no": LIB["sf"]["item_no"], "qty": 2, "need_date": d(15)})
     mo2 = api.req("post", "/purchase/merge-order", "buyer1", (200, 201), json={
         "supplier_id": SUP["华南标准件"]["id"], "ordered_at": d(0), "expected_date": d(15), "deliver_to": "公司仓库",
-        "lines": [{"request_id": mr2["id"], "unit_price": price_of(mr2["item_no"])}]})
+        "lines": [{"request_id": mr2["id"], "tax_incl": True, "unit_price": price_of(mr2["item_no"])}]})
     po2 = mo2.get("po_no") if isinstance(mo2, dict) else None
     probe("更改供应商", "post", f"/purchase/orders/{po2}/change-supplier", "buyer1",
           json={"supplier_id": SUP["华信传动"]["id"], "note": "原供应商交期太长"})
@@ -1393,7 +1393,7 @@ def deep_coverage2(pjs: list[dict]) -> None:
     def order_one(r):
         return api.req("post", "/purchase/merge-order", "buyer1", (200, 201), json={
             "supplier_id": SUP["华南标准件"]["id"], "ordered_at": d(0), "expected_date": d(15), "deliver_to": "公司仓库",
-            "lines": [{"request_id": r["id"], "unit_price": price_of(r["item_no"])}]})
+            "lines": [{"request_id": r["id"], "tax_incl": True, "unit_price": price_of(r["item_no"])}]})
 
     ts = [threading.Thread(target=_tcall, args=(lambda rr=rr: order_one(rr), out, lock)) for rr in mrs]
     for t in ts:
@@ -1426,7 +1426,7 @@ def deep_coverage2(pjs: list[dict]) -> None:
     for r in insp:
         api.req("post", "/purchase/merge-order", "buyer1", (200, 201), json={
             "supplier_id": SUP["华南标准件"]["id"], "ordered_at": d(0), "expected_date": d(15), "deliver_to": "公司仓库",
-            "lines": [{"request_id": r["id"], "unit_price": price_of(r["item_no"])}]})
+            "lines": [{"request_id": r["id"], "tax_incl": True, "unit_price": price_of(r["item_no"])}]})
     proj = insp[0].get("project_no")
     out3: list = []
 
@@ -1452,7 +1452,7 @@ def deep_coverage2(pjs: list[dict]) -> None:
         "item_no": LIB["dj"]["item_no"], "qty": 2, "need_date": d(10)})
     api.req("post", "/purchase/merge-order", "buyer1", (200, 201), json={
         "supplier_id": SUP["华南标准件"]["id"], "ordered_at": d(0), "expected_date": d(15), "deliver_to": "公司仓库",
-        "lines": [{"request_id": big["id"], "unit_price": price_of(big["item_no"])}]})
+        "lines": [{"request_id": big["id"], "tax_incl": True, "unit_price": price_of(big["item_no"])}]})
     code, res = probe("超额验收（订 2 验 5，应硬拦）", "post",
                       f"/projects/{p2no}/purchase-requests/{big['id']}/inspect", "wh1",
                       (400,), json={"qty": 5, "result": "合格", "receipt_date": d(0)})

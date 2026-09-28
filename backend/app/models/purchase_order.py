@@ -144,6 +144,35 @@ class PurchaseOrderLine(Base, TimestampMixin):
     remark: Mapped[str | None] = mapped_column(String(255))
 
 
+class PurchaseApproval(Base, TimestampMixin):
+    """采购单审批留档（08 §3.3，二期）：多轮多级，**退回重提全部留档**。
+
+    与工程评审 `review_action` 同构，但不复用同一张表（评审单是任务级按专业链；
+    采购审批是单据级按部门链，硬塞会两边都脏）。
+    """
+
+    __tablename__ = "purchase_approval"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    po_id: Mapped[int] = mapped_column(
+        ForeignKey("purchase_order.id", ondelete="CASCADE"), index=True
+    )
+    round_no: Mapped[int] = mapped_column(Integer, default=1, server_default="1")
+    level: Mapped[int] = mapped_column(Integer)  # 1=采购经理 / 2=采购总监 / 0=撤回
+    reviewer_id: Mapped[int | None] = mapped_column(ForeignKey("app_user.id"))
+    action: Mapped[str] = mapped_column(String(8))  # 通过 / 退回 / 跳过 / 撤回
+    note: Mapped[str | None] = mapped_column(String(255))  # ★ 退回必填说明
+    price_flags: Mapped[dict | None] = mapped_column(JSONB)  # 本轮审核时看到的价格参考快照
+    acted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+# 审批级别/动作
+APPR_LEVEL_WITHDRAW = 0
+APPR_LEVEL_LEAD = 1
+APPR_LEVEL_DIRECTOR = 2
+APPR_ACTIONS = ("通过", "退回", "跳过", "撤回")
+
+
 def compute_line_amounts(
     qty: float, unit_price: float | None, tax_incl: bool, tax_rate: float | None
 ) -> tuple[float | None, float | None]:

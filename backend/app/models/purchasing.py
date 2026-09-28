@@ -58,6 +58,8 @@ class SupplierQuote(Base, TimestampMixin):
     supplier_id: Mapped[int] = mapped_column(ForeignKey("supplier.id", ondelete="CASCADE"))
     project_no: Mapped[str | None] = mapped_column(ForeignKey("project.project_no"))
     price: Mapped[float] = mapped_column(Numeric(14, 2))
+    tax_incl: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")  # 含税/不含税（★ 必选）
+    qty: Mapped[float | None] = mapped_column(Numeric(14, 3))  # 本笔成交数量（审批比价要用）
     currency: Mapped[str] = mapped_column(String(8), default="CNY", server_default="CNY")
     unit: Mapped[str | None] = mapped_column(String(16))
     min_qty: Mapped[float | None] = mapped_column(Numeric(14, 3))  # 起订量

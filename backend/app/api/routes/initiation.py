@@ -957,6 +957,7 @@ class OrderIn(BaseModel):
     deliver_address: str | None = Field(default=None, description="送货地址（直发现场必填）")
     po_no: str | None = Field(default=None, description="采购单号")
     unit_price: float | None = Field(default=None, gt=0, description="单价")
+    tax_incl: bool = Field(..., description="这个价含税 / 不含税（采购员必选）")
     ordered_at: date = Field(..., description="下单日期")
     expected_date: date | None = Field(default=None, description="预计到货日期")
     qty: float | None = Field(default=None, gt=0, description="下单数量（可修改）")
@@ -1013,7 +1014,7 @@ def order(
                 "request_id": row.id,
                 "qty": qty,
                 "unit_price": body.unit_price,
-                "tax_incl": True,
+                "tax_incl": body.tax_incl,
                 "expect_date": expect,
             }
         ],
@@ -1031,6 +1032,8 @@ def order(
                 supplier_id=po.supplier_id,
                 project_no=project_no,
                 price=body.unit_price,
+                tax_incl=body.tax_incl,
+                qty=qty,
                 unit=row.unit,
                 lead_days=row.lead_days,
                 price_type="成交",
@@ -2027,6 +2030,7 @@ class MergeLineIn(BaseModel):
     request_id: int
     qty: float | None = Field(default=None, gt=0, description="不填就用需求数量")
     unit_price: float | None = Field(default=None, description="不填就只下单不记价")
+    tax_incl: bool = Field(..., description="这个价含税 / 不含税（采购员必选）")
 
 
 class MergeOrderIn(BaseModel):
@@ -2038,6 +2042,9 @@ class MergeOrderIn(BaseModel):
     deliver_to: str = Field(default="公司仓库", description="公司仓库 / 直发客户现场")
     deliver_address: str | None = Field(default=None, description="直发现场时必填")
     po_no: str | None = Field(default=None, description="不填则自动发号 PO{YY}{NNN}")
+    tax_rate: float | None = Field(default=None, description="整单参考税率 %")
+    freight: float | None = Field(default=None, description="运费")
+    discount: float | None = Field(default=None, description="整单折扣")
     lines: list[MergeLineIn]
     remark: str | None = None
 
@@ -2087,7 +2094,7 @@ def merge_order(
                 "request_id": row.id,
                 "qty": qty,
                 "unit_price": ln.unit_price,
-                "tax_incl": True,
+                "tax_incl": ln.tax_incl,
                 "expect_date": _resolve_expected(body.expected_date, body.ordered_at, row.lead_days),
             }
         )
@@ -2103,6 +2110,9 @@ def merge_order(
         lines=lines_in,
         actor_id=current.id,
         po_no=body.po_no,
+        tax_rate=body.tax_rate,
+        freight=body.freight,
+        discount=body.discount,
         remark=body.remark,
     )
 
@@ -2124,6 +2134,8 @@ def merge_order(
                     supplier_id=sup.id,
                     project_no=row.project_no,
                     price=x["unit_price"],
+                    tax_incl=x["tax_incl"],
+                    qty=x["qty"],
                     unit=row.unit,
                     lead_days=row.lead_days,
                     price_type="成交",

@@ -19,6 +19,7 @@ from app.api.deps import (
 )
 from app.core.db import get_session
 from app.models.initiation import PurchaseRequest
+from app.models.purchase_order import PurchaseOrderLine
 from app.models.library import SOURCE_STANDARD, Item, StdCategory, StdClass
 from app.models.platform import User
 from app.models.purchasing import (
@@ -258,6 +259,8 @@ def _quote_dict(q: SupplierQuote, supplier: Supplier | None, item: Item | None) 
         "supplier_id": q.supplier_id,
         "supplier_name": supplier.name if supplier else None,
         "price": float(q.price) if q.price is not None else None,
+        "tax_incl": q.tax_incl,
+        "qty": float(q.qty) if q.qty is not None else None,
         "currency": q.currency,
         "unit": q.unit or (item.unit if item else None),
         "min_qty": float(q.min_qty) if q.min_qty is not None else None,
@@ -363,13 +366,28 @@ def price_reference(
         if q.price_type == "报价" and q.supplier_id not in latest_quote:
             latest_quote[q.supplier_id] = q
 
-    # 采购单上记录过的价格（历史下单，兜底）
-    pr_prices = session.scalars(
-        select(PurchaseRequest)
-        .where(PurchaseRequest.item_no == item_no, PurchaseRequest.unit_price.isnot(None))
-        .order_by(PurchaseRequest.ordered_at.desc())
+    # 采购单行上记录过的价格（历史下单，兜底）
+    order_lines = session.scalars(
+        select(PurchaseOrderLine)
+        .where(PurchaseOrderLine.item_no == item_no, PurchaseOrderLine.unit_price.isnot(None))
+        .order_by(PurchaseOrderLine.id.desc())
         .limit(5)
     ).all()
+
+    def _seg(rows: list[SupplierQuote]) -> dict:
+        prices = [float(x.price) for x in rows]
+        return {
+            "last_price": prices[0] if rows else None,
+            "last_supplier": (
+                sups[rows[0].supplier_id].name if rows and rows[0].supplier_id in sups else None
+            ),
+            "last_date": rows[0].quote_date if rows else None,
+            "last_qty": float(rows[0].qty) if rows and rows[0].qty is not None else None,
+            "min_price": min(prices) if prices else None,
+            "max_price": max(prices) if prices else None,
+            "avg_price": round(sum(prices) / len(prices), 2) if prices else None,
+            "deal_count": len(rows),
+        }
 
     result = {
         "item_no": item_no,
@@ -380,11 +398,17 @@ def price_reference(
             "last_price": last_price,
             "last_supplier": sups[deals[0].supplier_id].name if deals else None,
             "last_date": deals[0].quote_date if deals else None,
+            "last_tax_incl": deals[0].tax_incl if deals else None,
             "min_price": min(deal_prices) if deal_prices else None,
             "max_price": max(deal_prices) if deal_prices else None,
             "avg_price": round(sum(deal_prices) / len(deal_prices), 2) if deal_prices else None,
             "deal_count": len(deals),
             "quote_count": len(latest_quote),
+        },
+        # ★ 客户口径（08 §5.3）：含税/不含税分列，上次价标明口径
+        "by_tax": {
+            "含税": _seg([q for q in deals if q.tax_incl]),
+            "不含税": _seg([q for q in deals if not q.tax_incl]),
         },
         "deals": [_quote_dict(q, sups.get(q.supplier_id), item) for q in deals[:8]],
         "quotes": [
@@ -393,13 +417,13 @@ def price_reference(
         ],
         "ordered": [
             {
-                "project_no": p.project_no,
-                "unit_price": float(p.unit_price) if p.unit_price is not None else None,
-                "supplier_name": p.supplier_name,
-                "ordered_at": p.ordered_at,
-                "qty": float(p.qty) if p.qty is not None else None,
+                "project_no": ln.project_no,
+                "unit_price": float(ln.unit_price) if ln.unit_price is not None else None,
+                "qty": float(ln.qty) if ln.qty is not None else None,
+                "tax_incl": ln.tax_incl,
+                "expect_date": ln.expect_date,
             }
-            for p in pr_prices
+            for ln in order_lines
         ],
     }
     return result if has_permission(current, "purchase:price") else scrub_money(result)

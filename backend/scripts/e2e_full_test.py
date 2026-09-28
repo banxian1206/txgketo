@@ -233,11 +233,11 @@ def main() -> None:
     rest = [r for r in mine if r["id"] != cover["id"]]
     req("post", "/api/v1/purchase/merge-order", "buyer1", (200, 201),
         json={"supplier_id": sup["id"], "ordered_at": d(0), "expected_date": d(15),
-              "deliver_to": "公司仓库", "lines": [{"request_id": r["id"]} for r in rest]})
+              "deliver_to": "公司仓库", "lines": [{"request_id": r["id"], "tax_incl": True} for r in rest]})
     req("post", "/api/v1/purchase/merge-order", "buyer1", (200, 201),
         json={"supplier_id": sup["id"], "ordered_at": d(0), "deliver_to": "直发客户现场",
               "deliver_address": "深圳龙华 创维工业园 3 号厂房",
-              "lines": [{"request_id": cover["id"]}]})
+              "lines": [{"request_id": cover["id"], "tax_incl": True}]})
     prs = {r["id"]: r for r in req("get", f"/api/v1/projects/{p}/purchase-requests", "buyer1")}
     direct_receipt_id = None
     for rid, r in prs.items():

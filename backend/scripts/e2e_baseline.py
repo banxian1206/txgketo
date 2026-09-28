@@ -414,14 +414,14 @@ def a_s3() -> None:
         mo = api.req("post", "/purchase/merge-order", "buyer1", (200, 201), json={
             "supplier_id": SUP["乙标准件"]["id"], "ordered_at": d(0), "expected_date": d(15),
             "deliver_to": "公司仓库",
-            "lines": [{"request_id": r["id"], "unit_price": 100.0} for r in wh]})
+            "lines": [{"request_id": r["id"], "tax_incl": True, "unit_price": 100.0} for r in wh]})
         CTX["po_wh"] = mo["po_no"]
         note(f"仓库单 {mo['po_no']}：{mo['count']} 行 ¥{mo['total']}")
     if dr:
         mo2 = api.req("post", "/purchase/merge-order", "buyer1", (200, 201), json={
             "supplier_id": SUP["丙钣金"]["id"], "ordered_at": d(0), "expected_date": d(12),
             "deliver_to": "直发客户现场", "deliver_address": "深圳市宝安区客户厂区",
-            "lines": [{"request_id": r["id"], "unit_price": 500.0} for r in dr]})
+            "lines": [{"request_id": r["id"], "tax_incl": True, "unit_price": 500.0} for r in dr]})
         CTX["po_direct"] = mo2["po_no"]
         note(f"直发单 {mo2['po_no']}：{mo2['count']} 行")
         # ★ R2-01：下单即建「现场待验收」到货单
@@ -733,7 +733,7 @@ def b_split() -> None:
     sc1, bd1 = api.try_("post", "/purchase/merge-order", "buyer1", json={
         "supplier_id": SUP["甲钢材"]["id"], "ordered_at": d(0), "expected_date": d(15),
         "deliver_to": "公司仓库",
-        "lines": [{"request_id": rid, "qty": 60, "unit_price": 200.0}]})
+        "lines": [{"request_id": rid, "tax_incl": True, "qty": 60, "unit_price": 200.0}]})
     rec(sc1 in (200, 201), f"第一张单（甲钢材 60）HTTP {sc1}", str(bd1)[:200])
     mid = _find_by_id(rid)
     note(f"第一张单后：qty={mid['qty']} status={mid['status']} po_no={mid.get('po_no')}")
@@ -746,7 +746,7 @@ def b_split() -> None:
     sc2, bd2 = api.try_("post", "/purchase/merge-order", "buyer1", json={
         "supplier_id": SUP["乙标准件"]["id"], "ordered_at": d(0), "expected_date": d(15),
         "deliver_to": "公司仓库",
-        "lines": [{"request_id": rid, "qty": 40, "unit_price": 210.0}]})
+        "lines": [{"request_id": rid, "tax_incl": True, "qty": 40, "unit_price": 210.0}]})
     rec(sc2 in (200, 201),
         f"★ 第二张单（乙标准件 40）HTTP {sc2} —— 拆单给第二家供应商",
         f"返回：{str(bd2)[:260]}\n预期：应能成功（客户口径#1「很有可能会拆给多个供应商」）")
@@ -766,7 +766,7 @@ def b_partial_ok() -> None:
     mo = api.req("post", "/purchase/merge-order", "buyer1", (200, 201), json={
         "supplier_id": SUP["甲钢材"]["id"], "ordered_at": d(0), "expected_date": d(15),
         "deliver_to": "公司仓库",
-        "lines": [{"request_id": rid, "qty": 100, "unit_price": 200.0}]})
+        "lines": [{"request_id": rid, "tax_incl": True, "qty": 100, "unit_price": 200.0}]})
     po = mo.get("po_no")
     api.req("post", f"/projects/{p}/purchase-requests/{rid}/inspect", "wh1", (200,), json={
         "qty": 100, "result": "合格", "qty_ok": 80, "qty_rejected": 20,
@@ -803,7 +803,7 @@ def b_void_order() -> None:
     rid = _new_demand("bc", 30)["id"]
     mo = api.req("post", "/purchase/merge-order", "buyer1", (200, 201), json={
         "supplier_id": SUP["甲钢材"]["id"], "ordered_at": d(0), "expected_date": d(10),
-        "deliver_to": "公司仓库", "lines": [{"request_id": rid, "qty": 30, "unit_price": 200.0}]})
+        "deliver_to": "公司仓库", "lines": [{"request_id": rid, "tax_incl": True, "qty": 30, "unit_price": 200.0}]})
     po = mo.get("po_no")
     rec(_find_by_id(rid)["status"] == "在途", f"下单后应 在途，实际={_find_by_id(rid)['status']}")
     api.req("post", f"/purchase/orders/{po}/void", "buyer1", (200,), json={"reason": "作废测试"})
@@ -812,7 +812,7 @@ def b_void_order() -> None:
         "死单：作废后需求卡在在途，池子里买不了")
     mo2 = api.req("post", "/purchase/merge-order", "buyer1", (200, 201), json={
         "supplier_id": SUP["乙标准件"]["id"], "ordered_at": d(0), "expected_date": d(10),
-        "deliver_to": "公司仓库", "lines": [{"request_id": rid, "qty": 30, "unit_price": 205.0}]})
+        "deliver_to": "公司仓库", "lines": [{"request_id": rid, "tax_incl": True, "qty": 30, "unit_price": 205.0}]})
     rec(bool(mo2.get("po_no")), "作废后能重新下单（回池生效）")
 
 
@@ -822,7 +822,7 @@ def b_close_return() -> None:
     rid = _new_demand("bc", 25)["id"]
     mo = api.req("post", "/purchase/merge-order", "buyer1", (200, 201), json={
         "supplier_id": SUP["甲钢材"]["id"], "ordered_at": d(0), "expected_date": d(10),
-        "deliver_to": "公司仓库", "lines": [{"request_id": rid, "qty": 25, "unit_price": 200.0}]})
+        "deliver_to": "公司仓库", "lines": [{"request_id": rid, "tax_incl": True, "qty": 25, "unit_price": 200.0}]})
     po = mo.get("po_no")
     _inspect_store(_find_by_id(rid), 25, do_store=False)  # 造一个「有到货」的执行中单
     api.req("post", f"/purchase/orders/{po}/close-return", "buyer1", (200,), json={"note": "不再合作"})
@@ -842,10 +842,10 @@ def b_split_line_cancel() -> None:
     rid = _new_demand("bc", 100)["id"]
     mo1 = api.req("post", "/purchase/merge-order", "buyer1", (200, 201), json={
         "supplier_id": SUP["甲钢材"]["id"], "ordered_at": d(0), "expected_date": d(10),
-        "deliver_to": "公司仓库", "lines": [{"request_id": rid, "qty": 60, "unit_price": 200.0}]})
+        "deliver_to": "公司仓库", "lines": [{"request_id": rid, "tax_incl": True, "qty": 60, "unit_price": 200.0}]})
     api.req("post", "/purchase/merge-order", "buyer1", (200, 201), json={
         "supplier_id": SUP["乙标准件"]["id"], "ordered_at": d(0), "expected_date": d(10),
-        "deliver_to": "公司仓库", "lines": [{"request_id": rid, "qty": 40, "unit_price": 210.0}]})
+        "deliver_to": "公司仓库", "lines": [{"request_id": rid, "tax_incl": True, "qty": 40, "unit_price": 210.0}]})
     api.req("post", f"/purchase/orders/{mo1.get('po_no')}/cancel", "buyer1", (200,),
             json={"reason": "只取消第一张"})
     row = _find_by_id(rid)
@@ -902,7 +902,7 @@ def b_pending_window() -> None:
     rid = _new_demand("dj", 10)["id"]
     api.req("post", "/purchase/merge-order", "buyer1", (200, 201), json={
         "supplier_id": SUP["乙标准件"]["id"], "ordered_at": d(0), "expected_date": d(10),
-        "deliver_to": "公司仓库", "lines": [{"request_id": rid, "unit_price": 900.0}]})
+        "deliver_to": "公司仓库", "lines": [{"request_id": rid, "tax_incl": True, "unit_price": 900.0}]})
     res = _inspect_store(_find_by_id(rid), 10, do_store=False)   # ★ 验收合格但不入库
     row = _find_by_id(rid)
     note(f"验收合格未入库：到货单={res['receipt_status']} 需求={row['status']} "
@@ -939,7 +939,7 @@ def b_pending_repool() -> None:
     r2 = _new_demand("ft", 10)
     api.req("post", "/purchase/merge-order", "buyer1", (200, 201), json={
         "supplier_id": SUP["甲钢材"]["id"], "ordered_at": d(0), "expected_date": d(10),
-        "deliver_to": "公司仓库", "lines": [{"request_id": r2["id"], "unit_price": 80.0}]})
+        "deliver_to": "公司仓库", "lines": [{"request_id": r2["id"], "tax_incl": True, "unit_price": 80.0}]})
     _inspect_store(_find_by_id(r2["id"]), 10, do_store=False)     # ★ 停在待入库
     # 先把之前已入库的方通清掉干扰：查库存
     stk = q("select coalesce(sum(qty_on_hand),0) as s from stock_item where item_no=:i", i=ft)
@@ -1068,7 +1068,7 @@ def b_stock_conservation() -> None:
         r = _new_demand("bc", big)
         api.req("post", "/purchase/merge-order", "buyer1", (200, 201), json={
             "supplier_id": SUP["甲钢材"]["id"], "ordered_at": d(0), "expected_date": d(5),
-            "deliver_to": "公司仓库", "lines": [{"request_id": r["id"], "unit_price": 200.0}]})
+            "deliver_to": "公司仓库", "lines": [{"request_id": r["id"], "tax_incl": True, "unit_price": 200.0}]})
         _inspect_store(_find_by_id(r["id"]), big)     # 验收入库 → 库存增加
         ids.append(r["id"])
     stk = q("select qty_on_hand, qty_locked from stock_item where item_no=:i and location_id=:l",

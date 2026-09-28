@@ -217,12 +217,12 @@ def main() -> None:
         call("post", "/api/v1/purchase/merge-order", who="buyer1", ok=(200, 201),
              label=f"合并下单 {len(rest)} 条 → 采购单（到公司仓库）",
              json={"supplier_id": sup["id"], "ordered_at": d(0), "expected_date": d(15),
-                   "deliver_to": "公司仓库", "lines": [{"request_id": r["id"], "unit_price": price_of(r["item_no"])} for r in rest]})
+                   "deliver_to": "公司仓库", "lines": [{"request_id": r["id"], "tax_incl": True, "unit_price": price_of(r["item_no"])} for r in rest]})
         call("post", "/api/v1/purchase/merge-order", who="buyer1", ok=(200, 201),
              label="外协防护罩：直发客户现场",
              json={"supplier_id": sup["id"], "ordered_at": d(0), "deliver_to": "直发客户现场",
                    "deliver_address": "深圳龙华 创维工业园 3 号厂房",
-                   "lines": [{"request_id": cover_req["id"], "unit_price": price_of(cover_req["item_no"])}]})
+                   "lines": [{"request_id": cover_req["id"], "tax_incl": True, "unit_price": price_of(cover_req["item_no"])}]})
         reqs = {r["id"]: r for r in c.get(f"/api/v1/projects/{p}/purchase-requests", headers=login("buyer1")).json()}
         for rid, r in reqs.items():
             ins = call("post", f"/api/v1/projects/{p}/purchase-requests/{rid}/inspect", who="wh1", ok=(200,),

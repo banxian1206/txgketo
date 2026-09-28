@@ -158,7 +158,7 @@ def order_and_receive(p: str, item_no: str, *, deliver_to="公司仓库", store=
         "supplier_id": q("select id from supplier limit 1")[0]["id"],
         "ordered_at": d(0), "expected_date": d(10), "deliver_to": deliver_to,
         "deliver_address": "深圳客户现场" if deliver_to == "直发客户现场" else None,
-        "lines": [{"request_id": r["id"], "unit_price": 100.0} for r in rows]})
+        "lines": [{"request_id": r["id"], "tax_incl": True, "unit_price": 100.0} for r in rows]})
     out = []
     for r in rows:
         qq = float(qty if qty is not None else r["qty"])
