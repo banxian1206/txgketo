@@ -47,6 +47,32 @@ def kitting_overview(
     return kt.overview(session, project_no)
 
 
+# ★ G5（09 卷 §3）：多视角齐套率 —— 客户口径 2026-09-28
+#   “其他人基本上都是按照项目去看齐套情况的…是还没有买，还是在途，还是验收已入库，
+#    还是说已经做成了成品（即组装件）？其实只有采购和仓库这两个人，他们看采购单。”
+@router.get("/kitting/funnel")
+def kitting_funnel(
+    project_no: str = Query(...),
+    session: Session = Depends(get_session),
+    _: User = Depends(require_permission("mfg:view")),
+):
+    """**项目视角（主）**：整个项目要的东西，现分布在
+    未买 / 在途 / 验收已入库 / 已领料 / **已做成成品（组装件）** 哪一格。"""
+    return kt.funnel(session, project_no)
+
+
+@router.get("/kitting/projects")
+def kitting_projects(
+    session: Session = Depends(get_session),
+    _: User = Depends(require_permission("mfg:view")),
+):
+    """**跨项目汇总**：同时多个项目在跑时，按项目看齐套分布（采购/管理层用）。
+
+    单据视角（按采购单看物件）在采购工作台 —— 那里也**保留项目筛选**。
+    """
+    return kt.projects_funnel(session)
+
+
 # --------------------------------------------------------------------------
 # 装配记录 / 厂内调试
 # --------------------------------------------------------------------------

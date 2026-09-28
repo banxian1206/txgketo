@@ -1820,7 +1820,10 @@ def _sync_purchase_task(session: Session, req: PurchaseRequest, status: str, not
 
 
 @purchase_router.get("/purchase/pool")
-def purchase_pool(session: Session = Depends(get_session), _: User = Depends(get_current_user)):
+def purchase_pool(
+    project_no: str | None = Query(None, description="★ G5：跨项目采购池，可按项目收窄"),
+    session: Session = Depends(get_session), _: User = Depends(get_current_user),
+):
     """采购池：所有「待采购」的需求，**按物料归拢**，标出哪些可以合并。
 
     各设计小组下单节点不一样，但东西大差不差 —— 攒一攒一起买，量大了价格才谈得下来。
@@ -1871,6 +1874,9 @@ def purchase_pool(session: Session = Depends(get_session), _: User = Depends(get
         )
 
     out = list(groups.values())
+    # ★ G5：单据视角是采购/仓库的工作口（按物料归拢），**保留项目筛选**
+    if project_no:
+        out = [g for g in out if any(x.get("project_no") == project_no for x in g["requests"])]
     # 退货重采的需求标一下是从哪张单退回来的
     origin_ids = {
         x["origin_request_id"]
@@ -2833,6 +2839,8 @@ def _po_line_payload(
 
 @purchase_router.get("/purchase/orders")
 def list_purchase_orders(
+    project_no: str | None = Query(None, description="★ G5：采购/仓库按单看，但保留项目筛选（别人来问也能查）"),
+    status: str | None = Query(None),
     session: Session = Depends(get_session), current: User = Depends(get_current_user)
 ):
     """采购单列表（真表：按 purchase_order 单头；一条需求可拆多单）。"""
@@ -2845,6 +2853,11 @@ def list_purchase_orders(
     agg = _receipt_qty_map(session, rids)
     out = [_po_order_summary(po, by_po.get(po.id, []), projects, equips, agg) for po in pos]
     out.sort(key=lambda o: (o["ordered_at"] or date.min, o["key"]), reverse=True)
+    # ★ G5：单据视角是采购/仓库的日常工作口，但**保留项目筛选**（“这个项目的件验收/入库没有”要能查）
+    if project_no:
+        out = [o for o in out if any(p.get("project_no") == project_no for p in o.get("projects", []))]
+    if status:
+        out = [o for o in out if o.get("status") == status]
     if not has_permission(current, "purchase:price"):
         return scrub_money(out)
     return out

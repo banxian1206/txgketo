@@ -24,11 +24,16 @@ import {
   finishAssembly,
   getKitting,
   hasPerm,
+  FUNNEL_ORDER,
+  kittingFunnel,
+  kittingProjects,
   listProjects,
   startAssembly,
   type AssemblyRecordRow,
+  type KittingFunnel,
   type KittingLine,
   type KittingResult,
+  type ProjectFunnelRow,
 } from '../../api/client'
 import AuthedImage from '../../components/AuthedImage'
 import MfgPhotoPicker from '../../components/MfgPhotoPicker'
@@ -59,6 +64,17 @@ export default function Assembly() {
 
   // 重构 2.3：看板数据走共享 hook（与另一端同源）
   const { overview, records, loading, reload: load } = useAsmBoard()
+
+  // ★ G5：项目漏斗（未买/在途/已入库/已领料/已做成成品）+ 跨项目汇总
+  const [funnel, setFunnel] = useState<KittingFunnel | null>(null)
+  const [crossRows, setCrossRows] = useState<ProjectFunnelRow[]>([])
+  useEffect(() => {
+    if (!projectNo) { setFunnel(null); return }
+    kittingFunnel(projectNo).then(setFunnel).catch(() => setFunnel(null))
+  }, [projectNo, overview])
+  useEffect(() => {
+    kittingProjects().then(setCrossRows).catch(() => setCrossRows([]))
+  }, [overview])
 
   useEffect(() => {
     listProjects()
@@ -164,6 +180,60 @@ export default function Assembly() {
       </Space>
 
       {!projectNo && <Empty description="先选一个项目" />}
+
+      {/* ★ G5 项目视角（主）：整个项目要的东西现在分布在哪一格 */}
+      {projectNo && funnel && funnel.total > 0 && (
+        <Card
+          size="small"
+          style={{ marginBottom: 16 }}
+          title="本项目齐套分布（项目视角）"
+          extra={
+            <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+              共 {funnel.total} 种 / {funnel.total_qty.toLocaleString()} 件·套　已做成成品 {Math.round(funnel.assembled_rate * 100)}%
+            </Typography.Text>
+          }
+        >
+          <Row gutter={12}>
+            {FUNNEL_ORDER.map((k) => (
+              <Col span={4} key={k}>
+                <div style={{ fontSize: 12, color: T.textSecondary }}>{k}</div>
+                <div style={{ fontSize: 20, fontWeight: 600 }}>{funnel.buckets[k]?.count ?? 0}</div>
+                <div style={{ fontSize: 12, color: T.textSecondary }}>{(funnel.buckets[k]?.qty ?? 0).toLocaleString()} 件</div>
+              </Col>
+            ))}
+            <Col span={4}>
+              <div style={{ fontSize: 12, color: T.textSecondary }}>物料类型</div>
+              <div style={{ fontSize: 12, marginTop: 4 }}>
+                {Object.entries(funnel.by_kind).map(([k, v]) => (
+                  <Tag key={k}>{k} {v.count}</Tag>
+                ))}
+              </div>
+            </Col>
+          </Row>
+        </Card>
+      )}
+
+      {/* ★ G5 跨项目汇总：同时多个项目在跑（采购/管理层看一眼全局） */}
+      {crossRows.length > 1 && (
+        <Card size="small" style={{ marginBottom: 16 }} title="跨项目齐套汇总（多项目并行）">
+          <Table
+            size="small"
+            rowKey="project_no"
+            pagination={false}
+            dataSource={[...crossRows].sort((a, b) => b.total - a.total)}
+            columns={[
+              { title: '项目', dataIndex: 'project_no', render: (v: string, r: ProjectFunnelRow) => `${v} ${r.project_name}` },
+              { title: '阶段', dataIndex: 'stage', width: 80 },
+              { title: '总数', dataIndex: 'total', width: 70 },
+              ...FUNNEL_ORDER.map((k) => ({
+                title: k,
+                width: 90,
+                render: (_: unknown, r: ProjectFunnelRow) => r.buckets[k]?.count ?? 0,
+              })),
+            ]}
+          />
+        </Card>
+      )}
 
       {projectNo && (
         <Row gutter={12} style={{ marginBottom: 16 }}>

@@ -66,6 +66,38 @@ export async function kittingOverview(projectNo: string) {
   return data
 }
 
+// ★ G5（09 卷 §3）：多视角齐套率 —— 项目视角（主）/ 跨项目汇总
+/** 项目漏斗的 5 个态（顺序即漏斗） */
+export const FUNNEL_ORDER = ['未买', '在途', '验收已入库', '已领料', '已做成成品'] as const
+
+export interface KittingFunnel {
+  project_no: string
+  total: number
+  total_qty: number
+  buckets: Record<string, { count: number; qty: number }>
+  by_kind: Record<string, { count: number; qty: number }>
+  arrived_qty: number
+  assembled_rate: number
+}
+
+export interface ProjectFunnelRow extends KittingFunnel {
+  project_name: string
+  stage: string
+}
+
+export async function kittingFunnel(projectNo: string) {
+  const { data } = await api.get<KittingFunnel>('/assembly/kitting/funnel', {
+    params: { project_no: projectNo },
+  })
+  return data
+}
+
+/** 跨项目汇总：同时多个项目在跑时，按项目看齐套分布 */
+export async function kittingProjects() {
+  const { data } = await api.get<ProjectFunnelRow[]>('/assembly/kitting/projects')
+  return data
+}
+
 export async function listAssemblyRecords(params?: { project_no?: string; equip_no?: string }) {
   const { data } = await api.get<AssemblyRecordRow[]>('/assembly/records', { params })
   return data

@@ -17,12 +17,12 @@ from datetime import UTC, datetime
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.models.assembly import ASSY_DEBUG_DONE, ASSY_DONE, AssemblyRecord, KittingSnapshot
+from app.models.assembly import ASSY_DEBUG_DONE, ASSY_DEBUGGING, ASSY_DONE, AssemblyRecord, KittingSnapshot
 from app.models.engineering import BOM_MATERIAL, BOM_ROW_FROZEN, BomItem, Drawing
 from app.models.initiation import GoodsReceipt, PurchaseRequest
 from app.models.library import Item
 from app.models.production import OS_OK, PROD_TRANSFERRED, OutsourceTask, ProdOrder
-from app.models.project import Equipment
+from app.models.project import Equipment, Project
 from app.models.warehouse import MaterialIssue, MaterialIssueLine
 from app.services.bom_demand import _stock_available
 from app.services.bom_math import bom_line_demand, cumulative_qty, drawing_demand, is_ready
@@ -152,6 +152,8 @@ def compute(session: Session, project_no: str, equip_no: str) -> dict:
                 "unit": d.unit,
                 "ready": ready,
                 "state": state,
+                # ★ G5：已领到车间多少（项目漏斗用来区分「已入库」与「已领料」）
+                "issued_qty": issued.get(d.drawing_no, 0.0),
             }
         )
 
@@ -182,6 +184,7 @@ def compute(session: Session, project_no: str, equip_no: str) -> dict:
                 "unit": it.unit if it else None,
                 "ready": ready,
                 "state": "已入库" if ready else (f"有 {have:g}" if have > 0 else "未到"),
+                "issued_qty": taken,  # ★ G5
             }
         )
 
@@ -200,6 +203,104 @@ def compute(session: Session, project_no: str, equip_no: str) -> dict:
         "missing": [x for x in lines if not x["ready"]],
         "lines": lines,
     }
+
+
+# 项目漏斗的 5 个态（客户口径 2026-09-28 · 09 卷 §3-G5）：
+#   未买 → 在途 → 验收已入库 → 已领料 → 已做成成品（组装件）
+FUNNEL_BUY = "未买"
+FUNNEL_TRANSIT = "在途"
+FUNNEL_STORED = "验收已入库"
+FUNNEL_ISSUED = "已领料"
+FUNNEL_ASSEMBLED = "已做成成品"
+FUNNEL_STATES = (FUNNEL_BUY, FUNNEL_TRANSIT, FUNNEL_STORED, FUNNEL_ISSUED, FUNNEL_ASSEMBLED)
+
+_NOT_BOUGHT_YET = ("未采购", "未到", "未排产", "未发出")
+
+
+def _bucket(line: dict) -> str:
+    """一条料当前落在漏斗哪一格（没装配完时）。"""
+    ready = line.get("ready")
+    issued = float(line.get("issued_qty") or 0.0)
+    need = float(line.get("qty") or 0.0)
+    if ready and issued + 1e-9 >= need:
+        return FUNNEL_ISSUED
+    if ready:
+        return FUNNEL_STORED
+    if line.get("state") in _NOT_BOUGHT_YET:
+        return FUNNEL_BUY
+    return FUNNEL_TRANSIT
+
+
+def _assembled_equips(session: Session, project_no: str) -> set[str]:
+    """已装配完成的设备（它们的件就“已做成成品/组装体”）。"""
+    rows = session.scalars(
+        select(AssemblyRecord).where(
+            AssemblyRecord.project_no == project_no,
+            AssemblyRecord.status.in_((ASSY_DONE, ASSY_DEBUGGING, ASSY_DEBUG_DONE)),
+        )
+    ).all()
+    return {r.equip_no for r in rows}
+
+
+def funnel(session: Session, project_no: str) -> dict:
+    """★ G5 **项目视角**（主）：整个项目要的东西，现在分布于哪几个状态。
+
+    客户口径 2026-09-28：“比如整个项目我要买 200 个零件：是还没有买，还是在途，
+    还是验收已入库，还是说已经做成了成品（即组装件）？”
+
+    已装配完成的设备，它的件**整体归入「已做成成品」**（这就是组装体，参 09 卷 §2.1）。
+    """
+    equips = session.scalars(
+        select(Equipment).where(Equipment.project_no == project_no).order_by(Equipment.equip_no)
+    ).all()
+    assembled = _assembled_equips(session, project_no)
+    buckets: dict[str, dict] = {k: {"count": 0, "qty": 0.0} for k in FUNNEL_STATES}
+    by_kind: dict[str, dict] = {}
+    for e in equips:
+        done = e.equip_no in assembled
+        k = compute(session, project_no, e.equip_no)
+        for ln in k["lines"]:
+            state = FUNNEL_ASSEMBLED if done else _bucket(ln)
+            qty = float(ln.get("qty") or 0.0)
+            buckets[state]["count"] += 1
+            buckets[state]["qty"] += qty
+            kind = by_kind.setdefault(ln.get("kind") or "其他", {"count": 0, "qty": 0.0})
+            kind["count"] += 1
+            kind["qty"] += qty
+    total = sum(b["count"] for b in buckets.values())
+    total_qty = sum(b["qty"] for b in buckets.values())
+    assembled_cnt = buckets[FUNNEL_ASSEMBLED]["count"]
+    return {
+        "project_no": project_no,
+        "total": total,
+        "total_qty": total_qty,
+        "buckets": buckets,
+        "by_kind": by_kind,
+        # 项目推进到哪：已到货量（入库+领料+成品）/ 总量
+        "arrived_qty": buckets[FUNNEL_STORED]["qty"]
+        + buckets[FUNNEL_ISSUED]["qty"]
+        + buckets[FUNNEL_ASSEMBLED]["qty"],
+        "assembled_rate": round(assembled_cnt / total, 4) if total else 0.0,
+    }
+
+
+def projects_funnel(session: Session, project_nos: list[str] | None = None) -> list[dict]:
+    """★ G5 **跨项目汇总**：同时多个项目在跑，按项目看齐套分布（采购/管理层用）。
+
+    客户口径：“多个项目会同时运行，采购池里面会看到多个项目的东西。”
+    默认只统计**还有东西要弄的**项目（未全部做成成品），已归档/已关闭的开选项过滤。
+    """
+    stmt = select(Project).where(Project.stage.notin_(("已关闭", "已归档")))
+    if project_nos:
+        stmt = stmt.where(Project.project_no.in_(project_nos))
+    rows = session.scalars(stmt.order_by(Project.project_no)).all()
+    out = []
+    for p in rows:
+        f = funnel(session, p.project_no)
+        if f["total"] == 0:  # 还没设计的项目没意义，不占位置
+            continue
+        out.append({"project_name": p.project_name, "stage": p.stage, **f})
+    return out
 
 
 def overview(session: Session, project_no: str) -> list[dict]:
