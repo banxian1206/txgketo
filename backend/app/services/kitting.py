@@ -25,6 +25,7 @@ from app.models.production import OS_OK, PROD_TRANSFERRED, OutsourceTask, ProdOr
 from app.models.project import Equipment
 from app.models.warehouse import MaterialIssue, MaterialIssueLine
 from app.services.bom_demand import _stock_available
+from app.services.bom_math import bom_line_demand, cumulative_qty, drawing_demand
 
 SOURCE_SELF_MADE = "自制件"
 SOURCE_OUTSOURCE = "外协件"
@@ -86,6 +87,7 @@ def compute(session: Session, project_no: str, equip_no: str) -> dict:
     ).all()
     published = [d for d in drawings if d.status == DRAWING_PUBLISHED]
     tree_nos = {d.drawing_no for d in drawings}
+    cum = cumulative_qty(drawings)
     stock = _stock_available(session)
     issued = _issued_to_workshop(session, project_no)
 
@@ -110,7 +112,7 @@ def compute(session: Session, project_no: str, equip_no: str) -> dict:
     for d in published:
         if d.parent_drawing_no is None:
             continue
-        need = _qty(d.qty) or 1
+        need = drawing_demand(d, cum)
         if d.source_type == SOURCE_SELF_MADE:
             o = prod.get(d.drawing_no)
             ready = bool(o and o.status == PROD_TRANSFERRED)
@@ -143,7 +145,7 @@ def compute(session: Session, project_no: str, equip_no: str) -> dict:
     ).all()
     items = {i.item_no: i for i in session.scalars(select(Item)).all()}
     for b in rows:
-        need = _qty(b.qty) or 1
+        need = bom_line_demand(b, cum)
         have = stock.get(b.child_item_no, 0.0)
         taken = issued.get(b.child_item_no, 0.0)  # 已领到车间（本项目）
         ready = have + taken >= need

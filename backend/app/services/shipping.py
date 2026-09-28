@@ -150,7 +150,7 @@ def generate_items(
     数量 = 结构连乘。生成的是"应发清单"，逐项勾「已发」+ 拍照。
     """
     from app.models.engineering import BOM_MATERIAL, BomItem, Drawing
-    from app.services.bom_demand import _cumulative_qty
+    from app.services.bom_math import bom_line_demand, cumulative_qty, drawing_demand
 
     equip_nos = [
         l.equip_no
@@ -163,7 +163,7 @@ def generate_items(
         ).all()
         published = [d for d in drawings if d.status == "已发布"]
         tree = {d.drawing_no: d for d in drawings}
-        cum = _cumulative_qty(drawings)
+        cum = cumulative_qty(drawings)
         bom_rows = session.scalars(
             select(BomItem).where(
                 BomItem.project_no == sh.project_no,
@@ -181,7 +181,7 @@ def generate_items(
                 "name": d.title,
                 "kind": "组件" if children else "零件",
                 "source": "结构",
-                "qty": float(d.qty or 1),
+                "qty": drawing_demand(d, cum),
                 "unit": d.unit,
                 "level": sum(1 for lv in (d.l1, d.l2, d.l3, d.l4) if lv != "00"),
             })
@@ -195,7 +195,7 @@ def generate_items(
                 "name": it.display_name if it else b.child_item_no,
                 "kind": "原材料" if b.bom_source == BOM_MATERIAL else "标准件",
                 "source": "结构",
-                "qty": float(b.qty or 0) * float(cum.get(b.parent_ref, 1) or 1),
+                "qty": bom_line_demand(b, cum),
                 "unit": None,
                 "level": 9,
             })

@@ -35,7 +35,7 @@ from app.models.project import Equipment
 from app.models.project import Equipment
 from app.models.project import Equipment
 from app.services import notify
-from app.services.bom_demand import _cumulative_qty
+from app.services.bom_math import cumulative_qty, drawing_demand
 from app.services.numbering import ObjectType, next_number, year_scope_key
 
 SOURCE_SELF_MADE = "自制件"
@@ -99,7 +99,7 @@ def generate_orders(
     if not published:
         raise ManufacturingError("这台设备还没有已发布的图纸，不能排产（先走工程设计审核发布）")
 
-    mult = _cumulative_qty(drawings)
+    mult = cumulative_qty(drawings)
     start = plan_start or date.today()
     end = start + timedelta(days=max(plan_days, 1))
 
@@ -110,7 +110,7 @@ def generate_orders(
             continue  # ★ 总装图是装配对象，不是车间加工件，不排产
         if d.source_type not in (SOURCE_SELF_MADE, SOURCE_OUTSOURCE):
             continue
-        qty = float(mult.get(d.drawing_no, 1) or 1)
+        qty = drawing_demand(d, mult)
         if d.source_type == SOURCE_SELF_MADE:
             exists = session.scalar(
                 select(ProdOrder).where(

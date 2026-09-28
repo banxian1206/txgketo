@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import client_ip, get_current_user, require_permission
 from app.core.db import get_session
-from app.models.engineering import BOM_MATERIAL, Drawing
+from app.models.engineering import BOM_ROW_FROZEN, Drawing
 from app.models.initiation import GoodsReceipt, PurchaseRequest
 from app.models.library import Item
 from app.models.platform import User
@@ -27,6 +27,7 @@ from app.models.warehouse import (
     WarehouseLocation,
 )
 from app.services import audit
+from app.services.bom_math import bom_line_demand, cumulative_qty
 from app.services.numbering import next_number, year_scope_key
 
 router = APIRouter(prefix="/warehouse", tags=["仓库"])
@@ -363,25 +364,26 @@ def generate_issue(
 
     from app.models.engineering import BomItem  # noqa: PLC0415
 
-    bom_rows = session.scalars(select(BomItem).where(BomItem.project_no == project_no)).all()
+    bom_rows = session.scalars(
+        select(BomItem).where(
+            BomItem.project_no == project_no,
+            # ★ 只领「已冻结」的行，且排除改版后被替代的旧行 —— 否则按草稿 BOM 领料 / ECN 白走
+            BomItem.status == BOM_ROW_FROZEN,
+            BomItem.superseded_by_id.is_(None),
+        )
+    ).all()
     tree_nos = {d.drawing_no for d in drawings}
+    cum = cumulative_qty(drawings)
 
     need: dict[str, float] = {}
     for_part: dict[str, str] = {}
-    # 标准件（挂在该设备任意节点下）
+    # 标准件 + 自制件的原材料：都在 BOM 行上，统一用「行数量 × 父件累计倍数」
+    # （旧算法标准件不乘父级、原材料只乘直接父件一层 → qty>1 的多级树必少领）
     for b in bom_rows:
-        if b.parent_ref in tree_nos and b.bom_source != BOM_MATERIAL:
-            need[b.child_item_no] = need.get(b.child_item_no, 0) + _qty(b.qty)
-            for_part[b.child_item_no] = b.parent_ref
-    # 自制件的原材料
-    for b in bom_rows:
-        if b.bom_source == BOM_MATERIAL and b.parent_ref in tree_nos:
-            qty = _qty(b.qty)
-            parent = next((d for d in drawings if d.drawing_no == b.parent_ref), None)
-            if parent and parent.qty:
-                qty = qty * _qty(parent.qty)
-            need[b.child_item_no] = need.get(b.child_item_no, 0) + qty
-            for_part[b.child_item_no] = b.parent_ref
+        if b.parent_ref not in tree_nos:
+            continue
+        need[b.child_item_no] = need.get(b.child_item_no, 0) + bom_line_demand(b, cum)
+        for_part[b.child_item_no] = b.parent_ref
 
     if not need:
         raise HTTPException(

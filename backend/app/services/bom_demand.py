@@ -14,7 +14,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.models.engineering import BOM_ROW_FROZEN, BomItem, Drawing
@@ -25,11 +25,20 @@ from app.models.initiation import (
 )
 from app.models.library import Item
 from app.models.review import DesignRelease
-from app.models.warehouse import StockItem
+from app.models.warehouse import MaterialIssue, MaterialIssueLine, StockItem
 from app.services import notify
+from app.services.bom_math import (
+    bom_line_demand,
+    cumulative_qty,
+    drawing_demand,
+    scaled_qty,
+)
 
-# 还在跑（没结束）的需求算已覆盖，避免重复进池
-OPEN_STATUS = ("待采购", "在途", "已下单", "待入库", "部分到货", "不合格")
+# 还在跑（没结束）的需求算已覆盖，避免重复进池。
+# ★ 去掉死值「已下单」（旧中间态已废弃，迁移 e9c06543ffaa）；补「现场待验收」（直发在途也要占位）
+OPEN_STATUS = ("待采购", "在途", "待入库", "现场待验收", "部分到货", "不合格")
+# 直发件：货直接到客户现场、**从不进公司库存** → 必须在抵扣里，否则现场验收后会重复进池（08 §8.2 场景 A）
+COVER_STATUS = OPEN_STATUS + ("现场已验收",)
 # 会被采购的物品类型（05 卷 §5）
 BUY_TYPES = ("标准件", "定制件", "外协件", "原材料")
 
@@ -44,29 +53,6 @@ class DemandLine:
     unit: str | None
 
 
-def _cumulative_qty(drawings: list[Drawing]) -> dict[str, float]:
-    """图纸在设备上的累计倍数：父子 qty 连乘（子件装 2 个、父件装 3 个 → 6）。"""
-    by_no = {d.drawing_no: d for d in drawings}
-    cache: dict[str, float] = {}
-
-    def calc(no: str, seen: frozenset[str]) -> float:
-        if no in cache:
-            return cache[no]
-        d = by_no.get(no)
-        if d is None or no in seen:
-            return 1.0
-        q = float(d.qty or 1)
-        parent = d.parent_drawing_no
-        if parent and parent in by_no:
-            q *= calc(parent, seen | {no})
-        cache[no] = q
-        return q
-
-    for d in drawings:
-        calc(d.drawing_no, frozenset())
-    return cache
-
-
 def _stock_available(session: Session) -> dict[str, float]:
     stock: dict[str, float] = {}
     for s in session.scalars(select(StockItem)).all():
@@ -76,33 +62,70 @@ def _stock_available(session: Session) -> dict[str, float]:
     return stock
 
 
-def _open_qty(session: Session, project_no: str | None, equip_no: str | None) -> dict[str, float]:
-    """这台设备已经在下单/在途的量（不重复买）。"""
+def _covered_qty(session: Session, project_no: str | None, equip_no: str | None) -> dict[str, float]:
+    """已经买过 / 已计划的需求量（净需求抵扣）。
+
+    ★ 用**整条 `qty`**，不用 `qty − qty_received`：
+      `qty_received` 含「待入库 / 现场待验收」的 pending，会让这部分「两头都不覆盖」→ 重复进池
+      （08 §8.2 场景 B）。当前系统「一条需求只属于一张单」，所以 `qty` 就是已承诺量
+      （一期拆单后才改用 `qty_ordered`）。
+    """
     if project_no is None:
         return {}
-    open_qty: dict[str, float] = {}
+    covered: dict[str, float] = {}
     stmt = select(PurchaseRequest).where(
         PurchaseRequest.project_no == project_no,
-        PurchaseRequest.status.in_(OPEN_STATUS),
+        PurchaseRequest.status.in_(COVER_STATUS),
     )
     if equip_no is not None:
         stmt = stmt.where(PurchaseRequest.equip_no == equip_no)
     for r in session.scalars(stmt):
-        remaining = max(0.0, float(r.qty or 0) - float(r.qty_received or 0))
-        open_qty[r.item_no] = open_qty.get(r.item_no, 0.0) + remaining
-    return open_qty
+        covered[r.item_no] = covered.get(r.item_no, 0.0) + float(r.qty or 0)
+    return covered
+
+
+def _issued_to_workshop(
+    session: Session, project_no: str | None, equip_no: str | None
+) -> dict[str, float]:
+    """本项目已领走到车间的量（领料单「已领走」）—— 从净需求视角这些料算已覆盖。
+
+    用 `qty_issued`（实发），不是 `qty_required`（需求）：缺料行实发 0，不能算领到（08 §8.3-c）。
+    """
+    if project_no is None:
+        return {}
+    stmt = (
+        select(MaterialIssueLine.item_no, func.sum(MaterialIssueLine.qty_issued))
+        .join(MaterialIssue, MaterialIssue.id == MaterialIssueLine.issue_id)
+        .where(MaterialIssue.project_no == project_no, MaterialIssue.status == "已领走")
+        .group_by(MaterialIssueLine.item_no)
+    )
+    if equip_no is not None:
+        stmt = stmt.where(MaterialIssue.equip_no == equip_no)
+    return {item_no: float(qty or 0) for item_no, qty in session.execute(stmt).all()}
+
+
+def _total_cover(session: Session, project_no: str | None, equip_no: str | None) -> dict[str, float]:
+    """净需求抵扣总量 = 可用库存 + 已领到车间 + 已承诺/已计划/已直发（08 §8.2 订正公式）。"""
+    cover = {item_no: max(qty, 0.0) for item_no, qty in _stock_available(session).items()}
+    for source in (
+        _covered_qty(session, project_no, equip_no),
+        _issued_to_workshop(session, project_no, equip_no),
+    ):
+        for item_no, qty in source.items():
+            cover[item_no] = cover.get(item_no, 0.0) + qty
+    return cover
 
 
 def _cover(
-    lines: list[DemandLine], stock: dict[str, float], open_qty: dict[str, float]
+    lines: list[DemandLine], cover: dict[str, float]
 ) -> tuple[list[tuple[DemandLine, float]], dict]:
-    """净需求 = 需求 − 库存 − 在跑需求（数量大的行先抵消，保证总数正确、分摊确定）。"""
+    """净需求 = 需求 − 已抵扣量（数量大的行先抵消，保证总数正确、分摊确定）。"""
     plan: list[tuple[DemandLine, float]] = []
     for item_no in sorted({l.item_no for l in lines}):
-        cover = max(stock.get(item_no, 0.0), 0.0) + open_qty.get(item_no, 0.0)
+        remaining_cover = cover.get(item_no, 0.0)
         for line in sorted((x for x in lines if x.item_no == item_no), key=lambda x: -x.qty):
-            take = min(line.qty, cover)
-            cover -= take
+            take = min(line.qty, remaining_cover)
+            remaining_cover -= take
             residual = line.qty - take
             if residual > 1e-9:
                 plan.append((line, round(residual, 3)))
@@ -131,7 +154,7 @@ def equipment_demand(session: Session, project_no: str, equip_no: str) -> list[D
     if not drawings:
         return []
     tree_nos = {d.drawing_no for d in drawings}
-    cum = _cumulative_qty(drawings)
+    cum = cumulative_qty(drawings)
     bom_rows = session.scalars(
         select(BomItem).where(
             BomItem.project_no == project_no, BomItem.superseded_by_id.is_(None)
@@ -149,9 +172,8 @@ def equipment_demand(session: Session, project_no: str, equip_no: str) -> list[D
         item = items.get(b.child_item_no)
         if item is None or item.source_type not in BUY_TYPES:
             continue
-        mult = cum.get(b.parent_ref, 1.0)
         key = (b.child_item_no, b.parent_ref)
-        need[key] = need.get(key, 0.0) + float(b.qty or 0) * mult
+        need[key] = need.get(key, 0.0) + bom_line_demand(b, cum)
 
     # 有图号的「定制件 / 外协件」（图号即物料号）：已发布就计入净需求（总装图除外）
     for d in drawings:
@@ -163,7 +185,7 @@ def equipment_demand(session: Session, project_no: str, equip_no: str) -> list[D
         if item is None or item.source_type not in BUY_TYPES:
             continue
         key = (d.drawing_no, d.drawing_no)
-        need[key] = need.get(key, 0.0) + float(d.qty or 0) * cum.get(d.drawing_no, 1.0)
+        need[key] = need.get(key, 0.0) + drawing_demand(d, cum)
 
     lines = [
         DemandLine(item_no=item_no, part_no=part_no, qty=round(qty, 3), unit=items[item_no].unit)
@@ -186,7 +208,7 @@ def release_demand(session: Session, release: DesignRelease) -> list[DemandLine]
             )
         ).all()
     )
-    cum = _cumulative_qty(drawings)
+    cum = cumulative_qty(drawings)
     items = {i.item_no: i for i in session.scalars(select(Item)).all()}
     summary = release.summary or {}
     need: dict[tuple[str, str | None], float] = {}
@@ -204,7 +226,7 @@ def release_demand(session: Session, release: DesignRelease) -> list[DemandLine]
         if item is None or item.source_type not in BUY_TYPES:
             continue
         parent = entry.get("parent_ref")
-        add(item_no, parent, float(entry.get("qty") or 0) * cum.get(parent, 1.0))
+        add(item_no, parent, scaled_qty(entry.get("qty"), parent, cum))
 
     # ② 机械/电气发布：这次冻结的「定制件（外购）」图纸
     for entry in summary.get("drawings", []):
@@ -214,7 +236,7 @@ def release_demand(session: Session, release: DesignRelease) -> list[DemandLine]
         item = items.get(d.drawing_no)
         if item is None or item.source_type != "定制件":
             continue
-        add(d.drawing_no, d.drawing_no, cum.get(d.drawing_no, 1.0))
+        add(d.drawing_no, d.drawing_no, drawing_demand(d, cum))
 
     # ③ 工艺发布：判定为「外协件 / 定制件」的零件（都要外购，自动进池）
     for entry in summary.get("source_tags", []):
@@ -223,7 +245,7 @@ def release_demand(session: Session, release: DesignRelease) -> list[DemandLine]
         d = session.get(Drawing, entry.get("drawing_no"))
         if d is None or items.get(d.drawing_no) is None:
             continue
-        add(d.drawing_no, d.drawing_no, cum.get(d.drawing_no, 1.0))
+        add(d.drawing_no, d.drawing_no, drawing_demand(d, cum))
 
     lines = [
         DemandLine(item_no=item_no, part_no=part_no, qty=round(qty, 3), unit=items[item_no].unit)
@@ -241,7 +263,7 @@ def plan_equipment_purchase(
     lines = equipment_demand(session, project_no, equip_no)
     if not lines:
         return [], {"need_lines": 0, "need_qty": 0.0, "buy_lines": 0, "buy_qty": 0.0}
-    return _cover(lines, _stock_available(session), _open_qty(session, project_no, equip_no))
+    return _cover(lines, _total_cover(session, project_no, equip_no))
 
 
 def plan_release_purchase(
@@ -251,9 +273,7 @@ def plan_release_purchase(
     lines = release_demand(session, release)
     if not lines:
         return [], {"need_lines": 0, "need_qty": 0.0, "buy_lines": 0, "buy_qty": 0.0}
-    return _cover(
-        lines, _stock_available(session), _open_qty(session, release.project_no, release.equip_no)
-    )
+    return _cover(lines, _total_cover(session, release.project_no, release.equip_no))
 
 
 def create_release_demands(session: Session, release: DesignRelease) -> list[PurchaseRequest]:
