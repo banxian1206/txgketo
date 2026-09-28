@@ -36,9 +36,22 @@ def notify(
     biz_type: str | None = None,
     biz_id: int | None = None,
     actor_id: int | None = None,
+    dedup_key: str | None = None,
 ) -> int:
-    """给一批人发站内消息；返回实际发出条数。"""
+    """给一批人发站内消息；返回实际发出条数。
+
+    `dedup_key`（★ 到期扫描用）：已给某人发过同 key 的消息 → **跳过**，不重复刷屏。
+    """
     targets = _user_ids(session, user_ids, actor_id)
+    if not targets:
+        return 0
+    if dedup_key:
+        sent = set(
+            session.scalars(
+                select(Notification.user_id).where(Notification.dedup_key == dedup_key)
+            ).all()
+        )
+        targets = [u for u in targets if u not in sent]
     if not targets:
         return 0
     now = datetime.now(UTC)
@@ -52,9 +65,11 @@ def notify(
                 link=link,
                 biz_type=biz_type,
                 biz_id=biz_id,
+                dedup_key=dedup_key,
                 is_read=False,
             )
         )
+    session.flush()
     return len(targets)
 
 
@@ -69,6 +84,7 @@ def notify_role(
     biz_type: str | None = None,
     biz_id: int | None = None,
     actor_id: int | None = None,
+    dedup_key: str | None = None,
 ) -> int:
     """给拥有某角色的人发（如 WAREHOUSE → 仓库、PURCHASE → 采购）。"""
     ids = list(
@@ -81,7 +97,7 @@ def notify_role(
     )
     return notify(
         session, ids, type_=type_, title=title, body=body, link=link,
-        biz_type=biz_type, biz_id=biz_id, actor_id=actor_id,
+        biz_type=biz_type, biz_id=biz_id, actor_id=actor_id, dedup_key=dedup_key,
     )
 
 

@@ -29,6 +29,7 @@ from app.models.review import (
 )
 from app.models.task import Task
 from app.models.warehouse import MaterialIssue
+from app.services import deadline as deadline_svc
 from app.services import manufacturing as mfg
 from app.services import notify
 
@@ -393,6 +394,12 @@ def shop_board(session: Session = Depends(get_session), _: User = Depends(get_cu
 
 @router.get("/me")
 def workbench_me(session: Session = Depends(get_session), current: User = Depends(get_current_user)):
+    # ★ 到期扫描（AGENTS §8.3 第 6 条）：惰性扫描 —— 工作台人人都会开，
+    #   顺手把「任务超期 / 项目交期临期 / 采购到货超期」推给该负责的人（每天最多一次，靠 dedup_key）。
+    try:
+        deadline_svc.scan_due(session)
+    except Exception:  # 提醒失败绝不能让工作台打不开
+        session.rollback()
     codes = {r.code for r in current.roles}
     is_top = current.is_superuser or current.position == POSITION_DIRECTOR
 
@@ -559,6 +566,7 @@ def workbench_me(session: Session = Depends(get_session), current: User = Depend
             "shop_debug": shop_debug,
             "my_leads": my_leads,
             "my_projects": len(project_nos),
+            "overdue_tasks": deadline_svc.overdue_tasks_count(session, current.id),
             "unread": notify.unread_count(session, current.id),
         },
         "my_projects": [

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 
 from sqlalchemy import (
     Boolean,
@@ -99,6 +99,18 @@ class Project(Base, TimestampMixin):
     # ---- ② 成交登记（必填）----
     period_start: Mapped[date | None] = mapped_column(Date)
     period_end: Mapped[date | None] = mapped_column(Date)
+
+    @property
+    def delivery_end_date(self) -> date | None:
+        """应交日（单一口径，到期扫描与列表页共用）。
+
+        签了合同有起算日就用「签订日 + 交期天数」（如 90 天）；否则退回周期止。
+        原有逻辑散在 `routes/project.py::_out` 里内联算，到期提醒又要在服务层算一次 ——
+        两处一旦漂移，“列表说还剩 3 天、提醒说已超期”这种矛盾就会冒出来。
+        """
+        if self.period_start and self.delivery_days:
+            return self.period_start + timedelta(days=self.delivery_days)
+        return self.period_end
     amount: Mapped[float | None] = mapped_column(Numeric(14, 2))
     amount_tax_incl: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
 

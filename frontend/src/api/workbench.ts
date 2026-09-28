@@ -21,6 +21,8 @@ export interface WorkbenchMe {
   workbenches: WorkbenchItem[]
   counts: {
     my_tasks: number
+    /** ★ 到期扫描：我名下超期未完成的任务数 */
+    overdue_tasks?: number
     to_review: number
     to_decide: number
     my_changes: number

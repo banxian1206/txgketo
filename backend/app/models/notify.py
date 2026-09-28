@@ -25,5 +25,7 @@ class Notification(Base, TimestampMixin):
     link: Mapped[str | None] = mapped_column(String(255))  # 前端路由，点了直接跳
     biz_type: Mapped[str | None] = mapped_column(String(24))
     biz_id: Mapped[int | None] = mapped_column()
+    # ★ 到期扫描去重键（§8.3 超期提醒）—— 同一天同一件事只提醒一次，不刷屏
+    dedup_key: Mapped[str | None] = mapped_column(String(96))
     is_read: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     read_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

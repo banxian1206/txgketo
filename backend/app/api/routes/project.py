@@ -51,12 +51,10 @@ def _out(
 
     # ② 项目交期：签了合同才有起算日；没签约日就算不出应交日与剩余
     data.delivery_start = p.period_start
-    if p.period_start and p.delivery_days:
-        data.delivery_end = p.period_start + timedelta(days=p.delivery_days)
-        data.delivery_days_left = (data.delivery_end - today).days
-    elif p.period_end:
-        data.delivery_end = p.period_end
-        data.delivery_days_left = (data.delivery_end - today).days
+    due = p.delivery_end_date  # ★ 单一口径（与到期扫描共用），见 Project.delivery_end_date
+    if due:
+        data.delivery_end = due
+        data.delivery_days_left = (due - today).days
     return data
 
 

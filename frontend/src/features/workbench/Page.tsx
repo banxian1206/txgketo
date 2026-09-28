@@ -67,7 +67,9 @@ export default function Workbench() {
   // A3（v2 拍板）：KPI 按角色裁剪 —— 卡带 roles 标注（对齐后端 WORKBENCHES 思路），ADMIN 角色兜底；
   // 人人卡（我的任务/我提的改版）不标注。仓库三卡改指 PC 仓库台（A6 桌面跳移动修正提前完成）。
   const todos: TodoCard[] = [
-    { label: '我的任务', count: c?.my_tasks ?? 0, to: '/workbench/tasks' },
+    { label: '我的任务', count: c?.my_tasks ?? 0, to: '/workbench/tasks',
+      // ★ 到期扫描（§8.3）：超期了就红字点出来，别等他自己翻
+      hint: c?.overdue_tasks ? `⚠ 超期 ${c.overdue_tasks}` : undefined },
     { label: '待我审核', count: c?.to_review ?? 0, to: '/workbench/reviews', hint: '评审单', roles: ['DESIGN_AUDIT', 'ADMIN'] },
     { label: '待我裁决', count: c?.to_decide ?? 0, to: '/workbench/changes', roles: ['DESIGN_AUDIT', 'ADMIN'] },
     { label: '待我改版', count: c?.to_change ?? 0, to: '/workbench/changes', hint: '改版任务', roles: ['DESIGN', 'DESIGN_AUDIT', 'CRAFT', 'ADMIN'] },
