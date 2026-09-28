@@ -34,7 +34,7 @@ from app.services import notify
 
 router = APIRouter(prefix="/workbench", tags=["工作台"])
 
-TO_INSPECT = ("在途", "已下单", "部分到货")
+TO_INSPECT = ("在途", "部分到货")
 LEAD_STAGES = ("线索", "成交待立项")
 
 # 工作台定义（06 卷 §5）：key / 名称 / 路由 / 由哪些角色看得见

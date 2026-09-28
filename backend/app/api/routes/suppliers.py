@@ -9,7 +9,14 @@ from pydantic import BaseModel, Field
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
-from app.api.deps import client_ip, get_current_user, has_permission, require_permission, scrub_money
+from app.api.deps import (
+    client_ip,
+    get_current_user,
+    has_permission,
+    require_any_permission,
+    require_permission,
+    scrub_money,
+)
 from app.core.db import get_session
 from app.models.initiation import PurchaseRequest
 from app.models.library import SOURCE_STANDARD, Item, StdCategory, StdClass
@@ -488,11 +495,23 @@ def add_catalog(
 
 @router.delete("/suppliers/catalog/{catalog_id}")
 def remove_catalog(
-    catalog_id: int, session: Session = Depends(get_session), _: User = Depends(get_current_user)
+    catalog_id: int,
+    request: Request,
+    session: Session = Depends(get_session),
+    current: User = Depends(require_any_permission("purchase:edit", "std:edit")),
 ):
     row = session.get(SupplierCatalog, catalog_id)
     if row is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "记录不存在")
+    audit.log(
+        session,
+        user=current,
+        action="delete",
+        object_type="supplier_catalog",
+        object_ref=str(catalog_id),
+        summary=f"删除供应商品类 {row.item_no}（供应商 #{row.supplier_id}）",
+        ip=client_ip(request),
+    )
     session.delete(row)
     session.commit()
     return {"ok": True}

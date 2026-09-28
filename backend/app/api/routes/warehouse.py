@@ -594,7 +594,7 @@ def workbench(session: Session = Depends(get_session), _: User = Depends(get_cur
     incoming = session.scalars(
         select(PurchaseRequest)
         .where(
-            PurchaseRequest.status.in_(("在途", "已下单", "部分到货")),
+            PurchaseRequest.status.in_(("在途", "部分到货")),
             or_(PurchaseRequest.deliver_to == "公司仓库", PurchaseRequest.deliver_to.is_(None)),
         )
         .order_by(PurchaseRequest.expected_date)

@@ -24,7 +24,7 @@ from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.api.deps import client_ip, get_current_user
+from app.api.deps import client_ip, get_current_user, require_permission
 from app.core.config import settings
 from app.core.db import get_session
 from app.models.change import CR_DISPATCHED, TARGET_PROGRAM
@@ -172,7 +172,7 @@ def update_program(
     body: ProgramPatch,
     request: Request,
     session: Session = Depends(get_session),
-    current: User = Depends(get_current_user),
+    current: User = Depends(require_permission("design:edit")),
 ):
     row = _get_program(session, program_id)
     if row.status != "草稿":
@@ -333,7 +333,7 @@ def delete_program(
     program_id: int,
     request: Request,
     session: Session = Depends(get_session),
-    current: User = Depends(get_current_user),
+    current: User = Depends(require_permission("design:edit")),
 ):
     row = _get_program(session, program_id)
     if row.status != "草稿":

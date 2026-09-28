@@ -69,6 +69,21 @@ def require_permission(code: str):
     return dep
 
 
+def require_any_permission(*codes: str):
+    """任一权限即可。
+
+    用例：长周期件登记（立项即下单）—— 项目经理在 S1 立项时登记（`project:edit`），
+    采购员也能补登（`purchase:edit`）；两边都该能，现场/车间不该能。
+    """
+
+    def dep(current: User = Depends(get_current_user)) -> User:
+        if not any(has_permission(current, c) for c in codes):
+            raise HTTPException(status.HTTP_403_FORBIDDEN, f"没有权限：{'/'.join(codes)}")
+        return current
+
+    return dep
+
+
 # 金额字段名（无对应权限时抹成 None，前端直接不显示）
 MONEY_KEYS = {
     "unit_price",

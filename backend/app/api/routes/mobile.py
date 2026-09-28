@@ -34,7 +34,7 @@ from app.services.notify import unread_count
 
 router = APIRouter(prefix="/m", tags=["移动端"])
 
-TO_INSPECT = ("在途", "已下单", "部分到货")
+TO_INSPECT = ("在途", "部分到货")
 
 
 def _photos(gr: GoodsReceipt) -> list[dict]:

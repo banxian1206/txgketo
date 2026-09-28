@@ -225,5 +225,7 @@ class ProjectOut(BaseModel):
     tech_agreement_frozen: bool = False
     close_reason: str | None = None
     close_note: str | None = None
+    warranty_start: date | None = None  # 质保起（客户验收确认日，S10 自动写）
+    warranty_end: date | None = None  # 质保止（验收日 + 质保月数）
     pm_id: int | None = None
     created_at: object | None = None

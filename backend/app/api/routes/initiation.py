@@ -11,7 +11,14 @@ from pydantic import BaseModel, Field
 from sqlalchemy import delete, or_, select
 from sqlalchemy.orm import Session
 
-from app.api.deps import client_ip, get_current_user, has_permission, require_permission, scrub_money
+from app.api.deps import (
+    client_ip,
+    get_current_user,
+    has_permission,
+    require_any_permission,
+    require_permission,
+    scrub_money,
+)
 from app.core.config import settings
 from app.core.db import get_session
 from app.models.engineering import Drawing
@@ -610,7 +617,7 @@ def add_purchase_request(
     body: LongLeadIn,
     request: Request,
     session: Session = Depends(get_session),
-    current: User = Depends(require_permission("purchase:edit")),
+    current: User = Depends(require_any_permission("purchase:edit", "project:edit")),
 ):
     """登记长周期采购件（从标准库选）。填下单日期 → 已下单，预计到货 = 下单 + 周期。
 
@@ -744,7 +751,7 @@ def remove_purchase_request(
     request_id: int,
     request: Request,
     session: Session = Depends(get_session),
-    current: User = Depends(require_permission("purchase:edit")),
+    current: User = Depends(require_any_permission("purchase:edit", "project:edit")),
 ):
     """删除一条采购需求：**只允许还没进入采购流程的需求**。
 
@@ -1180,7 +1187,7 @@ def _perform_inspect(
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "验收不合格必须写明原因")
     if row.status in ("已取消", "已退货"):
         raise HTTPException(status.HTTP_400_BAD_REQUEST, f"这一行已经结束了（{row.status}），不能再验收")
-    if row.status not in ("在途", "部分到货", "待入库", "不合格", "已下单"):
+    if row.status not in ("在途", "部分到货", "待入库", "不合格"):
         raise HTTPException(status.HTTP_400_BAD_REQUEST, f"当前状态是「{row.status}」，不能验收")
 
     # ★ R2-01：直发单在下单时已生成「现场待验收」单 —— 仓库不再重复验收，直接返回该单
@@ -1628,7 +1635,7 @@ def purchase_workbench(session: Session = Depends(get_session), _: User = Depend
                 ),
             }
         )
-    order = {"不合格": 0, "待采购": 1, "在途": 2, "已下单": 3, "待入库": 4, "现场待验收": 4, "部分到货": 5}
+    order = {"不合格": 0, "待采购": 1, "在途": 2, "待入库": 4, "现场待验收": 4, "部分到货": 5}
     return sorted(out, key=lambda x: (order.get(x["status"], 9), x.get("need_date") or "9999"))
 
 
@@ -2031,7 +2038,7 @@ def merge_order(
 
 
 # 可继续操作的行：未到货部分（取消 / 改供应商）；到货落地后不能动
-ORDER_ACTIVE_STATUS = ("待采购", "在途", "已下单", "部分到货")
+ORDER_ACTIVE_STATUS = ("待采购", "在途", "部分到货")
 # 验收不合格：由采购协商 → 换货（回在途）/ 退货（结束）
 ORDER_FAILED_STATUS = ("不合格",)
 # 已落地（验收中/已入库/已退）：取消、改供应商都动不了
@@ -2356,7 +2363,7 @@ def change_order_supplier(
 
     price_map = {ln.request_id: ln.unit_price for ln in (body.lines or [])}
     only = set(price_map) if body.lines else None
-    eligible = [r for r in rows if r.status in ("在途", "已下单")]
+    eligible = [r for r in rows if r.status in ("在途",)]
     target = [r for r in eligible if only is None or r.id in only]
     if not target:
         raise HTTPException(

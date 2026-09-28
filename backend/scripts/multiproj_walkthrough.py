@@ -646,7 +646,7 @@ def s3(pj: dict) -> None:
         })
     if dr:
         api.req("post", "/purchase/merge-order", "buyer1", (200, 201), json={
-            "supplier_id": SUP["恒钲钣金"]["id"], "ordered_at": d(0),
+            "supplier_id": SUP["恒钲钣金"]["id"], "ordered_at": d(0), "expected_date": d(10),
             "deliver_to": "直发客户现场", "deliver_address": prof["site"],
             "lines": [{"request_id": r["id"], "unit_price": price_of(r["item_no"])} for r in dr],
         })
@@ -1192,7 +1192,7 @@ def deep_coverage(pjs: list[dict]) -> None:
         "attribution": "辅料", "item_no": LIB["zct"]["item_no"], "qty": 3, "unit": "个",
         "need_date": d(10), "note": "车间辅料"})
     mo = api.req("post", "/purchase/merge-order", "buyer1", (200, 201), json={
-        "supplier_id": SUP["华南标准件"]["id"], "ordered_at": d(0), "deliver_to": "公司仓库",
+        "supplier_id": SUP["华南标准件"]["id"], "ordered_at": d(0), "expected_date": d(15), "deliver_to": "公司仓库",
         "lines": [{"request_id": mr["id"], "unit_price": price_of(mr["item_no"])}]})
     po = mo.get("po_no") if isinstance(mo, dict) else None
     probe("采购单详情", "get", f"/purchase/orders/{po}", "buyer1")
@@ -1201,7 +1201,7 @@ def deep_coverage(pjs: list[dict]) -> None:
     mr2 = api.req("post", "/purchase/manual-request", "shop1", (201,), json={
         "attribution": "辅料", "item_no": LIB["sf"]["item_no"], "qty": 2, "need_date": d(15)})
     mo2 = api.req("post", "/purchase/merge-order", "buyer1", (200, 201), json={
-        "supplier_id": SUP["华南标准件"]["id"], "ordered_at": d(0), "deliver_to": "公司仓库",
+        "supplier_id": SUP["华南标准件"]["id"], "ordered_at": d(0), "expected_date": d(15), "deliver_to": "公司仓库",
         "lines": [{"request_id": mr2["id"], "unit_price": price_of(mr2["item_no"])}]})
     po2 = mo2.get("po_no") if isinstance(mo2, dict) else None
     probe("更改供应商", "post", f"/purchase/orders/{po2}/change-supplier", "buyer1",
@@ -1392,7 +1392,7 @@ def deep_coverage2(pjs: list[dict]) -> None:
 
     def order_one(r):
         return api.req("post", "/purchase/merge-order", "buyer1", (200, 201), json={
-            "supplier_id": SUP["华南标准件"]["id"], "ordered_at": d(0), "deliver_to": "公司仓库",
+            "supplier_id": SUP["华南标准件"]["id"], "ordered_at": d(0), "expected_date": d(15), "deliver_to": "公司仓库",
             "lines": [{"request_id": r["id"], "unit_price": price_of(r["item_no"])}]})
 
     ts = [threading.Thread(target=_tcall, args=(lambda rr=rr: order_one(rr), out, lock)) for rr in mrs]
@@ -1425,7 +1425,7 @@ def deep_coverage2(pjs: list[dict]) -> None:
         "attribution": "辅料", "item_no": LIB["qg"]["item_no"], "qty": 1, "need_date": d(10)}) for _ in range(3)]
     for r in insp:
         api.req("post", "/purchase/merge-order", "buyer1", (200, 201), json={
-            "supplier_id": SUP["华南标准件"]["id"], "ordered_at": d(0), "deliver_to": "公司仓库",
+            "supplier_id": SUP["华南标准件"]["id"], "ordered_at": d(0), "expected_date": d(15), "deliver_to": "公司仓库",
             "lines": [{"request_id": r["id"], "unit_price": price_of(r["item_no"])}]})
     proj = insp[0].get("project_no")
     out3: list = []
@@ -1451,7 +1451,7 @@ def deep_coverage2(pjs: list[dict]) -> None:
         "attribution": "项目", "project_no": p2no, "equip_no": deep2,
         "item_no": LIB["dj"]["item_no"], "qty": 2, "need_date": d(10)})
     api.req("post", "/purchase/merge-order", "buyer1", (200, 201), json={
-        "supplier_id": SUP["华南标准件"]["id"], "ordered_at": d(0), "deliver_to": "公司仓库",
+        "supplier_id": SUP["华南标准件"]["id"], "ordered_at": d(0), "expected_date": d(15), "deliver_to": "公司仓库",
         "lines": [{"request_id": big["id"], "unit_price": price_of(big["item_no"])}]})
     code, res = probe("超额验收（订 2 验 5，应硬拦）", "post",
                       f"/projects/{p2no}/purchase-requests/{big['id']}/inspect", "wh1",
