@@ -157,6 +157,39 @@ def main() -> None:
     chk("★ 作废后不能再备料",
         C.post(f"/warehouse/issues/{mid}/pick", headers=dict(login("wh1")), json={}).status_code == 400, "400")
 
+    print("\n═══ M-03 续 · 跨库位分次备料（原以为不支持，其实支持 —— 见勘误）═══")
+    # 场景：需 10 · A 库位备 5 → A 被别的单领空 → 补货到 B → 还要能接着备，并且锁不能乱
+    loc2 = q("select id from warehouse_location order by id desc limit 1")[0]["id"]
+    if loc2 == loc_id:
+        C.post("/warehouse/locations", headers=dict(login("wh1")),
+               json={"warehouse": "惠州仓", "code": "B-09-09", "name": "跨库位探针位"})
+        loc2 = q("select id from warehouse_location order by id desc limit 1")[0]["id"]
+    ex("delete from material_issue_line where issue_id in (select id from material_issue where project_no=:p)", p=proj)
+    ex("delete from material_issue where project_no=:p", p=proj)
+    ex("delete from stock_item where item_no=:i", i=it)
+    ex("insert into stock_item(item_no,location_id,qty_on_hand,qty_locked) values (:i,:l,5,0)", i=it, l=loc_id)
+    rx = C.post(f"/warehouse/projects/{proj}/equipment/{eq}/generate-issue", headers=dict(login("shop1")))
+    xid = rx.json()["id"]
+    C.post(f"/warehouse/issues/{xid}/pick", headers=dict(login("wh1")), json={})
+    x1 = q("select location_id,qty_picked from material_issue_line where issue_id=:i and item_no=:t", i=xid, t=it)[0]
+    chk("① 先备 A 一部分（5/10）", float(x1["qty_picked"]) == 5.0 and x1["location_id"] == loc_id,
+        f"备={x1['qty_picked']} 库位={x1['location_id']}")
+    # A 被清空（模拟别的单领走），补货到 B
+    ex("delete from stock_item where item_no=:i and location_id=:l", i=it, l=loc_id)
+    ex("insert into stock_item(item_no,location_id,qty_on_hand,qty_locked) values (:i,:l,10,0)", i=it, l=loc2)
+    rx2 = C.post(f"/warehouse/issues/{xid}/pick", headers=dict(login("wh1")), json={})
+    x2 = q("select location_id,qty_picked from material_issue_line where issue_id=:i and item_no=:t", i=xid, t=it)[0]
+    chk("★ ② A 空了以后能接着从 B 备（库位自动迁移）",
+        rx2.status_code == 200 and float(x2["qty_picked"]) == 10.0 and x2["location_id"] == loc2,
+        f"HTTP {rx2.status_code} 备={x2['qty_picked']} 库位→{x2['location_id']}")
+    C.post(f"/warehouse/issues/{xid}/hand-over", headers=dict(login("wh1")), json={"issued_to": "车间 跨库位"})
+    x3 = q("select qty_issued from material_issue_line where issue_id=:i and item_no=:t", i=xid, t=it)[0]
+    xneg = q("select count(*) c from stock_item where qty_on_hand<0")[0]["c"]
+    xover = q("select count(*) c from stock_item where qty_locked>qty_on_hand")[0]["c"]
+    chk("★ ③ 跨库位领完 + 锁不泄（守恒）",
+        float(x3["qty_issued"]) == 10.0 and xneg == 0 and xover == 0,
+        f"领={x3['qty_issued']} 负库存={xneg} 超锁={xover}")
+
     print("\n═══ N25 验收不可重复（原会覆盖质保起算日）═══")
     acc = q("select project_no from acceptance where status='已通过' order by id limit 1")
     if not acc:
