@@ -1033,6 +1033,25 @@ def b_split_receive() -> None:
     rec(scv == 200, f"未到货的乙单应可作废，实际={scv}")
 
 
+def b_direct_split() -> None:
+    """N13 交叉护栏：直发 × 拆单 → 每张到货单量=本行量、合计 ≤ 需求、各自挂对行。"""
+    probe("N13 直发 × 拆单 交叉护栏")
+    rid = _new_demand("bc", 60)["id"]
+    for sup, qty in (("甲钢材", 30), ("乙标准件", 30)):
+        api.req("post", "/purchase/merge-order", "buyer1", (200, 201), json={
+            "supplier_id": SUP[sup]["id"], "ordered_at": d(0), "expected_date": d(10),
+            "deliver_to": "直发客户现场", "deliver_address": "深圳客户现场",
+            "lines": [{"request_id": rid, "qty": qty, "unit_price": 10.0, "tax_incl": True}]})
+    recs = q("select gr.receipt_no, gr.qty, gr.po_line_id, l.qty line_qty "
+             "from goods_receipt gr left join purchase_order_line l on l.id=gr.po_line_id "
+             "where gr.request_id=:i order by gr.id", i=rid)
+    rec(len(recs) == 2, f"拆两家直发 → 2 张现场待验收单，实际={len(recs)}")
+    rec(all(float(r["qty"]) == float(r["line_qty"] or 0) for r in recs),
+        f"★ 每张到货单 qty 应=本行订购量，实际={[(float(r['qty']), float(r['line_qty'] or 0)) for r in recs]}")
+    rec(sum(float(r["qty"]) for r in recs) <= 60.0 + 1e-6,
+        f"两份合计不应超需求，实际={sum(float(r['qty']) for r in recs)}")
+
+
 def _new_demand(item_key: str, qty: float, who: str = "buyer1") -> dict:
     """建一条干净的「待采购」需求（手工申请通道，免审核直入池）。"""
     r = api.req("post", "/purchase/manual-request", who, (201,), json={
@@ -1430,7 +1449,7 @@ def main() -> None:
             traceback.print_exc()
 
     part("Part B · 采购域专项探针")
-    for fn in (b_split, b_split_receive, b_partial_ok, b_split_line_cancel, b_void_order, b_close_return, b_approval_chain, b_payment, b_fixes, b_idempotent_after_release, b_pending_window, b_pending_repool,
+    for fn in (b_split, b_split_receive, b_direct_split, b_partial_ok, b_split_line_cancel, b_void_order, b_close_return, b_approval_chain, b_payment, b_fixes, b_idempotent_after_release, b_pending_window, b_pending_repool,
                b_direct_repool, b_delete_authz, b_kitting_inflate, b_issue_draft_bom,
                b_stock_conservation, b_price_reference):
         try:

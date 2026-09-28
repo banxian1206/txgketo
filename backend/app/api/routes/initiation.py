@@ -1134,13 +1134,15 @@ def _ensure_site_pending_receipt(
     if existing is not None:
         return existing
     item = session.get(Item, row.item_no)
+    # ★ N13：直发到货单数量取【本行订购量】，不是需求总量（一条需求拆给多家时各记各的）
+    q_ = float(line.qty or 0) if line is not None else float(row.qty or 0)
     gr = GoodsReceipt(
         receipt_no=next_number(session, "RECEIPT", scope_key=year_scope_key()),
         project_no=row.project_no,
         request_id=row.id,
         item_no=row.item_no,
-        qty=row.qty,
-        qty_ok=row.qty,
+        qty=q_,
+        qty_ok=q_,
         unit=row.unit or (item.unit if item else None),
         receipt_date=None,
         deliver_to="直发客户现场",
@@ -2519,7 +2521,11 @@ def mark_orders_paid(
         ip=client_ip(request),
     )
     session.commit()
-    return {"paid": paid, "skipped": skipped}
+    return {
+        "paid": paid,
+        "skipped": skipped,
+        "skipped_reason": "已付款/已作废跳过（一单付一次）" if skipped else None,
+    }
 
 
 @purchase_router.post("/purchase/orders/{key}/vouchers", status_code=status.HTTP_201_CREATED)
