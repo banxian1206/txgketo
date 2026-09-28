@@ -42,9 +42,25 @@ export default function MfgPhotoPicker({
   const uploadRef = useRef(upload)
   uploadRef.current = upload
 
-  /** 把队列里的离线照片补传回服务端，token 追加回调给表单 */
+  // 本 picker 自己的 ref（与入队时写的保持一致）
+  const myRef = refNo || 'misc'
+
+  /** 队列里**属于本 picker** 的照片。
+   *
+   * ★ 必须按 (projectNo, refNo) 过滤，不能拿整条队列！
+   *   同一个页面/同一次会话里会有多个 picker（daily / incoming / issue / 按设备 / 按批次…），
+   *   每个 picker 挂载或联网时都会 flush；若不加过滤，
+   *   会把**别人**的照片 token 追加到**自己的**表单上，
+   *   而照片又已被移出队列 → 那张照片从此没有任何表单引用（服务端有文件、业务上却丢了）。
+   */
+  const myQueued = useCallback(async () => {
+    const all = await queueList('photo')
+    return all.filter((it) => it.projectNo === projectNo && it.refNo === myRef)
+  }, [projectNo, myRef])
+
+  /** 把队列里**本 picker** 的离线照片补传回服务端，token 追加回调给表单 */
   const flush = useCallback(async () => {
-    const items = await queueList('photo')
+    const items = await myQueued()
     if (!items.length) return 0
     let added = 0
     let acc = [...valueRef.current]
@@ -61,19 +77,19 @@ export default function MfgPhotoPicker({
       }
     }
     if (added) {
-      setQueued(await queueList('photo'))
+      setQueued(await myQueued())
       message.success(`离线照片已同步 ${added} 张`)
     }
     return added
-  }, [message])
+  }, [message, myQueued])
 
   // 挂载扫队列（上次没 flush 成功的）+ 联网自动 flush
   useEffect(() => {
-    void queueList('photo').then(setQueued).catch(() => undefined)
+    void myQueued().then(setQueued).catch(() => undefined)
     const on = () => { void flush() }
     window.addEventListener('online', on)
     return () => window.removeEventListener('online', on)
-  }, [flush])
+  }, [flush, myQueued])
 
   const pick = async (files: File[]) => {
     setBusy(true)
@@ -91,7 +107,7 @@ export default function MfgPhotoPicker({
         // 03 卷：弱网拍完先存本地 —— Blob 入队，⏳占位，联网自动同步
         try {
           for (const f of files) await queueAdd({ kind: 'photo', projectNo, refNo: refNo || 'misc', blob: f })
-          setQueued(await queueList('photo'))
+          setQueued(await myQueued())
           message.warning(`网络不可用：${files.length} 张已存本地，联网后自动同步`)
         } catch {
           message.error('本地存储不可用，照片未能保存')
@@ -150,7 +166,7 @@ export default function MfgPhotoPicker({
               </Tag>
               <a
                 style={{ fontSize: 12, marginLeft: 4 }}
-                onClick={() => { void queueRemove(q.id).then(() => queueList('photo')).then(setQueued) }}
+                onClick={() => { void queueRemove(q.id).then(() => myQueued()).then(setQueued) }}
               >
                 删
               </a>
