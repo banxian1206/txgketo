@@ -413,6 +413,8 @@ def main() -> None:
     sh1 = next(x for x in req("get", "/api/v1/shipping/list", "pm1", params={"project_no": p}) if x["id"] == sh1["id"])
     flag("S7", all(i["shipped"] for i in sh1["items"]), "勾选后所有项应标记已发")
     # 装车（拍照）→ 发运 → 到货
+    req("post", f"/api/v1/shipping/{sh1['id']}/request-vehicle", "buyer1", ok=(200,),
+        json={"count": 1, "fee": 800, "note": "回归叫车"})
     req("post", f"/api/v1/shipping/{sh1['id']}/load", "delivery1",
         json={"plate_no": "粤B88888", "driver": "张师傅", "photos": sph[:1]})
     req("post", f"/api/v1/shipping/{sh1['id']}/depart", "delivery1", json={})
@@ -433,6 +435,8 @@ def main() -> None:
     sh2 = next(x for x in req("get", "/api/v1/shipping/list", "pm1", params={"project_no": p}) if x["id"] == sh2["id"])
     ship_ids = [i["id"] for i in sh2["items"]][:-1]  # 故意漏发最后一项
     req("post", "/api/v1/shipping/items/ship", "delivery1", json={"item_ids": ship_ids})
+    req("post", f"/api/v1/shipping/{sh2['id']}/request-vehicle", "buyer1", ok=(200,),
+        json={"count": 1, "fee": 800, "note": "回归叫车"})
     req("post", f"/api/v1/shipping/{sh2['id']}/load", "delivery1",
         json={"plate_no": "粤B66666", "photos": photos("pm1", "shipping", p, sh2["shipment_no"])})
     req("post", f"/api/v1/shipping/{sh2['id']}/depart", "delivery1", json={})

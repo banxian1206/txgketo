@@ -1772,6 +1772,36 @@ def list_receipts(
     ]
 
 
+@purchase_router.get("/purchase/to-vehicle")
+def purchase_to_vehicle(session: Session = Depends(get_session), _: User = Depends(get_current_user)):
+    """★ §2.2（09 卷）采购待办：**待叫车**的发运批次（跨项目）。
+
+    客户口径：“PM 发出指令需要叫车服务，**采购**就去采购车辆回来，发运就开始装车。”
+    —— 一条指令、两个部门：PM 下指令（含发货日）后，**采购这里就多一个待办**。
+    装货的人看 `vehicle_count` 知道“当天要装几车”。
+    """
+    from app.models.shipment import VEHICLE_PENDING, Shipment
+
+    projects = {p.project_no: p.project_name for p in session.scalars(select(Project)).all()}
+    rows = session.scalars(
+        select(Shipment)
+        .where(Shipment.vehicle_status == VEHICLE_PENDING, Shipment.status.in_(("已指令", "发货中")))
+        .order_by(Shipment.plan_ship_date, Shipment.id)
+    ).all()
+    return [
+        {
+            "id": s.id,
+            "shipment_no": s.shipment_no,
+            "project_no": s.project_no,
+            "project_name": projects.get(s.project_no),
+            "plan_ship_date": s.plan_ship_date,
+            "status": s.status,
+            "instruct_at": s.instruct_at,
+        }
+        for s in rows
+    ]
+
+
 @purchase_router.get("/purchase/workbench")
 def purchase_workbench(session: Session = Depends(get_session), _: User = Depends(get_current_user)):
     """采购工作台：全公司在采购上的待办（跨项目）。"""

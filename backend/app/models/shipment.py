@@ -27,6 +27,14 @@ SHIP_ARRIVED = "已到货"
 SHIP_SIGNED = "已签收"
 SHIP_STATUS = (SHIP_INSTRUCTED, SHIP_SHIPPING, SHIP_LOADED, SHIP_TRANSIT, SHIP_ARRIVED, SHIP_SIGNED)
 
+# ★ 叫车环节（09 卷 §2.2，客户口径 2026-09-28）：
+#   “PM 发出指令需要**叫车服务**，**采购**就去采购车辆回来，**发运**就开始装车并进行交付…
+#    这相当于是一条指令，但是**指挥了两个部门**的人在干事情。”
+#   所以：PM 下指令（含**发货日**）→ **采购叫车**（当天把车叫回来）→ 发运装车。
+VEHICLE_PENDING = "待叫车"
+VEHICLE_READY = "已叫车"
+VEHICLE_STATUS = (VEHICLE_PENDING, VEHICLE_READY)
+
 # 现场到货验收结论
 RECEIPT_OK = "齐"
 RECEIPT_SHORT = "缺件"
@@ -44,8 +52,17 @@ class Shipment(Base, TimestampMixin):
     project_no: Mapped[str] = mapped_column(ForeignKey("project.project_no", ondelete="CASCADE"))
     instruct_by: Mapped[int | None] = mapped_column(ForeignKey("app_user.id"))  # 项目经理
     instruct_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-    plan_ship_date: Mapped[date | None] = mapped_column(Date)
+    plan_ship_date: Mapped[date | None] = mapped_column(Date)  # ★ 计划发货日（PM 定，精确到天）
     status: Mapped[str] = mapped_column(String(16), default=SHIP_INSTRUCTED, server_default=SHIP_INSTRUCTED)
+    # ★ 叫车（采购做的事，与发运的「装车」分开）
+    vehicle_status: Mapped[str] = mapped_column(
+        String(16), default=VEHICLE_PENDING, server_default=VEHICLE_PENDING
+    )
+    vehicle_count: Mapped[int | None] = mapped_column(Integer)  # 几车（装货的人看“当天要装几车”）
+    vehicle_fee: Mapped[float | None] = mapped_column(Numeric(14, 2))  # **本次**运费（不进价格库）
+    vehicle_note: Mapped[str | None] = mapped_column(String(255))  # 承运商 / 备注
+    vehicle_by: Mapped[int | None] = mapped_column(ForeignKey("app_user.id"))
+    vehicle_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     vehicle: Mapped[str | None] = mapped_column(String(64))
     driver: Mapped[str | None] = mapped_column(String(64))
     plate_no: Mapped[str | None] = mapped_column(String(32))

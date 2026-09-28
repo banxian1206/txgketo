@@ -606,7 +606,18 @@ def a_s7() -> None:
     api.req("post", f"/shipping/{sid}/items/generate", "pm1", (200, 201))
     items = api.req("get", f"/shipping/{sid}/items", "pm1")
     note(f"发运清单 {len(items)} 项")
-    # ★ 0 项已发不能装车（R5-01）
+    # ★ §2.2：采购还没叫车 → 装车被拦（一条指令指挥两个部门）
+    sc, bd = api.try_("post", f"/shipping/{sid}/load", "pm1",
+                      json={"vehicle": "平板车", "driver": "张三", "plate_no": "粤B12345",
+                            "photos": CTX["ph"]})
+    rec(sc == 400, f"未叫车时装车被拦（HTTP {sc}）", "09 卷 §2.2")
+    # 采购按发货日叫车
+    api.req("post", f"/shipping/{sid}/request-vehicle", "buyer1", (200,),
+            json={"count": 2, "fee": 1800, "note": "顺达物流 17.5米"})
+    det_v = api.req("get", f"/shipping/{sid}", "pm1")
+    rec(det_v["vehicle_status"] == "已叫车" and det_v["vehicle_count"] == 2,
+        f"采购叫车：{det_v['vehicle_status']} / {det_v['vehicle_count']} 车")
+    # ★ 0 项已发不能装车（R5-01）—— 车已就绪，这一条失败原因就只能是“没勾已发”
     sc, bd = api.try_("post", f"/shipping/{sid}/load", "pm1",
                       json={"vehicle": "平板车", "driver": "张三", "plate_no": "粤B12345",
                             "photos": CTX["ph"]})

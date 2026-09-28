@@ -337,6 +337,8 @@ def main() -> None:
               if x["id"] == sh["id"])
     req("post", "/api/v1/shipping/items/ship", "delivery1",
         json={"item_ids": [i["id"] for i in sh["items"]], "photos": sph[:1]})
+    req("post", f"/api/v1/shipping/{sh['id']}/request-vehicle", "buyer1", ok=(200,),
+        json={"count": 1, "fee": 800, "note": "回归叫车"})
     req("post", f"/api/v1/shipping/{sh['id']}/load", "delivery1",
         json={"vehicle": "17.5 米平板", "plate_no": "粤B88888", "driver": "张师傅", "photos": sph[:1]})
     req("post", f"/api/v1/shipping/{sh['id']}/depart", "delivery1", json={})

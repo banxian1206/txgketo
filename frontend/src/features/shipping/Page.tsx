@@ -10,6 +10,7 @@ import {
   Empty,
   Form,
   Input,
+  InputNumber,
   Modal,
   Row,
   Select,
@@ -35,6 +36,7 @@ import {
   loadShipment,
   markShipItems,
   receiptShipment,
+  requestVehicle,
   setItemPlacePhotos,
   shipPhotoUrl,
   uploadShipPhotos,
@@ -50,6 +52,7 @@ import { T } from '../../theme/tokens'
 export default function Shipping() {
   const { message } = App.useApp()
   const canEdit = hasPerm('ship:edit')
+  const canBuy = hasPerm('purchase:edit')  // ★ §2.2：叫车是采购做的事
 
   const [projects, setProjects] = useState<{ project_no: string; project_name: string }[]>([])
   const [projectNo, setProjectNo] = useState<string | undefined>()
@@ -65,6 +68,10 @@ export default function Shipping() {
   const [loadTarget, setLoadTarget] = useState<ShipmentRow | null>(null)
   const [loadPhotos, setLoadPhotos] = useState<string[]>([])
   const [loadForm] = Form.useForm()
+
+  // ★ §2.2 叫车（采购）
+  const [vehicleTarget, setVehicleTarget] = useState<ShipmentRow | null>(null)
+  const [vehicleForm] = Form.useForm()
 
   // 现场清点
   const [receiptTarget, setReceiptTarget] = useState<ShipmentRow | null>(null)
@@ -345,6 +352,15 @@ export default function Shipping() {
               { title: '发运单号', dataIndex: 'shipment_no', width: 110, render: (v: string, r: ShipmentRow) => <a onClick={() => setDetail(r)}>{v}</a> },
               { title: '本次设备', key: 'lines', render: (_: unknown, r: ShipmentRow) => r.lines.map((l) => l.equip_no).join('、') },
               { title: '状态', dataIndex: 'status', width: 100, render: (v: string) => <Tag color={SHIP_COLOR[v] ?? 'default'}>{v}</Tag> },
+              // ★ §2.2：PM 定的发货日 + 采购叫车结果（装货的人看“当天几车”）
+              { title: '发货日', dataIndex: 'plan_ship_date', width: 110, render: (v?: string | null) => v ?? '—' },
+              {
+                title: '车辆', key: 'veh', width: 150,
+                render: (_: unknown, r: ShipmentRow) =>
+                  r.vehicle_status === '已叫车'
+                    ? <span>已叫 {r.vehicle_count ?? '?'} 车{r.vehicle_note ? `· ${r.vehicle_note}` : ''}</span>
+                    : <Tag color="orange">待叫车</Tag>,
+              },
               { title: '车牌 / 司机', key: 'v', width: 160, render: (_: unknown, r: ShipmentRow) => `${r.plate_no ?? ''} ${r.driver ?? ''}` || '—' },
               {
                 title: '发运进度', key: 'prog', width: 130,
@@ -360,6 +376,9 @@ export default function Shipping() {
                 render: (_: unknown, r: ShipmentRow) => (
                   <Space size={4} wrap>
                     {canEdit && ['已指令', '发货中', '已装车'].includes(r.status) && <a onClick={() => void openItems(r)}>发运清单</a>}
+                    {canBuy && r.vehicle_status !== '已叫车' && ['已指令', '发货中'].includes(r.status) && (
+                      <a onClick={() => { setVehicleTarget(r); vehicleForm.resetFields() }}>叫车</a>
+                    )}
                     {canEdit && ['已指令', '发货中', '已装车'].includes(r.status) && <a onClick={() => { setLoadPhotos([]); setLoadTarget(r) }}>装车</a>}
                     {canEdit && r.status === '已装车' && <a onClick={() => void doDepart(r)}>发运</a>}
                     {canEdit && r.status === '在途' && <a onClick={() => void doArrive(r)}>登记到货</a>}
@@ -428,6 +447,45 @@ export default function Shipping() {
             <Button onClick={() => itemsShip && void addManual(itemsShip)}>加补充项</Button>
           </Space>
         )}
+      </Modal>
+
+      {/* ★ §2.2 采购叫车（一条指令、两个部门：PM 定发货日 → 采购叫车 → 发运装车） */}
+      <Modal
+        open={!!vehicleTarget}
+        title={`采购叫车 · ${vehicleTarget?.shipment_no ?? ''}`}
+        onCancel={() => setVehicleTarget(null)}
+        onOk={() =>
+          vehicleForm.validateFields().then(async (v) => {
+            if (!vehicleTarget) return
+            try {
+              await requestVehicle(vehicleTarget.id, { count: Number(v.count), fee: v.fee ? Number(v.fee) : undefined, note: v.note })
+              message.success('已叫车，发运可以装车了')
+              setVehicleTarget(null)
+              await load(projectNo)
+            } catch (e) { message.error(errMsg(e)) }
+          })
+        }
+        confirmLoading={saving}
+        okText="确认已叫车"
+        destroyOnHidden
+      >
+        <Typography.Paragraph type="secondary" style={{ fontSize: 12 }}>
+          按 PM 定的「发货日」当天把车订好；装货的人据此知道当天装几车。
+          车辆费用只记**本次**金额，不进价格库。
+        </Typography.Paragraph>
+        <Form form={vehicleForm} layout="vertical" preserve={false}>
+          <Space style={{ display: 'flex' }} size="middle" align="start">
+            <Form.Item name="count" label="几辆车" rules={[{ required: true, message: '装货的人要知道当天几车' }]}>
+              <InputNumber min={1} style={{ width: 110 }} />
+            </Form.Item>
+            <Form.Item name="fee" label="本次运费（不进价格库）">
+              <InputNumber min={0} style={{ width: 150 }} placeholder="如 1800" />
+            </Form.Item>
+            <Form.Item name="note" label="承运商 / 备注">
+              <Input style={{ width: 200 }} placeholder="如 顺达物流 17.5米" />
+            </Form.Item>
+          </Space>
+        </Form>
       </Modal>
 
       {/* 装车 */}

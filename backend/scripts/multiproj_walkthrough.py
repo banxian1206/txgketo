@@ -837,6 +837,8 @@ def s7(pj: dict) -> None:
         ship_ids = [i["id"] for i in items][:-1] if missing else [i["id"] for i in items]
         api.req("post", "/shipping/items/ship", "delivery1",
                 json={"item_ids": ship_ids, "photos": sph[:1]})
+        api.req("post", f"/shipping/{sh['id']}/request-vehicle", "buyer1", (200,),
+                json={"count": 1, "fee": 1000, "note": "走查叫车"})
         api.req("post", f"/shipping/{sh['id']}/load", "delivery1",
                 json={"plate_no": f"粤B{80000 + bi}", "driver": "张师傅", "photos": sph[:1]})
         api.req("post", f"/shipping/{sh['id']}/depart", "delivery1", json={})

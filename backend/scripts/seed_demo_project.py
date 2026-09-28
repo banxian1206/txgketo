@@ -305,6 +305,8 @@ def main() -> None:
         all_ids = [i["id"] for i in sh["items"]]
         call("post", "/api/v1/shipping/items/ship", who="delivery1", ok=(200,),
              label=f"逐项勾「已发」（{len(all_ids)} 项，含拍照）", json={"item_ids": all_ids, "photos": sph[:1]})
+        call("post", f"/api/v1/shipping/{sh['id']}/request-vehicle", who="buyer1", ok=(200,),
+             label="采购叫车（当天把车叫回来）", json={"count": 1, "fee": 1200, "note": "演示物流"})
         call("post", f"/api/v1/shipping/{sh['id']}/load", who="delivery1", ok=(200,),
              label="装车（拍照）", json={"vehicle": "17.5 米平板", "plate_no": "粤B88888", "driver": "张师傅 137...", "photos": sph[:1]})
         call("post", f"/api/v1/shipping/{sh['id']}/depart", who="delivery1", ok=(200,), label="发运（在途）", json={})

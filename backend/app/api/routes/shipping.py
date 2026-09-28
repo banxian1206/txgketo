@@ -148,6 +148,14 @@ def workbench(
     return {
         "counts": {
             "instructed": len([s for s in rows if s.status == "已指令"]),
+            "to_vehicle": len(
+                [
+                    s
+                    for s in rows
+                    if s.vehicle_status == "待叫车"
+                    and s.status in (SHIP_INSTRUCTED, SHIP_SHIPPING)
+                ]
+            ),
             "packing": len([s for s in rows if s.status == "打包中"]),
             "loaded": len([s for s in rows if s.status == "已装车"]),
             "transit": len([s for s in rows if s.status == "在途"]),
@@ -316,6 +324,48 @@ class LoadIn(BaseModel):
     remark: str | None = None
 
 
+class RequestVehicleIn(BaseModel):
+    """★ §2.2：采购叫车。车辆服务**不进价格库**，只填本次价格。"""
+
+    count: int = Field(description="几辆车（装货的人要知道当天装几车）")
+    fee: float | None = None  # 本次运费（不进价格库）
+    note: str | None = Field(default=None, description="承运商 / 备注")
+
+
+@router.post("/{ship_id}/request-vehicle")
+def request_vehicle(
+    ship_id: int,
+    body: RequestVehicleIn,
+    request: Request,
+    session: Session = Depends(get_session),
+    # ★ §2.2：叫车是**采购**做的事（一条指令、两个部门）—— 不是发运/项目
+    current: User = Depends(require_permission("purchase:edit")),
+):
+    """采购叫车（按 PM 定的发货日，当天把车叫回来）。
+
+    叫完之后发运才能装车；同时通知发运“可以装车了”。
+    """
+    sh = session.get(Shipment, ship_id)
+    if sh is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "发运批次不存在")
+    shp.request_vehicle(
+        session, sh, count=body.count, fee=body.fee, note=body.note, operator_id=current.id
+    )
+    audit.log(
+        session,
+        user=current,
+        action="ship_vehicle",
+        object_type="shipment",
+        object_ref=sh.shipment_no,
+        summary=f"采购叫车 {sh.shipment_no}：{sh.vehicle_count} 车"
+        + (f"，本次运费 {sh.vehicle_fee}" if sh.vehicle_fee is not None else "")
+        + (f"；{sh.vehicle_note}" if sh.vehicle_note else ""),
+        ip=client_ip(request),
+    )
+    session.commit()
+    return shp.shipment_dict(session, sh)
+
+
 @router.post("/{ship_id}/load")
 def load(
     ship_id: int,
@@ -324,7 +374,7 @@ def load(
     session: Session = Depends(get_session),
     current: User = Depends(require_permission("ship:edit")),
 ):
-    """装车（拍照）。"""
+    """装车（拍照）。★ §2.2：**采购叫完车**才能装车。"""
     sh = session.get(Shipment, ship_id)
     if sh is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "发运批次不存在")

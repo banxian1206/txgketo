@@ -53,6 +53,11 @@ export interface ShipmentRow {
   project_no: string
   status: string
   plan_ship_date?: string | null
+  // ★ §2.2：叫车（采购）
+  vehicle_status?: string | null
+  vehicle_count?: number | null
+  vehicle_fee?: number | null
+  vehicle_note?: string | null
   vehicle?: string | null
   driver?: string | null
   plate_no?: string | null
@@ -123,6 +128,15 @@ export async function loadShipment(
   body: { vehicle?: string; driver?: string; plate_no?: string; photos: string[]; remark?: string },
 ) {
   const { data } = await api.post<ShipmentRow>(`/shipping/${id}/load`, body)
+  return data
+}
+
+// ★ §2.2（09 卷）：采购叫车 —— 一条指令、两个部门（PM 定发货日 → 采购叫车 → 发运装车）
+export async function requestVehicle(
+  id: number,
+  body: { count: number; fee?: number; note?: string },
+) {
+  const { data } = await api.post<ShipmentRow>(`/shipping/${id}/request-vehicle`, body)
   return data
 }
 

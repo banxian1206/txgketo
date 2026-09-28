@@ -23,6 +23,8 @@ from app.models.shipment import (
     SHIP_SHIPPING,
     SHIP_SIGNED,
     SHIP_TRANSIT,
+    VEHICLE_PENDING,
+    VEHICLE_READY,
     Shipment,
     ShipmentItem,
     ShipmentLine,
@@ -315,6 +317,47 @@ def add_manual_item(
     return row
 
 
+def request_vehicle(
+    session: Session,
+    sh: Shipment,
+    *,
+    count: int | None,
+    fee: float | None,
+    note: str | None,
+    operator_id: int | None,
+) -> Shipment:
+    """★ §2.2（09 卷）：**采购叫车** —— 一条指令、两个部门。
+
+    客户口径：“采购就去采购车辆回来”（按 PM 定的**发货日**，当天把车叫回来）；
+    “**装货的人就知道当天需要装几车货**” → `count` 必填。
+    车辆服务**不进价格库**（地方/车型/时间不同价格必不同），只记**本次**费用。
+    """
+    if sh.status in (SHIP_TRANSIT, SHIP_ARRIVED, SHIP_SIGNED):
+        raise ShippingError(f"这批已经「{sh.status}」了，不能再改车辆安排")
+    if not count or int(count) < 1:
+        raise ShippingError("要填几辆车 —— 装货的人要知道当天装几车")
+    sh.vehicle_status = VEHICLE_READY
+    sh.vehicle_count = int(count)
+    sh.vehicle_fee = fee
+    sh.vehicle_note = (note or "").strip() or None
+    sh.vehicle_by = operator_id
+    sh.vehicle_at = _now()
+    # 叫车了 → 同时通知发运“可以装车了”（两个部门靠同一条指令协同）
+    notify.notify_role(
+        session,
+        "DELIVERY",
+        type_=notify.TYPE_TASK,
+        title=f"车辆已就绪，可以装车：{sh.shipment_no}（{sh.vehicle_count} 车）",
+        body=(f"计划发货日 {sh.plan_ship_date}；" if sh.plan_ship_date else "")
+        + (f"承运/备注：{sh.vehicle_note}" if sh.vehicle_note else ""),
+        link=f"/shipping",
+        biz_type="shipment",
+        biz_id=sh.id,
+        actor_id=operator_id,
+    )
+    return sh
+
+
 def load(
     session: Session,
     sh: Shipment,
@@ -327,6 +370,12 @@ def load(
 ) -> Shipment:
     if sh.status not in (SHIP_INSTRUCTED, SHIP_SHIPPING, SHIP_LOADED):
         raise ShippingError(f"当前状态「{sh.status}」，不能装车")
+    # ★ §2.2（09 卷）：**采购要先叫车** —— 一条指令指挥两个部门。
+    #   客户：“PM 发出指令需要叫车服务，采购就去采购车辆回来，发运就开始装车并进行交付。”
+    if sh.vehicle_status != VEHICLE_READY:
+        raise ShippingError(
+            "采购还没叫车 —— 先由采购按「计划发货日」把车订好（登记几车 + 本次运费），才能装车"
+        )
     if not photos:
         raise ShippingError("装车要拍照")
     # ★ R5-01（客户口径）：0 项已发**不能装车** —— 一件都没发，车上装的是什么？
@@ -370,7 +419,8 @@ def depart(
         )
     sh.status = SHIP_TRANSIT
     sh.depart_at = _now()
-    if depart_at:
+    # ★ §2.2：计划发货日是**计划**，不被实际发运日覆盖（原来会覆盖，把计划毁掉）；只在空时回填
+    if depart_at and not sh.plan_ship_date:
         sh.plan_ship_date = depart_at
     if photos:
         sh.photos = list(sh.photos or []) + list(photos)
@@ -514,6 +564,13 @@ def shipment_dict(session: Session, sh: Shipment) -> dict:
         "project_no": sh.project_no,
         "status": sh.status,
         "plan_ship_date": sh.plan_ship_date,
+        # ★ §2.2 叫车（采购做的）
+        "vehicle_status": sh.vehicle_status,
+        "vehicle_count": sh.vehicle_count,
+        "vehicle_fee": float(sh.vehicle_fee) if sh.vehicle_fee is not None else None,
+        "vehicle_note": sh.vehicle_note,
+        "vehicle_by": sh.vehicle_by,
+        "vehicle_at": sh.vehicle_at,
         "vehicle": sh.vehicle,
         "driver": sh.driver,
         "plate_no": sh.plate_no,

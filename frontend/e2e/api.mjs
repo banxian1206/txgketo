@@ -244,6 +244,8 @@ const wh1 = await apiLogin('wh1', 'txgk@123');
       check('R5-探针自清理', true, '同上', 'SKIP');
     } else {
     const shot = async () => (await (await apiGet(`/shipping/${sid}`, pm)).json()).status;
+    // ★ §2.2：采购先叫车（否则“0 项已发”那条会被“未叫车”先拦住，测不到真因）
+    await post(`/shipping/${sid}/request-vehicle`, { count: 1, fee: 900, note: 'R5 探针叫车' }, buyer);
     // ① 0 项已发：装车与发运都必须 400
     const ld0 = await post(`/shipping/${sid}/load`, { photos: PH });
     const dp0 = await post(`/shipping/${sid}/depart`, {});
