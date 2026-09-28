@@ -875,6 +875,38 @@ def b_split_line_cancel() -> None:
     rec(n == 1, f"第二张单的行还在（应剩 1 条未取消行），实际={n}")
 
 
+def b_approval_chain() -> None:
+    """二期 审批链：两级 / 退回必填 / 自审 403 / 留档多轮（08 §5）。"""
+    probe("二期 采购审批链")
+    rid = _new_demand("bc", 20)["id"]
+    # 用 raw 绕过自动审批，拿到「待总监审」的单
+    r = api.raw("post", "/purchase/merge-order", "buyer1", json={
+        "supplier_id": SUP["甲钢材"]["id"], "ordered_at": d(0), "expected_date": d(10),
+        "deliver_to": "公司仓库",
+        "lines": [{"request_id": rid, "tax_incl": True, "qty": 20, "unit_price": 100.0}]})
+    po = r.json().get("po_no")
+    od = api.req("get", f"/purchase/orders/{po}", "buyer1")
+    rec(od["order"]["po_status"] == "待总监审", f"提交后应 待总监审，实际={od['order']['po_status']}")
+
+    sc_self, _ = api.try_("post", f"/purchase/orders/{po}/approve", "buyer1", json={"action": "通过"})
+    rec(sc_self == 403, f"提交人自己审批应 403，实际={sc_self}")
+    sc_nonote, _ = api.try_("post", f"/purchase/orders/{po}/approve", "purchase_director",
+                            json={"action": "退回"})
+    rec(sc_nonote == 400, f"退回不填说明应 400，实际={sc_nonote}")
+    api.req("post", f"/purchase/orders/{po}/approve", "purchase_director", (200,),
+            json={"action": "退回", "note": "价格再谈谈"})
+    od = api.req("get", f"/purchase/orders/{po}", "buyer1")
+    rec(od["order"]["po_status"] == "已退回", f"退回后应 已退回，实际={od['order']['po_status']}")
+    api.req("post", f"/purchase/orders/{po}/submit", "buyer1", (200,))
+    api.req("post", f"/purchase/orders/{po}/approve", "purchase_director", (200,), json={"action": "通过"})
+    od = api.req("get", f"/purchase/orders/{po}", "buyer1")
+    rec(od["order"]["po_status"] == "已批准", f"通过后应 已批准，实际={od['order']['po_status']}")
+    ap = api.req("get", f"/purchase/orders/{po}/approvals", "buyer1")
+    acts = [x["action"] for x in ap]
+    rec("跳过" in acts and "退回" in acts and "通过" in acts,
+        f"审批留档应含 跳过/退回/通过（多轮），实际={acts}")
+
+
 def _new_demand(item_key: str, qty: float, who: str = "buyer1") -> dict:
     """建一条干净的「待采购」需求（手工申请通道，免审核直入池）。"""
     r = api.req("post", "/purchase/manual-request", who, (201,), json={
@@ -1272,7 +1304,7 @@ def main() -> None:
             traceback.print_exc()
 
     part("Part B · 采购域专项探针")
-    for fn in (b_split, b_partial_ok, b_split_line_cancel, b_void_order, b_close_return, b_idempotent_after_release, b_pending_window, b_pending_repool,
+    for fn in (b_split, b_partial_ok, b_split_line_cancel, b_void_order, b_close_return, b_approval_chain, b_idempotent_after_release, b_pending_window, b_pending_repool,
                b_direct_repool, b_delete_authz, b_kitting_inflate, b_issue_draft_bom,
                b_stock_conservation, b_price_reference):
         try:

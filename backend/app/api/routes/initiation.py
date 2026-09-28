@@ -2292,6 +2292,91 @@ def list_po_approvals(
     ]
 
 
+class PoLinePatchIn(BaseModel):
+    id: int
+    qty: float | None = None
+    unit_price: float | None = None
+    tax_incl: bool | None = None
+
+
+class PoPatchIn(BaseModel):
+    supplier_id: int | None = None
+    expect_date: date | None = None
+    deliver_to: str | None = None
+    deliver_address: str | None = None
+    tax_rate: float | None = None
+    freight: float | None = None
+    discount: float | None = None
+    remark: str | None = None
+    lines: list[PoLinePatchIn] | None = None
+
+
+@purchase_router.patch("/purchase/orders/{key}")
+def patch_purchase_order(
+    key: str,
+    body: PoPatchIn,
+    request: Request,
+    session: Session = Depends(get_session),
+    current: User = Depends(require_permission("purchase:edit")),
+):
+    """改草稿/已退回的单（08 §5.4）：供应商/交期/收货地/税率/运费折扣/备注 + 行的数量单价口径。
+
+    ★ 物料/需求总量/零件归属不允许改（那是上游决定的，错了走退回上游 ECN）。
+    """
+    from app.models.purchase_order import compute_line_amounts
+    from app.models.purchasing import Supplier
+    from app.services import purchase_order as po_svc
+
+    po = session.scalar(select(PurchaseOrder).where(PurchaseOrder.po_no == key))
+    if po is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "采购单不存在")
+    if po.status not in ("草稿", "已退回"):
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST, f"当前状态是「{po.status}」，不能编辑（只有草稿/已退回能改）"
+        )
+    if body.supplier_id is not None:
+        sup = session.get(Supplier, body.supplier_id)
+        if sup is None:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, "供应商不存在")
+        po.supplier_id = sup.id
+        po.supplier_name = sup.name
+    for field in ("expect_date", "deliver_to", "deliver_address", "tax_rate", "freight", "discount", "remark"):
+        val = getattr(body, field)
+        if val is not None:
+            setattr(po, field, val)
+    for lp in body.lines or []:
+        ln = session.get(PurchaseOrderLine, lp.id)
+        if ln is None or ln.po_id != po.id:
+            continue
+        if lp.qty is not None:
+            ln.qty = lp.qty
+        if lp.unit_price is not None:
+            ln.unit_price = lp.unit_price
+        if lp.tax_incl is not None:
+            ln.tax_incl = lp.tax_incl
+        incl, excl = compute_line_amounts(
+            float(ln.qty or 0), ln.unit_price, ln.tax_incl, ln.tax_rate or po.tax_rate
+        )
+        ln.amount_tax_incl = incl
+        ln.amount_tax_excl = excl
+    session.flush()
+    po_svc.recalc_order_total(session, po)
+    for ln in _po_lines(session, po.id):
+        if ln.request_id:
+            po_svc.sync_request_order_state(session, session.get(PurchaseRequest, ln.request_id))
+    audit.log(
+        session,
+        user=current,
+        action="patch_order",
+        object_type="purchase_order",
+        object_ref=key,
+        summary=f"编辑采购单 {key}（{po.status}）",
+        ip=client_ip(request),
+    )
+    session.commit()
+    return {"status": po.status}
+
+
 # ============================================================================
 # ★ 采购单视图：一张采购单 + 各项目/设备的需求明细（合并单的「归属」）
 #   00 卷 §3.1②：累计合并不丢来源 —— 这 10 个方通分别是谁家的，单子上要看得到。

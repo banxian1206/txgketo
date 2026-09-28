@@ -28,7 +28,9 @@ import {
   errMsg,
   listSuppliers,
   purchaseOrderDetail,
+  submitPurchaseOrder,
   voidPurchaseOrder,
+  withdrawPurchaseOrder,
   type PurchaseOrderDetail,
   type PurchaseOrderLine,
   type SupplierRow,
@@ -168,6 +170,30 @@ export default function PurchaseOrderDrawer({
     }
   }
 
+  const doSubmit = async () => {
+    if (!orderKey) return
+    try {
+      await submitPurchaseOrder(orderKey)
+      message.success('已提交审批')
+      await load()
+      onChanged()
+    } catch (e) {
+      message.error(errMsg(e))
+    }
+  }
+
+  const doWithdraw = async () => {
+    if (!orderKey) return
+    try {
+      await withdrawPurchaseOrder(orderKey)
+      message.success('已撤回（回草稿）')
+      await load()
+      onChanged()
+    } catch (e) {
+      message.error(errMsg(e))
+    }
+  }
+
   const doVoid = async () => {
     if (!orderKey) return
     try {
@@ -229,6 +255,14 @@ export default function PurchaseOrderDrawer({
             <Button type="primary" onClick={() => setApproveOpen(true)}>
               审批
             </Button>
+          )}
+          {o && ['草稿', '已退回'].includes(o.po_status ?? '') && (
+            <Button type="primary" onClick={() => void doSubmit()}>
+              提交审批
+            </Button>
+          )}
+          {o && ['待经理审', '待总监审'].includes(o.po_status ?? '') && (
+            <Button onClick={() => void doWithdraw()}>撤回</Button>
           )}
           <Button disabled={changeable.length === 0} onClick={() => void openSupplier()}>
             更改供应商
