@@ -18,7 +18,7 @@ from app.api.deps import (
     scrub_money,
 )
 from app.core.db import get_session
-from app.models.initiation import PurchaseRequest
+from app.models.initiation import GoodsReceipt, PurchaseRequest
 from app.models.purchase_order import PurchaseOrder, PurchaseOrderLine
 from app.models.library import SOURCE_STANDARD, Item, StdCategory, StdClass
 from app.models.platform import User
@@ -629,6 +629,25 @@ def recommend_suppliers(
     ).all()
     today = date.today()
 
+    # ★ 供应商绩效（08 §7）：准时交付率 + 验收合格率 —— 把「评级」从拍脑袋变成客观证据
+    all_pos = session.scalars(select(PurchaseOrder)).all()
+    po_supplier = {po.id: po.supplier_id for po in all_pos if po.supplier_id}
+    perf: dict[int, dict[str, float]] = {}
+    for po in all_pos:
+        if not po.supplier_id or not (po.actual_arrive_date and po.expect_date):
+            continue
+        d = perf.setdefault(po.supplier_id, {"delivered": 0, "ontime": 0, "ok": 0.0, "qty": 0.0})
+        d["delivered"] += 1
+        if (po.delay_days or 0) <= 0:
+            d["ontime"] += 1
+    for g in session.scalars(select(GoodsReceipt).where(GoodsReceipt.po_id.isnot(None))).all():
+        sid = po_supplier.get(g.po_id)
+        if sid is None:
+            continue
+        d = perf.setdefault(sid, {"delivered": 0, "ontime": 0, "ok": 0.0, "qty": 0.0})
+        d["ok"] += float(g.qty_ok or 0)
+        d["qty"] += float(g.qty or 0)
+
     recos = []
     for sup in suppliers:
         score = 0
@@ -704,6 +723,28 @@ def recommend_suppliers(
             pass  # 有价格记录就不算无关
         else:
             continue  # 完全无关，不推荐
+
+        # ── 绩效（客观证据，08 §7）
+        pf = perf.get(sup.id)
+        if pf:
+            if pf["delivered"] >= 2:
+                rate = pf["ontime"] / pf["delivered"]
+                if rate >= 0.8:
+                    score += 12
+                    reasons.append(f"准时交付 {pf['ontime']:.0f}/{pf['delivered']:.0f}（{rate:.0%}）")
+                elif rate < 0.6:
+                    score -= 12
+                    reasons.append(
+                        f"★ 经常逾期：{pf['delivered'] - pf['ontime']:.0f}/{pf['delivered']:.0f} 批晚到"
+                    )
+            if pf["qty"] > 0:
+                qr = pf["ok"] / pf["qty"]
+                if qr < 0.98:
+                    score -= 12
+                    reasons.append(f"★ 验收合格率 {qr:.0%}（有不合格）")
+                elif qr >= 0.999:
+                    score += 8
+                    reasons.append(f"验收全合格（{pf['qty']:.0f} 件）")
 
         # ── ④ 价格提示（优先成交价，其次报价，再次常规价）
         price_hint = None
