@@ -139,7 +139,7 @@ def create_program(
     body: ProgramIn,
     request: Request,
     session: Session = Depends(get_session),
-    current: User = Depends(get_current_user),
+    current: User = Depends(require_permission("design:edit")),
 ):
     if not body.name.strip():
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "程序名称不能为空")
@@ -201,7 +201,7 @@ async def upload_program_draft(
     change_reason: str = Form(""),
     request: Request = None,  # type: ignore[assignment]
     session: Session = Depends(get_session),
-    current: User = Depends(get_current_user),
+    current: User = Depends(require_permission("design:edit")),
 ):
     """上传/更新程序草稿文件（不改审核状态；提交评审后才发布）。"""
     row = _get_program(session, program_id)

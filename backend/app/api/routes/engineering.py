@@ -20,7 +20,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.api.deps import client_ip, get_current_user
+from app.api.deps import client_ip, get_current_user, require_permission
 from app.core.config import settings
 from app.core.db import get_session
 from app.models.change import CR_DISPATCHED, TARGET_BOM_ITEM, TARGET_DRAWING
@@ -278,7 +278,7 @@ def add_drawing(
     body: DrawingIn,
     request: Request,
     session: Session = Depends(get_session),
-    current: User = Depends(get_current_user),
+    current: User = Depends(require_permission("design:edit")),
 ):
     """新增组件/零件：**图号按父级 + 同级下一序号自动生成**（不让人手填）。"""
     _get_project(session, project_no)
@@ -403,7 +403,7 @@ def update_drawing(
     body: DrawingPatch,
     request: Request,
     session: Session = Depends(get_session),
-    current: User = Depends(get_current_user),
+    current: User = Depends(require_permission("design:edit")),
 ):
     row = session.get(Drawing, drawing_no)
     if row is None:
@@ -456,7 +456,7 @@ def delete_drawing(
     drawing_no: str,
     request: Request,
     session: Session = Depends(get_session),
-    current: User = Depends(get_current_user),
+    current: User = Depends(require_permission("design:edit")),
 ):
     row = session.get(Drawing, drawing_no)
     if row is None:
@@ -506,7 +506,7 @@ async def upload_drawing_draft(
     change_reason: str = Form(""),
     request: Request = None,  # type: ignore[assignment]
     session: Session = Depends(get_session),
-    current: User = Depends(get_current_user),
+    current: User = Depends(require_permission("design:edit")),
 ):
     """上传/更新草稿文件（05 卷 §3.1）。
 
@@ -738,7 +738,7 @@ def add_std_bom(
     body: BomIn,
     request: Request,
     session: Session = Depends(get_session),
-    current: User = Depends(get_current_user),
+    current: User = Depends(require_permission("design:edit")),
 ):
     """设计 BOM：给组件/零件挂标准件（从标准库选）。"""
     _get_project(session, project_no)
@@ -754,7 +754,7 @@ def add_material_bom(
     body: BomIn,
     request: Request,
     session: Session = Depends(get_session),
-    current: User = Depends(get_current_user),
+    current: User = Depends(require_permission("design:edit")),
 ):
     """材料 BOM（工艺部）：给自制件挂原材料。"""
     _get_project(session, project_no)
@@ -770,7 +770,7 @@ def add_material_bom(
 def remove_bom(
     bom_id: int,
     session: Session = Depends(get_session),
-    current: User = Depends(get_current_user),
+    current: User = Depends(require_permission("design:edit")),
 ):
     row = session.get(BomItem, bom_id)
     if row is None:

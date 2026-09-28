@@ -73,7 +73,7 @@ def create_project(
     body: ProjectCreateIn,
     request: Request,
     session: Session = Depends(get_session),
-    current: User = Depends(get_current_user),
+    current: User = Depends(require_permission("project:edit")),
 ):
     """新建商机：发号（TX{YY}{NNN}）→ 建客户（如不存在）→ 建项目档案 → 建联系人。"""
     customer = session.scalar(select(Customer).where(Customer.name == body.customer_name))
@@ -241,7 +241,7 @@ def register_deal(
     body: DealIn,
     request: Request,
     session: Session = Depends(get_session),
-    current: User = Depends(get_current_user),
+    current: User = Depends(require_permission("contract:edit")),
 ) -> dict:
     """成交登记：登记周期 / 金额 / 付款方式 / 质保，阶段 线索 → 成交待立项。"""
     project = session.get(Project, project_no)
@@ -763,7 +763,7 @@ def update_contact(
     body: ContactIn,
     request: Request,
     session: Session = Depends(get_session),
-    current: User = Depends(get_current_user),
+    current: User = Depends(require_permission("project:edit")),
 ) -> dict:
     """编辑联系人（字段级留痕）。"""
     project = session.get(Project, project_no)
@@ -810,7 +810,7 @@ async def upload_attachment(
     category: str = Form("客户资料"),
     file: UploadFile = File(...),
     session: Session = Depends(get_session),
-    current: User = Depends(get_current_user),
+    current: User = Depends(require_permission("project:edit")),
 ) -> dict:
     """上传资料（图纸 / 合同 / 技术协议 / 客户资料）。"""
     if session.get(Project, project_no) is None:

@@ -612,7 +612,7 @@ def recommend_suppliers(
     item_no: str,
     need_date: date | None = Query(default=None, description="需要到货日期，用来判断交期赶不赶得上"),
     session: Session = Depends(get_session),
-    current: User = Depends(get_current_user),
+    current: User = Depends(require_permission("purchase:edit")),
 ):
     item = session.get(Item, item_no)
     if item is None:

@@ -101,7 +101,7 @@ def add_member(
     body: MemberIn,
     request: Request,
     session: Session = Depends(get_session),
-    current: User = Depends(get_current_user),
+    current: User = Depends(require_permission("project:edit")),
 ):
     _get_project(session, project_no)
     if body.project_role not in PROJECT_ROLES:
@@ -163,7 +163,7 @@ def remove_member(
     member_id: int,
     request: Request,
     session: Session = Depends(get_session),
-    current: User = Depends(get_current_user),
+    current: User = Depends(require_permission("project:edit")),
 ):
     row = session.get(ProjectMember, member_id)
     if row is None or row.project_no != project_no:
@@ -233,7 +233,7 @@ def add_equipment(
     body: EquipmentIn,
     request: Request,
     session: Session = Depends(get_session),
-    current: User = Depends(get_current_user),
+    current: User = Depends(require_permission("project:edit")),
 ):
     """新增设备。设备号自动生成，不允许手工填。"""
     _get_project(session, project_no)
@@ -301,7 +301,7 @@ def update_equipment(
     body: EquipmentPatch,
     request: Request,
     session: Session = Depends(get_session),
-    current: User = Depends(get_current_user),
+    current: User = Depends(require_permission("project:edit")),
 ):
     row = session.get(Equipment, equip_id)
     if row is None or row.project_no != project_no:
@@ -336,7 +336,7 @@ def remove_equipment(
     equip_id: int,
     request: Request,
     session: Session = Depends(get_session),
-    current: User = Depends(get_current_user),
+    current: User = Depends(require_permission("project:edit")),
 ):
     row = session.get(Equipment, equip_id)
     if row is None or row.project_no != project_no:
@@ -399,7 +399,7 @@ def generate_milestones(
     project_no: str,
     request: Request,
     session: Session = Depends(get_session),
-    current: User = Depends(get_current_user),
+    current: User = Depends(require_permission("project:edit")),
 ):
     """按标准节点一键生成：按合同周期均分出每个节点的计划起止（可再手工调整）。已存在的不动。"""
     project = _get_project(session, project_no)
@@ -484,7 +484,7 @@ def update_milestone(
     body: MilestonePatch,
     request: Request,
     session: Session = Depends(get_session),
-    current: User = Depends(get_current_user),
+    current: User = Depends(require_permission("project:edit")),
 ):
     row = session.get(Milestone, milestone_id)
     if row is None or row.project_no != project_no:
@@ -532,7 +532,7 @@ def remove_milestone(
     project_no: str,
     milestone_id: int,
     session: Session = Depends(get_session),
-    _: User = Depends(get_current_user),
+    _: User = Depends(require_permission("project:edit")),
 ):
     row = session.get(Milestone, milestone_id)
     if row is None or row.project_no != project_no:
@@ -701,7 +701,7 @@ def update_purchase_request(
     body: LongLeadPatch,
     request: Request,
     session: Session = Depends(get_session),
-    current: User = Depends(get_current_user),
+    current: User = Depends(require_any_permission("purchase:edit", "project:edit")),
 ):
     row = session.get(PurchaseRequest, request_id)
     if row is None or row.project_no != project_no:
@@ -798,7 +798,7 @@ def initiate_project(
     project_no: str,
     request: Request,
     session: Session = Depends(get_session),
-    current: User = Depends(get_current_user),
+    current: User = Depends(require_permission("project:edit")),
 ):
     """立项。校验三件事做完没有，然后阶段 → 执行中。"""
     project = _get_project(session, project_no)
@@ -917,7 +917,7 @@ def initiate_project(
 def clear_milestones(
     project_no: str,
     session: Session = Depends(get_session),
-    _: User = Depends(get_current_user),
+    _: User = Depends(require_permission("project:edit")),
 ):
     session.execute(delete(Milestone).where(Milestone.project_no == project_no))
     session.commit()

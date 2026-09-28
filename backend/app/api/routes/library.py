@@ -7,7 +7,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
-from app.api.deps import client_ip, get_current_user
+from app.api.deps import client_ip, get_current_user, require_permission
 from app.core.db import get_session
 from app.models.library import (
     SOURCE_STANDARD,
@@ -152,7 +152,7 @@ def create_item(
     body: ItemIn,
     request: Request,
     session: Session = Depends(get_session),
-    current: User = Depends(get_current_user),
+    current: User = Depends(require_permission("std:edit")),
 ):
     """新建标准库物料：规格必须完整 → 自动发码 → 品名与规格串自动生成 → 防重复建码。"""
     k = session.get(StdClass, body.std_class_code)
@@ -233,7 +233,7 @@ def update_item(
     body: ItemPatch,
     request: Request,
     session: Session = Depends(get_session),
-    current: User = Depends(get_current_user),
+    current: User = Depends(require_permission("std:edit")),
 ):
     """★ 一码不变：规格要改就新建物料；这里只允许改单位/品牌/厂家型号/停用。"""
     row = session.get(Item, item_no)
