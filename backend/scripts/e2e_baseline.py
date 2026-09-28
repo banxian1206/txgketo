@@ -216,7 +216,7 @@ def setup_suppliers() -> None:
     # 供应商品类声明（推荐供应商用）
     for sup in ("甲钢材", "乙标准件"):
         for cls in ("FT", "BC", "ZCT"):
-            api.try_("post", "/suppliers/catalog", "buyer1",
+            api.try_("post", f"/suppliers/{SUP[sup]['id']}/catalog", "buyer1",
                      json={"supplier_id": SUP[sup]["id"], "std_class_code": cls,
                            "price": 10.0, "lead_days": 10})
     note("供应商：" + ", ".join(SUP))
