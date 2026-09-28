@@ -226,6 +226,7 @@ def my_scope(session: Session = Depends(get_session), current: User = Depends(ge
     """我能不能管用户/组织、能勾哪些角色（06 卷 §4）。"""
     scope = _scope(session, current)
     return {
+        "user_id": current.id,  # ★ “我是谁” —— 建单时要填 sales_id / owner_id 这类字段，前端不必再猜
         "is_admin": scope["admin"],
         "can_manage_users": scope["can_manage"],
         "can_manage_org": scope["can_manage"],

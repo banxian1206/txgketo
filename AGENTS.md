@@ -464,8 +464,8 @@ POST /api/v1/warehouse/inbound                    其他入库（退料回库/�
 ### 8.6 当前环境
 
 - 后端 :8208 · 前端 :5207 · PG 35432（`docker compose -f deploy/docker-compose.dev.yml up -d`，compose 顶层写死了 `name: txgketo`）
-- 测试：`.venv/bin/python -m pytest -q` → **129 passed**；e2e 基线 `.venv/bin/python -m scripts.e2e_baseline`（★ 跑前复位业务数据；只清业务表，账户/组织/编号规则不动）→ **问题 0 / 中断 0 / 通过 126**；
-  隔离探针 `scripts/probe_bom_math.py` → **8/8**、`scripts/probe_n24_n25.py` → **17/17**；前端 `e2e:static 22` / `e2e:api 10+4skip` / `e2e:ui 55+3skip`
+- 测试：`.venv/bin/python -m pytest -q` → **132 passed**；e2e 基线 `.venv/bin/python -m scripts.e2e_baseline`（★ 跑前复位业务数据；只清业务表，账户/组织/编号规则不动）→ **问题 0 / 中断 0 / 通过 126**；
+  隔离探针 `scripts/probe_bom_math.py` → **8/8**、`scripts/probe_n24_n25.py` → **17/17**；前端 `e2e:static 22` / **`e2e:api 15+0skip`**（自建靶，可单跑）/ `e2e:ui 55+3skip`
 - alembic head：**`z2f4b6d80e91`**（到期扫描去重键）
 - ★ 套件**执行顺序**：`e2e_baseline` → `probe_n24_n25` → `probe_bom_math`（最后一个会 TRUNCATE 业务表，放最后）
 - 账号：admin / admin12345；演示账号密码 `txgk@123`（采购链：`buyer1` 组员 / `purchase_manager` 经理 / `purchase_director` 总监 —— 三级都要有，缺经理会全程自动跳级、两级审批退化成一级）

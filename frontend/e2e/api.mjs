@@ -27,7 +27,7 @@ const wh1 = await apiLogin('wh1', 'txgk@123');
   const arr = Array.isArray(list) ? list : [];
   const pno = (arr.find(p => p.amount != null) ?? arr[0])?.project_no;
   if (!pno) {
-    check('P-07', true, '无项目可测，跳过', 'SKIP');
+    check('P-07', false, '无项目可测，跳过');
   } else {
     const r = await apiGet(`/projects/${pno}`, wh1);
     const d = await r.json().catch(() => ({}));
@@ -41,17 +41,25 @@ const wh1 = await apiLogin('wh1', 'txgk@123');
   }
 }
 
-// P-05：验收门禁 —— 用一个肯定没有调试完成记录的幽灵之外的探针：
-// 门禁在服务层，直接对已知未调试项目探（不存在的项目会先撞 P-06 的 400，所以这里用文案断言：
-// 找一个非"调试完成"的项目。若全部项目都已调试完成，则退化为纯文案检查——门禁函数存在即可。
+// P-05：验收门禁 —— **自建靶**：新建一个商机（线索阶段，肯定没有“调试完成”记录）→ 申请验收应被拦
+// （原来找不到“未调试阶段项目”就永远 SKIP —— 休眠的护栏永远绿 = 没有。报告 §4）
 {
-  // 走 API 找一个 stage 不在质保/执行尾期的项目太绕；直接断言：对不存在项目返回的是
-  // 「项目不存在」而不是 500；对存在但未调试项目返回「现场调试还没完成」。
-  // 动态找未调试项目：
-  const list = await (await apiGet('/projects', pm)).json();
-  const probe = (Array.isArray(list) ? list : []).find(p => p.stage === '线索' || p.stage === '成交待立项' || p.stage === '执行中');
-  if (!probe) {
-    check('P-05', true, '当前无未调试阶段项目（门禁逻辑由 UI 写链回归覆盖）', 'SKIP');
+  const me = (await (await apiGet('/my-scope', sales)).json()) ?? {};   // 顶层已有 sales1 的 token
+  const probe = await (await fetch(`${API}/api/v1/projects`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${sales}` },
+    body: JSON.stringify({
+      customer_name: `P05 门禁客户 ${Date.now()}`,
+      project_name: `P05-验收门禁探针-${Date.now()}`,
+      sales_id: me.user_id,
+      project_desc: 'P-05 自建靶：验证验收门禁（不登流程）',
+      site_address: '探针地址',
+      deadline: new Date(Date.now() + 86400000 * 30).toISOString().slice(0, 10),
+      contacts: [{ name: '探针联系人', phone: '13900000000' }],
+    }),
+  })).json();
+  if (!probe?.project_no) {
+    check('P-05', false, '自建靶失败：新建商机失败（必填项变更？）');
   } else {
     const r = await fetch(`${API}/api/v1/acceptance/apply`, {
       method: 'POST',
@@ -59,23 +67,57 @@ const wh1 = await apiLogin('wh1', 'txgk@123');
       body: JSON.stringify({ project_no: probe.project_no }),
     });
     const d = await r.json().catch(() => ({}));
-    const ok = r.status !== 201 && r.status !== 200;
     const msg = String(d.detail || '');
-    // 若该项目恰有调试完成记录放行了（201），也接受——断言的是"不会 500"
-    check('P-05', ok ? /调试/.test(msg) || /申请验收中/.test(msg) || /不存在/.test(msg) : true,
-      r.status === 201 ? `${probe.project_no} 已调试完成（放行，符合预期）` : `HTTP ${r.status} · ${msg.slice(0, 70)}`);
+    // 未走到调试 → 必须 400 且文案指向“调试”，绝不得 500
+    check('P-05', r.status === 400 && /调试/.test(msg),
+      `自建靶 ${probe.project_no}（线索）申请验收 → HTTP ${r.status} · ${msg.slice(0, 60)}`);
   }
 }
 
-// P-02：无项目（辅料）需求存在验收路由 —— 找一条 project_no 为 NULL 的在途需求，验收接口不应 404
-// （用 pool/incoming 探针：若无此类需求则 SKIP）
+// P-02：无项目（辅料）需求存在验收路由 —— **自建靶**：辅料手工申请 → 合并下单 → 审批到在途
+// （原来靠扫库碰运气：“无辅料在途需求”就永远 SKIP —— 休眠的护栏永远绿 = 没有。报告 §4）
 {
-  const wb = await (await apiGet('/warehouse/workbench', wh1)).json();
-  const nullProj = (wb.incoming || []).find(x => !x.project_no);
-  if (!nullProj) {
-    check('P-02', true, '当前无辅料在途需求（P-02 路径由 UI 写链回归覆盖）', 'SKIP');
+  const suppliers = await (await apiGet('/suppliers', buyer)).json();
+  const sup = Array.isArray(suppliers) ? suppliers[0] : null;
+  const items = await (await apiGet('/library/items?limit=1', buyer)).json();
+  const item = Array.isArray(items) ? items[0] : null;
+  let seeded = null;
+  if (sup && item) {
+    const h = { 'Content-Type': 'application/json', Authorization: `Bearer ${buyer}` };
+    const mr = await (await fetch(`${API}/api/v1/purchase/manual-request`, {
+      method: 'POST', headers: h,
+      // ★ 关键：**不带 project_no** —— 这正是 P-02 要测的“无项目（辅料）”路径
+      body: JSON.stringify({ attribution: '辅料', item_no: item.item_no, qty: 1,
+        need_date: new Date(Date.now() + 86400000 * 10).toISOString().slice(0, 10), note: 'P-02 护栏探针' }),
+    })).json();
+    const po = await (await fetch(`${API}/api/v1/purchase/merge-order`, {
+      method: 'POST', headers: h,
+      body: JSON.stringify({ supplier_id: sup.id, ordered_at: new Date().toISOString().slice(0, 10),
+        expected_date: new Date(Date.now() + 86400000 * 7).toISOString().slice(0, 10),
+        deliver_to: '公司仓库',
+        lines: [{ request_id: mr.id, tax_incl: true }] }),
+    })).json();
+    // 推到已批准 → 需求才转「在途」、仓库才看得到这条待验收
+    let st = po.status;
+    const approverOf = { 待经理审: 'purchase_manager', 待总监审: 'purchase_director' };
+    for (let k = 0; k < 3 && approverOf[st]; k++) {
+      let tok = null;
+      try { tok = await apiLogin(approverOf[st], 'txgk@123'); } catch { /* 无该演示账号 */ }
+      if (!tok) break;
+      await fetch(`${API}/api/v1/purchase/orders/${po.po_no}/approve`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${tok}` },
+        body: JSON.stringify({ action: '通过', note: 'P-02 探针自动通过' }),
+      });
+      const cur = await (await apiGet('/purchase/orders', buyer)).json();
+      st = (Array.isArray(cur) ? cur : []).find(o => o.po_no === po.po_no)?.po_status;
+    }
+    const wb = await (await apiGet('/warehouse/workbench', wh1)).json();
+    seeded = (wb.incoming || []).find(x => x.id === mr.id) ?? null;
+  }
+  if (!seeded) {
+    check('P-02', false, '自建靶失败：辅料申请→下单→审批后仍未出现在仓库待验收');
   } else {
-    const r = await fetch(`${API}/api/v1/purchase-requests/${nullProj.id}/inspect`, {
+    const r = await fetch(`${API}/api/v1/purchase-requests/${seeded.id}/inspect`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${wh1}` },
       body: JSON.stringify({ receipt_date: new Date().toISOString().slice(0, 10), qty: 1, result: '合格' }),
@@ -83,7 +125,7 @@ const wh1 = await apiLogin('wh1', 'txgk@123');
     const d = await r.json().catch(() => ({}));
     // 不再出现 404「采购需求不存在」= 修复成立（201/400 都算路由存在）
     check('P-02', r.status !== 404 && !/不存在/.test(String(d.detail)),
-      `HTTP ${r.status} · ${String(d.detail).slice(0, 60)}`);
+      `自建靶 #${seeded.id}（无项目）验收 → HTTP ${r.status} · ${String(d.detail).slice(0, 50)}`);
   }
 }
 
@@ -96,7 +138,7 @@ const wh1 = await apiLogin('wh1', 'txgk@123');
   const items = await (await apiGet('/library/items?limit=1', buyer)).json();
   const item = Array.isArray(items) ? items[0] : null;
   if (!proj || !sup || !item) {
-    check('R2-01', true, '缺少造数前置（项目/供应商/物料），跳过', 'SKIP');
+    check('R2-01', false, '缺少造数前置（项目/供应商/物料），跳过');
   } else {
     // ★ 采购单要用真实采购员身份下（buyer1）：admin 无部门，审批链的
     //   `director_for` 会全局兜底到「第一个总监」（往往是工程总监）而采购总监审不了 → 单卡死。
@@ -145,7 +187,7 @@ const wh1 = await apiLogin('wh1', 'txgk@123');
   const projects = await (await apiGet('/projects', pm)).json();
   const proj = (Array.isArray(projects) ? projects : []).find(p => ['执行中', '交付中', '质保'].includes(p.stage)) || (Array.isArray(projects) ? projects[0] : null);
   if (!proj) {
-    check('RCPT-售后报修→项目经理', true, '无项目可探', 'SKIP');
+    check('RCPT-售后报修→项目经理', false, '无项目可探');
   } else {
     const svc = await apiLogin('service1', 'txgk@123');
     const pm = await apiLogin('pm1', 'txgk@123');
@@ -187,7 +229,7 @@ const wh1 = await apiLogin('wh1', 'txgk@123');
   const sup = ((await (await apiGet('/suppliers', buyer)).json()) ?? [])[0];
   const item = ((await (await apiGet('/library/items?limit=1', buyer)).json()) ?? [])[0];
   if (!proj || !sup || !item) {
-    check('O3A-预计到货必填', true, '缺造数前置，跳过', 'SKIP');
+    check('O3A-预计到货必填', false, '缺造数前置，跳过');
   } else {
     const mr = await (await fetch(`${API}/api/v1/purchase/manual-request`, {
       method: 'POST', headers: h,
@@ -221,27 +263,47 @@ const wh1 = await apiLogin('wh1', 'txgk@123');
     return { code: r.status, j };
   };
   const PH = ['e2e-guard-probe.png'];
+  // ★ **自建靶**（原来靠扫库碰运气：“无可下达设备”就永远 SKIP —— 休眠的护栏永远绿 = 没有。报告 §4）
+  //   造一台“装配完成 + 有已发布结构”的设备：设计面有零件的设备 → 开始装配 → 装配完成。
   let target = null;
+  const shop1 = await apiLogin('shop1', 'txgk@123');   // mfg:edit
+  const postAs = async (url, body, token) => {
+    const r = await fetch(`${API}/api/v1${url}`, { method: 'POST', headers: H(token), body: JSON.stringify(body ?? {}) });
+    let j = null; try { j = await r.json(); } catch { /* noop */ }
+    return { code: r.status, j };
+  };
   const ps = (await (await apiGet('/projects', pm)).json()) ?? [];
   for (const p of (Array.isArray(ps) ? ps : [])) {
-    const ts = await (await apiGet(`/shipping/to-ship?project_no=${p.project_no}`, pm)).json();
-    const rows = (Array.isArray(ts) ? ts : (ts.items ?? [])).filter(r => r.ready && !r.in_open_shipment);
-    if (rows.length) { target = { pno: p.project_no, equip: rows[0].equip_no }; break; }
+    const ts = (await (await apiGet(`/shipping/to-ship?project_no=${p.project_no}`, pm)).json()) ?? [];
+    const all = Array.isArray(ts) ? ts : (ts.items ?? []);
+    const already = all.find(r => r.ready && !r.in_open_shipment);
+    if (already) { target = { pno: p.project_no, equip: already.equip_no }; break; }
+    // 没有现成“装配完成”的 → 自己造一台（挑有零件的设备）
+    const ov = (await (await apiGet(`/projects/${p.project_no}/design-overview`, pm)).json()) ?? [];
+    const cand = (Array.isArray(ov) ? ov : []).find(o => (o.parts ?? 0) > 0);
+    if (!cand) continue;
+    const rec = await postAs('/assembly/records', { project_no: p.project_no, equip_no: cand.equip_no, sub_assembly: '整机装配' }, shop1);
+    if (!rec.j?.id) continue;
+    const fin = await postAs(`/assembly/records/${rec.j.id}/finish`, {}, shop1);
+    if (fin.code >= 300) continue;
+    const ts2 = (await (await apiGet(`/shipping/to-ship?project_no=${p.project_no}`, pm)).json()) ?? [];
+    const rows2 = (Array.isArray(ts2) ? ts2 : (ts2.items ?? [])).filter(r => r.ready && !r.in_open_shipment);
+    if (rows2.length) { target = { pno: p.project_no, equip: rows2[0].equip_no }; break; }
   }
   if (!target) {
-    check('R5-01-装车硬拦', true, '无可下达设备，跳过', 'SKIP');
-    check('R5-01-已装车可补勾', true, '同上', 'SKIP');
-    check('R5-02-锁死报400非500', true, '同上', 'SKIP');
+    check('R5-01-装车硬拦', false, '自建靶失败：没能造出“装配完成 + 已发布结构”的设备');
+    check('R5-01-已装车可补勾', false, '同上');
+    check('R5-02-锁死报400非500', false, '同上');
   } else {
     const ins = await post('/shipping/instructions', { project_no: target.pno, equip_nos: [target.equip] });
     const sid = ins.j?.id;
     await post(`/shipping/${sid}/items/generate`, {});
     const its = (await (await apiGet(`/shipping/${sid}/items`, pm)).json()) ?? [];
     if (!sid || its.length === 0) {
-      check('R5-01-装车硬拦', true, `批次 ${ins.j?.shipment_no ?? '?'} 清单为空（结构未发布），跳过`, 'SKIP');
-      check('R5-01-已装车可补勾', true, '同上', 'SKIP');
-      check('R5-02-锁死报400非500', true, '同上', 'SKIP');
-      check('R5-探针自清理', true, '同上', 'SKIP');
+      check('R5-01-装车硬拦', false, `自建靶批次 ${ins.j?.shipment_no ?? '?'} 清单为空（结构未发布）`);
+      check('R5-01-已装车可补勾', false, '同上');
+      check('R5-02-锁死报400非500', false, '同上');
+      check('R5-探针自清理', false, '同上');
     } else {
     const shot = async () => (await (await apiGet(`/shipping/${sid}`, pm)).json()).status;
     // ★ §2.2：采购先叫车（否则“0 项已发”那条会被“未叫车”先拦住，测不到真因）
