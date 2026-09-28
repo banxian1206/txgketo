@@ -143,6 +143,8 @@ def list_records(
 class FinishIn(BaseModel):
     photos: list = Field(default_factory=list)
     remark: str | None = None
+    # ★ §2.1：未装清单（还剩哪些零件没装上）→ 发运清单 = 1 组装体 + N 个未装零件
+    unassembled: list = Field(default_factory=list)
 
 
 @router.post("/records/{rec_id}/finish")
@@ -156,7 +158,7 @@ def finish_assembly(
     rec = session.get(AssemblyRecord, rec_id)
     if rec is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "装配记录不存在")
-    kt.finish_assembly(session, rec, photos=body.photos, remark=body.remark)
+    kt.finish_assembly(session, rec, photos=body.photos, remark=body.remark, unassembled=body.unassembled)
     audit.log(
         session, user=current, action="finish_assembly", object_type="assembly_record",
         object_ref=str(rec.id), summary=f"装配完成：{rec.project_no} / {rec.equip_no}（{rec.sub_assembly}）",

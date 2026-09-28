@@ -383,12 +383,30 @@ def finish_assembly(
     *,
     photos: list | None = None,
     remark: str | None = None,
+    unassembled: list | None = None,
 ) -> AssemblyRecord:
+    """装配完成。★ §2.1：登记**未装清单**（还剩哪些零件没装上）——
+
+    客户口径：“一个设备有 100 个零件，但我只装配了 80 个，那么发货时怎么发？那肯定是发这个
+    装了 80 件的**组装体**，勾选这个就可以了。装配完之后，清单其实就变成了**一个组装体 + 20 个零件**。”
+    不填 = 全部装完（发运清单就是一个组装体）。
+    """
     rec.status = ASSY_DONE
     if photos:
         rec.photos = list(rec.photos or []) + list(photos)
     if remark:
         rec.remark = remark
+    if unassembled is not None:
+        rec.unassembled = [
+            {
+                "ref": str(x.get("ref") or "").strip(),
+                "name": (x.get("name") or "").strip() or None,
+                "qty": float(x.get("qty") or 0) or None,
+                "unit": x.get("unit") or None,
+            }
+            for x in unassembled
+            if str(x.get("ref") or "").strip()
+        ]
     return rec
 
 
@@ -425,6 +443,7 @@ def record_dict(r: AssemblyRecord) -> dict:
         "assembled_by": r.assembled_by,
         "assembled_at": r.assembled_at,
         "photos": r.photos or [],
+        "unassembled": r.unassembled or [],  # ★ §2.1：未装清单
         "debug_by": r.debug_by,
         "debug_at": r.debug_at,
         "debug_result": r.debug_result,

@@ -12,7 +12,7 @@ from datetime import UTC, date, datetime
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.models.assembly import AssemblyRecord
+from app.models.assembly import ASSY_DEBUG_DONE, ASSY_DEBUGGING, ASSY_DONE, AssemblyRecord
 from app.models.library import Item
 from app.models.project import Equipment, Project
 from app.services import project_stage
@@ -22,6 +22,7 @@ from app.models.shipment import (
     SHIP_LOADED,
     SHIP_SHIPPING,
     SHIP_SIGNED,
+    SHIP_ITEM_ASSEMBLY,
     SHIP_TRANSIT,
     VEHICLE_PENDING,
     VEHICLE_READY,
@@ -151,6 +152,10 @@ def generate_items(
     """按本次发运设备的**已发布结构**生成发运清单候选（组件→子组件→零件 + 标准件/原材料）。
 
     数量 = 结构连乘。生成的是"应发清单"，逐项勾「已发」+ 拍照。
+
+    ★ §2.1（09 卷）：**装配完成的设备**不再平铺 100 个零件，而是折成
+    「**1 个组装体 + N 个未装零件**」（客户口径：“装配完之后，清单其实就变成了一个组装体
+    加 20 个零件”）。组装体**不展开**子件（“不需要去纠结它是由 80 个零件组成的”）。
     """
     from app.models.engineering import BOM_MATERIAL, BomItem, Drawing
     from app.services.bom_math import bom_line_demand, cumulative_qty, drawing_demand
@@ -174,6 +179,45 @@ def generate_items(
                 BomItem.status == "已冻结",
             )
         ).all()
+
+        # ★ §2.1：这台设备已经装配完成 → 整体折成「组装体」+ 未装清单
+        asm = _assembled_record(session, sh.project_no, eq)
+        if asm is not None:
+            root = next((d.drawing_no for d in published if d.parent_drawing_no is None), None)
+            equip = session.scalar(
+                select(Equipment).where(Equipment.project_no == sh.project_no, Equipment.equip_no == eq)
+            )
+            out.append(
+                {
+                    "equip_no": eq,
+                    "ref": root or f"{eq}-ASSY",
+                    "parent_ref": None,
+                    "name": f"{(equip.equip_name if equip else None) or eq} 组装体",
+                    "kind": SHIP_ITEM_ASSEMBLY,
+                    "source": "装配",
+                    "qty": 1,
+                    "unit": "台",
+                    "level": 1,
+                    "remark": f"装配完成 {asm.assembled_at:%Y-%m-%d}" if asm.assembled_at else "装配完成",
+                }
+            )
+            for u in asm.unassembled or []:
+                out.append(
+                    {
+                        "equip_no": eq,
+                        "ref": u.get("ref"),
+                        "parent_ref": root,
+                        "name": u.get("name") or u.get("ref"),
+                        "kind": "零件",
+                        "source": "装配未装",
+                        "qty": u.get("qty") or 1,
+                        "unit": u.get("unit"),
+                        "level": 2,
+                        "remark": "本次未装上，随货发出",
+                    }
+                )
+            continue
+
         # 组件/零件（图纸树）
         for d in published:
             children = any(x.parent_drawing_no == d.drawing_no for x in published)
@@ -203,6 +247,19 @@ def generate_items(
                 "level": 9,
             })
     return out
+
+
+def _assembled_record(session: Session, project_no: str, equip_no: str) -> AssemblyRecord | None:
+    """★ §2.1：这台设备是否已装配完成（已完成 → 清单折成组装体 + 未装清单）。"""
+    return session.scalar(
+        select(AssemblyRecord)
+        .where(
+            AssemblyRecord.project_no == project_no,
+            AssemblyRecord.equip_no == equip_no,
+            AssemblyRecord.status.in_((ASSY_DONE, ASSY_DEBUGGING, ASSY_DEBUG_DONE)),
+        )
+        .order_by(AssemblyRecord.id.desc())
+    )
 
 
 def _shipped_count(session: Session, sh: Shipment) -> int:

@@ -1,11 +1,13 @@
 import { useAsmBoard } from '../../hooks/useAsmBoard'
 import {
   App,
+  Button,
   Card,
   Col,
   Empty,
   Form,
   Input,
+  InputNumber,
   Progress,
   Radio,
   Row,
@@ -121,13 +123,26 @@ export default function Assembly() {
     }
   }
 
-  const doFinish = async (r: AssemblyRecordRow) => {
+  const [finishTarget, setFinishTarget] = useState<AssemblyRecordRow | null>(null)
+  const [finishInitial, setFinishInitial] = useState<Record<string, unknown>>({})
+  const [finishForm] = Form.useForm()
+
+  const doFinish = async () => {
+    if (!finishTarget) return
+    let v: { unassembled?: { ref?: string; name?: string; qty?: number }[] }
+    try { v = await finishForm.validateFields() } catch { return }
+    setSaving(true)
     try {
-      await finishAssembly(r.id, {})
-      message.success('装配完成')
+      // ★ §2.1：未装清单（还剩哪些零件没装上）→ 发运清单 = 1 个组装体 + N 个零件
+      const un = (v.unassembled ?? []).filter((x) => (x?.ref ?? '').trim())
+      await finishAssembly(finishTarget.id, { unassembled: un as never })
+      message.success(un.length ? `装配完成（${un.length} 项未装，发运时随货发）` : '装配完成（全部装齐）')
+      setFinishTarget(null)
       await load(projectNo)
     } catch (e) {
       message.error(errMsg(e))
+    } finally {
+      setSaving(false)
     }
   }
 
@@ -358,7 +373,9 @@ export default function Assembly() {
             width: 170,
             render: (_: unknown, r: AssemblyRecordRow) => (
               <Space size={4}>
-                {canEdit && r.status === '装配中' && <a onClick={() => void doFinish(r)}>装配完成</a>}
+                {canEdit && r.status === '装配中' && (
+                  <a onClick={() => { setFinishInitial({ unassembled: [] }); setFinishTarget(r) }}>装配完成</a>
+                )}
                 {canEdit && (r.status === '已装配' || r.status === '调试中') && (
                   <a onClick={() => openDebug(r)}>厂内调试</a>
                 )}
@@ -367,6 +384,56 @@ export default function Assembly() {
           },
         ]}
       />
+
+      {/* ★ §2.1 装配完成 + 未装清单（客户：一个设备 100 个零件只装了 80 → 发「1 组装体 + 20 零件」） */}
+      <AppModal
+        open={!!finishTarget}
+        title={`装配完成 · ${finishTarget?.equip_no ?? ''}`}
+        onClose={() => setFinishTarget(null)}
+        onOk={() => void doFinish()}
+        loading={saving}
+        okText="确认装配完成"
+        form={finishForm}
+        initialValues={finishInitial}
+        subtitle={
+          <Typography.Paragraph type="secondary" style={{ fontSize: 12 }}>
+            没装完也没关系 —— 下面登记**还剩哪些零件没装上**（留空表示全装齐）。
+            发货时清单就是「**一个组装体 + 这些零件**」，现场也按同一份清单清点，不拆开。
+          </Typography.Paragraph>
+        }
+      >
+        <Form.List name="unassembled">
+          {(fields, { add, remove }) => (
+            <>
+              {fields.map((field) => (
+                <Row key={field.key} gutter={8} align="middle">
+                  <Col span={11}>
+                    <Form.Item name={[field.name, 'ref']} style={{ marginBottom: 0 }}>
+                      <Input placeholder="没装上的零件：图号 / 物料号" />
+                    </Form.Item>
+                  </Col>
+                  <Col span={8}>
+                    <Form.Item name={[field.name, 'name']} style={{ marginBottom: 0 }}>
+                      <Input placeholder="名称（可空）" />
+                    </Form.Item>
+                  </Col>
+                  <Col span={3}>
+                    <Form.Item name={[field.name, 'qty']} style={{ marginBottom: 0 }}>
+                      <InputNumber style={{ width: '100%' }} min={1} placeholder="数" />
+                    </Form.Item>
+                  </Col>
+                  <Col span={2}>
+                    <a onClick={() => remove(field.name)}>删</a>
+                  </Col>
+                </Row>
+              ))}
+              <Button type="dashed" onClick={() => add()} block style={{ marginTop: 8 }}>
+                + 加一条「没装上的零件」
+              </Button>
+            </>
+          )}
+        </Form.List>
+      </AppModal>
 
       {/* 开始装配 */}
       <AppModal

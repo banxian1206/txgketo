@@ -59,6 +59,10 @@ class AssemblyRecord(Base, TimestampMixin):
     assembled_by: Mapped[int | None] = mapped_column(ForeignKey("app_user.id"))
     assembled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     photos: Mapped[list | None] = mapped_column(JSONB)
+    # ★ §2.1（09 卷）：装配完成时登记**未装清单**（还剩哪些零件没装上）。
+    #   发运清单据此变成「**1 个组装体 + N 个未装零件**」（客户口径：不纠结构成、不展开）。
+    #   形如 [{"ref": 图号/物料号, "name": ..., "qty": 2, "unit": "件"}]；空 = 全部装完。
+    unassembled: Mapped[list | None] = mapped_column(JSONB)
     # 厂内调试
     debug_by: Mapped[int | None] = mapped_column(ForeignKey("app_user.id"))
     debug_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

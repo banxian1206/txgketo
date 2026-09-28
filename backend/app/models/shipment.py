@@ -27,6 +27,11 @@ SHIP_ARRIVED = "已到货"
 SHIP_SIGNED = "已签收"
 SHIP_STATUS = (SHIP_INSTRUCTED, SHIP_SHIPPING, SHIP_LOADED, SHIP_TRANSIT, SHIP_ARRIVED, SHIP_SIGNED)
 
+# ★ §2.1（09 卷）：发运清单里「组装体」这一项 —— 装配完成的设备**整体折成一项**，不展开子件。
+#   客户口径：“那肯定是发这个装了 80 件的**组装体**…组装体只是清单里面的一项，
+#   你不需要去纠结它是由 80 个零件组成的。”（收货也是「组装体 + N 个零件」，不拆）
+SHIP_ITEM_ASSEMBLY = "组装体"
+
 # ★ 叫车环节（09 卷 §2.2，客户口径 2026-09-28）：
 #   “PM 发出指令需要**叫车服务**，**采购**就去采购车辆回来，**发运**就开始装车并进行交付…
 #    这相当于是一条指令，但是**指挥了两个部门**的人在干事情。”
@@ -99,9 +104,10 @@ class ShipmentItem(Base, TimestampMixin):
     shipment_id: Mapped[int] = mapped_column(ForeignKey("shipment.id", ondelete="CASCADE"))
     equip_no: Mapped[str] = mapped_column(String(16))
     # 树结构
-    ref: Mapped[str] = mapped_column(String(48))  # 图号 / 物料号
+    ref: Mapped[str] = mapped_column(String(48))  # 图号 / 物料号 / 设备号（组装体）
     parent_ref: Mapped[str | None] = mapped_column(String(48))  # 父级图号（组件树）
     name: Mapped[str | None] = mapped_column(String(128))
+    # kind：组件 / 零件 / 标准件 / 原材料 / **组装体**（§2.1：装配完成后整体折成一项）
     kind: Mapped[str] = mapped_column(String(16), default="零件", server_default="零件")
     # 组件 / 零件 / 标准件 / 原材料 / 补充
     qty: Mapped[float] = mapped_column(Numeric(12, 2), default=1, server_default="1")

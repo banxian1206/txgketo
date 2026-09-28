@@ -114,7 +114,18 @@ export async function startAssembly(body: {
   return data
 }
 
-export async function finishAssembly(id: number, body: { photos?: string[]; remark?: string } = {}) {
+/** ★ §2.1：装配完成时登记【未装清单】（还剩哪些零件没装上）→ 发运清单 = 1 组装体 + N 个零件 */
+export interface UnassembledLine {
+  ref: string
+  name?: string | null
+  qty?: number | null
+  unit?: string | null
+}
+
+export async function finishAssembly(
+  id: number,
+  body: { photos?: string[]; remark?: string; unassembled?: UnassembledLine[] } = {},
+) {
   const { data } = await api.post<AssemblyRecordRow>(`/assembly/records/${id}/finish`, body)
   return data
 }
