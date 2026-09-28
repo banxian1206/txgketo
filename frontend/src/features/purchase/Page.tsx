@@ -99,7 +99,9 @@ export default function PurchaseWorkbench() {
   }, [load])
 
   const poolRequests = pool.reduce((s, g) => s + g.request_count, 0)
-  const openOrders = orders.filter((o) => o.status !== '已取消' && o.status !== '已完成')
+  const openOrders = orders.filter(
+    (o) => !['已取消', '已完成', '草稿', '待经理审', '待总监审', '已退回'].includes(o.status),
+  )
   const toApprove = orders.filter((o) => ['待经理审', '待总监审'].includes(o.po_status ?? ''))
   // 到货跟踪 = 没到齐的单（在途/部分到货），按预计到货日升序；超期红、3天内临期黄
   const arrivals = orders

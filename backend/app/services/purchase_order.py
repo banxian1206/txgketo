@@ -14,7 +14,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.errors import ForbiddenOperation
-from app.models.initiation import PurchaseRequest
+from app.models.initiation import GoodsReceipt, PurchaseRequest
 from app.models.platform import POSITION_DIRECTOR, POSITION_LEAD, User
 from app.models.purchase_order import (
     APPR_LEVEL_DIRECTOR,
@@ -60,7 +60,7 @@ def ordered_qty(session: Session, request_id: int) -> float:
     return float(total or 0)
 
 
-def _ordered_and_approved(session: Session, request_id: int) -> tuple[float, bool]:
+def _order_states(session: Session, request_id: int) -> tuple[float, set[str]]:
     rows = session.execute(
         select(PurchaseOrderLine.qty, PurchaseOrder.status)
         .join(PurchaseOrder, PurchaseOrder.id == PurchaseOrderLine.po_id)
@@ -70,28 +70,40 @@ def _ordered_and_approved(session: Session, request_id: int) -> tuple[float, boo
         )
     ).all()
     ordered = sum(float(q or 0) for q, _ in rows)
-    approved = any(st in PO_LIVE_STATUS for _, st in rows)
-    return ordered, approved
+    return ordered, {st for _, st in rows}
 
 
 def sync_request_order_state(session: Session, row: PurchaseRequest) -> float:
-    """重算需求状态：待采购 / 审批中（有单未批）/ 在途 / 部分下单（已批未下满）。
+    """重算需求状态：待采购 / 审批中 / 已退回 / 在途 / 部分下单（08 §4.3）。
 
-    只在需求还处于下单阶段时改状态；已进入收货流程的由 `_recalc_request_status` 负责。
+    ★ 退回/撤回后不能还显示「审批中」——那是「等我改」，不是「等我批」（客户口径 #14）。
     """
-    ordered, approved = _ordered_and_approved(session, row.id)
+    ordered, states = _order_states(session, row.id)
     row.qty_ordered = ordered
-    if row.status in ("待采购", "部分下单", "审批中", "在途"):
+    if row.status in ("待采购", "部分下单", "审批中", "已退回", "在途"):
         need = float(row.qty or 0)
         if ordered <= 1e-9:
             row.status = "待采购"
-        elif not approved:
+        elif states & set(PO_LIVE_STATUS):
+            row.status = "在途" if ordered + 1e-9 >= need else "部分下单"
+        elif states & {PO_PENDING_LEAD, PO_PENDING_DIRECTOR}:
             row.status = "审批中"
-        elif ordered + 1e-9 >= need:
-            row.status = "在途"
+        elif PO_RETURNED in states:
+            row.status = "已退回"
         else:
-            row.status = "部分下单"
+            row.status = "待采购"  # 全是草稿
     return ordered
+
+
+def _sync_po_requests(session: Session, po: PurchaseOrder) -> None:
+    """把单的新状态回写到它名下各条需求（★ 先 flush，否则 autoflush=False 下读到旧单头状态）。"""
+    session.flush()
+    for ln in session.scalars(
+        select(PurchaseOrderLine).where(PurchaseOrderLine.po_id == po.id)
+    ).all():
+        if ln.request_id:
+            sync_request_order_state(session, session.get(PurchaseRequest, ln.request_id))
+    session.flush()
 
 
 def resolve_po_chain(session: Session, submitter: User) -> tuple[User | None, User]:
@@ -126,6 +138,7 @@ def submit_order(session: Session, po: PurchaseOrder, submitter: User) -> str:
     else:
         po.status = PO_PENDING_LEAD
     session.flush()
+    _sync_po_requests(session, po)
     return po.status
 
 
@@ -177,7 +190,7 @@ def approve_order(
             acted_at=_now(),
         )
     )
-    session.flush()
+    _sync_po_requests(session, po)
     return po.status
 
 
@@ -198,7 +211,7 @@ def withdraw_order(session: Session, po: PurchaseOrder, user: User) -> str:
             acted_at=_now(),
         )
     )
-    session.flush()
+    _sync_po_requests(session, po)
     return po.status
 
 
@@ -303,6 +316,41 @@ def create_order(
         sync_request_order_state(session, session.get(PurchaseRequest, rid))
     session.flush()
     return po
+
+
+def recalc_delivery(session: Session, po_id: int) -> None:
+    """交期留痕（08 §7）：实际到货 = 最后一批到货日；delay_days = 实际 − 承诺（>0 逾期）。
+
+    口径（客户 #5「实际交期以仓库验收为准」）：**货到了就算实际到货** ——
+    待入库/已入库/现场待验收/现场已验收 都算；不合格/已退货不算。
+    ★ 必须在【验收时刻】就能算（否则要等到入库，直发件更是永远等不到）。
+    """
+    po = session.get(PurchaseOrder, po_id)
+    if po is None:
+        return
+    rids = [
+        ln.request_id
+        for ln in session.scalars(
+            select(PurchaseOrderLine).where(PurchaseOrderLine.po_id == po_id)
+        ).all()
+        if ln.request_id
+    ]
+    if not rids:
+        return
+    dates = [
+        g.receipt_date
+        for g in session.scalars(
+            select(GoodsReceipt).where(
+                GoodsReceipt.request_id.in_(rids),
+                GoodsReceipt.status.in_(("待入库", "已入库", "现场待验收", "现场已验收")),
+            )
+        )
+        if g.receipt_date
+    ]
+    if dates:
+        po.actual_arrive_date = max(dates)
+        if po.expect_date:
+            po.delay_days = (po.actual_arrive_date - po.expect_date).days
 
 
 def recalc_order_total(session: Session, po: PurchaseOrder) -> None:

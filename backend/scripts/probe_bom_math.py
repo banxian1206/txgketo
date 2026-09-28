@@ -148,17 +148,46 @@ def gen_purchase(p: str, eq: str) -> dict:
     return r.json() if r.status_code in (200, 201) else {"error": r.status_code, "body": r.text[:300]}
 
 
+def approve_po(po_no: str) -> str:
+    """★ 重构后下单即提交审批：把单推到「已批准」（激活后需求才转在途、才能验收）。
+
+    审批链按岗位找：组员提交 → 经理审 → 总监审；经理空缺会自动跳级给总监。
+    """
+    for _ in range(4):
+        po = [o for o in call("get", "/purchase/orders", "buyer1") if o.get("po_no") == po_no]
+        if not po:
+            raise RuntimeError(f"采购单 {po_no} 不在列表里")
+        st = po[0].get("po_status") or po[0]["status"]   # ★ po_status 是真单头状态；status 是派生展示口径
+        if st in ("已批准", "执行中", "已完成"):
+            return st
+        if st == "待经理审":
+            call("post", f"/purchase/orders/{po_no}/approve", "purchase_manager", (200,),
+                 json={"action": "通过", "note": "探针自动通过"})
+        elif st == "待总监审":
+            call("post", f"/purchase/orders/{po_no}/approve", "purchase_director", (200,),
+                 json={"action": "通过", "note": "探针自动通过"})
+        else:
+            raise RuntimeError(f"{po_no} 状态 {st}，无法推进审批")
+    po = [o for o in call("get", "/purchase/orders", "buyer1") if o.get("po_no") == po_no]
+    return po[0].get("po_status") or po[0]["status"] if po else "?"
+
+
 def order_and_receive(p: str, item_no: str, *, deliver_to="公司仓库", store=True, qty=None):
-    """把该物料所有待采购需求下单，然后验收（可选入库）。"""
+    """把该物料所有待采购需求下单 → 审批通过 → 验收（可选入库）。"""
     rows = [r for r in q("select id, qty from purchase_request "
-                         "where project_no=:p and item_no=:i and status='待采购'", p=p, i=item_no)]
+                         "where project_no=:p and item_no=:i and status in ('待采购','部分下单')",
+                         p=p, i=item_no)]
     if not rows:
         return []
-    call("post", "/purchase/merge-order", "buyer1", (200, 201), json={
+    mo = call("post", "/purchase/merge-order", "buyer1", (200, 201), json={
         "supplier_id": q("select id from supplier limit 1")[0]["id"],
         "ordered_at": d(0), "expected_date": d(10), "deliver_to": deliver_to,
         "deliver_address": "深圳客户现场" if deliver_to == "直发客户现场" else None,
         "lines": [{"request_id": r["id"], "tax_incl": True, "unit_price": 100.0} for r in rows]})
+    st = approve_po(mo["po_no"])
+    print(f"     [下单 {mo['po_no']} → 审批后 {st}]")
+    if st not in ("已批准", "执行中", "已完成"):
+        raise RuntimeError(f"{mo['po_no']} 审批未通过（{st}），无法验收")
     out = []
     for r in rows:
         qq = float(qty if qty is not None else r["qty"])

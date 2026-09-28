@@ -246,6 +246,22 @@ def accept_incoming(
     if result == SITE_RECEIPT_OK:
         receipt.status = SITE_RECEIPT_DONE
         receipt.inspect_note = remark or (receipt.inspect_note or "")
+        # ★ 交期留痕（08 §7）：现场清点「齐」= 实际到货
+        if receipt.receipt_date is None:
+            receipt.receipt_date = date.today()
+        from app.models.purchase_order import PurchaseOrderLine
+        from app.services.purchase_order import recalc_delivery
+
+        po_id = receipt.po_id
+        if po_id is None and receipt.request_id:
+            line = session.scalar(
+                select(PurchaseOrderLine)
+                .where(PurchaseOrderLine.request_id == receipt.request_id)
+                .order_by(PurchaseOrderLine.id.desc())
+            )
+            po_id = line.po_id if line else None
+        if po_id is not None:
+            recalc_delivery(session, po_id)
     else:
         notify.notify(
             session,

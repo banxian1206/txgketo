@@ -122,10 +122,12 @@ class Api:
             body = r.json()
         else:
             body = r.content
-        # ★ 二期：下单即提交审批 → 脚本自动用采购总监审批通过，否则后续验收/入库会被拦
+        # ★ 二期：下单即提交审批（采购经理 → 采购总监）→ 脚本自动逐级审批通过，否则后续验收/入库会被拦
         if method.lower() == "post" and "merge-order" in path and isinstance(body, dict) and body.get("po_no"):
-            self.raw("post", f"/purchase/orders/{body['po_no']}/approve", "purchase_director",
-                     json={"action": "通过"})
+            pno = body["po_no"]
+            # 一级：采购经理（若已自动跳级会 400，忽略）；二级：采购总监
+            self.raw("post", f"/purchase/orders/{pno}/approve", "purchase_manager", json={"action": "通过"})
+            self.raw("post", f"/purchase/orders/{pno}/approve", "purchase_director", json={"action": "通过"})
         return body
 
     def try_(self, method, path, who, **kw):
@@ -135,10 +137,11 @@ class Api:
             status, body = r.status_code, r.json()
         except Exception:
             return r.status_code, r.text
-        # ★ 二期：merge-order 后自动审批通过（同 req）
+        # ★ 二期：merge-order 后自动逐级审批通过（同 req）
         if method.lower() == "post" and "merge-order" in path and status in (200, 201) and isinstance(body, dict) and body.get("po_no"):
-            self.raw("post", f"/purchase/orders/{body['po_no']}/approve", "purchase_director",
-                     json={"action": "通过"})
+            pno = body["po_no"]
+            self.raw("post", f"/purchase/orders/{pno}/approve", "purchase_manager", json={"action": "通过"})
+            self.raw("post", f"/purchase/orders/{pno}/approve", "purchase_director", json={"action": "通过"})
         return status, body
 
 
@@ -886,25 +889,29 @@ def b_approval_chain() -> None:
         "lines": [{"request_id": rid, "tax_incl": True, "qty": 20, "unit_price": 100.0}]})
     po = r.json().get("po_no")
     od = api.req("get", f"/purchase/orders/{po}", "buyer1")
-    rec(od["order"]["po_status"] == "待总监审", f"提交后应 待总监审，实际={od['order']['po_status']}")
+    rec(od["order"]["po_status"] == "待经理审", f"提交后应 待经理审，实际={od['order']['po_status']}")
 
     sc_self, _ = api.try_("post", f"/purchase/orders/{po}/approve", "buyer1", json={"action": "通过"})
     rec(sc_self == 403, f"提交人自己审批应 403，实际={sc_self}")
-    sc_nonote, _ = api.try_("post", f"/purchase/orders/{po}/approve", "purchase_director",
+    sc_nonote, _ = api.try_("post", f"/purchase/orders/{po}/approve", "purchase_manager",
                             json={"action": "退回"})
     rec(sc_nonote == 400, f"退回不填说明应 400，实际={sc_nonote}")
-    api.req("post", f"/purchase/orders/{po}/approve", "purchase_director", (200,),
+    api.req("post", f"/purchase/orders/{po}/approve", "purchase_manager", (200,),
             json={"action": "退回", "note": "价格再谈谈"})
     od = api.req("get", f"/purchase/orders/{po}", "buyer1")
     rec(od["order"]["po_status"] == "已退回", f"退回后应 已退回，实际={od['order']['po_status']}")
     api.req("post", f"/purchase/orders/{po}/submit", "buyer1", (200,))
+    api.req("post", f"/purchase/orders/{po}/approve", "purchase_manager", (200,), json={"action": "通过"})
+    od = api.req("get", f"/purchase/orders/{po}", "buyer1")
+    rec(od["order"]["po_status"] == "待总监审", f"经理通过后应 待总监审，实际={od['order']['po_status']}")
     api.req("post", f"/purchase/orders/{po}/approve", "purchase_director", (200,), json={"action": "通过"})
     od = api.req("get", f"/purchase/orders/{po}", "buyer1")
     rec(od["order"]["po_status"] == "已批准", f"通过后应 已批准，实际={od['order']['po_status']}")
     ap = api.req("get", f"/purchase/orders/{po}/approvals", "buyer1")
+    levels = {x["level"] for x in ap}
     acts = [x["action"] for x in ap]
-    rec("跳过" in acts and "退回" in acts and "通过" in acts,
-        f"审批留档应含 跳过/退回/通过（多轮），实际={acts}")
+    rec({1, 2} <= levels and "退回" in acts and "通过" in acts,
+        f"审批留档应含一级+二级（多轮），level={sorted(levels)} acts={acts}")
 
 
 def b_payment() -> None:
@@ -923,6 +930,68 @@ def b_payment() -> None:
     rec(st["summary"]["paid_count"] >= 1, f"对账已付应 ≥1，实际={st['summary']['paid_count']}")
     paid_nos = {x["po_no"] for x in st["paid"]}
     rec(po["po_no"] in paid_nos, f"该单应出现在已付列表，实际={sorted(paid_nos)[:3]}")
+
+
+def b_fixes() -> None:
+    """修复回归：交期留痕(N1)/总监下单500(N2)/重复付款(N3)/退回标签(N5)/拆单并行(N6)/展示(N7)。"""
+    probe("修复回归 N1/N2/N3/N5/N6/N7")
+    p = CTX["p"]
+
+    def body(rid, qty, sup, price=10.0):
+        return {"supplier_id": SUP[sup]["id"], "ordered_at": d(0), "expected_date": d(10),
+                "deliver_to": "公司仓库",
+                "lines": [{"request_id": rid, "qty": qty, "unit_price": price, "tax_incl": True}]}
+
+    # N2 总监下单 → 400（原 500）
+    rid = _new_demand("bc", 5)["id"]
+    sc, bd = api.try_("post", "/purchase/merge-order", "purchase_director", json=body(rid, 5, "甲钢材"))
+    rec(sc == 400, f"N2 总监下单应 400（不再 500），实际={sc}", str(bd)[:100])
+
+    # N6 未审批即可拆两刀（raw 绕过自动审批）
+    rid2 = _new_demand("bc", 100)["id"]
+    r1 = api.raw("post", "/purchase/merge-order", "buyer1", json=body(rid2, 60, "甲钢材"))
+    r2 = api.raw("post", "/purchase/merge-order", "buyer1", json=body(rid2, 40, "乙标准件"))
+    rec(r1.status_code in (200, 201) and r2.status_code in (200, 201),
+        f"N6 未审批即可拆两刀：{r1.status_code}/{r2.status_code}",
+        "拆多家不该等第一次审批")
+    pno_list = [r.json().get("po_no") for r in (r1, r2) if r.status_code in (200, 201)]
+
+    # N7 未审批单不得显示为「在途」；N5 退回后需求=已退回
+    rid3 = _new_demand("bc", 7)["id"]
+    r3 = api.raw("post", "/purchase/merge-order", "buyer1", json=body(rid3, 7, "甲钢材"))
+    pno3 = r3.json().get("po_no")
+    ol = api.req("get", "/purchase/orders", "buyer1")
+    row = next((x for x in ol if x["po_no"] == pno3), {})
+    rec(row.get("status") == "待经理审",
+        f"N7 待审单展示应=待经理审（原「在途」），实际={row.get('status')}")
+    api.req("post", f"/purchase/orders/{pno3}/approve", "purchase_manager", (200,),
+            json={"action": "退回", "note": "价格再谈"})
+    st = next(x for x in api.req("get", f"/projects/{p}/purchase-requests", "buyer1") if x["id"] == rid3)
+    rec(st["status"] == "已退回",
+        f"N5 退回后需求应=已退回（原「审批中」），实际={st['status']}")
+
+    # N1 交期留痕：下单→审批→验收→入库 → actual_arrive_date/delay_days 有值
+    rid4 = _new_demand("bc", 3)["id"]
+    mo = api.req("post", "/purchase/merge-order", "buyer1", (200, 201), json=body(rid4, 3, "甲钢材"))
+    _inspect_store(_find_by_id(rid4), 3, do_store=True)
+    po_row = q("select actual_arrive_date, delay_days from purchase_order where po_no=:p", p=mo["po_no"])[0]
+    rec(po_row["actual_arrive_date"] is not None,
+        f"★ N1 已入库后 actual_arrive_date 应有值（原 NULL），实际={po_row['actual_arrive_date']}")
+    rec(po_row["delay_days"] is not None,
+        f"★ N1 delay_days 应有值，实际={po_row['delay_days']}")
+
+    # N3 重复标记付款 → 跳过、不覆盖付款日
+    po_id = q("select id from purchase_order where po_no=:p", p=mo["po_no"])[0]["id"]
+    api.req("post", "/purchase/orders/mark-paid", "buyer1", (200,), json={"po_ids": [po_id], "paid_at": d(-1)})
+    paid1 = q("select paid_at from purchase_order where id=:i", i=po_id)[0]["paid_at"]
+    res = api.req("post", "/purchase/orders/mark-paid", "buyer1", (200,), json={"po_ids": [po_id], "paid_at": d(0)})
+    paid2 = q("select paid_at from purchase_order where id=:i", i=po_id)[0]["paid_at"]
+    rec(paid1 == paid2 and res.get("skipped", 0) >= 1,
+        f"N3 重复标记应跳过、付款日不变（{paid1}=={paid2}，skipped={res.get('skipped')}）")
+
+    # 清理 N6 留下的两张待审单
+    for pno in pno_list:
+        api.raw("post", f"/purchase/orders/{pno}/void", "buyer1", json={"reason": "探针清理"})
 
 
 def _new_demand(item_key: str, qty: float, who: str = "buyer1") -> dict:
@@ -1322,7 +1391,7 @@ def main() -> None:
             traceback.print_exc()
 
     part("Part B · 采购域专项探针")
-    for fn in (b_split, b_partial_ok, b_split_line_cancel, b_void_order, b_close_return, b_approval_chain, b_payment, b_idempotent_after_release, b_pending_window, b_pending_repool,
+    for fn in (b_split, b_partial_ok, b_split_line_cancel, b_void_order, b_close_return, b_approval_chain, b_payment, b_fixes, b_idempotent_after_release, b_pending_window, b_pending_repool,
                b_direct_repool, b_delete_authz, b_kitting_inflate, b_issue_draft_bom,
                b_stock_conservation, b_price_reference):
         try:

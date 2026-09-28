@@ -33,6 +33,8 @@ DEMO_USERS: list[tuple[str, str, str, str, str | None, list[str]]] = [
     ("sales_director", "商务部总监", "SALES", "总监", None, ["SALES"]),
     # 采购部
     ("buyer1", "采购组员", "PURCHASE", "组员", None, ["PURCHASE"]),
+    # ★ 经理账号（客户口径 #17 要「经理 + 总监」两个；缺了经理会全程自动跳级、两级审批退化成一级）
+    ("purchase_manager", "采购经理", "PURCHASE", "经理", None, ["PURCHASE_LEAD"]),
     ("purchase_director", "采购总监", "PURCHASE", "总监", None, ["PURCHASE_LEAD"]),
     # 仓库
     ("wh1", "仓管组员", "WH", "组员", None, ["WAREHOUSE"]),

@@ -979,7 +979,7 @@ def order(
     row = session.get(PurchaseRequest, request_id)
     if row is None or row.project_no != project_no:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "采购需求不存在")
-    if row.status not in ("待采购", "部分下单"):
+    if row.status not in ("待采购", "部分下单", "审批中"):
         raise HTTPException(status.HTTP_400_BAD_REQUEST, f"当前状态是「{row.status}」，不能重复下单")
     if body.deliver_to not in DELIVER_TO:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, f"收货地点只能是：{'/'.join(DELIVER_TO)}")
@@ -1001,28 +1001,31 @@ def order(
         raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
     expect = _resolve_expected(body.expected_date, body.ordered_at, row.lead_days)
 
-    po = po_svc.create_order(
-        session,
-        supplier_id=sup.id if sup else None,
-        supplier_name=sup.name if sup else body.supplier_name,
-        order_date=body.ordered_at,
-        expect_date=body.expected_date or expect,
-        deliver_to=body.deliver_to,
-        deliver_address=body.deliver_address,
-        lines=[
-            {
-                "request_id": row.id,
-                "qty": qty,
-                "unit_price": body.unit_price,
-                "tax_incl": body.tax_incl,
-                "expect_date": expect,
-            }
-        ],
-        actor_id=current.id,
-        po_no=body.po_no,
-        status="草稿",
-    )
-    po_svc.submit_order(session, po, current)  # ★ 二期：下单即提交审批
+    try:
+        po = po_svc.create_order(
+            session,
+            supplier_id=sup.id if sup else None,
+            supplier_name=sup.name if sup else body.supplier_name,
+            order_date=body.ordered_at,
+            expect_date=body.expected_date or expect,
+            deliver_to=body.deliver_to,
+            deliver_address=body.deliver_address,
+            lines=[
+                {
+                    "request_id": row.id,
+                    "qty": qty,
+                    "unit_price": body.unit_price,
+                    "tax_incl": body.tax_incl,
+                    "expect_date": expect,
+                }
+            ],
+            actor_id=current.id,
+            po_no=body.po_no,
+            status="草稿",
+        )
+        po_svc.submit_order(session, po, current)  # ★ 二期：下单即提交审批
+    except po_svc.PurchaseOrderError as exc:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
     po_svc.sync_request_snapshot(session, row)
     item = session.get(Item, row.item_no)
     audit.log(
@@ -1132,6 +1135,7 @@ def _ensure_site_pending_receipt(session: Session, row: PurchaseRequest, actor_i
     )
     session.add(gr)
     session.flush()
+    _attach_po_refs(session, [gr])  # 挂到采购单/行（交期留痕/对账靠它）
     project = session.get(Project, row.project_no) if row.project_no else None
     if project is not None and project.pm_id:
         notify.notify(
@@ -1205,27 +1209,13 @@ def _attach_po_refs(session: Session, receipts: list[GoodsReceipt]) -> None:
 
 
 def _recalc_po_delivery(session: Session, po_id: int) -> None:
-    """交期留痕（08 §7）：实际到货 = 最后一批到货日；delay_days = 实际 − 承诺（>0 逾期）。"""
-    po = session.get(PurchaseOrder, po_id)
-    if po is None:
-        return
-    rids = [ln.request_id for ln in _po_lines(session, po_id) if ln.request_id]
-    if not rids:
-        return
-    dates = [
-        g.receipt_date
-        for g in session.scalars(
-            select(GoodsReceipt).where(
-                GoodsReceipt.request_id.in_(rids),
-                GoodsReceipt.status.in_(("已入库", "现场已验收")),
-            )
-        )
-        if g.receipt_date
-    ]
-    if dates:
-        po.actual_arrive_date = max(dates)
-        if po.expect_date:
-            po.delay_days = (po.actual_arrive_date - po.expect_date).days
+    """交期留痕（08 §7）：实际到货 = 最后一批到货日；delay_days = 实际 − 承诺（>0 逾期）。
+
+    口径：货到了（待入库/已入库/现场待验收/现场已验收）就算实际到货。实现在 `services.purchase_order`。
+    """
+    from app.services import purchase_order as po_svc
+
+    po_svc.recalc_delivery(session, po_id)
 
 
 def _bump_line_on_receipt(
@@ -1537,6 +1527,8 @@ def store_receipt(
             _sync_purchase_task(
                 session, row, "进行中", f"已入库 {gr.qty:g}（{gr.location}），剩余还在途"
             )
+    if gr.po_id:
+        _recalc_po_delivery(session, gr.po_id)  # 交期留痕（08 §7）
     audit.log(
         session,
         user=current,
@@ -2082,7 +2074,7 @@ def merge_order(
         row = session.get(PurchaseRequest, ln.request_id)
         if row is None:
             raise HTTPException(status.HTTP_404_NOT_FOUND, f"需求不存在：{ln.request_id}")
-        if row.status not in ("待采购", "部分下单"):
+        if row.status not in ("待采购", "部分下单", "审批中"):
             raise HTTPException(
                 status.HTTP_400_BAD_REQUEST,
                 f"{row.item_no} 当前状态是「{row.status}」，不能合并下单",
@@ -2105,25 +2097,28 @@ def merge_order(
             }
         )
 
-    po = po_svc.create_order(
-        session,
-        supplier_id=sup.id,
-        supplier_name=sup.name,
-        order_date=body.ordered_at,
-        expect_date=body.expected_date or lines_in[0]["expect_date"],
-        deliver_to=body.deliver_to,
-        deliver_address=body.deliver_address,
-        lines=lines_in,
-        actor_id=current.id,
-        po_no=body.po_no,
-        tax_rate=body.tax_rate,
-        freight=body.freight,
-        discount=body.discount,
-        status="草稿",
-        remark=body.remark,
-    )
-    # ★ 二期：下单即提交审批（采购经理 → 采购总监）；需求转「审批中」，通过后才在途
-    po_svc.submit_order(session, po, current)
+    try:
+        po = po_svc.create_order(
+            session,
+            supplier_id=sup.id,
+            supplier_name=sup.name,
+            order_date=body.ordered_at,
+            expect_date=body.expected_date or lines_in[0]["expect_date"],
+            deliver_to=body.deliver_to,
+            deliver_address=body.deliver_address,
+            lines=lines_in,
+            actor_id=current.id,
+            po_no=body.po_no,
+            tax_rate=body.tax_rate,
+            freight=body.freight,
+            discount=body.discount,
+            status="草稿",
+            remark=body.remark,
+        )
+        # ★ 二期：下单即提交审批（采购经理 → 采购总监）；需求转「审批中」，通过后才在途
+        po_svc.submit_order(session, po, current)
+    except po_svc.PurchaseOrderError as exc:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
 
     done: list[str] = []
     for x in lines_in:
@@ -2427,8 +2422,11 @@ def mark_orders_paid(
         raise HTTPException(status.HTTP_404_NOT_FOUND, "采购单不存在")
     now = datetime.now(UTC)
     paid = 0
+    skipped = 0
     for po in pos:
-        if po.status == "已作废":
+        # 一单付一次（客户口径 #12）：已作废 / 已标记付款的跳过，不覆盖付款日
+        if po.status == "已作废" or po.pay_status == "已付款":
+            skipped += 1
             continue
         po.pay_status = "已付款"
         po.paid_at = body.paid_at or date.today()
@@ -2450,13 +2448,14 @@ def mark_orders_paid(
         object_type="purchase_order",
         object_ref=",".join(po.po_no for po in pos),
         summary=f"批量标记已付款：{paid} 张单"
+        + (f"，{skipped} 张已付/已作废跳过" if skipped else "")
         + (f"（付款日 {body.paid_at}）" if body.paid_at else "")
         + (f"，{len(body.vouchers)} 张凭证" if body.vouchers else ""),
         detail={"po_ids": body.po_ids},
         ip=client_ip(request),
     )
     session.commit()
-    return {"paid": paid}
+    return {"paid": paid, "skipped": skipped}
 
 
 @purchase_router.post("/purchase/orders/{key}/vouchers", status_code=status.HTTP_201_CREATED)
@@ -2557,9 +2556,12 @@ def _po_lines(session: Session, po_id: int) -> list[PurchaseOrderLine]:
 
 
 def _po_display_status(po: PurchaseOrder, lines: list[PurchaseOrderLine]) -> str:
-    """单头状态的**展示口径**（沿用旧词表，前端无需改色）：由单行状态汇总。"""
+    """单头状态的**展示口径**：审批中的单展示真实审批态，别伪装成「在途」（08 §4.2）。"""
     if po.status in ("已作废",):
         return "已取消"
+    # 还没批准的单：显示真实状态（草稿/待经理审/待总监审/已退回），不要落到「在途」
+    if po.status in ("草稿", "待经理审", "待总监审", "已退回"):
+        return po.status
     active = [ln for ln in lines if ln.status != "已取消"] or lines
     st = {ln.status for ln in active}
     if "不合格" in st:
