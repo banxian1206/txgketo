@@ -1204,6 +1204,30 @@ def _attach_po_refs(session: Session, receipts: list[GoodsReceipt]) -> None:
             g.po_line_id = line.id
 
 
+def _recalc_po_delivery(session: Session, po_id: int) -> None:
+    """交期留痕（08 §7）：实际到货 = 最后一批到货日；delay_days = 实际 − 承诺（>0 逾期）。"""
+    po = session.get(PurchaseOrder, po_id)
+    if po is None:
+        return
+    rids = [ln.request_id for ln in _po_lines(session, po_id) if ln.request_id]
+    if not rids:
+        return
+    dates = [
+        g.receipt_date
+        for g in session.scalars(
+            select(GoodsReceipt).where(
+                GoodsReceipt.request_id.in_(rids),
+                GoodsReceipt.status.in_(("已入库", "现场已验收")),
+            )
+        )
+        if g.receipt_date
+    ]
+    if dates:
+        po.actual_arrive_date = max(dates)
+        if po.expect_date:
+            po.delay_days = (po.actual_arrive_date - po.expect_date).days
+
+
 def _bump_line_on_receipt(
     session: Session, row: PurchaseRequest, *, ok: float, rejected: float
 ) -> None:
@@ -1226,6 +1250,7 @@ def _bump_line_on_receipt(
     po = session.get(PurchaseOrder, line.po_id)
     if po is not None and po.status in ("已批准",):
         po.status = "执行中"
+    _recalc_po_delivery(session, line.po_id)
 
 
 def _perform_inspect(
@@ -2375,6 +2400,101 @@ def patch_purchase_order(
     )
     session.commit()
     return {"status": po.status}
+
+
+class MarkPaidIn(BaseModel):
+    """批量标记已付款（客户口径 #11：财务线下付款 → 采购在系统标记 + 传截图）。"""
+
+    po_ids: list[int]
+    paid_at: date | None = Field(default=None, description="财务实际付款日（可回填）")
+    paid_amount: float | None = Field(default=None, description="不填默认=单额")
+    note: str | None = None
+    vouchers: list[str] | None = Field(default=None, description="付款截图 stored_path（可选，共享）")
+
+
+@purchase_router.post("/purchase/orders/mark-paid")
+def mark_orders_paid(
+    body: MarkPaidIn,
+    request: Request,
+    session: Session = Depends(get_session),
+    current: User = Depends(require_permission("purchase:payment")),
+):
+    """批量标记已付款 + 付款截图（客户口径 #11/#12/#13）：一单付一次，pay_status 二态。"""
+    if not body.po_ids:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "至少选一张采购单")
+    pos = session.scalars(select(PurchaseOrder).where(PurchaseOrder.id.in_(body.po_ids))).all()
+    if not pos:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "采购单不存在")
+    now = datetime.now(UTC)
+    paid = 0
+    for po in pos:
+        if po.status == "已作废":
+            continue
+        po.pay_status = "已付款"
+        po.paid_at = body.paid_at or date.today()
+        po.paid_amount = body.paid_amount if body.paid_amount is not None else po.total_tax_incl
+        po.paid_by = current.id
+        po.paid_marked_at = now
+        po.paid_note = body.note
+        if body.vouchers:
+            existing = list(po.paid_vouchers or [])
+            existing.extend(
+                {"stored_path": v, "by": current.name, "at": now.isoformat()} for v in body.vouchers
+            )
+            po.paid_vouchers = existing
+        paid += 1
+    audit.log(
+        session,
+        user=current,
+        action="mark_paid",
+        object_type="purchase_order",
+        object_ref=",".join(po.po_no for po in pos),
+        summary=f"批量标记已付款：{paid} 张单"
+        + (f"（付款日 {body.paid_at}）" if body.paid_at else "")
+        + (f"，{len(body.vouchers)} 张凭证" if body.vouchers else ""),
+        detail={"po_ids": body.po_ids},
+        ip=client_ip(request),
+    )
+    session.commit()
+    return {"paid": paid}
+
+
+@purchase_router.post("/purchase/orders/{key}/vouchers", status_code=status.HTTP_201_CREATED)
+async def upload_po_vouchers(
+    key: str,
+    request: Request,
+    files: list[UploadFile] = File(...),
+    session: Session = Depends(get_session),
+    current: User = Depends(require_permission("purchase:payment")),
+):
+    """采购单付款凭证（截图）：一次可传多张。"""
+    po = session.scalar(select(PurchaseOrder).where(PurchaseOrder.po_no == key))
+    if po is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "采购单不存在")
+    vouchers = list(po.paid_vouchers or [])
+    folder = Path(settings.upload_dir) / "purchase" / po.po_no
+    for f in files[:10]:
+        stored, name = await save_upload(f, folder)
+        vouchers.append(
+            {
+                "filename": name,
+                "stored_path": stored,
+                "by": current.name,
+                "at": datetime.now(UTC).isoformat(),
+            }
+        )
+    po.paid_vouchers = vouchers
+    audit.log(
+        session,
+        user=current,
+        action="vouchers",
+        object_type="purchase_order",
+        object_ref=key,
+        summary=f"采购单 {key} 上传付款凭证 {len(files)} 张",
+        ip=client_ip(request),
+    )
+    session.commit()
+    return {"count": len(vouchers)}
 
 
 # ============================================================================

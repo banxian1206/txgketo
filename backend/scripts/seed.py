@@ -72,6 +72,7 @@ PERMISSIONS: list[tuple[str, str, str]] = [
     ("purchase:view", "查看采购", "采购"),
     ("purchase:edit", "采购下单", "采购"),
     ("purchase:price", "查看采购价格", "采购"),
+    ("purchase:payment", "标记付款/上传付款凭证", "采购"),
     ("warehouse:view", "查看库存", "仓库"),
     ("warehouse:edit", "到货验收/入库/领料", "仓库"),
     ("mfg:view", "查看制造任务", "制造"),
@@ -94,8 +95,8 @@ ROLES: list[tuple[str, str, list[str]]] = [
     ("DESIGN_AUDIT", "技术审核", ["project:view", "design:edit", "design:audit", "std:view"]),
     ("CRAFT", "工艺", ["project:view", "design:edit", "std:view", "std:edit"]),
     ("PM", "项目经理", ["project:view", "project:edit", "project:close", "project:amount", "contract:view", "design:edit", "purchase:view", "mfg:view", "ship:edit", "site:edit", "acceptance:edit"]),
-    ("PURCHASE", "采购", ["project:view", "purchase:view", "purchase:edit", "purchase:price", "std:view", "warehouse:view"]),
-    ("PURCHASE_LEAD", "采购经理", ["project:view", "purchase:view", "purchase:edit", "purchase:price", "std:view", "std:edit", "warehouse:view", "cost:view"]),
+    ("PURCHASE", "采购", ["project:view", "purchase:view", "purchase:edit", "purchase:price", "purchase:payment", "std:view", "warehouse:view"]),
+    ("PURCHASE_LEAD", "采购经理", ["project:view", "purchase:view", "purchase:edit", "purchase:price", "purchase:payment", "std:view", "std:edit", "warehouse:view", "cost:view"]),
     ("WAREHOUSE", "仓库", ["project:view", "warehouse:view", "warehouse:edit", "purchase:view", "std:view"]),
     ("MFG", "制造执行", ["project:view", "mfg:view", "mfg:edit", "warehouse:edit"]),
     ("ASSY", "装配", ["project:view", "mfg:view", "mfg:edit"]),
@@ -103,7 +104,7 @@ ROLES: list[tuple[str, str, list[str]]] = [
     ("DELIVERY", "交付发运", ["project:view", "ship:edit", "warehouse:view"]),
     ("SITE", "现场服务", ["project:view", "site:edit", "acceptance:edit"]),
     ("SERVICE", "售后", ["project:view", "service:edit"]),
-    ("FIN", "财务", ["project:view", "project:amount", "contract:view", "cost:view", "purchase:price", "payment:edit"]),
+    ("FIN", "财务", ["project:view", "project:amount", "contract:view", "cost:view", "purchase:price", "purchase:payment", "payment:edit"]),
 ]
 
 ADMIN_USERNAME = "admin"

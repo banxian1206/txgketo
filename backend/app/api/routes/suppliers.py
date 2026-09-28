@@ -19,7 +19,7 @@ from app.api.deps import (
 )
 from app.core.db import get_session
 from app.models.initiation import PurchaseRequest
-from app.models.purchase_order import PurchaseOrderLine
+from app.models.purchase_order import PurchaseOrder, PurchaseOrderLine
 from app.models.library import SOURCE_STANDARD, Item, StdCategory, StdClass
 from app.models.platform import User
 from app.models.purchasing import (
@@ -338,6 +338,63 @@ def add_quote(
 # ============================================================================
 # ★ 价格参考：下单前看清历史，才好砍价
 # ============================================================================
+
+
+# ============================================================================
+# ★ 供应商往来对账单（客户口径 §13：未付/已付两页签）
+# ============================================================================
+
+
+@router.get("/suppliers/{supplier_id}/statement")
+def supplier_statement(
+    supplier_id: int,
+    session: Session = Depends(get_session),
+    current: User = Depends(require_permission("purchase:price")),
+):
+    """供应商往来：共 N 张单、已付 M / 未付 K；未付/已付两页签 + 累计金额。"""
+    sup = session.get(Supplier, supplier_id)
+    if sup is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "供应商不存在")
+    pos = session.scalars(
+        select(PurchaseOrder)
+        .where(PurchaseOrder.supplier_id == supplier_id, PurchaseOrder.status != "已作废")
+        .order_by(PurchaseOrder.id.desc())
+    ).all()
+    names = {u.id: u.name for u in session.scalars(select(User)).all()}
+
+    def brief(po: PurchaseOrder) -> dict:
+        return {
+            "id": po.id,
+            "po_no": po.po_no,
+            "order_date": po.order_date,
+            "expect_date": po.expect_date,
+            "status": po.status,
+            "pay_status": po.pay_status,
+            "total_tax_incl": float(po.total_tax_incl or 0),
+            "actual_arrive_date": po.actual_arrive_date,
+            "delay_days": po.delay_days,
+            "paid_at": po.paid_at,
+            "paid_amount": float(po.paid_amount) if po.paid_amount is not None else None,
+            "paid_by": names.get(po.paid_by) if po.paid_by else None,
+            "paid_marked_at": po.paid_marked_at,
+            "voucher_count": len(po.paid_vouchers or []),
+            "paid_note": po.paid_note,
+        }
+
+    unpaid = [po for po in pos if po.pay_status != "已付款"]
+    paid = [po for po in pos if po.pay_status == "已付款"]
+    return {
+        "supplier": {"id": sup.id, "name": sup.name, "tax_rate": sup.tax_rate},
+        "summary": {
+            "total_orders": len(pos),
+            "paid_count": len(paid),
+            "unpaid_count": len(unpaid),
+            "total_amount": round(sum(float(po.total_tax_incl or 0) for po in pos), 2),
+            "paid_amount": round(sum(float(po.paid_amount or 0) for po in paid), 2),
+        },
+        "unpaid": [brief(po) for po in unpaid],
+        "paid": [brief(po) for po in paid],
+    }
 
 
 @router.get("/purchase/price-reference/{item_no}")

@@ -907,6 +907,24 @@ def b_approval_chain() -> None:
         f"审批留档应含 跳过/退回/通过（多轮），实际={acts}")
 
 
+def b_payment() -> None:
+    """三期 付款标记 + 供应商往来对账（客户口径 #11/#12/#13）。"""
+    probe("三期 付款标记 + 往来对账")
+    orders = api.req("get", "/purchase/orders", "buyer1")
+    po = next((o for o in orders if o.get("id") and o.get("supplier_id")), None)
+    if po is None:
+        rec(False, "没有可付款的采购单")
+        return
+    sc, _ = api.try_("post", "/purchase/orders/mark-paid", "wh1", json={"po_ids": [po["id"]]})
+    rec(sc == 403, f"仓管标记付款应 403（无 purchase:payment），实际={sc}")
+    api.req("post", "/purchase/orders/mark-paid", "buyer1", (200,),
+            json={"po_ids": [po["id"]], "paid_at": d(0), "note": "月结"})
+    st = api.req("get", f"/suppliers/{po['supplier_id']}/statement", "buyer1")
+    rec(st["summary"]["paid_count"] >= 1, f"对账已付应 ≥1，实际={st['summary']['paid_count']}")
+    paid_nos = {x["po_no"] for x in st["paid"]}
+    rec(po["po_no"] in paid_nos, f"该单应出现在已付列表，实际={sorted(paid_nos)[:3]}")
+
+
 def _new_demand(item_key: str, qty: float, who: str = "buyer1") -> dict:
     """建一条干净的「待采购」需求（手工申请通道，免审核直入池）。"""
     r = api.req("post", "/purchase/manual-request", who, (201,), json={
@@ -1304,7 +1322,7 @@ def main() -> None:
             traceback.print_exc()
 
     part("Part B · 采购域专项探针")
-    for fn in (b_split, b_partial_ok, b_split_line_cancel, b_void_order, b_close_return, b_approval_chain, b_idempotent_after_release, b_pending_window, b_pending_repool,
+    for fn in (b_split, b_partial_ok, b_split_line_cancel, b_void_order, b_close_return, b_approval_chain, b_payment, b_idempotent_after_release, b_pending_window, b_pending_repool,
                b_direct_repool, b_delete_authz, b_kitting_inflate, b_issue_draft_bom,
                b_stock_conservation, b_price_reference):
         try:
