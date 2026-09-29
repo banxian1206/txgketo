@@ -10,25 +10,25 @@ import { Navigate, Route } from 'react-router-dom'
 export interface TabItem {
   path: string
   label: ReactNode // 台 Tab 角标 Badge 需要节点（A3）
+  /**
+   * ★ 重整 P0（docs/10 §3.2）：真实权限码，命中任一才显示。未给 = 人人可见。
+   *   目的：域/台这一层也按权限过滤，且只允许用**后端下发的真实码**
+   *   （不许 `position === '总监'` 这类前端猜岗位 —— 那会造出「看得见、点了必 403」）。
+   */
+  anyOf?: string[]
 }
 
-export const DELIVERY_TABS: TabItem[] = [
-  { path: '/delivery/mfg', label: '制造' },
-  { path: '/delivery/assembly', label: '装配' },
-  { path: '/delivery/shipping', label: '发运' },
-  { path: '/delivery/site', label: '现场' },
-  { path: '/delivery/acceptance', label: '验收与质保' },
-  { path: '/delivery/service', label: '售后' },
-]
+/* ★ 「交付执行」域已删除（docs/10 §8.1 D1，客户拍板）：
+   业务线只在**工作台**里跑，一个角色一台，登录看到自己的台。
+   制造/装配 → 车间工作台；发运/现场/售后 → 各自的工作台（route 仍指 /delivery/*，URL 不改，壳换掉）。 */
 
 export const BASE_TABS: TabItem[] = [
-  { path: '/library', label: '标准库' },
-  { path: '/numbering', label: '编号规则' },
+  { path: '/library', label: '标准库', anyOf: ['std:view', 'std:edit'] },
+  { path: '/numbering', label: '编号规则' }, // 只读页，人人可看自己公司怎么编号
 ]
 
 export const ADMIN_TABS: TabItem[] = [
-  { path: '/admin/users', label: '用户与权限' },
-  // P3 追加：{ path: '/admin/audit', label: '操作日志' }
+  { path: '/admin/users', label: '用户与权限', anyOf: ['admin:users', 'system:admin'] },
 ]
 
 /**
@@ -51,12 +51,17 @@ export const ROUTE_REDIRECTS: [string, string][] = [
   ['/mine/tasks', '/workbench/tasks'],
   ['/mine/reviews', '/workbench/reviews'],
   ['/mine/changes', '/workbench/changes'],
-  ['/manufacturing', '/delivery/mfg'],
-  ['/assembly', '/delivery/assembly'],
+  // ★ 目标全部**一跳到位**（D-E 拍板）：交付域删除后不再有 /delivery/mfg 这种中转站
+  ['/manufacturing', '/workbench/shop/mfg'],
+  ['/assembly', '/workbench/shop/assembly'],
   ['/shipping', '/delivery/shipping'],
   ['/site', '/delivery/site'],
-  ['/acceptance', '/delivery/acceptance'],
+  ['/acceptance', '/workbench/pm?tab=acceptance'], // 验收与质保归项目经理台（D-A 默认）
   ['/service', '/delivery/service'],
+  ['/delivery', '/workbench/shop'],
+  ['/delivery/mfg', '/workbench/shop/mfg'],
+  ['/delivery/assembly', '/workbench/shop/assembly'],
+  ['/delivery/acceptance', '/workbench/pm?tab=acceptance'],
   ['/purchase/orders', '/purchase'],
   ['/suppliers', '/purchase?tab=suppliers'],
   ['/purchase/suppliers', '/purchase?tab=suppliers'],
@@ -71,15 +76,14 @@ export interface SidebarRoot {
   prefixes: string[]
   icon: string
   group?: string
-  perm?: string
   admin?: boolean
 }
 
 export const SIDEBAR_ROOTS: SidebarRoot[] = [
   // 工作台 = 角色台（Tab 化，数据 = /workbench/me 的 visible 列表；采购台 /purchase、仓库台 /warehouse 同属此类 —— 用户纠偏 2026-09-23）
-  { key: '/workbench', label: '工作台', to: '/workbench', prefixes: ['/workbench', '/purchase', '/warehouse', '/'], icon: 'home' },
+  { key: '/workbench', label: '工作台', to: '/workbench', prefixes: ['/workbench', '/purchase', '/warehouse', '/delivery', '/'], icon: 'home' },
   { key: '/projects', label: '项目', to: '/projects', prefixes: ['/projects'], icon: 'folder', group: '业务' },
-  { key: '/delivery/mfg', label: '交付执行', to: '/delivery/mfg', prefixes: ['/delivery'], icon: 'truck', group: '业务', perm: 'mfg' },
+  // ★ 「交付执行」已删（docs/10 §8.1 D1）：它的内容现在是各角色的工作台，侧栏不再放业务流水线入口
   { key: '/library', label: '基础数据', to: '/library', prefixes: ['/library', '/numbering'], icon: 'database', group: '业务' },
   { key: '/admin/users', label: '用户与权限', to: '/admin/users', prefixes: ['/admin', '/users'], icon: 'setting', group: '系统管理', admin: true },
 ]

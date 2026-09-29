@@ -40,19 +40,21 @@ LEAD_STAGES = ("线索", "成交待立项")
 
 # 工作台定义（06 卷 §5）：key / 名称 / 路由 / 由哪些角色看得见
 WORKBENCHES: list[dict] = [
+    # ★ 重整（docs/10 §8）：**业务线只在「台」里跑，不再有「交付执行」这个域**。
+    #   制造/装配唯一归车间工作台（D1）；发运/现场/售后各自成台，route 直达自己那页。
+    #   ⚠ 原 delivery 台 route=/delivery，而 /delivery 的 index 是 Navigate to mfg ——
+    #     发运角色点自己的台会落进【制造页】并吃 403（无 mfg:view）。这就是那次实测故障的根因。
+    #   名字统一「XX工作台」（D）。
     {"key": "mine", "name": "我的工作台", "route": "/workbench", "roles": None},
     {"key": "sales", "name": "商务部工作台", "route": "/workbench/sales", "roles": ("SALES", "SCHEME")},
-    {"key": "pm", "name": "项目经理台", "route": "/workbench/pm", "roles": ("PM",)},
+    {"key": "pm", "name": "项目经理工作台", "route": "/workbench/pm", "roles": ("PM",)},
     {"key": "eng", "name": "工程部工作台", "route": "/workbench/eng", "roles": ("DESIGN", "DESIGN_AUDIT", "CRAFT")},
     {"key": "purchase", "name": "采购工作台", "route": "/purchase", "roles": ("PURCHASE", "PURCHASE_LEAD")},
     {"key": "warehouse", "name": "仓库工作台", "route": "/warehouse", "roles": ("WAREHOUSE",)},
     {"key": "shop", "name": "车间工作台", "route": "/workbench/shop", "roles": ("MFG", "ASSY", "QC")},
-    # B1（v2 方案 §2.0.6 拍板④）：发运/现场/售后三角色开台 —— role code 已在（05 卷权限表），route 指交付域：
-    # 台 Tab 点击直达交付域（delivery 台=域入口，index→mfg；site/service 直达子页，域 Tab 随行）
-    # 附带修复：SITE 无 mfg:view 进不了交付组菜单 —— 开台后经台 Tab 获得验收/现场入口
-    {"key": "delivery", "name": "发运台", "route": "/delivery", "roles": ("DELIVERY",)},
-    {"key": "site", "name": "现场台", "route": "/delivery/site", "roles": ("SITE",)},
-    {"key": "service", "name": "售后台", "route": "/delivery/service", "roles": ("SERVICE",)},
+    {"key": "delivery", "name": "发运工作台", "route": "/delivery/shipping", "roles": ("DELIVERY",)},
+    {"key": "site", "name": "现场工作台", "route": "/delivery/site", "roles": ("SITE",)},
+    {"key": "service", "name": "售后工作台", "route": "/delivery/service", "roles": ("SERVICE",)},
 ]
 
 

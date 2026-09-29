@@ -14,7 +14,8 @@ export default function MeM() {
     void refreshMe()
   }, [refreshMe])
 
-  const canManageUsers = profile?.is_superuser === true || profile?.position === '总监'
+  // ★ 重整 P3：手机端同一份「管理入口」判断，来源也是后端能力位（原来是 position === '总监' 的第二份拷贝）
+  const canManageUsers = hasPerm('admin:users')
 
   const links = [
     // R4-01（客户口径 A）：手机端隐藏 PC-only 入口 —— 任务/评审/改版无移动页，
@@ -60,3 +61,4 @@ export default function MeM() {
     </>
   )
 }
+import { hasPerm } from '../../api/user'

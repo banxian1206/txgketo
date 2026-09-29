@@ -41,6 +41,8 @@ import AppModal from '../../components/AppModal'
 import { SITE_ISSUE_STATUS as ISSUE_COLOR } from '../../theme/status'
 import { SITE_COMMISSION_STATUS as COMMISSION_COLOR } from '../../theme/status'
 import { T } from '../../theme/tokens'
+import { SITE_TABS, filterTabs } from '../../configs/tabs'
+import { useTab } from '../../hooks/useTab'
 
 /** 现场台（PC，S8）：给项目经理/现场负责人看整体 —— 手机端是现场的主终端。 */
 export default function Site() {
@@ -83,6 +85,10 @@ export default function Site() {
 
   const c = wb?.counts
 
+
+  // ★ 重整 P0（docs/10 §3.2/§3.3）：页签条按**真实权限码**过滤，状态写进 URL（?tab=）
+  const visKeys = filterTabs(SITE_TABS).map((x) => x.key)
+  const [tab, setTab] = useTab(visKeys, 'incoming')
   return (
     <Card
       title="现场安装（S8）"
@@ -125,6 +131,8 @@ export default function Site() {
           </Row>
 
           <Tabs
+            activeKey={tab}
+            onChange={setTab}
             items={[
               {
                 key: 'incoming',
@@ -278,7 +286,7 @@ export default function Site() {
                   />
                 ),
               },
-            ]}
+            ].filter((x) => visKeys.includes(x.key))}
           />
         </>
       )}

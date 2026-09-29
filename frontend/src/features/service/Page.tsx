@@ -40,6 +40,8 @@ import AppModal from '../../components/AppModal'
 import { SelectEquipment, SelectProject } from '../../components/fields'
 import { SERVICE_ORDER_STATUS as SO_COLOR } from '../../theme/status'
 import { T } from '../../theme/tokens'
+import { SERVICE_TABS, filterTabs } from '../../configs/tabs'
+import { useTab } from '../../hooks/useTab'
 
 type Kind = 'create' | 'dispatch' | 'fix' | 'sign' | 'part' | 'move'
 
@@ -49,7 +51,9 @@ export default function Service() {
   const canEdit = hasPerm('service:edit')
 
   const [moves, setMoves] = useState<Record<number, { move_type: string; qty: number; moved_at?: string | null }[]>>({})
-  const [tab, setTab] = useState('orders')
+  // ★ 重整 P0（docs/10 §3.2/§3.3）：页签条按**真实权限码**过滤，状态写进 URL（?tab=）
+  const visKeys = filterTabs(SERVICE_TABS).map((x) => x.key)
+  const [tab, setTab] = useTab(visKeys, 'orders')
 
   const [modal, setModal] = useState<{ kind: Kind; order?: ServiceOrderRow; part?: SparePartRow } | null>(null)
   const [modalInitial, setModalInitial] = useState<Record<string, unknown>>({})
@@ -245,7 +249,7 @@ export default function Service() {
               </>
             ),
           },
-        ]}
+        ].filter((x) => visKeys.includes(x.key))}
       />
 
       <AppModal

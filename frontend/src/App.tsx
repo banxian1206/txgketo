@@ -6,7 +6,7 @@ import { Navigate, Route, Routes } from 'react-router-dom'
 import AppLayout from './layouts/AppLayout'
 import DomainShell from './components/domain/DomainShell'
 import WorkbenchShell from './components/domain/WorkbenchShell'
-import { ADMIN_TABS, BASE_TABS, DELIVERY_TABS, redirectRoutes } from './configs/domain'
+import { ADMIN_TABS, BASE_TABS, redirectRoutes } from './configs/domain'
 import MobileLayout from './layouts/MobileLayout'
 import Login from './features/auth/Page'
 const AcceptM = lazy(() => import('./features/acceptance/MobilePage'))
@@ -28,7 +28,6 @@ const Manufacturing = lazy(() => import('./features/manufacturing/Page'))
 const Assembly = lazy(() => import('./features/assembly/Page'))
 const Shipping = lazy(() => import('./features/shipping/Page'))
 const Site = lazy(() => import('./features/site/Page'))
-const AcceptancePage = lazy(() => import('./features/acceptance/Page'))
 const Service = lazy(() => import('./features/service/Page'))
 const ProductionM = lazy(() => import('./features/manufacturing/MobilePage'))
 const AssemblyM = lazy(() => import('./features/assembly/MobilePage'))
@@ -42,6 +41,7 @@ const EngWorkbench = lazy(() => import('./features/workbench/EngWorkbench'))
 const PmWorkbench = lazy(() => import('./features/workbench/PmWorkbench'))
 const SalesWorkbench = lazy(() => import('./features/workbench/SalesWorkbench'))
 import { useAuth } from './contexts/AuthContext'
+import { hasPerm } from './api/user'
 
 /** 路由懒加载占位（重构 3.1 · 按 feature 分包） */
 function RouteLoading() {
@@ -55,6 +55,19 @@ function RouteLoading() {
 function RequireAuth({ children }: { children: JSX.Element }) {
   const { token } = useAuth()
   return token ? children : <Navigate to="/login" replace />
+}
+
+/**
+ * 路由级权限守卫（重整 P3 · docs/10 §3.5 第 3 刀）。
+ *
+ * 为什么必须有：页签过滤只管“看得见”，管不了有人**直接敲 URL**。
+ * 实测过一次真回归：eng_director 打开 /purchase?tab=suppliers —— 他没有任何 purchase:* 码，
+ * 页签被过滤成 0 项 → 整页空白，比“看得见但 403”更难自查。
+ * 现在：无权限 → 回「我的工作台」（那里人人可进），不渲染空页。
+ */
+function RequirePerm({ anyOf, children }: { anyOf: string[]; children: JSX.Element }) {
+  if (!anyOf.some((c) => hasPerm(c))) return <Navigate to="/workbench" replace />
+  return children
 }
 
 export default function App() {
@@ -106,29 +119,27 @@ export default function App() {
         <Route path="workbench/tasks" element={<Workbench />} />
         <Route path="workbench/reviews" element={<Workbench />} />
         <Route path="workbench/changes" element={<Workbench />} />
-        <Route path="purchase" element={<PurchaseWorkbench />} />
-        <Route path="warehouse" element={<Warehouse />} />
+        <Route path="purchase" element={<RequirePerm anyOf={['purchase:view', 'purchase:edit', 'purchase:price']}><PurchaseWorkbench /></RequirePerm>} />
+        <Route path="warehouse" element={<RequirePerm anyOf={['warehouse:view', 'warehouse:edit']}><Warehouse /></RequirePerm>} />
+        {/* ★ 重整 P1（docs/10 §8.4）：「交付执行」域删除，业务线只在台里跑。
+            URL 一个没改（/delivery/shipping|site|service 原样），只是换壳：由 WorkbenchShell 包，
+            所以顶部是「我的工作台 · 发运工作台」这种**角色台**条，而不是 6 项流水线域条。 */}
+        <Route path="delivery/shipping" element={<RequirePerm anyOf={['ship:edit', 'project:edit']}><Shipping /></RequirePerm>} />
+        <Route path="delivery/site" element={<RequirePerm anyOf={['site:edit', 'project:edit', 'acceptance:edit']}><Site /></RequirePerm>} />
+        <Route path="delivery/service" element={<RequirePerm anyOf={['service:edit']}><Service /></RequirePerm>} />
         </Route>
         <Route path="projects" element={<Projects />} />
         <Route path="projects/new" element={<ProjectCreate />} />
         <Route path="projects/:projectNo" element={<ProjectDetailPage />} />
         <Route path="projects/:projectNo/initiate" element={<ProjectInitiate />} />
-        <Route path="/delivery" element={<DomainShell tabs={DELIVERY_TABS} />}>
-          {/* B1：发运台 route=/delivery（域入口）→ 默认落制造（S5 流程首位） */}
-          <Route index element={<Navigate to="mfg" replace />} />
-          <Route path="mfg" element={<Manufacturing />} />
-          <Route path="assembly" element={<Assembly />} />
-          <Route path="shipping" element={<Shipping />} />
-          <Route path="site" element={<Site />} />
-          <Route path="acceptance" element={<AcceptancePage />} />
-          <Route path="service" element={<Service />} />
-        </Route>
+        {/* ★ 交付域壳已删：制造/装配唯一入口=车间台；发运/现场/售后见上面 WorkbenchShell 内。
+            /delivery、/delivery/mfg、/delivery/acceptance 等旧路径走 ROUTE_REDIRECTS 一跳到位。 */}
         <Route path="/admin" element={<DomainShell tabs={ADMIN_TABS} />}>
           <Route index element={<Navigate to="/admin/users" replace />} />
-          <Route path="users" element={<Users />} />
+          <Route path="users" element={<RequirePerm anyOf={['admin:users', 'system:admin']}><Users /></RequirePerm>} />
         </Route>
         <Route element={<DomainShell tabs={BASE_TABS} />}>
-          <Route path="library" element={<Library />} />
+          <Route path="library" element={<RequirePerm anyOf={['std:view', 'std:edit']}><Library /></RequirePerm>} />
           <Route path="numbering" element={<NumberRules />} />
         </Route>
         {redirectRoutes()}

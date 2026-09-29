@@ -1,5 +1,5 @@
 
-import { App, Button, Card, Col, List, Row, Space, Statistic, Table, Tabs, Tag, Typography } from 'antd'
+import { App, Button, Card, Col, List, Row, Space, Statistic, Table, Tag, Typography } from 'antd'
 import { lazy, useCallback, useEffect, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 
@@ -13,6 +13,7 @@ import {
   type NotificationRow,
   type WorkbenchMe,
 } from '../../api/client'
+import { hasPerm } from '../../api/user'
 import { WB_TYPE as TYPE_COLOR } from '../../theme/status'
 import { PROJECT_STAGE as STAGE_COLOR } from '../../theme/status'
 import { T } from '../../theme/tokens'
@@ -70,14 +71,14 @@ export default function Workbench() {
     { label: '我的任务', count: c?.my_tasks ?? 0, to: '/workbench/tasks',
       // ★ 到期扫描（§8.3）：超期了就红字点出来，别等他自己翻
       hint: c?.overdue_tasks ? `⚠ 超期 ${c.overdue_tasks}` : undefined },
-    { label: '待我审核', count: c?.to_review ?? 0, to: '/workbench/reviews', hint: '评审单', roles: ['DESIGN_AUDIT', 'ADMIN'] },
-    { label: '待我裁决', count: c?.to_decide ?? 0, to: '/workbench/changes', roles: ['DESIGN_AUDIT', 'ADMIN'] },
-    { label: '待我改版', count: c?.to_change ?? 0, to: '/workbench/changes', hint: '改版任务', roles: ['DESIGN', 'DESIGN_AUDIT', 'CRAFT', 'ADMIN'] },
-    { label: '我提的改版', count: c?.my_changes ?? 0, to: '/workbench/changes' },
-    { label: '待采购', count: c?.to_purchase ?? 0, to: '/purchase', hint: '采购池', roles: ['PURCHASE', 'PURCHASE_LEAD', 'ADMIN'] },
-    { label: '待验收', count: c?.to_inspect ?? 0, to: '/warehouse', roles: ['WAREHOUSE', 'ADMIN'] },
-    { label: '待入库', count: c?.to_store ?? 0, to: '/warehouse', roles: ['WAREHOUSE', 'ADMIN'] },
-    { label: '待领料', count: c?.issues ?? 0, to: '/warehouse', roles: ['WAREHOUSE', 'ADMIN'] },
+    { label: '待我审核', count: c?.to_review ?? 0, to: '/workbench/reviews?tab=todo', hint: '评审单', roles: ['DESIGN_AUDIT', 'ADMIN'] },
+    { label: '待我裁决', count: c?.to_decide ?? 0, to: '/workbench/changes?tab=pending', roles: ['DESIGN_AUDIT', 'ADMIN'] },
+    { label: '待我改版', count: c?.to_change ?? 0, to: '/workbench/changes?tab=pending', hint: '改版任务', roles: ['DESIGN', 'DESIGN_AUDIT', 'CRAFT', 'ADMIN'] },
+    { label: '我提的改版', count: c?.my_changes ?? 0, to: '/workbench/changes?tab=mine' },
+    { label: '待采购', count: c?.to_purchase ?? 0, to: '/purchase?tab=pool', hint: '采购池', roles: ['PURCHASE', 'PURCHASE_LEAD', 'ADMIN'] },
+    { label: '待验收', count: c?.to_inspect ?? 0, to: '/warehouse?tab=incoming', roles: ['WAREHOUSE', 'ADMIN'] },
+    { label: '待入库', count: c?.to_store ?? 0, to: '/warehouse?tab=storage', roles: ['WAREHOUSE', 'ADMIN'] },
+    { label: '待领料', count: c?.issues ?? 0, to: '/warehouse?tab=issues', roles: ['WAREHOUSE', 'ADMIN'] },
     { label: '我的商机', count: c?.my_leads ?? 0, to: '/projects', hint: '线索 / 待立项', roles: ['SALES', 'SCHEME', 'ADMIN'] },
   ]
   // 裁剪：角色码交集 + ADMIN 兜底（无 roles = 人人卡）
@@ -85,23 +86,21 @@ export default function Workbench() {
   const isAdminRole = myRoles.includes('ADMIN')
   const visibleTodos = todos.filter((t) => !t.roles || isAdminRole || t.roles.some((r) => myRoles.includes(r)))
   // 管理入口卡（canManageUsers 对齐：ADMIN 角色或总监岗）——纯入口无数字，不发明数据
-  const canManageUsers = isAdminRole || data?.user.position === '总监'
+  const canManageUsers = hasPerm('admin:users')
 
 
 
-  // A2：台内页签 = URL 子路由（/workbench/tasks 等）——待办/我的任务/设计评审/改版申请
+  // ★ 重整 P1（docs/10 §8.4）：**台内不再放页签条**。
+  //   待办卡本身就是入口，点它直达「对应台 + 对应页签」（?tab=），
+  //   原来是「台条 → 台内条 → 页内条 → 状态条」四条叠在一屏（§1.3 实测 4 层）。
+  //   /workbench/tasks|reviews|changes 三个子路由**保留**（通知 link / 书签 / ROUTE_REDIRECTS 不破），
+  //   只是从"页签"改成"整页渲染"。
   const seg = loc.pathname.replace(/^\/workbench\/?/, '')
-  const activeKey = ['tasks', 'reviews', 'changes'].includes(seg) ? seg : 'todo'
+  if (seg === 'tasks') return <MyTasks />
+  if (seg === 'reviews') return <Reviews />
+  if (seg === 'changes') return <Changes />
+
   return (
-    <Tabs
-      type="card"
-      activeKey={activeKey}
-      onChange={(k) => nav(k === 'todo' ? '/workbench' : `/workbench/${k}`)}
-      items={[
-        {
-          key: 'todo',
-          label: '待办',
-          children: (
     <>
       <Card size="small" style={{ marginBottom: 12 }}>
         <Space wrap>
@@ -207,12 +206,5 @@ export default function Workbench() {
         每个节点一个工作台，按角色显示；「我的工作台」把所有待办收在一屏。工作台的详细内容随后续步骤补齐（06 卷 §11）。
       </Typography.Paragraph>
     </>
-        ),
-        },
-        { key: 'tasks', label: '我的任务', children: <MyTasks /> },
-        { key: 'reviews', label: '设计评审', children: <Reviews /> },
-        { key: 'changes', label: '改版申请', children: <Changes /> },
-      ]}
-    />
   )
 }

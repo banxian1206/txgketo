@@ -21,6 +21,8 @@ import IntegrationPanel from './IntegrationPanel'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import { useAuth } from '../../contexts/AuthContext'
+import { USERS_TABS, filterTabs } from '../../configs/tabs'
+import { useTab } from '../../hooks/useTab'
 import AppModal from '../../components/AppModal'
 
 import {
@@ -131,7 +133,9 @@ export default function Users() {
   const [roles, setRoles] = useState<RoleRow[]>([])
   const [users, setUsers] = useState<UserRow[]>([])
   const [loading, setLoading] = useState(false)
-  const [tab, setTab] = useState('users')
+  // ★ 重整 P0（docs/10 §3.2/§3.3）：页签条按**真实权限码**过滤，状态写进 URL（?tab=）
+  const visKeys = filterTabs(USERS_TABS).map((x) => x.key)
+  const [tab, setTab] = useTab(visKeys, 'users')
 
   // 用户筛选
   const [fOrg, setFOrg] = useState<number | undefined>()
@@ -728,7 +732,7 @@ export default function Users() {
               </>
             ),
           },
-        ]}
+        ].filter((x) => visKeys.includes(x.key))}
       />
 
       {/* 用户编辑 */}

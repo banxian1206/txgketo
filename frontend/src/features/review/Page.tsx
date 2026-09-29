@@ -5,11 +5,16 @@ import { useCallback, useEffect, useState } from 'react'
 import ReviewDetailModal from '../../components/ReviewDetailModal'
 import { errMsg, listReviewTickets, me, type ReviewTicketBrief, type User } from '../../api/client'
 import { REVIEW_STATUS as STATUS_COLOR } from '../../theme/status'
+import { REVIEW_TABS, filterTabs } from '../../configs/tabs'
+import { useTab } from '../../hooks/useTab'
 
 /** 设计评审：待我审核 / 我提交的 / 全部（05 卷 §3、§9 评审工作台） */
 export default function Reviews() {
   const { message } = App.useApp()
-  const [scope, setScope] = useState<'todo' | 'mine' | 'all'>('todo')
+  // ★ 重整 P0（docs/10 §3.2/§3.3）：页签条按**真实权限码**过滤，状态写进 URL（?tab=）
+  const visKeys = filterTabs(REVIEW_TABS).map((x) => x.key)
+  const [tabKey, setTab] = useTab(visKeys, 'todo')
+  const scope = tabKey as 'todo' | 'mine' | 'all'
   const [rows, setRows] = useState<ReviewTicketBrief[]>([])
   const [loading, setLoading] = useState(false)
   const [profile, setProfile] = useState<User | null>(null)
@@ -112,12 +117,12 @@ export default function Reviews() {
     >
       <Tabs
         activeKey={scope}
-        onChange={(k) => setScope(k as 'todo' | 'mine' | 'all')}
+        onChange={setTab}
         items={[
           { key: 'todo', label: `待我审核 (${scope === 'todo' ? rows.length : '—'})` },
           { key: 'mine', label: '我提交的' },
           { key: 'all', label: '全部' },
-        ]}
+        ].filter((x) => visKeys.includes(x.key))}
       />
       <Table<ReviewTicketBrief>
         rowKey="id"

@@ -20,6 +20,8 @@ import {
 import { ENG_BOARD_STATE as STATE_COLOR } from '../../theme/status'
 import { TASK_STATUS as TASK_STATUS_COLOR } from '../../theme/status'
 import { T } from '../../theme/tokens'
+import { ENG_TABS, filterTabs } from '../../configs/tabs'
+import { useTab } from '../../hooks/useTab'
 
 const PROFS = ['机械', '电气', '程序', '工艺']
 
@@ -171,6 +173,11 @@ export default function EngWorkbench() {
     },
   ]
 
+  // ★ 台内页签：按权限过滤 + 状态进 URL（docs/10 P0）。
+  //   「我组 / 部门看板」只给有审核权的角色（经理/总监），组员看到的是干净的一层。
+  const visKeys = filterTabs(ENG_TABS).map((x) => x.key)
+  const [tab, setTab] = useTab(visKeys, 'mine')
+
   return (
     <Spin spinning={loading}>
       <Card size="small" style={{ marginBottom: 12 }}>
@@ -188,6 +195,8 @@ export default function EngWorkbench() {
       </Card>
 
       <Tabs
+        activeKey={tab}
+        onChange={setTab}
         items={[
           {
             key: 'mine',
@@ -376,7 +385,7 @@ export default function EngWorkbench() {
                 },
               ]
             : []),
-        ]}
+        ].filter((x) => visKeys.includes(x.key))}
       />
     </Spin>
   )

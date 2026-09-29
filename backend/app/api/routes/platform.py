@@ -353,8 +353,16 @@ def list_users(
     is_active: bool | None = None,
     q: str | None = Query(default=None, description="账号/姓名关键字"),
     session: Session = Depends(get_session),
-    _: User = Depends(get_current_user),
+    current: User = Depends(get_current_user),
 ):
+    """用户名单。
+
+    ★ 分级返回（重整方案 docs/10 §8.1 拍板#5）：
+      · 有 `admin:users`（管理员=全部 / 总监=本部门）→ 全字段，含 roles/permissions/phone，供用户管理页用
+      · 其他人 → **降级视图**（只 id/username/name/org_id/is_superuser）：选人控件、成员归属显示照常能用了，
+        但不再把「每个人的角色与权限清单 + 手机号」摊给全员（原来只要登录就能读全量）
+    """
+    can_manage = _scope(session, current)["can_manage"]
     stmt = select(User).order_by(User.id)
     if org_id:
         stmt = stmt.where(User.org_id.in_(_subtree_ids(session, org_id)))
@@ -366,6 +374,20 @@ def list_users(
     rows = session.scalars(stmt).all()
     if role_code:
         rows = [u for u in rows if any(r.code == role_code for r in u.roles)]
+    if not can_manage:
+        # 显式构造（不靠 response_model 把缺的字段悄悄补成默认值）
+        # 前端三处选人控件只声明 { id, name }（CreatePage/InitiatePage/DetailPage）→ 不受影响
+        return [
+            UserAdminOut(
+                id=u.id,
+                username=u.username,
+                name=u.name,
+                org_id=u.org_id,
+                is_active=u.is_active,
+                is_superuser=u.is_superuser,
+            )
+            for u in rows
+        ]
     return [
         UserAdminOut(**UserOut.model_validate(u).model_dump(), roles=[x.code for x in u.roles])
         for u in rows
@@ -378,10 +400,25 @@ def list_audit_logs(
     object_ref: str | None = None,
     limit: int = 100,
     session: Session = Depends(get_session),
-    _: User = Depends(get_current_user),
+    current: User = Depends(get_current_user),
 ) -> list[dict]:
-    """操作记录（谁、什么时候、干了什么）—— 商机详情抽屉的“操作记录”页签用。"""
+    """操作记录（谁、什么时候、干了什么）。
+
+    ★ 两种用途，门禁不同（重整方案 docs/10 §3.5；搞错就会重演 M-04「把干活的人拦在门外」）：
+      · **带 object_type/object_ref 查某个对象的痕迹** → 登录即可（商机/项目详情的「操作记录」页签在用）
+      · **不带过滤的全局日志**（后台「操作日志」页签）→ 需要 `admin:audit`：
+          管理员看全量；总监只看**本部门子树**的人干的事；其他人 403
+    """
+    scoped = bool(object_type or object_ref)
+    scope = _scope(session, current)
+    if not scoped:
+        if not scope["can_manage"]:
+            raise HTTPException(status.HTTP_403_FORBIDDEN, "只有系统管理员或总监能查看全局操作日志")
     stmt = select(AuditLog).order_by(AuditLog.id.desc()).limit(min(limit, 500))
+    if not scoped and not scope["admin"]:
+        dept_ids = _subtree_ids(session, scope["department"].id)
+        stmt = stmt.where(AuditLog.user_id.in_(
+            select(User.id).where(User.org_id.in_(dept_ids))))
     if object_type:
         stmt = stmt.where(AuditLog.object_type == object_type)
     if object_ref:

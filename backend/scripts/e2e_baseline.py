@@ -1511,6 +1511,42 @@ def c_ocr_authz() -> None:
         f"available={bd.get('available') if isinstance(bd, dict) else '?'}")
 
 
+def c_read_scoped() -> None:
+    """★ 重整 P3（docs/10 §3.5）：页签隐藏只是化妆，**读接口必须自己收口**。
+
+    实测过的原状态：/users、/audit-logs、/roles 只要登录就 200 ——
+    全员能拿到 26 人名单（含 phone 与每人 roles/permissions 清单）+ 全量操作日志。
+    同时**不能误伤**：项目详情抽屉的「操作记录」页签用的就是 /audit-logs（带 object_type/object_ref），
+    一刀切会变成 M-04 那类「补洞把干活的人拦在门外」。
+    """
+    probe("C6 后台读接口的门禁与降级视图")
+    p = CTX["p"]
+    sc, _bd = api.try_("get", "/audit-logs", "site1")
+    rec(sc == 403, f"★ 现场账号读【全局】操作日志 → HTTP {sc}（应 403）")
+    sc2, bd2 = api.try_("get", "/audit-logs", "site1", params={"object_type": "project", "object_ref": p})
+    rec(sc2 == 200, f"★ 正控：按对象查痕迹仍放行（项目详情「操作记录」页签在用）→ HTTP {sc2} {str(bd2)[:50]}")
+    sc3, users = api.try_("get", "/users", "site1")
+    leak = bool(users) and isinstance(users, list) and any(
+        (u.get("roles") or []) or u.get("phone") for u in users)
+    rec(sc3 == 200 and not leak,
+        f"仓管/现场读用户名单应为降级视图（无 roles/phone）→ HTTP={sc3} 泄漏={leak}",
+        f"第1行字段={sorted(users[0].keys()) if isinstance(users, list) and users else '?'}")
+    sc4, mine = api.try_("get", "/audit-logs", "buyer1")
+    rec(sc4 == 403, f"采购员（非总监/管理员）读全局日志 → HTTP {sc4}（应 403）")
+    # 总监应看得到，而且**确实只看到本部门子树**（不靠 admin 对照——超管绕过权限码，对照无意义）
+    dept = api.req("get", "/audit-logs", "eng_director")
+    assert isinstance(dept, list)
+    inside = q("with recursive t(id) as ("
+               "  select id from org where code='ENG'"
+               "  union all select o2.id from org o2 join t on o2.parent_id = t.id)"
+               " select distinct u.username from app_user u where u.org_id in (select id from t)")
+    allowed = {x["username"] for x in inside}
+    seen = {r.get("username") for r in dept if isinstance(r, dict)}
+    rec(len(dept) > 0 and seen <= allowed,
+        f"★ 工程总监读到的日志应全部落在 ENG 部门子树内（{len(dept)} 条）",
+        f"越界人员={sorted(seen - allowed) or '无'} · 子树人数={len(allowed)}")
+
+
 def c_write_no_perm() -> None:
     probe("C3 只校验登录的写接口")
     p = CTX["p"]
@@ -1616,7 +1652,7 @@ def main() -> None:
 
     part("Part C · 授权探针")
     for fn in (c_authz_codes, c_review_authz, c_write_no_perm, c_money_scrub, c_longlead_no_perm,
-               c_archive, c_excel_import, c_ocr_authz):
+               c_archive, c_excel_import, c_ocr_authz, c_read_scoped):
         try:
             fn()
         except Exception as exc:  # noqa: BLE001

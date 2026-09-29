@@ -34,6 +34,8 @@ import { useSubmit } from '../../hooks/useSubmit'
 import {api, createLocation, errMsg, generateEquipmentIssue, hasPerm, inspectPurchase, listEquipment, listLocations, listProjects, manualInbound, searchItems, storeReceipt, type ItemLite, type LocationRow} from '../../api/client'
 import { WH_ISSUE_STATUS as ISSUE_COLOR } from '../../theme/status'
 import { T } from '../../theme/tokens'
+import { WAREHOUSE_TABS, filterTabs } from '../../configs/tabs'
+import { useTab } from '../../hooks/useTab'
 
 
 
@@ -64,7 +66,9 @@ export default function Warehouse() {
   const [locOpen, setLocOpen] = useState(false)
   const [locForm] = Form.useForm()
   const itemSearchTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const [tab, setTab] = useState('todo')
+  // ★ 重整 P0（docs/10 §3.2/§3.3）：页签条按**真实权限码**过滤，状态写进 URL（?tab=）
+  const visKeys = filterTabs(WAREHOUSE_TABS).map((x) => x.key)
+  const [tab, setTab] = useTab(visKeys, 'todo')
   const [acceptOpen, setAcceptOpen] = useState(false)
   const [acceptTarget, setAcceptTarget] = useState<IncomingRow | null>(null)
   const [storeOpen, setStoreOpen] = useState(false)
@@ -571,7 +575,7 @@ export default function Warehouse() {
               </>
             ),
           },
-        ]}
+        ].filter((x) => visKeys.includes(x.key))}
       />
 
       {/* 其他入库 */}

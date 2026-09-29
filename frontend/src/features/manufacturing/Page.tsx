@@ -50,6 +50,8 @@ import AuthedFileLink from '../../components/AuthedFileLink'
 import { PROD_STATUS as STATUS_COLOR } from '../../theme/status'
 import { OUTSOURCE_STATUS as OS_COLOR } from '../../theme/status'
 import { T } from '../../theme/tokens'
+import { MFG_TABS, filterTabs } from '../../configs/tabs'
+import { useTab } from '../../hooks/useTab'
 
 const TEAMS = ['下料', '机加', '焊接', '钣金', '喷涂']
 
@@ -60,7 +62,9 @@ export default function Manufacturing() {
   const nav = useNavigate()
   const canEdit = hasPerm('mfg:edit')
 
-  const [tab, setTab] = useState('wait')
+  // ★ 重整 P0（docs/10 §3.2/§3.3）：页签条按**真实权限码**过滤，状态写进 URL（?tab=）
+  const visKeys = filterTabs(MFG_TABS).map((x) => x.key)
+  const [tab, setTab] = useTab(visKeys, 'wait')
 
   // 生成排产
   const [genProject, setGenProject] = useState<string | undefined>()
@@ -407,7 +411,7 @@ export default function Manufacturing() {
                   <Table<OutsourceRow> rowKey="id" size="small" loading={loading} dataSource={wb?.outsource ?? []} pagination={{ pageSize: 10, showSizeChanger: false }} locale={{ emptyText: <Empty description="没有外协任务" /> }} columns={osColumns} />
                 ),
               },
-            ]}
+            ].filter((x) => visKeys.includes(x.key))}
           />
         </>
       )}

@@ -27,7 +27,7 @@ export default function EquipmentsCard({
                 size="small"
                 title="齐套率（装配 · 只展示，不设门槛）"
                 style={{ marginBottom: 16 }}
-                extra={<a onClick={() => nav('/delivery/assembly')}>装配 / 厂内调试</a>}
+                extra={<a onClick={() => nav('/workbench/shop/assembly')}>装配 / 厂内调试</a>}
               >
                 <Table<KittingOverviewRow>
                   rowKey="equip_no"

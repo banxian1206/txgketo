@@ -264,5 +264,87 @@ const FEATS = path.join(SRC, 'features');
       : `站内导航引用零处命中 ROUTE_REDIRECTS 的 ${fromList.length} 条旧路径`);
 }
 
+/* ══════════ TAB-页签护栏（后台信息架构重整 docs/10 §4 · 防回潮）══════════
+   这三条各自对着一个实测出来的结构性毛病，不是审美：
+   G1 一屏叠多条页签条（旧实测 pm1 点「我的任务」叠了 4 条）
+   G2 页签条是散写的静态数组 → 永远没有权限过滤（旧实测 17 条里 15 条零过滤）
+   G3 可见性用「岗位」猜 / 写不存在的假权限码（旧实测 4 总监+gm 看得到「外部集成」、点了必 403） */
+{
+  const bad = []
+  const walk = (d) => {
+    for (const f of fs.readdirSync(d)) {
+      const p2 = path.join(d, f)
+      if (fs.statSync(p2).isDirectory()) { walk(p2); continue }
+      if (!/\.tsx$/.test(f)) continue
+      const n = (fs.readFileSync(p2, 'utf8').match(/<Tabs\b/g) || []).length
+      if (n > 1) bad.push(`${p2.replace(SRC, 'src')} 有 ${n} 条页签条`)
+    }
+  }
+  walk(FEATS)
+  check('TAB-一屏一条页签条', bad.length === 0,
+    bad.length ? `同一页面又叠了多条页签条（第二层改用 Segmented/筛选，跨页改用子路由）: ${bad.join('; ')}`
+      : 'features/ 下每个页面最多 1 条 <Tabs>')
+}
+{
+  // 例外必须写清为什么，且只允许这几条（新增一条就得在这儿交代）
+  const EXEMPT = {
+    'features/workbench/ShopShell.tsx': '台内「看板/制造/装配」是子路由导航（URL 即状态），不是页签状态',
+    'features/manufacturing/MobilePage.tsx': '移动端动线页签，键与 PC 不同（os vs outsource），接入注册表见 docs/10 P2',
+    'features/warehouse/MobilePage.tsx': '同上（移动端三队列）',
+    'features/site/MobilePage.tsx': '同上（移动端含客户验收，PC 按拍板 D3 不做签认）',
+  }
+  const bad = []
+  const walk = (d) => {
+    for (const f of fs.readdirSync(d)) {
+      const p2 = path.join(d, f)
+      if (fs.statSync(p2).isDirectory()) { walk(p2); continue }
+      if (!/\.tsx$/.test(f)) continue
+      const rel = p2.replace(SRC + '/', '')
+      const src = fs.readFileSync(p2, 'utf8')
+      if (!/<Tabs\b/.test(src)) continue
+      if (EXEMPT[rel]) continue
+      const byRegistry = /configs\/tabs/.test(src)
+      const filtered = /filterTabs\(|visKeys/.test(src)
+      const urlDriven = /useTab\(/.test(src)
+      if (!byRegistry || !filtered) bad.push(`${rel}（注册表=${byRegistry} 权限过滤=${filtered} URL驱动=${urlDriven}）`)
+      else if (!urlDriven) bad.push(`${rel}（页签状态没进 URL）`)
+    }
+  }
+  walk(FEATS)
+  check('TAB-页签来自注册表', bad.length === 0,
+    bad.length ? `页签条没走 configs/tabs 注册表或没按权限过滤: ${bad.join('; ')}`
+      : 'PC 页签条一律由注册表驱动 + filterTabs 权限过滤 + useTab 进 URL')
+}
+{
+  // ★ 这条只管一件事：入口/页签的**可见性**不许靠岗位猜（那必然漂移成「看得见、点了必 403」——
+  //   实测过 4 位总监 + gm 看得到「外部集成」，点进去每个请求 403）。
+  //   业务规则里的岗位判断（拆分派工限本专业经理、候选池按岗位筛人）是合法的，不在射程内：
+  //   它们对应后端同一套岗位规则（tasks._can_act_on_task / split），不是“给不给你看门”。
+  const guess = grepAll(/can(Manage|Admin|See|Access)\w*\s*=[^\n]*position\s*===/)
+  check('TAB-可见性不猜岗位', guess.length === 0,
+    guess.length ? `入口可见性由岗位猜（改用 hasPerm('admin:users') 这类后端能力位）: ${guess.join(', ')}`
+      : '管理入口可见性一律来自后端能力位（0 处由 position 推导）')
+  // 权限码必须是后端真存在的码（派生码 admin:users / admin:audit 由 deps.effective_permissions 下发）
+  const KNOWN = new Set([
+    'system:admin', 'project:view', 'project:edit', 'project:close', 'project:amount',
+    'customer:view', 'customer:edit', 'contract:view', 'contract:edit', 'payment:edit',
+    'design:view', 'design:edit', 'design:audit', 'std:view', 'std:edit',
+    'purchase:view', 'purchase:edit', 'purchase:price', 'purchase:payment',
+    'warehouse:view', 'warehouse:edit', 'mfg:view', 'mfg:edit',
+    'ship:edit', 'site:edit', 'acceptance:edit', 'service:edit', 'cost:view',
+    'admin:users', 'admin:audit', // ★ 派生码（管理员=全部 / 总监=本部门）
+  ])
+  const used = new Set()
+  for (const m of (fs.readFileSync(path.join(SRC, 'configs', 'tabs.ts'), 'utf8')
+    + fs.readFileSync(path.join(SRC, 'configs', 'domain.tsx'), 'utf8')
+    + fs.readFileSync(path.join(SRC, 'App.tsx'), 'utf8')).matchAll(/anyOf:\s*\[([^\]]*)\]/g)) {
+    for (const c of m[1].matchAll(/'([^']+)'/g)) used.add(c[1])
+  }
+  const fake = [...used].filter((c) => !KNOWN.has(c))
+  check('TAB-权限码非假码', fake.length === 0,
+    fake.length ? `页签/路由用了后端不存在的权限码（旧例：侧栏 perm:'mfg' 谁都不认识）: ${fake.join(', ')}`
+      : `${used.size} 个 anyOf 权限码全部在后端权限表/派生码之内`)
+}
+
 const fails = summary('静态回归');
 exitWith(fails);

@@ -94,17 +94,19 @@ try {
     await page.waitForTimeout(500)
     const t = await body(page)
     const groups = ['业务', '系统管理'].every((g) => t.includes(g))
-    const roots = ['项目', '交付执行', '基础数据', '系统管理']
+    const roots = ['项目', '基础数据', '系统管理']
     const missing = roots.filter((r) => !t.includes(r))
+    // ★ 重整 D1（docs/10 §8.1）：「交付执行」这一层已经不存在，侧栏必须查不到它
+    const hasDelivery = t.includes('交付执行')
     const siderIcons = await page.locator('.ant-menu-item .anticon').count()
     const siderText = await page.locator('.ant-layout-sider').innerText().catch(() => '')
     const siderLines = siderText.split('\n').map((x) => x.trim())
     // 整行匹配（防'我的工作台'子串误伤'我的工作'）
     const oldFlat = ['制造（车间）', '装配 · 齐套率', '发运（发货指令）', '我的工作'].filter((x) => siderLines.includes(x))
-    // A2 后侧栏终态 5 项：工作台 + 项目 + 交付执行 + 基础数据 + 系统管理
+    // ★ 重整后侧栏终态 4 项：工作台 + 项目 + 基础数据 + 系统管理（业务线不再占侧栏）
     const itemCount = await page.locator('.ant-layout-sider .ant-menu-item').count()
-    check('NAV-侧栏5项终态', groups && missing.length === 0 && itemCount === 5,
-      `项数=${itemCount}/5 · 三分类组=${groups} · 缺项=${missing.join('/') || '无'} · 图标=${siderIcons}`)
+    check('NAV-侧栏4项终态', groups && missing.length === 0 && itemCount === 4 && !hasDelivery,
+      `项数=${itemCount}/4 · 三分类组=${groups} · 缺项=${missing.join('/') || '无'} · 交付执行残留=${hasDelivery}`)
     check('NAV-旧平铺已收', oldFlat.length === 0,
       oldFlat.length ? `侧栏仍有平铺: ${oldFlat.join('/')}` : '我的工作/交付执行二级已全部收编')
   }
@@ -112,16 +114,18 @@ try {
   // ── P0 域 Tab + 旧路径 redirect（通知/书签不断）──
   {
     await page.goto(BASE + '/manufacturing', { waitUntil: 'networkidle' })
-    await page.waitForURL(/\/delivery\/mfg/, { timeout: 8000 }).catch(() => {})
-    const redirected = page.url().includes('/delivery/mfg')
-    const tabN = await page.locator('.domain-tabs a').count()
-    check('NAV-redirect交付', redirected && tabN >= 6, `旧 /manufacturing → ${page.url()} · 交付Tab=${tabN}`)
-    const asmTab = page.locator('.domain-tabs a', { hasText: '装配' })
+    await page.waitForURL(/\/workbench\/shop\/mfg/, { timeout: 8000 }).catch(() => {})
+    const redirected = page.url().includes('/workbench/shop/mfg')
+    // 车间台内导航：看板 / 制造 / 装配（制造与装配的唯一入口，双入口已收）
+    const shopTabs = await page.locator('.domain-content .ant-tabs-tab').allInnerTexts().catch(() => [])
+    check('NAV-redirect交付', redirected && shopTabs.some((x) => x.includes('制造')) && shopTabs.some((x) => x.includes('装配')),
+      `旧 /manufacturing → ${page.url()} · 车间台导航=${JSON.stringify(shopTabs)}`)
+    const asmTab = page.locator('.domain-content .ant-tabs-tab', { hasText: '装配' }).first()
     if (await asmTab.count()) {
       await asmTab.click()
-      await page.waitForURL(/\/delivery\/assembly/, { timeout: 6000 }).catch(() => {})
-      check('NAV-Tab切换', page.url().includes('/delivery/assembly'), `点装配Tab → ${page.url()}`)
-    } else check('NAV-Tab切换', false, '交付域无装配Tab')
+      await page.waitForURL(/\/workbench\/shop\/assembly/, { timeout: 6000 }).catch(() => {})
+      check('NAV-Tab切换', page.url().includes('/workbench/shop/assembly'), `点装配 → ${page.url()}`)
+    } else check('NAV-Tab切换', false, '车间台无装配入口')
     const cases = [['/my-tasks', 'workbench\\/tasks'], ['/mine/tasks', 'workbench\\/tasks'], ['/users', 'admin\\/users'], ['/purchase/orders', 'purchase(?!,/suppliers)'], ['/purchase/suppliers', 'suppliers']]
     const bad = []
     for (const [from, to] of cases) {
@@ -235,31 +239,29 @@ try {
       check('NAV-采购台在工作台', onPurchase, `点采购Tab → ${page.url()}（角色台归位工作台域）`)
     } else check('NAV-采购台在工作台', false, '无采购Tab')
   }
-  // A2（v2 拍板②）：我的台内页签 —— 待办/我的任务/设计评审/改版申请（card 型，与域 Tab 下划线区分）
+  // ★ 重整 P1（docs/10 §8.4）：「我的工作台」不再自带页签条 —— 原来台条→台内条→页内条→状态条
+  //   四条横条叠在一屏。现在待办卡就是入口，点它直达「对应台 + 对应页签」。
   {
     await page.goto(BASE + '/workbench', { waitUntil: 'networkidle' })
-    await page.waitForSelector('.ant-tabs-type-card', { timeout: 8000 }).catch(() => {})
-    const inner = page.locator('.domain-content .ant-tabs')
-    const innerTabs = await inner.locator('.ant-tabs-tab').allInnerTexts().catch(() => [])
-    const cardType = (await inner.getAttribute('class').catch(() => ''))?.includes('ant-tabs-card')
-    // 点「我的任务」→ URL 子路由 + 内容挂载
-    const taskTab = inner.locator('.ant-tabs-tab', { hasText: '我的任务' }).first()
+    await page.waitForTimeout(900)
+    const innerTabs = await page.locator('.domain-content .ant-tabs-tab').allInnerTexts().catch(() => [])
+    const taskCard = page.locator('.domain-content').getByText('我的任务', { exact: true }).first()
     let urlOk = false, contentOk = false
-    if (await taskTab.count()) {
-      await taskTab.click()
+    if (await taskCard.count()) {
+      await taskCard.click()
       await page.waitForURL(/\/workbench\/tasks/, { timeout: 6000 }).catch(() => {})
       urlOk = page.url().includes('/workbench/tasks')
-      await page.waitForTimeout(600)
-      const t = await body(page)
-      contentOk = t.includes('任务号') || t.includes('拆分派工') || t.includes('我的任务')
+      await page.waitForTimeout(800)
+      const t2 = await body(page)
+      contentOk = t2.includes('任务号') || t2.includes('拆分派工') || t2.includes('我的任务')
     }
-    check('NAV-台内页签', innerTabs.length === 4 && !!cardType && urlOk && contentOk,
-      `页签=${JSON.stringify(innerTabs)} · card型=${!!cardType} · URL=${urlOk} · 内容挂载=${contentOk}`)
+    check('NAV-台内不叠页签', innerTabs.length === 0 && urlOk && contentOk,
+      `台内页签条=${innerTabs.length}（应 0）· 卡片深链 → /workbench/tasks=${urlOk} · 内容挂载=${contentOk}`)
   }
 
   // ── B1 三角色开台（拍板④）：发运/现场/售后各见自己的台 + 台Tab直达交付域 ──
   {
-    const roles = [['delivery1', '发运台'], ['site1', '现场台'], ['service1', '售后台']]
+    const roles = [['delivery1', '发运工作台'], ['site1', '现场工作台'], ['service1', '售后工作台']]
     const bad = []
     let domainOk = false
     for (const [u, expect] of roles) {
@@ -273,24 +275,27 @@ try {
         if (tabs.length !== 2 || !tabs.some((t) => t.includes(expect))) {
           bad.push(`${u}: Tab=[${tabs.join(',')}] 应含「${expect}」且共 2`)
         }
-        // 第一个角色：点发运台 → 交付域（index redirect → /delivery/mfg，域 Tab 6）
+        // ★ 第八/九轮实测过的故障：发运角色点自己的台 → index redirect 落进【制造页】→ 403（无 mfg:view）
+        //   重整后台必须直达自己的页面，且不再有 6 项域条
         if (u === 'delivery1' && !bad.length) {
-          const t0 = cr.page.locator('.domain-tabs a', { hasText: '发运台' }).first()
+          const t0 = cr.page.locator('.domain-tabs a', { hasText: '发运工作台' }).first()
           if (await t0.count()) {
             await t0.click()
-            await cr.page.waitForURL(/\/delivery\/mfg/, { timeout: 8000 }).catch(() => {})
-            domainOk = cr.page.url().includes('/delivery/mfg')
-            await cr.page.waitForTimeout(500)
+            await cr.page.waitForURL(/\/delivery\/shipping/, { timeout: 8000 }).catch(() => {})
+            domainOk = cr.page.url().includes('/delivery/shipping')
+            await cr.page.waitForTimeout(700)
+            const body1 = await cr.page.locator('body').innerText().catch(() => '')
+            if (/没有权限|mfg:view/.test(body1)) bad.push('发运工作台落进了无权限页（旧故障复现）')
             const dTabs = await cr.page.locator('.domain-tabs a').count()
-            if (dTabs < 6) bad.push(`点发运台后域Tab=${dTabs} 应≥6`)
-          } else bad.push('delivery1 无发运台Tab')
+            if (dTabs > 3) bad.push(`点发运工作台后仍出现 ${dTabs} 项导航（交付域未删净）`)
+          } else bad.push('delivery1 无「发运工作台」Tab')
         }
       } finally {
         await cr.browser.close()
       }
     }
     check('NAV-B1三角色开台', bad.length === 0 && domainOk,
-      bad.length ? bad.join(' | ') : `三角色各 2 Tab 正确 · 发运台Tab → ${'/delivery/mfg'}（index redirect）+ 域 Tab 6 项`)
+      bad.length ? bad.join(' | ') : '三角色各 2 Tab 正确 · 发运工作台 → /delivery/shipping（不再落制造页）')
   }
 
   // A1（v2 拍板①）：供应商入采购台 —— 旧链落台内页签 + 侧栏收编
@@ -803,7 +808,10 @@ try {
       await closeModal();
     } else check('PREFILL-用户编辑', false, '无编辑入口');
 
-    // 供应商编辑
+    // 供应商编辑 —— ★ 换成采购账号：重整后有了路由守卫（RequirePerm），
+    // 工程总监打开 /purchase?tab=suppliers 会被送回工作台（他没有任何 purchase:* 码，
+    // 以前是「看得见、点了 403」，现在是「进不去」—— 用错账号会假报“无编辑入口”）
+    await login(page, 'buyer1', 'txgk@123');
     await page.goto(BASE + '/suppliers', { waitUntil: 'networkidle' }); await page.waitForTimeout(1200);
     edit = page.locator('a,button').filter({ hasText: /^编\s*辑$/ }).first();
     if (await edit.count()) {

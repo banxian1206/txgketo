@@ -34,6 +34,8 @@ import {
 import { hasPerm } from '../../api/user'
 import { TASK_STATUS as STATUS_COLOR } from '../../theme/status'
 import { TASK_TYPE as TYPE_COLOR } from '../../theme/status'
+import { TASK_TABS } from '../../configs/tabs'
+import { useTab } from '../../hooks/useTab'
 
 /** 我的任务（工作台）：我的任务 / 我组任务（经理，05 卷 §2.2） */
 export default function MyTasks() {
@@ -41,7 +43,9 @@ export default function MyTasks() {
   const nav = useNavigate()
   const [rows, setRows] = useState<TaskItem[]>([])
   const [loading, setLoading] = useState(false)
-  const [tab, setTab] = useState('未完成')
+  // ★ 重整 P0：状态页签状态进 URL（?tab=），刷新/分享不丢
+  const visKeys = TASK_TABS.map((x) => x.key)
+  const [tab, setTab] = useTab(visKeys, '未完成')
   const [scope, setScope] = useState<'mine' | 'team'>('mine')
   const [profile, setProfile] = useState<User | null>(null)
   const [purchases, setPurchases] = useState<PurchaseRequestItem[]>([])

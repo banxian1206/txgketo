@@ -1,14 +1,17 @@
-import { App, Button, Card, Col, Progress, Row, Space, Spin, Table, Tag, Typography } from 'antd'
+import { App, Button, Card, Col, Progress, Row, Space, Spin, Table, Tabs, Tag, Typography } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
 import { errMsg, pmBoard, workbenchMe, type PmBoard, type PmProjectRow, type WorkbenchMe } from '../../api/client'
+import { PM_TABS, filterTabs } from '../../configs/tabs'
+import { useTab } from '../../hooks/useTab'
+import AcceptancePage from '../acceptance/Page'
 import { PROJECT_STAGE as STAGE_COLOR } from '../../theme/status'
 import { T } from '../../theme/tokens'
 
 /** 项目经理台（06 卷 §3）：我项目的全链进度（设计 → 采购 → 到货/入库）+ 风险/待办 */
-export default function PmWorkbench() {
+function PmBoardPage() {
   const { message } = App.useApp()
   const nav = useNavigate()
   const [me, setMe] = useState<WorkbenchMe | null>(null)
@@ -142,5 +145,27 @@ export default function PmWorkbench() {
         />
       </Card>
     </Spin>
+  )
+}
+
+/**
+ * 项目经理台 = 台内页签（docs/10 §8.5 拍板 A 的默认归属）：
+ *   看板 · 验收与质保（PM 有 acceptance:edit；质保到期/质保金本就是 PM 与商务关心的）
+ * 只剩一个可见页签时不画条（避免多一层噪音）。
+ */
+export default function PmWorkbench() {
+  const vis = filterTabs(PM_TABS)
+  const [tab, setTab] = useTab(vis.map((x) => x.key), 'board')
+  if (vis.length <= 1) return <PmBoardPage />
+  return (
+    <Tabs
+      activeKey={tab}
+      onChange={setTab}
+      items={vis.map((x) => ({
+        key: x.key,
+        label: x.label,
+        children: x.key === 'acceptance' ? <AcceptancePage /> : <PmBoardPage />,
+      }))}
+    />
   )
 }

@@ -1,7 +1,7 @@
 import { App, Button, Card, Col, Empty, Row, Space, Table, Tabs, Tag, Typography } from 'antd'
 import dayjs from 'dayjs'
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 
 import SuppliersPage from './SuppliersPage'
 import ManualPurchaseModal from '../../components/ManualPurchaseModal'
@@ -26,6 +26,8 @@ import {
 import { ORDER_STATUS as ORDER_STATUS_COLOR } from '../../theme/status'
 import { RECEIPT_STATUS as RECEIPT_STATUS_COLOR } from '../../theme/status'
 import { T } from '../../theme/tokens'
+import { PURCHASE_TABS, filterTabs } from '../../configs/tabs'
+import { useTab } from '../../hooks/useTab'
 
 const today = () => dayjs().format('YYYY-MM-DD')
 
@@ -44,9 +46,9 @@ export default function PurchaseWorkbench() {
   const [doneReceipts, setDoneReceipts] = useState<GoodsReceiptRow[]>([])
   const [selected, setSelected] = useState<string[]>([])
   // A1（v2 方案 §2.0.6）：页签 = URL query（?tab=suppliers 深链 / 旧 /suppliers redirect 落点 / 分享可还原）
-  const [sp, setSp] = useSearchParams()
-  const tab = sp.get('tab') || 'pool'
-  const setTab = (k: string) => setSp(k === 'pool' ? {} : { tab: k }, { replace: true })
+  //  ★ 重整 P0：这段手写实现已抽成 hooks/useTab（全站同一套页签状态机，含未知值回退）
+  const visKeys = filterTabs(PURCHASE_TABS).map((x) => x.key)
+  const [tab, setTab] = useTab(visKeys, 'pool')
   const [manualOpen, setManualOpen] = useState(false)
   const [mergeOpen, setMergeOpen] = useState(false)
   const [orderKey, setOrderKey] = useState<string | null>(null)
@@ -995,7 +997,7 @@ export default function PurchaseWorkbench() {
             label: '供应商',
             children: <SuppliersPage />,
           },
-        ]}
+        ].filter((x) => visKeys.includes(x.key))}
       />
 
       <PoApproveModal
@@ -1033,3 +1035,4 @@ export default function PurchaseWorkbench() {
     </Card>
   )
 }
+

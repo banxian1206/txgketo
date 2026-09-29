@@ -5,11 +5,16 @@ import { useCallback, useEffect, useState } from 'react'
 import ChangeDetailModal from '../../components/ChangeDetailModal'
 import { errMsg, listChangeRequests, type ChangeRequestRow } from '../../api/client'
 import { CHANGE_STATUS as STATUS_COLOR } from '../../theme/status'
+import { CHANGE_TABS, filterTabs } from '../../configs/tabs'
+import { useTab } from '../../hooks/useTab'
 
 /** 改版（ECN）工作台（05 卷 §7、§9）：提申请 → 总监裁决 → 下发 → 修订 → 重审发布 */
 export default function Changes() {
   const { message } = App.useApp()
-  const [scope, setScope] = useState<'pending' | 'todo' | 'mine' | 'all'>('pending')
+  // ★ 重整 P0（docs/10 §3.2/§3.3）：页签条按**真实权限码**过滤，状态写进 URL（?tab=）
+  const visKeys = filterTabs(CHANGE_TABS).map((x) => x.key)
+  const [tabKey, setTab] = useTab(visKeys, 'pending')
+  const scope = tabKey as 'pending' | 'todo' | 'mine' | 'all'
   const [rows, setRows] = useState<ChangeRequestRow[]>([])
   const [loading, setLoading] = useState(false)
   const [crId, setCrId] = useState<number | null>(null)
@@ -87,13 +92,13 @@ export default function Changes() {
     <Card title="改版申请（ECN）" extra={<Button onClick={() => void load()}>刷新</Button>}>
       <Tabs
         activeKey={scope}
-        onChange={(k) => setScope(k as 'pending' | 'todo' | 'mine' | 'all')}
+        onChange={setTab}
         items={[
           { key: 'pending', label: '待我裁决（总监）' },
           { key: 'todo', label: '待我改版' },
           { key: 'mine', label: '我提的' },
           { key: 'all', label: '全部' },
-        ]}
+        ].filter((x) => visKeys.includes(x.key))}
       />
       <Table<ChangeRequestRow>
         rowKey="id"

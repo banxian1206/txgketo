@@ -54,6 +54,26 @@ def permissions_of(user: User) -> set[str]:
     return {p.code for r in user.roles for p in r.permissions}
 
 
+# ★ 派生权限码（重整方案 docs/10 §3.5 / §8.4）。
+#   「能不能管用户」「能不能看全局操作日志」取决于**岗位 + 部门**（总监=本部门，管理员=全部），
+#   不是角色能静态表达的，所以不进 permission 表，而是从 `_scope()` 现场派生 ——
+#   **唯一事实源仍是 platform._scope，前后端读的是同一个判断。**
+#   目的：前端不再用 `position === '总监'` 猜岗位（那样造出「看得见、点了必 403」）。
+PERM_ADMIN_USERS = "admin:users"
+PERM_ADMIN_AUDIT = "admin:audit"
+
+
+def effective_permissions(session, user: User) -> set[str]:
+    """角色权限码 + 派生码（登录/me 下发给前端，门禁与可见性因此同源）。"""
+    codes = set(permissions_of(user))
+    from app.api.routes.platform import _scope  # 局部导入避免环依赖
+
+    if _scope(session, user)["can_manage"]:
+        codes.add(PERM_ADMIN_USERS)
+        codes.add(PERM_ADMIN_AUDIT)
+    return codes
+
+
 def has_permission(user: User, code: str) -> bool:
     return user.is_superuser or code in permissions_of(user)
 

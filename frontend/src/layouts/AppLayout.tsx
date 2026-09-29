@@ -29,8 +29,10 @@ export default function AppLayout() {
   // 重构 1.3：登录态/用户名/伪装横幅全部来自 AuthContext（单一 session，不再散读 localStorage）
   const { user: profile, impersonateName, logout, refreshMe, stopImpersonate } = useAuth()
   const name = profile?.name ?? '用户'
-  // 用户与权限：系统管理员 + 总监（06 卷 §4）
-  const canManageUsers = profile?.is_superuser === true || profile?.position === '总监'
+  // ★ 重整 P3（docs/10 §8.1 拍板#4/#5）：可见性来源 = **后端下发的能力位**。
+  //   `admin:users` 是派生码（deps.effective_permissions ← platform._scope：管理员=全部、总监=本部门），
+  //   所以前端不再用 `position === '总监'` 猜岗位 —— 那正是「看得见、点了必 403」的成因。
+  const canManageUsers = hasPerm('admin:users')
   // 站内消息红点（06 卷 §9）：60s 轮询未读数
   const [unread, setUnread] = useState(0)
   const [notifOpen, setNotifOpen] = useState(false)
@@ -53,7 +55,7 @@ export default function AppLayout() {
   }, [refreshMe])
 
 
-  // P0：最长前缀匹配（/delivery/mfg → 交付执行）
+  // P0：最长前缀匹配（/delivery/site → 现场工作台所在的工作台组）
   const selected = matchSidebarKey(loc.pathname)
 
   const SIDEBAR_ICONS: Record<string, React.ReactNode> = {
@@ -63,14 +65,11 @@ export default function AppLayout() {
   }
   /** P0：侧栏一级 21→7（三分类=组标题；二级由右侧 DomainShell Tab 承接） */
   const sidebarItems: MenuProps['items'] = (() => {
-    const roots = SIDEBAR_ROOTS.filter((r) =>
-      r.admin ? canManageUsers : true,
-    ).filter((r) =>
-      r.perm !== 'mfg' || hasPerm('mfg:view') || canManageUsers,
-    )
+    // ★ 「交付执行」已从侧栏删除（docs/10 §8.1 D1）：业务线只在各角色的工作台里跑
+    const roots = SIDEBAR_ROOTS.filter((r) => (r.admin ? canManageUsers : true))
     const groups: { label: string; keys: string[] }[] = [
       { label: '工作台', keys: ['/workbench'] },
-      { label: '业务', keys: ['/projects', '/delivery/mfg', '/library'] },
+      { label: '业务', keys: ['/projects', '/library'] },
       { label: '系统管理', keys: ['/admin/users'] },
     ]
     return groups
