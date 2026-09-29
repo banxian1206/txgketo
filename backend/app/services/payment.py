@@ -15,6 +15,8 @@
 from __future__ import annotations
 
 
+from datetime import date
+
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -28,6 +30,7 @@ from app.models.project import (
     Project,
 )
 from app.services import notify
+from app.services.reviewers import director_in_dept
 
 # 关键词 → 业务节点（顺序敏感：先匹配更具体的前缀）
 _KEYWORD_RULES: tuple[tuple[str, str], ...] = (
@@ -61,7 +64,14 @@ def normalize_trigger(value: str | None, node_name: str | None = None) -> str | 
 def remind(session: Session, project_no: str, node: str, *, actor_id: int | None = None) -> int:
     """★ 节点达成 → 提醒商务部收款（**只提醒，不卡流程**）。
 
-    :returns 提醒了几条（便于审计/测试）。
+    **收件人精度**（第九轮报告 Q-2）：只发**项目自己的销售负责人** + **销售部总监**，
+    不再 `notify_role("SALES")` 群发 —— 销售多于 2 人时，每人都会被别人项目的催款打扰。
+    口径与 `deadline.py`（任务超期精确到负责人 + 同专业经理）对齐。
+
+    **幂等**（Q-3）：带 `dedup_key`，同一项目同一节点**每天最多催一次** ——
+    否则分批发运时每趟 `depart` 都让同一笔发货款再催一次（未收额相同时看着就是刷屏）。
+
+    :returns 实际发出条数。
     """
     terms = session.scalars(
         select(PaymentTerm).where(
@@ -69,28 +79,50 @@ def remind(session: Session, project_no: str, node: str, *, actor_id: int | None
         )
     ).all()
     outstanding = [
-        t
-        for t in terms
-        if float(t.amount or 0) - float(t.received_amount or 0) > 1e-6
+        t for t in terms if float(t.amount or 0) - float(t.received_amount or 0) > 1e-6
     ]
     if not outstanding:
         return 0
     total = sum(float(t.amount or 0) - float(t.received_amount or 0) for t in outstanding)
     project = session.get(Project, project_no)
+    boss = director_in_dept(session, "SALES")
     names = "、".join(t.node_name for t in outstanding)
-    notify.notify_role(
+    title = f"该收款了：{project_no} 已「{node}」（未收 ¥{total:,.0f}）"
+    body = (
+        f"付款节点：{names}。项目 {project.project_name if project else project_no}"
+        f"已到达「{node}」节点，请去收款并登记回款。"
+    )
+    key = notify.daily_key("payment-remind", f"{project_no}:{node}", date.today())
+    # ① 项目自己的销售负责人 + ② 销售部总监（按**部门**找 —— N21/M-01 口径，不按提交人）
+    targets = [t for t in (project.sales_id if project else None, boss.id if boss else None) if t]
+    if not targets:
+        # 兵底：老数据没填销售负责人、部门也没配总监 → 群发 SALES（**钱的事不能静默丢掉**）
+        return notify.notify_role(
+            session,
+            "SALES",
+            type_=notify.TYPE_TASK,
+            title=title,
+            body=body,
+            link=f"/projects/{project_no}",
+            biz_type="payment_term",
+            biz_id=outstanding[0].id,
+            actor_id=actor_id,
+            dedup_key=key,
+        )
+    # ⚠ 注意：**不能靠 `sent == 0` 判“没配收件人”** —— 去重命中时它也是 0，
+    #   那样会把“今天已经催过了”误当成“没人可催”，转而触发下面那个兜底群发（反而扰乱无关销售）。
+    return notify.notify(
         session,
-        "SALES",
+        targets,
         type_=notify.TYPE_TASK,
-        title=f"该收款了：{project_no} 已「{node}」（未收 ¥{total:,.0f}）",
-        body=f"付款节点：{names}。项目 {project.project_name if project else project_no}"
-        "已到达「{}」节点，请去收款并登记回款。".format(node),
+        title=title,
+        body=body,
         link=f"/projects/{project_no}",
         biz_type="payment_term",
         biz_id=outstanding[0].id,
         actor_id=actor_id,
+        dedup_key=key,
     )
-    return len(outstanding)
 
 
 def trigger_for_shipment(session: Session, project_no: str, *, actor_id: int | None = None) -> int:

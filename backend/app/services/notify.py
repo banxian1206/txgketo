@@ -21,6 +21,14 @@ TYPE_WAREHOUSE = "warehouse"
 TYPE_PURCHASE = "purchase"
 
 
+def daily_key(kind: str, ident, day) -> str:
+    """★ 每天一次的提醒键（到期扫描 / 收款提醒共用）。
+
+    `notification.dedup_key` 靠它去重 —— 同一件事**每天最多提醒一次**，不然一刷新就刷屏。
+    """
+    return f"{kind}:{ident}:{day.isoformat()}"
+
+
 def _user_ids(session: Session, user_ids: list[int] | set[int], actor_id: int | None) -> list[int]:
     return sorted({u for u in user_ids if u and u != actor_id})
 

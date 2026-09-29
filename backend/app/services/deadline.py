@@ -36,9 +36,8 @@ _ACTIVE_STAGES = ("执行中", "交付中")
 _OPEN_REQ = ("待采购", "在途", "待入库", "部分到货", "现场待验收", "不合格")
 
 
-def _key(kind: str, ident, day: date) -> str:
-    """每天的提醒键（同一天同一件事只发一次）。"""
-    return f"{kind}:{ident}:{day.isoformat()}"
+# 提醒键统一由 notify.daily_key 提供（收款提醒也用同一套去重口径）
+_key = notify.daily_key
 
 
 def scan_due(session: Session, *, today: date | None = None) -> dict:

@@ -67,9 +67,31 @@ def test_reminder_never_raises_so_it_cannot_block_the_flow():
     assert "raise" not in body, "提醒不能抛异常（否则会卡住发运/验收流程）"
 
 
-def test_reminder_goes_to_sales_role():
+def test_reminder_targets_the_project_owner_not_the_whole_role():
+    """★ Q-2（第九轮报告）：只发**项目自己的销售负责人** + **销售部总监**，不群发 SALES 角色。
+
+    群发的毛病：销售多于 2 人时，每人都会被**别人项目**的催款打扰。
+    """
     src = _code("services/payment.py")
-    assert '"SALES"' in src, "提醒要发给商务部（客户：催商务部去收款）"
+    assert "project.sales_id" in src, "要精确定位到项目自己的销售负责人"
+    assert 'director_in_dept(session, "SALES")' in src, "并带上销售部总监（按部门找，不按提交人）"
+    # 群发只能作为"谁都没有"时的兵底，且必须有 `if not targets:` 把住
+    i = src.index("return notify.notify_role(")   # 找真实调用（docstring 里也提到了这个词）
+    assert "if not targets:" in src[max(0, i - 400) : i], "群发 SALES 只能是兜底（`if not targets:`）"
+
+
+def test_fallback_is_not_triggered_by_a_dedup_hit():
+    """★ 我自己踩过的坑：**不能拿 `sent == 0` 判"没配收件人"** —— 去重命中时它也是 0，
+    那样会把"今天已经催过了"误当"没人可催"，转而触发兜底群发（反而扰乱无关销售）。"""
+    src = _code("services/payment.py")
+    assert "sent == 0" not in src, "别用 sent==0 判「没配收件人」—— 去重命中时它也是 0"
+
+
+def test_reminder_has_a_dedup_key():
+    """★ Q-3：同一项目同一节点**每天最多催一次**（分批发运不再反复催同一笔）。"""
+    src = _code("services/payment.py")
+    assert 'daily_key("payment-remind"' in src
+    assert src.count("dedup_key=key") >= 2, "主路径与兵底都要带去重键"
 
 
 def test_settled_terms_are_not_reminded():
