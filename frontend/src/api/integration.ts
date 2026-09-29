@@ -5,10 +5,17 @@ import { api } from './http'
  * `key` **永不回传原文** —— 只有 `has_key` 与掩码 `key_masked`。
  * 写入语义：不传 key = 保持原样 · 传空串 = 清空 · 传值 = 替换。
  */
+export interface OcrModel {
+  value: string
+  label: string
+}
+
 export interface OcrApi {
   value: string
   label: string
   default_model?: string | null
+  /** 该服务可选的视觉模型（**服务端是唯一来源**，前端不写死列表） */
+  models?: OcrModel[]
 }
 
 export interface OcrConfig {
@@ -23,6 +30,8 @@ export interface OcrConfig {
   default_model?: string | null
   /** 已知识别服务 + 各自默认模型（下拉与 placeholder 都从这里取） */
   apis?: OcrApi[]
+  /** 当前服务可选的模型 */
+  models?: OcrModel[]
   /** 上次「测试连接」的结果 */
   last_test?: { at: string; ok: boolean; verdict: string } | null
   /** unconfigured | unverified | verified | failed */

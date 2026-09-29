@@ -90,14 +90,37 @@ def set_value(session: Session, key: str, value: str | None, *, actor_id: int | 
 # ★ 已知的识别服务 + 各自默认模型（**单一来源**：前端下拉与 placeholder 都从这里取，
 #   免得像之前那样在界面上写死一个已经被证伪的模型名 `glm-ocr`）
 KNOWN_APIS = (
-    {"value": "zhipu", "label": "智谱（glm-4v-flash）"},
-    {"value": "dashscope", "label": "通义千问（qwen-vl-ocr）"},
+    {"value": "zhipu", "label": "智谱（BigModel）"},
+    {"value": "dashscope", "label": "通义千问（百炼）"},
 )
+
+# ★ 各服务可选的视觉模型（**前端下拉的唯一来源**，别在前端再写一份）。
+#   智谱这几条是 **2026-09-29 用真实 key 逐个实测**过的（都能 200）；
+#   ⚠ `glm-ocr` **不在这里** —— 它是智谱的文件级 OCR 接口，喂 chat 格式必报「仅支持 PDF/JPG/PNG…」。
+MODELS_BY_API: dict[str, tuple[dict, ...]] = {
+    "zhipu": (
+        {"value": "glm-4v-flash", "label": "glm-4v-flash（快、便宜）★默认"},
+        {"value": "glm-4v-plus", "label": "glm-4v-plus（更强，贵一点）"},
+        {"value": "glm-4.5v", "label": "glm-4.5v（新一代视觉）"},
+        {"value": "glm-4.1v-thinking-flash", "label": "glm-4.1v-thinking-flash（带思考，可能慢）"},
+    ),
+    "dashscope": (
+        {"value": "qwen-vl-ocr", "label": "qwen-vl-ocr（通义专用 OCR）★默认"},
+        {"value": "qwen3-vl-flash", "label": "qwen3-vl-flash（新一代，快）"},
+        {"value": "qwen3-vl-plus", "label": "qwen3-vl-plus（新一代，更强）"},
+        {"value": "qwen-vl-max", "label": "qwen-vl-max（经典旗舰）"},
+    ),
+}
 
 
 def ocr_apis() -> list[dict]:
     return [
-        {"value": k["value"], "label": k["label"], "default_model": DEFAULT_MODELS.get(k["value"])}
+        {
+            "value": k["value"],
+            "label": k["label"],
+            "default_model": DEFAULT_MODELS.get(k["value"]),
+            "models": list(MODELS_BY_API.get(k["value"], ())),
+        }
         for k in KNOWN_APIS
     ]
 
@@ -147,6 +170,7 @@ def ocr_config(session: Session) -> dict:
         "available": configured,
         "default_model": DEFAULT_MODELS.get(api),
         "apis": ocr_apis(),
+        "models": list(MODELS_BY_API.get(api, ())),  # 当前服务的可选模型（前端下拉用）
         "last_test": lt,
         "state": state,
     }

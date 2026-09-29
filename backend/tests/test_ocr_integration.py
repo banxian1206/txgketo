@@ -174,3 +174,38 @@ def test_config_exposes_state_not_just_available():
     theme = (ROOT / "frontend" / "src" / "theme" / "status.ts").read_text(encoding="utf-8")
     assert "OCR_STATE_TEXT" in theme and "已配置（未验证）" in theme, "配置状态的人话要进 theme/status.ts"
     assert "OCR_STATE" in theme
+
+
+# ── 模型下拉：清单由服务端下发，且不许放进"走不通"的模型 ─────────────────────
+def test_model_list_is_served_and_verified():
+    """★ 智谱这几条是 **2026-09-29 用真 key + 真库位图逐个实测**过的（都精确识别 A-03-12）。"""
+    from app.services.settings import MODELS_BY_API
+
+    zp = {m["value"] for m in MODELS_BY_API["zhipu"]}
+    assert {"glm-4v-flash", "glm-4v-plus", "glm-4.5v", "glm-4.1v-thinking-flash"} <= zp
+    assert MODELS_BY_API["dashscope"], "通义也要给清单"
+
+
+def test_glm_ocr_is_never_offered():
+    """★★ `glm-ocr` 是**文件级 OCR 接口**，走 chat 格式必报「仅支持 PDF/JPG/PNG/JPEG…」。
+
+    （这一条曾经让我们白跑一轮：默认模型填了 `glm-ocr` → 调用直接 400。别再让它回到菜单里。）
+    """
+    from app.services.settings import DEFAULT_MODELS, MODELS_BY_API
+
+    for models in MODELS_BY_API.values():
+        assert not any(m["value"] == "glm-ocr" for m in models), "glm-ocr 不能进下拉（走不通 chat）"
+    assert "glm-ocr" not in DEFAULT_MODELS.values(), "默认模型也不能是 glm-ocr"
+
+
+def test_model_dropdown_comes_from_the_server_not_hardcoded():
+    """前端不许自己写一份模型清单（否则又会出现"写死一个已被证伪的名字"）。"""
+    raw = (ROOT / "frontend" / "src" / "features" / "admin" / "IntegrationPanel.tsx").read_text(encoding="utf-8")
+    assert "cfg?.models" in raw, "下拉要用服务端下发的 models"
+    assert "AutoComplete" in raw, "用 AutoComplete（下拉可选 + 允许手输别的）"
+    # ★ 只在**代码**里查（注释里可以提历史模型名，比如"曾经写成 glm-ocr"）
+    code = "\n".join(
+        ln for ln in raw.splitlines() if not ln.strip().startswith(("//", "*", "/*"))
+    )
+    for hard in ("glm-4v-flash", "qwen-vl-ocr", "glm-4v-plus", "glm-ocr"):
+        assert hard not in code, f"前端不许写死模型名：{hard}（要从服务端 models 取）"

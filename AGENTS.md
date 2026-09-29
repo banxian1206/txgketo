@@ -50,7 +50,9 @@
 > （OpenAI 兼容即可），**前端与路由一行不改**。
 
 **★ 模型名实测（2026-09-29，用真库位标签图跑的）**：
-- 智谱：**必须用 `glm-4v-flash`**（或 `glm-4v-plus` / `glm-4.5v`）—— 走标准 `chat + image_url`。
+- 智谱：**必须用 `glm-4v-flash`**（或 `glm-4v-plus` / `glm-4.5v` / `glm-4.1v-thinking-flash`）—— 走标准 `chat + image_url`。
+  ★ 这 4 条 **2026-09-29 用真 key + 真库位图逐个实测**过（都精确识别 `A-03-12`）；清单在
+  `services/settings.py::MODELS_BY_API`，**由服务端下发**给后台下拉（`ocr_config().models`），前端**不许写死**。
   ⚠ **`glm-ocr` 不能走这条链路**：它是智谱的**文件级 OCR 接口**，喂 chat 格式会报
   「OCR仅支持PDF/JPG/PNG/JPEG…」（已据此把默认模型从 `glm-ocr` 改成 `glm-4v-flash`）。
 - 通义：`qwen-vl-ocr`（同样走标准 chat + image_url）。
@@ -516,7 +518,7 @@ POST /api/v1/warehouse/inbound                    其他入库（退料回库/�
 ### 8.6 当前环境
 
 - 后端 :8208 · 前端 :5207 · PG 35432（`docker compose -f deploy/docker-compose.dev.yml up -d`，compose 顶层写死了 `name: txgketo`）
-- 测试：`.venv/bin/python -m pytest -q` → **169 passed**；e2e 基线 `.venv/bin/python -m scripts.e2e_baseline`（★ 跑前复位业务数据；只清业务表，账户/组织/编号规则不动）→ **问题 0 / 中断 0 / 通过 144**；
+- 测试：`.venv/bin/python -m pytest -q` → **172 passed**；e2e 基线 `.venv/bin/python -m scripts.e2e_baseline`（★ 跑前复位业务数据；只清业务表，账户/组织/编号规则不动）→ **问题 0 / 中断 0 / 通过 144**；
   隔离探针 `scripts/probe_bom_math.py` → **8/8**、`scripts/probe_n24_n25.py` → **20/20**；前端 `e2e:static 22` / **`e2e:api 15+0skip`** / **`e2e:ui 58+0skip`**（两套都自建靶，可复位后单跑）
 - alembic head：**`b4c6d8e02f13`**（OCR 设置表）
 - ★ 套件**执行顺序**：`e2e_baseline` → `probe_n24_n25` → `probe_bom_math`（最后一个会 TRUNCATE 业务表，放最后）

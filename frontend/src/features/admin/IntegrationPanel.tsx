@@ -1,4 +1,4 @@
-import { App, Alert, Button, Card, Form, Input, Select, Space, Tag, Typography } from 'antd'
+import { App, Alert, AutoComplete, Button, Card, Form, Input, Select, Space, Tag, Typography } from 'antd'
 import { useCallback, useEffect, useState } from 'react'
 
 import { getOcrIntegration, setOcrIntegration, testOcrIntegration, type OcrConfig } from '../../api/integration'
@@ -122,9 +122,21 @@ export default function IntegrationPanel() {
           <Form.Item
             name="model"
             label="模型（可留空，留空用默认）"
-            extra={cfg?.default_model ? `当前服务的默认模型：${cfg.default_model}` : '先选识别服务，默认可留空'}
+            extra={
+              cfg?.default_model
+                ? `当前服务默认：${cfg.default_model}；下面这些是**已实测可用**的，也可以直接手输别的`
+                : '先选识别服务；默认模型由服务端下发'
+            }
           >
-            <Input placeholder={cfg?.default_model ?? '留空用默认'} />
+            {/* AutoComplete = 下拉可选 + 允许自由输入（模型名会变，别把用户锁死在下拉里） */}
+            <AutoComplete
+              allowClear
+              options={(cfg?.models ?? []).map((m) => ({ value: m.value, label: m.label }))}
+              placeholder={cfg?.default_model ?? '留空用默认'}
+              filterOption={(input, opt) =>
+                String(opt?.value ?? '').toLowerCase().includes(input.toLowerCase())
+              }
+            />
           </Form.Item>
           <Form.Item
             name="key"
