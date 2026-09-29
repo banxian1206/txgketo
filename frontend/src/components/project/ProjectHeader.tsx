@@ -20,7 +20,7 @@ import {
   type DesignOverviewRow,
   type ProjectDetail as Detail,
 } from '../../api/client'
-import { useBack } from '../../hooks/useFrom'
+import { useBack, useGoFrom } from '../../hooks/useFrom'
 
 export default function ProjectHeader({
   NEXT_HINT,
@@ -44,6 +44,7 @@ export default function ProjectHeader({
   projectNo: any;
 }) {
   const nav = useNavigate()
+  const go = useGoFrom()
   // ★ docs/11：从台里点进来的，返回口要回**那个台**（并回到原来那个页签）；没有来源时行为完全不变
   const back = useBack('/projects', '← 返回列表')
   return (
@@ -90,7 +91,7 @@ export default function ProjectHeader({
                 </Button>
               )}
               {p.stage === '成交待立项' && (
-                <Button type="primary" onClick={() => nav(`/projects/${projectNo}/initiate`)}>
+                <Button type="primary" onClick={() => go(`/projects/${projectNo}/initiate`)}>
                   立项
                 </Button>
               )}
@@ -125,7 +126,7 @@ export default function ProjectHeader({
             <Button
               type="link"
               size="small"
-              onClick={() => nav(`/projects/${projectNo}/design/${design[0].equip_no}`)}
+              onClick={() => go(`/projects/${projectNo}/design/${design[0].equip_no}`)}
             >
               进入设计 →
             </Button>

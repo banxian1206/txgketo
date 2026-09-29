@@ -30,7 +30,9 @@ export default function DomainShell({ tabs, children }: { tabs: TabItem[]; child
           (t.path !== '/' && here.startsWith(t.path + '/')),
       )
       .sort((a, b) => b.path.length - a.path.length)[0]?.path ?? ''
-  if (visible.length <= 1) {
+  // ★ docs/11 §5-3：既不在任何台的路径下、又没有 ?from= → 这条台 Tab 与客户无关，不画
+  //   （从「项目」列表点进详情时台条高亮为空 = 一堆点了会跳走的无关按钮，纯噪音）
+  if (visible.length <= 1 || !active) {
     // 只剩一项就没有“导航条”的意义了，直接渲染内容（少一条横条）
     return <div className="domain-shell">{children ?? <Outlet />}</div>
   }

@@ -4,7 +4,6 @@ import {
   Space,
   Typography,
 } from 'antd'
-import {useNavigate} from 'react-router-dom'
 
 import {
   EquipmentEditor,
@@ -12,6 +11,7 @@ import {
   MilestoneEditor,
   TeamEditor,
 } from '../InitiationEditors'
+import { useGoFrom } from '../../hooks/useFrom'
 
 export default function InitiateCards({
   load,
@@ -22,7 +22,7 @@ export default function InitiateCards({
   projectNo: any;
   users: { id: number; name: string }[];
 }) {
-  const nav = useNavigate()
+  const go = useGoFrom()
   return (
     <>
               <Card
@@ -35,7 +35,7 @@ export default function InitiateCards({
                     <Typography.Text type="secondary" style={{ fontSize: 12 }}>
                       点设备名右边「设计」进设计工作面（出图 / BOM）
                     </Typography.Text>
-                    <a onClick={() => nav(`/projects/${projectNo}/initiate`)}>去立项页维护</a>
+                    <a onClick={() => go(`/projects/${projectNo}/initiate`)}>去立项页维护</a>
                   </Space>
                 }
               >

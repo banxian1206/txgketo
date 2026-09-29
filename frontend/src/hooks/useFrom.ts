@@ -24,7 +24,19 @@ export function useGoFrom() {
   const loc = useLocation()
   return useCallback(
     (path: string) => {
-      const origin = loc.pathname + loc.search
+      const bare = path.split('?')[0]
+      const mine = new URLSearchParams(loc.search).get(FROM_PARAM)
+      // ★ 多级下钻要把**最初那个台**一路带下去（docs/11 §5-1）：
+      //   采购台 → 项目详情 → 设备设计面 → 改版单，每一跳都重写 from 的话，第二跳起
+      //   「返回口」就变成「← 返回项目」，人又被踢出自己的台了。
+      //   所以：本页已带 from 就继续透传它；只有“回到来源本身”时才不写（避免 /purchase?from=/purchase）。
+      const carried = mine ? decodeURIComponent(mine) : null
+      const isBenchTarget = bare === '/workbench' || bare.startsWith('/workbench/') || bare === '/purchase' || bare === '/warehouse'
+      // 回到「本来就是来源」的那个台 → 不带 from（自指没意义）；
+      // 但跳到**另一个台**时要重新记（否则从采购台跳工程台，还留着采购台的来源，返回口就骗人了）
+      if (carried && carried.split('?')[0] === bare) { nav(path); return }
+      if (isBenchTarget && !carried) { nav(path); return }
+      const origin = carried ?? loc.pathname + loc.search
       const sep = path.includes('?') ? '&' : '?'
       nav(`${path}${sep}${FROM_PARAM}=${encodeURIComponent(origin)}`)
     },

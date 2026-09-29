@@ -346,5 +346,32 @@ const FEATS = path.join(SRC, 'features');
       : `${used.size} 个 anyOf 权限码全部在后端权限表/派生码之内`)
 }
 
+{
+  // ★ docs/11：台/业务域里点进项目必须带来源（go() → ?from=），否则侧栏被抢、台条消失、返回口骗人。
+  //   静态盯，不看数据 —— 加新链接时忘了带 from，当场红。
+  const DOMAINS = ['features/workbench', 'features/purchase', 'features/warehouse', 'features/task',
+    'features/site', 'features/assembly', 'features/manufacturing', 'features/service',
+    'features/shipping', 'features/acceptance', 'features/review', 'features/change', 'features/design']
+  const bad = []
+  for (const d of DOMAINS) {
+    const abs = path.join(SRC, d)
+    if (!fs.existsSync(abs)) continue
+    const walk = (dir) => {
+      for (const f of fs.readdirSync(dir)) {
+        const p2 = path.join(dir, f)
+        if (fs.statSync(p2).isDirectory()) { walk(p2); continue }
+        if (!/\.tsx$/.test(f)) continue
+        p2 && fs.readFileSync(p2, 'utf8').split('\n').forEach((l, i) => {
+          if (/nav\([`'"]\/projects/.test(l) && !/\bgo\(/.test(l)) bad.push(`${p2.replace(SRC, 'src')}:${i + 1}`)
+        })
+      }
+    }
+    walk(abs)
+  }
+  check('NAV-跨域跳转带来源', bad.length === 0,
+    bad.length ? `台/业务域里出现裸 nav('/projects…')（应改用 useGoFrom 的 go() 带 ?from=）: ${bad.slice(0, 6).join(', ')}`
+      : '台/业务域 → 项目的跳转全部走 go()（来源随链路透传）')
+}
+
 const fails = summary('静态回归');
 exitWith(fails);

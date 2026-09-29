@@ -8,11 +8,11 @@ import {
   Tag,
   Typography,
 } from 'antd'
-import {useNavigate} from 'react-router-dom'
 
 import {
   type DesignOverviewRow,
 } from '../../api/client'
+import { useGoFrom } from '../../hooks/useFrom'
 
 export default function DesignProgressCard({
   design,
@@ -21,7 +21,7 @@ export default function DesignProgressCard({
   design: DesignOverviewRow[];
   projectNo: any;
 }) {
-  const nav = useNavigate()
+  const go = useGoFrom()
   return (
     <>
               <Card
@@ -86,7 +86,7 @@ export default function DesignProgressCard({
                           <Button
                             type="primary"
                             size="small"
-                            onClick={() => nav(`/projects/${projectNo}/design/${r.equip_no}`)}
+                            onClick={() => go(`/projects/${projectNo}/design/${r.equip_no}`)}
                           >
                             进入设计
                           </Button>
