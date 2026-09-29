@@ -1,3 +1,4 @@
+import { hasPerm } from '../../api/user'
 // components/project/TimeCard.tsx —— 由 ProjectDetailPage 拆出（重构 1.6b · 只拆不改）
 import type { Project } from '../../api/client'
 import {
@@ -17,6 +18,10 @@ export default function TimeCard({
   DASH: any;
   p: Project;
 }) {
+
+  // ★ 与后端 project.assert_sales_owned 同一把尺子：这些字段只有商务部（contract:edit）能改。
+  //   过去对 PM 也画着 ✎，点了必 403 —— 前端可见性必须反映后端门禁（AGENTS 铁律）。
+  const canBiz = hasPerm('contract:edit')
   return (
     <>
           <Card
@@ -26,7 +31,7 @@ export default function TimeCard({
             style={{ marginBottom: 16 }}
           >
             <div className="ef-grid">
-              <EditableField
+              <EditableField editable={canBiz}
                 label="商机截止"
                 value={p.deadline}
                 type="date"
@@ -48,7 +53,7 @@ export default function TimeCard({
                   )}
                 </span>
               </div>
-              <EditableField
+              <EditableField editable={canBiz}
                 label="项目交期"
                 value={p.delivery_days}
                 type="number"
@@ -65,32 +70,32 @@ export default function TimeCard({
                   )}
                 </span>
               </div>
-              <EditableField
+              <EditableField editable={canBiz}
                 label="预计签单"
                 value={p.expect_sign_date}
                 type="date"
                 onSave={(v) => save('expect_sign_date', v)}
               />
-              <EditableField
+              <EditableField editable={canBiz}
                 label="预计金额"
                 value={p.est_amount}
                 type="money"
                 onSave={(v) => save('est_amount', v)}
               />
-              <EditableField
+              <EditableField editable={canBiz}
                 label="履约保证金"
                 value={p.performance_deposit}
                 type="money"
                 suffix="（我们交给对方）"
                 onSave={(v) => save('performance_deposit', v)}
               />
-              <EditableField
+              <EditableField editable={canBiz}
                 label="保证金退还"
                 value={p.performance_deposit_return_date}
                 type="date"
                 onSave={(v) => save('performance_deposit_return_date', v)}
               />
-              <EditableField
+              <EditableField editable={canBiz}
                 label="已退还"
                 value={p.performance_deposit_returned}
                 type="switch"

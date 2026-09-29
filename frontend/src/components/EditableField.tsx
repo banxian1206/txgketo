@@ -20,6 +20,14 @@ interface Props {
   onSave: (value: unknown) => Promise<void>
   /** 占两列 */
   wide?: boolean
+  /**
+   * 这个字段当前用户**能不能改**（默认 true）。
+   * ★ 必须传对：详情页过去对 PM 也画着商务字段的 ✎，而 PATCH 只放行商务部 → 点了必 403
+   *   （AGENTS 铁律：前端可见性必须反映后端门禁）。false 时渲染成纯文本，且**空值不占位**。
+   */
+  editable?: boolean
+  /** 只读且为空时是否仍渲染（默认不渲染；"本该有值却没有"的提示场景才传 true） */
+  showWhenEmpty?: boolean
 }
 
 /**
@@ -36,6 +44,8 @@ export default function EditableField({
   render,
   onSave,
   wide = false,
+  editable = true,
+  showWhenEmpty = false,
 }: Props) {
   const { message } = App.useApp()
   const [editing, setEditing] = useState(false)
@@ -147,6 +157,22 @@ export default function EditableField({
           />
         )
     }
+  }
+
+  const isEmpty =
+    value === null || value === undefined || value === '' || (Array.isArray(value) && value.length === 0)
+
+  // ── 只读态：没有权限的人看到的就是一行文本，而不是一戳就 403 的 ✎ ──
+  if (!editable) {
+    if (isEmpty && !showWhenEmpty) return null
+    return (
+      <div className="ef" style={wide ? { gridColumn: 'span 2' } : undefined}>
+        <span className="ef-label">{label}</span>
+        <span className="ef-value">
+          {render ? render(value) : <span className="ef-readonly">{display()}</span>}
+        </span>
+      </div>
+    )
   }
 
   if (type === 'switch') {

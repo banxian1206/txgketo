@@ -24,3 +24,33 @@ export const T = {
   purple: '#722ed1',
   cyan: '#13c2c2',
 } as const
+
+/**
+ * ★ 排版刻度（视觉规范 §1.2）—— 页面里只准出现这 6 档字号。
+ *   之前只有颜色是单源，字号/间距各页自由发挥（实测 5 档含 10px，低于可读下限），
+ *   这就是「没有观感」的直接技术原因。e2e:static「VIS-字号在刻度内」盯着回潮。
+ */
+export const FS = {
+  /** 极小注释（原 10/11px 一律升到这里） */
+  xs: 12,
+  /** 表格正文、密集列表 */
+  sm: 13,
+  /** 正文默认 */
+  md: 14,
+  /** 区块标题 */
+  lg: 16,
+  /** 页面标题 / 结论条项目号 */
+  xl: 20,
+  /** 关键数字（Statistic 用） */
+  num: 24,
+} as const
+
+/** 间距刻度（8px 基准，视觉规范 §1.3） */
+export const SP = { xxs: 4, xs: 8, sm: 12, md: 16, lg: 24, xl: 32 } as const
+
+/**
+ * ★ 等宽数字/编号（视觉规范 §3.1：本系统最重要的排版决定，此前落地率 0%）。
+ *   图号、单据号、物料号、日期、数量全靠它对齐 —— 一线是扫读，不是逐字读。
+ */
+export const MONO =
+  'ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace'

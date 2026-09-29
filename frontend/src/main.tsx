@@ -17,7 +17,24 @@ if (import.meta.env.PROD && 'serviceWorker' in navigator) {
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <ConfigProvider locale={zhCN} theme={{ token: { colorPrimary: T.brand, borderRadius: 6 } }}>
+    <ConfigProvider locale={zhCN} theme={{
+        // ★ P0 视觉底座（docs/12 §4-1）：排版/密度/组件级 token 一次定死，
+        //   页面里不许再各写各的字号（e2e:static「VIS-字号在刻度内」+「VIS-inline 棘轮」盯着）
+        token: {
+          colorPrimary: T.brand,
+          borderRadius: 6,
+          fontSize: FS.md,
+          fontSizeSM: FS.xs,
+          fontSizeLG: FS.lg,
+          fontSizeXL: FS.xl,
+        },
+        components: {
+          Table: { fontSize: FS.sm, cellFontSizeSM: FS.sm, headerBg: T.bgSunken },
+          Card: { headerFontSize: FS.lg, headerFontSizeSM: FS.md },
+          Tag: { fontSizeSM: FS.xs },
+          Typography: { fontSize: FS.md },
+        },
+      }}>
       <AntApp>
         <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
           <AuthProvider>
@@ -29,4 +46,4 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
   </React.StrictMode>,
 )
 
-import { T } from './theme/tokens'
+import { FS, T } from './theme/tokens'

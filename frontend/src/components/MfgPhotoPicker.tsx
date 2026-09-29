@@ -161,7 +161,7 @@ export default function MfgPhotoPicker({
                 alt="离线暂存"
                 style={{ width: 56, height: 56, objectFit: 'cover', borderRadius: 4, opacity: 0.75 }}
               />
-              <Tag color="orange" style={{ position: 'absolute', top: 0, right: 0, fontSize: 10, margin: 0 }}>
+              <Tag color="orange" style={{ position: 'absolute', top: 0, right: 0, fontSize: 12, margin: 0 }}>
                 ⏳
               </Tag>
               <a

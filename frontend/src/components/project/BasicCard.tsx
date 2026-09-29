@@ -1,3 +1,4 @@
+import { hasPerm } from '../../api/user'
 // components/project/BasicCard.tsx —— 由 ProjectDetailPage 拆出（重构 1.6b · 只拆不改）
 import type { Project } from '../../api/client'
 import {
@@ -25,16 +26,20 @@ export default function BasicCard({
   DASH: any;
   p: Project;
 }) {
+
+  // ★ 与后端 project.assert_sales_owned 同一把尺子：这些字段只有商务部（contract:edit）能改。
+  //   过去对 PM 也画着 ✎，点了必 403 —— 前端可见性必须反映后端门禁（AGENTS 铁律）。
+  const canBiz = hasPerm('contract:edit')
   return (
     <>
           <Card id="sec-basic" size="small" title="基本信息" style={{ marginBottom: 16 }}>
             <div className="ef-grid">
-              <EditableField
+              <EditableField editable={canBiz}
                 label="项目名称"
                 value={p.project_name}
                 onSave={(v) => save('project_name', v)}
               />
-              <EditableField
+              <EditableField editable={canBiz}
                 label="项目方式"
                 value={p.deal_mode}
                 type="select"
@@ -44,14 +49,14 @@ export default function BasicCard({
                 ]}
                 onSave={(v) => save('deal_mode', v)}
               />
-              <EditableField
+              <EditableField editable={canBiz}
                 label="线索来源"
                 value={p.source}
                 type="select"
                 options={SOURCES.map((s) => ({ value: s, label: s }))}
                 onSave={(v) => save('source', v)}
               />
-              <EditableField
+              <EditableField editable={canBiz}
                 label="销售负责人"
                 value={p.sales_id}
                 type="select"
@@ -59,14 +64,14 @@ export default function BasicCard({
                 render={() => detail?.sales_name ?? DASH}
                 onSave={(v) => save('sales_id', v)}
               />
-              <EditableField
+              <EditableField editable={canBiz}
                 label="项目描述"
                 value={p.project_desc}
                 type="textarea"
                 wide
                 onSave={(v) => save('project_desc', v)}
               />
-              <EditableField
+              <EditableField editable={canBiz}
                 label="风险标记"
                 value={p.risk_note}
                 wide

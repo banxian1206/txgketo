@@ -1,3 +1,4 @@
+import { Muted } from '../ui/Primitives'
 // components/project/CustomerCard.tsx —— 由 ProjectDetailPage 拆出（重构 1.6b · 只拆不改）
 import type { Project } from '../../api/client'
 import {
@@ -66,11 +67,22 @@ export default function CustomerCard({
                   width: 110,
                   render: (v: string) => (v ? <Tag color="blue">{v}</Tag> : DASH),
                 },
-                { title: '姓名', dataIndex: 'name', width: 100 },
-                { title: '职务', dataIndex: 'title' },
-                { title: '电话', dataIndex: 'phone', width: 130 },
-                { title: '微信', dataIndex: 'wechat', width: 120 },
-                { title: '邮箱', dataIndex: 'email' },
+                { title: '姓名', dataIndex: 'name', width: 110 },
+                { title: '电话', dataIndex: 'phone', width: 140 },
+                // ★ 列治理（docs/12 §3.2）：7 列 → 4 列。职务/微信/邮箱多数为空，
+                //   过去三列空占位把关键信息挤没了 —— 收进展开行，有才显示。
+                {
+                  title: '联系方式',
+                  key: 'more',
+                  render: (_: unknown, r: ProjectContact) =>
+                    r.wechat || r.email ? (
+                      <Muted>
+                        {[r.wechat && `微信 ${r.wechat}`, r.email && `邮箱 ${r.email}`].filter(Boolean).join(' · ')}
+                      </Muted>
+                    ) : (
+                      <Muted>仅电话</Muted>
+                    ),
+                },
                 {
                   title: '',
                   key: 'action',

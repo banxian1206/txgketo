@@ -373,5 +373,38 @@ const FEATS = path.join(SRC, 'features');
       : '台/业务域 → 项目的跳转全部走 go()（来源随链路透传）')
 }
 
+/* ══════════ VIS-视觉底座棘轮（docs/12 §6 · P0）══════════
+   「观感」这种东西一旦没人盯就会漂回去，所以做成棘轮：只许降、不许升。
+   基线数取本次改造前实测值，每做完一期就把数字往下改一格。 */
+{
+  const SCALE = new Set([12, 13, 14, 16, 20, 24])
+  const files = []
+  const walk = (d) => { for (const f of fs.readdirSync(d)) { const p2 = path.join(d, f); if (fs.statSync(p2).isDirectory()) walk(p2); else if (/\.tsx?$/.test(f)) files.push(p2) } }
+  walk(SRC)
+  let inline = 0, offScale = [], docRef = [], monoCols = 0
+  for (const f of files) {
+    let src = fs.readFileSync(f, 'utf8')
+    // 设计系统实现层自己当然要用 style 组装 —— 它不算「页面各写各的」
+    if (!/components\/ui\//.test(f)) inline += (src.match(/style=\{\{/g) || []).length
+    src.replace(/fontSize:\s*(\d+)/g, (_, n) => { if (!SCALE.has(+n)) offScale.push(`${f.replace(SRC, 'src')}:${n}`); return _ })
+    // 剥掉注释后再找「把内部文档口径写给用户看」的地方
+    const code = src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
+    code.split('\n').forEach((l, i) => {
+      const isJsxText = />[^<>]*卷\s*§/.test(l)
+      const isLabel = /(?:label|title|placeholder|description|message)\s*[:=][^\n]*卷\s*§/.test(l)
+      if (isJsxText || isLabel) docRef.push(`${f.replace(SRC, 'src')}:${i + 1}`)
+    })
+    if (/from '[^']*ui\/Primitives'/.test(src) && /CodeNo|NumCell/.test(src)) monoCols++
+  }
+  // ★ 棘轮基线（2026-09-29 实测）：改完一期就下调一次，绝不许往上抬
+  const BASE_INLINE = 857
+  const BASE_DOCREF = 0
+  check('VIS-inline棘轮', inline <= BASE_INLINE, `inline style ${inline} 处（基线 ${BASE_INLINE}，只许降）`)
+  check('VIS-字号在刻度内', offScale.length === 0, offScale.length ? `不在 FS 刻度(12/13/14/16/20/24)里的字号: ${offScale.slice(0, 5).join(', ')}` : '全部字号来自 FS 刻度')
+  check('VIS-用户文案不引内部文档', docRef.length <= BASE_DOCREF,
+    docRef.length ? `JSX 文案里出现「卷 §」（内部口径该进 Tooltip/帮助，不该上屏）: ${docRef.slice(0, 5).join(', ')}` : '用户可见文案零处引用内部文档章节号')
+  check('VIS-等宽编号已启用', monoCols >= 1, `使用 CodeNo/NumCell 的文件数 = ${monoCols}`)
+}
+
 const fails = summary('静态回归');
 exitWith(fails);

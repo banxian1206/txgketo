@@ -54,6 +54,9 @@ export default function DealCard({
   DASH: any;
   p: Project;
 }) {
+
+  // ★ 与后端 project.assert_sales_owned 同一把尺子：成交/合同字段只有商务部能改
+  const canBiz = hasPerm('contract:edit')
   return (
     <>
           <Card id="sec-deal" size="small" title="成交信息" style={{ marginBottom: 16 }}>
@@ -67,31 +70,31 @@ export default function DealCard({
             ) : (
               <>
                 <div className="ef-grid">
-                  <EditableField
+                  <EditableField editable={canBiz}
                     label="合同金额"
                     value={p.amount}
                     type="money"
                     suffix={p.amount_tax_incl ? '（含税）' : '（不含税）'}
                     onSave={(v) => save('amount', v)}
                   />
-                  <EditableField
+                  <EditableField editable={canBiz}
                     label="合同签订日"
                     value={p.period_start}
                     type="date"
                     onSave={(v) => save('period_start', v)}
                   />
-                  <EditableField
+                  <EditableField editable={canBiz}
                     label="合同交期"
                     value={p.period_end}
                     type="date"
                     onSave={(v) => save('period_end', v)}
                   />
-                  <EditableField
+                  <EditableField editable={canBiz}
                     label="客户合同号"
                     value={p.contract_no_customer}
                     onSave={(v) => save('contract_no_customer', v)}
                   />
-                  <EditableField
+                  <EditableField editable={canBiz}
                     label="质保期"
                     value={p.warranty_months}
                     type="number"
@@ -113,38 +116,38 @@ export default function DealCard({
                       )}
                     </span>
                   </div>
-                  <EditableField
+                  <EditableField editable={canBiz}
                     label="技术协议"
                     value={p.tech_agreement_frozen}
                     type="switch"
                     suffix="冻结后 = 设计基线、验收裁判"
                     onSave={(v) => save('tech_agreement_frozen', v)}
                   />
-                  <EditableField
+                  <EditableField editable={canBiz}
                     label="验收标准"
                     value={p.acceptance_standard}
                     wide
                     onSave={(v) => save('acceptance_standard', v)}
                   />
-                  <EditableField
+                  <EditableField editable={canBiz}
                     label="指定品牌"
                     value={p.designated_brand}
                     wide
                     suffix="指定件不能换供应商、不能合并采购"
                     onSave={(v) => save('designated_brand', v)}
                   />
-                  <EditableField
+                  <EditableField editable={canBiz}
                     label="违约条款"
                     value={p.penalty_note}
                     wide
                     onSave={(v) => save('penalty_note', v)}
                   />
-                  <EditableField
+                  <EditableField editable={canBiz}
                     label="交货方式"
                     value={p.delivery_mode}
                     onSave={(v) => save('delivery_mode', v)}
                   />
-                  <EditableField
+                  <EditableField editable={canBiz}
                     label="现场接收条件"
                     value={p.site_condition}
                     onSave={(v) => save('site_condition', v)}

@@ -259,6 +259,66 @@ try {
       `台内页签条=${innerTabs.length}（应 0）· 卡片深链 → /workbench/tasks=${urlOk} · 内容挂载=${contentOk}`)
   }
 
+  // ── docs/12 视觉/信息架构护栏：详情页首屏必须给出结论；表格不许截断数据 ──
+  {
+    const vc = await newCtx()
+    try {
+      await login(vc.page, 'pm1', 'txgk@123')
+      const pno = await vc.page.evaluate(async (api) => {
+        const raw = JSON.parse(localStorage.getItem('txgk_session') || '{}')
+        const r = await fetch(api + '/api/v1/projects', { headers: { Authorization: 'Bearer ' + raw.token } })
+        const j = await r.json()
+        return Array.isArray(j) && j.length ? j[0].project_no : null
+      }, API)
+      if (!pno) {
+        check('VIS-详情首屏', false, '库里没有项目 —— 基线未跑（护栏不许空转，直接红）')
+      } else {
+        await vc.page.goto(`${BASE}/projects/${pno}`, { waitUntil: 'networkidle' })
+        await vc.page.waitForTimeout(1500)
+        const fold = await vc.page.evaluate(() => {
+          const vh = window.innerHeight
+          const txt = (el) => (el?.innerText ?? '')
+          const bar = document.querySelector('.ant-collapse-item')?.closest('.ant-collapse')?.previousElementSibling
+          const inFold = (sel) => Array.from(document.querySelectorAll(sel)).some((e) => {
+            const r = e.getBoundingClientRect(); return r.top >= 0 && r.bottom <= vh + 40
+          })
+          return {
+            h: Math.round((document.querySelector('.domain-content') || document.body).scrollHeight),
+            no: inFold('.ant-breadcrumb') || txt(document.body).slice(0, 400).includes('TX'),
+            stage: inFold('.ant-tag'),
+            nextBtn: Array.from(document.querySelectorAll('button')).some((b) => b.getBoundingClientRect().top < vh && /成交登记|立项|进入设计|去发运|登记回款|质保金/.test(b.innerText)),
+            nums: (() => {
+              const s = Array.from(document.querySelectorAll('*')).filter((e) => /设备|齐套|未收|客户/.test(e.textContent ?? '') && e.children.length <= 3)
+              return s.length > 0 && s[0].getBoundingClientRect().top < vh
+            })(),
+          }
+        })
+        check('VIS-详情首屏给结论', fold.stage && fold.nextBtn && fold.nums,
+          `首屏: 阶段=${fold.stage} 下一步=${fold.nextBtn} 关键数字=${fold.nums} · 页高 ${fold.h}px`)
+        check('VIS-详情页≤3屏', fold.h <= 2700, `页高 ${fold.h}px（改造前 7411px）`)
+        // 结构断言比像素更敏感：默认只许展开**一段**泳道（全展开就是回到 9 屏平铺的老路）
+        const openLanes = await vc.page.evaluate(() => document.querySelectorAll('.ant-collapse-item-active').length)
+        check('VIS-默认只展开一段泳道', openLanes === 1, `默认展开 ${openLanes} 段（>1 就是又回到平铺）`)
+        // 空值不占位：只读页面上的「—」是注意力黑洞（改造前光首屏就 3 个）
+        const dashes = await vc.page.evaluate(() => (document.querySelector('.domain-content')?.innerText.match(/—/g) ?? []).length)
+        check('VIS-空值不占位', dashes <= 6, `可见文本里「—」占位 ${dashes} 处`)
+        const trunc = await vc.page.evaluate(() => {
+          const bad = []
+          document.querySelectorAll('.ant-table td, .ant-table th').forEach((c) => {
+            if (c.scrollWidth > c.clientWidth + 1) {
+              const r = c.getBoundingClientRect()
+              if (r.width > 0 && r.top < window.innerHeight) bad.push((c.innerText || '').slice(0, 18))
+            }
+          })
+          return bad
+        })
+        check('VIS-表格不截断数据', trunc.length === 0, trunc.length ? `被截断: ${trunc.slice(0, 4).join(' | ')}` : '可见单元格无 scrollWidth 溢出')
+      }
+    } finally {
+      await vc.browser.close()
+    }
+  }
+
   // ── docs/11 导航上下文：从台点进项目，不许"换了个地方" ──
   // ★ 自建靶（不许"没数据就跳过"——那是休眠护栏，第九轮报告点过名）：
   //   用当前角色自己的台 + 真实点击链路，断言侧栏/台条/返回口三件事都没漂。

@@ -33,8 +33,13 @@ export default function DomainShell({ tabs, children }: { tabs: TabItem[]; child
   // ★ docs/11 §5-3：既不在任何台的路径下、又没有 ?from= → 这条台 Tab 与客户无关，不画
   //   （从「项目」列表点进详情时台条高亮为空 = 一堆点了会跳走的无关按钮，纯噪音）
   if (visible.length <= 1 || !active) {
-    // 只剩一项就没有“导航条”的意义了，直接渲染内容（少一条横条）
-    return <div className="domain-shell">{children ?? <Outlet />}</div>
+    // 只剩一项（或压根不属于任何台）就没有“导航条”的意义 —— 只省 nav，
+    // ★ 外壳与 .domain-content 必须照常渲染：e2e 与样式都挂在这个容器上
+    return (
+      <div className="domain-shell">
+        <div className="domain-content">{children ?? <Outlet />}</div>
+      </div>
+    )
   }
   return (
     <div className="domain-shell">

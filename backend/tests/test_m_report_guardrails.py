@@ -99,5 +99,21 @@ def test_m05_frontend_reflects_task_gate():
 
 
 def test_m05_frontend_gates_close_button():
-    src = _read(FE / "components" / "project" / "ProjectHeader.tsx")
-    assert "hasPerm('project:close')" in src, "关闭订单必须按 project:close 显示（非商务点了必 403）"
+    """关单按钮必须按 project:close 显示（非商务点了必 403）。
+
+    ★ 不写死文件名：详情页重构后「关闭订单」从 ProjectHeader 搬进了结论条
+      （components/project/ProjectSummaryBar.tsx），按文件锁会让重构必挂红。
+      改成扫这一层的所有组件：谁渲染「关闭订单」，谁就必须带权限判断。
+    """
+    d = FE / "components" / "project"
+    hits = [(f.name, f.read_text(encoding="utf-8")) for f in sorted(d.glob("*.tsx"))]
+    # 「入口」（能打开关单弹窗的地方）必须带门禁；弹窗本体由入口控制，只要求它提交前再判一次
+    entries = [(n, s) for n, s in hits if "关闭订单" in s and ("setCloseOpen(true)" in s or "Dropdown" in s)]
+    assert entries, "项目层找不到任何渲染「关闭订单」的组件 —— 入口丢了（AGENTS §8.5：做完了但找不到）"
+    bad = [n for n, s in entries if "hasPerm('project:close')" not in s]
+    assert not bad, f"这些**入口**渲染了「关闭订单」却没按 project:close 收口：{bad}"
+    # 提交函数所在页面（关单真正发请求的地方）也必须再判一次权限
+    page_src = (FE / "features" / "project" / "DetailPage.tsx").read_text(encoding="utf-8")
+    modals = [("features/project/DetailPage.tsx", page_src)]
+    bad2 = [n for n, s in modals if "hasPerm('project:close')" not in s]
+    assert not bad2, f"关单弹窗本体也要在提交前判一次权限（防将来新增入口绕过）：{bad2}"
