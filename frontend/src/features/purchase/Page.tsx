@@ -1,4 +1,4 @@
-import { App, Button, Card, Col, Empty, Row, Space, Table, Tabs, Tag, Typography } from 'antd'
+import { App, Button, Card, Empty, Space, Table, Tabs, Tag, Tooltip, Typography } from 'antd'
 import dayjs from 'dayjs'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import SuppliersPage from './SuppliersPage'
@@ -131,25 +131,15 @@ export default function PurchaseWorkbench() {
     void load()
   }
   return (
-    <Card title="采购工作台" extra={<Button onClick={() => void load()}>刷新</Button>}>
-      {/* 待办头（06 卷 §8）：进页面第一眼看到该处理什么 */}
-      <Row gutter={[12, 12]} style={{ marginBottom: 12 }}>
-        {[
-          { label: '采购池待下单', value: poolRequests, sub: `${pool.length} 种`, tab: 'pool', color: poolRequests ? T.brand : T.textDisabled },
-          { label: '在途采购单', value: openOrders.length, sub: '等货', tab: 'orders', color: openOrders.length ? T.orange : T.textDisabled },
-          { label: '验收不合格', value: failedReceipts.length, sub: '待跟供应商协商', tab: 'failed', color: failedReceipts.length ? T.error : T.textDisabled },
-          { label: '退换处理中', value: resolveReceipts.length, sub: '换货/退货', tab: 'resolve', color: resolveReceipts.length ? T.purple : T.textDisabled },
-          { label: '到货跟踪', value: arrivals.length, sub: overdueCount > 0 ? `${overdueCount} 单已超期` : '在途盯货', tab: 'arrivals', color: overdueCount > 0 ? T.error : T.warning },
-        ].map((s) => (
-          <Col xs={12} md={4} key={s.label}>
-            <Card size="small" hoverable onClick={() => setTab(s.tab)} style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: 12, color: T.textSecondary }}>{s.label}</div>
-              <div style={{ fontSize: 20, fontWeight: 600, color: s.color }}>{s.value}</div>
-              <div style={{ fontSize: 12, color: T.textDisabled }}>{s.sub}</div>
-            </Card>
-          </Col>
-        ))}
-      </Row>
+    <Card
+      title={
+        <Space>
+          <span>采购工作台</span>
+          {overdueCount > 0 && <Tag color="red">{overdueCount} 单到货已超期</Tag>}
+        </Space>
+      }
+      extra={<Button onClick={() => void load()}>刷新</Button>}
+    >
       <Tabs
         activeKey={tab}
         onChange={setTab}
@@ -160,10 +150,6 @@ export default function PurchaseWorkbench() {
             label: `待我审批 (${toApprove.length})`,
             children: (
               <>
-                <Typography.Paragraph type="secondary" style={{ fontSize: 12 }}>
-                  采购单提交后走<b>两级审批</b>：采购经理 → 采购总监（08 §4/§5）。点「审批」一屏看单头 +
-                  每行价格对比（本次价 vs <b>同口径</b>历史），通过或退回（退回必填说明）。审批通过后供应商即接单。
-                </Typography.Paragraph>
                 <Table
                   rowKey="key"
                   size="small"
@@ -198,7 +184,11 @@ export default function PurchaseWorkbench() {
           // ---------------------------------------------------------------- ① 采购池
           {
             key: 'pool',
-            label: `采购池 (${pool.length} 种 / ${poolRequests} 条)`,
+            label: (
+              <Tooltip title="先查仓库 → 缺的进池 → 攒一攒合并下单：勾选同类物料一起买，量大了价格才好谈、供应商也愿意一次送。手工申请（车间耗品/现场缺件/辅料）免审核，提交即进池。">
+                <span>采购池 ({pool.length} 种 / {poolRequests} 条)</span>
+              </Tooltip>
+            ),
             children: (
               <>
                 <Typography.Paragraph type="secondary" style={{ fontSize: 12 }}>

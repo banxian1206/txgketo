@@ -3,7 +3,6 @@ import {
   App,
   Button,
   Card,
-  Col,
   DatePicker,
   Descriptions,
   Drawer,
@@ -12,10 +11,8 @@ import {
   Input,
   InputNumber,
   Radio,
-  Row,
   Select,
   Space,
-  Statistic,
   Table,
   Tabs,
   Tag,
@@ -302,7 +299,13 @@ export default function Manufacturing() {
   const c = wb?.counts
   return (
     <Card
-      title="制造（S5）"
+      title={
+        <Space>
+          <span>制造（S5）</span>
+          {c?.overdue ? <Tag color="red">超期 {c.overdue}</Tag> : null}
+          {c?.transferred ? <Tag color="green">已转运 {c.transferred}</Tag> : null}
+        </Space>
+      }
       extra={
         <Typography.Text type="secondary" style={{ fontSize: 12 }}>
           只管两头：下发（原材料 + 图纸，拍照）→ 到期验收（拍照）→ 转运装配区（拍照）
@@ -312,15 +315,6 @@ export default function Manufacturing() {
       {!canGo && <Empty description="没有查看制造任务的权限（找管理员开 mfg:view）" />}
       {canGo && (
         <>
-          <Row gutter={12} style={{ marginBottom: 12 }}>
-            <Col span={3}><Statistic title="待下发" value={c?.wait ?? 0} /></Col>
-            <Col span={3}><Statistic title="在制" value={c?.running ?? 0} /></Col>
-            <Col span={3}><Statistic title="待转运" value={c?.to_transfer ?? 0} valueStyle={{ color: c?.to_transfer ? T.goldText : undefined }} /></Col>
-            <Col span={3}><Statistic title="返工" value={c?.rework ?? 0} valueStyle={{ color: c?.rework ? T.error : undefined }} /></Col>
-            <Col span={3}><Statistic title="超期" value={c?.overdue ?? 0} valueStyle={{ color: c?.overdue ? T.error : undefined }} /></Col>
-            <Col span={3}><Statistic title="外协在途" value={c?.outsource ?? 0} /></Col>
-            <Col span={3}><Statistic title="已转运" value={c?.transferred ?? 0} /></Col>
-          </Row>
           <Card size="small" title="生成排产单（按设备）" style={{ marginBottom: 12 }}>
             <Space wrap>
               <Select

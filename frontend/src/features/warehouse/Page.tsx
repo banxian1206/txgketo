@@ -5,7 +5,6 @@ import {
   Alert,
   Button,
   Card,
-  Col,
   DatePicker,
   Empty,
   Form,
@@ -13,10 +12,10 @@ import {
   InputNumber,
   Modal,
   Radio,
-  Row,
   Select,
   Space,
   Table,
+  Tooltip,
   Tabs,
   Tag,
   Typography,
@@ -63,7 +62,7 @@ export default function Warehouse() {
   const itemSearchTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   // ★ 重整 P0（docs/10 §3.2/§3.3）：页签条按**真实权限码**过滤，状态写进 URL（?tab=）
   const visKeys = filterTabs(WAREHOUSE_TABS).map((x) => x.key)
-  const [tab, setTab] = useTab(visKeys, 'todo')
+  const [tab, setTab] = useTab(visKeys, 'incoming')
   const [acceptOpen, setAcceptOpen] = useState(false)
   const [acceptTarget, setAcceptTarget] = useState<IncomingRow | null>(null)
   const [storeOpen, setStoreOpen] = useState(false)
@@ -234,93 +233,26 @@ export default function Warehouse() {
     <Card
       title={
         <Space>
-          <span>仓库</span>
+          <span>仓库工作台</span>
           <Typography.Text type="secondary" style={{ fontSize: 12, fontWeight: 400 }}>
-            库存 {wb?.stock.item_kinds ?? 0} 种 · 缺货 {wb?.stock.out_of_stock ?? 0}
+            {wb?.stock.out_of_stock ? <Tag color="red">缺货 {wb.stock.out_of_stock} 种</Tag> : <Typography.Text type="secondary" style={{ fontSize: 12, fontWeight: 400 }}>库存正常</Typography.Text>}
           </Typography.Text>
         </Space>
       }
       extra={<Button onClick={() => void load()}>刷新</Button>}
     >
-      {/* 待办头（06 卷 §8） */}
-      <Row gutter={[12, 12]} style={{ marginBottom: 12 }}>
-        {[
-          { label: '待验收', value: wb?.incoming.length ?? 0, hint: '货到了就验' },
-          { label: '待入库', value: wb?.pending_storage.length ?? 0, hint: '验收合格选库位' },
-          { label: '待领料', value: wb?.pending_issues.length ?? 0, hint: '备料/领走' },
-        ].map((s) => (
-          <Col xs={8} key={s.label}>
-            <Card size="small" hoverable onClick={() => setTab('todo')} style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: 12, color: T.textSecondary }}>{s.label}</div>
-              <div style={{ fontSize: 20, fontWeight: 600, color: s.value ? T.brand : T.textDisabled }}>{s.value}</div>
-              <div style={{ fontSize: 12, color: T.textDisabled }}>{s.hint}</div>
-            </Card>
-          </Col>
-        ))}
-      </Row>
       <Tabs
         activeKey={tab}
         onChange={setTab}
         items={[
           {
-            key: 'todo',
-            label: `待办 (${(wb?.incoming.length ?? 0) + (wb?.pending_storage.length ?? 0) + (wb?.pending_issues.length ?? 0)})`,
+            key: 'incoming',
+            label: (
+              <Tooltip title="分批送的货分批验收：合格 → 待入库；不合格 → 回采购「验收不合格」协商换货/退货">
+                <span>待验收 ({wb?.incoming.length ?? 0})</span>
+              </Tooltip>
+            ),
             children: (
-              <>
-                <Card size="small" title="生成领料单（按设备）" style={{ marginBottom: 12 }}>
-                  <Space wrap>
-                    <Select
-                      showSearch
-                      optionFilterProp="label"
-                      style={{ width: 260 }}
-                      placeholder="项目"
-                      value={genProject}
-                      onChange={(v: string | undefined) => void onGenProject(v)}
-                      options={genProjects.map((p) => ({
-                        value: p.project_no,
-                        label: `${p.project_no} ${p.project_name}`,
-                      }))}
-                    />
-                    <Select
-                      showSearch
-                      optionFilterProp="label"
-                      style={{ width: 220 }}
-                      placeholder="设备"
-                      value={genEquip}
-                      onChange={setGenEquip}
-                      options={genEquips.map((e) => ({
-                        value: e.equip_no,
-                        label: `${e.equip_no} ${e.equip_name}`,
-                      }))}
-                    />
-                    <Button
-                      type="primary"
-                      disabled={!canStore || !genProject || !genEquip}
-                      loading={genLoading}
-                      onClick={() => void doGenerateIssue()}
-                    >
-                      生成领料单
-                    </Button>
-                    <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-                      按设备展开：自制件的原材料 + 整台设备的标准件；缺料会标出来，生成后到下面「领料」里备料 → 车间领走。
-                    </Typography.Text>
-                  </Space>
-                  {genErr && (
-                    <Alert
-                      type="warning"
-                      showIcon
-                      closable
-                      style={{ marginTop: 10 }}
-                      message="生成领料单失败"
-                      description={genErr}
-                      onClose={() => setGenErr(null)}
-                    />
-                  )}
-                </Card>
-                <Typography.Title level={5}>① 验收（货到了就验：合格 / 不合格）</Typography.Title>
-                <Typography.Paragraph type="secondary" style={{ fontSize: 12 }}>
-                  分批送的货分批验收：合格 → 进「待入库」；不合格 → 回采购「验收不合格」协商换货/退货。
-                </Typography.Paragraph>
                 <Table<IncomingRow>
                   rowKey="id" size="small" loading={loading}
                   dataSource={wb?.incoming ?? []} pagination={false}
@@ -379,7 +311,16 @@ export default function Warehouse() {
                     },
                   ]}
                 />
-                <Typography.Title level={5} style={{ marginTop: 24 }}>② 入库（验收合格，选库位入库）</Typography.Title>
+            ),
+          },
+          {
+            key: 'storage',
+            label: (
+              <Tooltip title="验收合格的货选库位入库；入库后库存与出入库流水同时更新">
+                <span>待入库 ({wb?.pending_storage.length ?? 0})</span>
+              </Tooltip>
+            ),
+            children: (
                 <Table<StorageRow>
                   rowKey="id" size="small" loading={loading}
                   dataSource={wb?.pending_storage ?? []} pagination={false}
@@ -437,7 +378,67 @@ export default function Warehouse() {
                     },
                   ]}
                 />
-                <Typography.Title level={5} style={{ marginTop: 24 }}>③ 领料单（仓库备料 → 车间领走）</Typography.Title>
+            ),
+          },
+          {
+            key: 'issues',
+            label: (
+              <Tooltip title="按设备展开 BOM 生成领料单 → 仓库备料 → 车间领走；缺料会标出来，不再静默跳过">
+                <span>待领料 ({wb?.pending_issues.length ?? 0})</span>
+              </Tooltip>
+            ),
+            children: (
+              <>
+                <Card size="small" title="生成领料单（按设备）" style={{ marginBottom: 12 }}>
+                  <Space wrap>
+                    <Select
+                      showSearch
+                      optionFilterProp="label"
+                      style={{ width: 260 }}
+                      placeholder="项目"
+                      value={genProject}
+                      onChange={(v: string | undefined) => void onGenProject(v)}
+                      options={genProjects.map((p) => ({
+                        value: p.project_no,
+                        label: `${p.project_no} ${p.project_name}`,
+                      }))}
+                    />
+                    <Select
+                      showSearch
+                      optionFilterProp="label"
+                      style={{ width: 220 }}
+                      placeholder="设备"
+                      value={genEquip}
+                      onChange={setGenEquip}
+                      options={genEquips.map((e) => ({
+                        value: e.equip_no,
+                        label: `${e.equip_no} ${e.equip_name}`,
+                      }))}
+                    />
+                    <Button
+                      type="primary"
+                      disabled={!canStore || !genProject || !genEquip}
+                      loading={genLoading}
+                      onClick={() => void doGenerateIssue()}
+                    >
+                      生成领料单
+                    </Button>
+                    <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                      按设备展开：自制件的原材料 + 整台设备的标准件；缺料会标出来，生成后到下面「领料」里备料 → 车间领走。
+                    </Typography.Text>
+                  </Space>
+                  {genErr && (
+                    <Alert
+                      type="warning"
+                      showIcon
+                      closable
+                      style={{ marginTop: 10 }}
+                      message="生成领料单失败"
+                      description={genErr}
+                      onClose={() => setGenErr(null)}
+                    />
+                  )}
+                </Card>
                 <Table<IssueRow>
                   rowKey="id" size="small"
                   dataSource={wb?.pending_issues ?? []} pagination={false}

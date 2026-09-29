@@ -4,13 +4,10 @@ import {
   App,
   Alert,
   Card,
-  Col,
   Empty,
   Form,
-  Row,
   Select,
   Space,
-  Statistic,
   Table,
   Tabs,
   Tag,
@@ -38,7 +35,6 @@ import MfgPhotoPicker from '../../components/MfgPhotoPicker'
 import AppModal from '../../components/AppModal'
 import { SITE_ISSUE_STATUS as ISSUE_COLOR } from '../../theme/status'
 import { SITE_COMMISSION_STATUS as COMMISSION_COLOR } from '../../theme/status'
-import { T } from '../../theme/tokens'
 import { SITE_TABS, filterTabs } from '../../configs/tabs'
 import { useTab } from '../../hooks/useTab'
 import { useGoFrom } from '../../hooks/useFrom'
@@ -86,7 +82,13 @@ export default function Site() {
   const [tab, setTab] = useTab(visKeys, 'incoming')
   return (
     <Card
-      title="现场安装（S8）"
+      title={
+        <Space>
+          <span>现场安装（S8）</span>
+          {c?.daily_today ? <Tag color="blue">今日汇报 {c.daily_today}</Tag> : null}
+          {c?.debugging ? <Tag color="orange">调试中 {c.debugging}</Tag> : null}
+        </Space>
+      }
       extra={
         <Typography.Text type="secondary" style={{ fontSize: 12 }}>
           勘测 → 来货清点（含直发）→ 每日汇报（拍照/录视频）→ 申请调试；现场问题一律走变更
@@ -115,13 +117,6 @@ export default function Site() {
           message="现场录入请用手机端"
           description="勘测 / 每日汇报 / 现场问题 / 申请调试 都在手机端「现场」页录入（打开 /m/site，或手机浏览器加主屏）；本页用于查看进度与推进状态。"
         />
-        <Row gutter={12} style={{ marginBottom: 12 }}>
-            <Col span={4}><Statistic title="已勘测" value={c?.surveyed ?? 0} /></Col>
-            <Col span={4}><Statistic title="今日汇报" value={c?.daily_today ?? 0} /></Col>
-            <Col span={4}><Statistic title="待处理问题" value={c?.open_issues ?? 0} valueStyle={{ color: c?.open_issues ? T.error : undefined }} /></Col>
-            <Col span={4}><Statistic title="待派调试" value={c?.to_dispatch ?? 0} /></Col>
-            <Col span={4}><Statistic title="调试中" value={c?.debugging ?? 0} /></Col>
-          </Row>
           <Tabs
             activeKey={tab}
             onChange={setTab}

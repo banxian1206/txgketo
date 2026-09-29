@@ -406,5 +406,35 @@ const FEATS = path.join(SRC, 'features');
   check('VIS-等宽编号已启用', monoCols >= 1, `使用 CodeNo/NumCell 的文件数 = ${monoCols}`)
 }
 
+/* ══════════ 台类页统一壳（docs/12 §2-B · P2）══════════
+   实测过的病：台条「仓库工作台⑦」→ 卡标题「仓库」→ 3 张数字卡(4/2/1) → 页签「待办(7)」
+   —— 同一批事被数了两遍、标题重复三层，还互相矛盾（卡说库存 4 种、页签说库存 5）。 */
+{
+  // V4 单壳单标题：有页签的页面最多一个外层卡片标题
+  const bad = []
+  const walk = (d) => {
+    for (const f of fs.readdirSync(d)) {
+      const p2 = path.join(d, f)
+      if (fs.statSync(p2).isDirectory()) { walk(p2); continue }
+      if (!/Page\.tsx$/.test(f)) continue
+      const src = fs.readFileSync(p2, 'utf8')
+      if (!/<Tabs\b/.test(src)) continue
+      const outer = (src.match(/^\s{0,6}<Card title=/gm) || []).length + (src.match(/^\s{0,6}title=\{$/gm) || []).length
+      if (outer > 1) bad.push(`${p2.replace(SRC, 'src')} 外层标题 ${outer} 个`)
+    }
+  }
+  walk(path.join(SRC, 'features'))
+  check('SHELL-单壳单标题', bad.length === 0, bad.length ? bad.join('; ') : '带页签的页面都只有一个外层标题（不再台条+卡标题+小标题三层）')
+
+  // V5 计数单源：这些台已改为「页签带计数」，数字卡再回来就是双份计数
+  const CLEAN = ['features/purchase/Page.tsx', 'features/warehouse/Page.tsx', 'features/manufacturing/Page.tsx', 'features/site/Page.tsx']
+  const dup = CLEAN.filter((rel) => {
+    const f = path.join(SRC, rel)
+    return fs.existsSync(f) && /<Statistic\b/.test(fs.readFileSync(f, 'utf8'))
+  })
+  check('SHELL-计数单源', dup.length === 0,
+    dup.length ? `这些台又加了数字卡，与页签计数重复：${dup.join(', ')}` : '采购/仓库/制造/现场台计数只在页签上（独有指标已上标题徽标）')
+}
+
 const fails = summary('静态回归');
 exitWith(fails);

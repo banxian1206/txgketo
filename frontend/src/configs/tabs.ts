@@ -63,9 +63,11 @@ export const PURCHASE_TABS: TabDef[] = [
   { key: 'suppliers', label: '供应商', anyOf: ['purchase:view', 'purchase:edit'] },
 ]
 
-/** 仓库工作台（现状是一个「待办」页签装三块队列；拆成三页签留给 P2） */
+/** 仓库工作台 —— P2 已把「待办」拆成三个队列页签（与手机端 /m/warehouse 同构） */
 export const WAREHOUSE_TABS: TabDef[] = [
-  { key: 'todo', label: '待办', anyOf: ['warehouse:edit', 'warehouse:view'] },
+  { key: 'incoming', label: '待验收', anyOf: ['warehouse:edit'], writeOnly: true },
+  { key: 'storage', label: '待入库', anyOf: ['warehouse:edit'], writeOnly: true },
+  { key: 'issues', label: '待领料', anyOf: ['warehouse:edit'], writeOnly: true },
   { key: 'stock', label: '库存', anyOf: ['warehouse:view', 'warehouse:edit'] },
   { key: 'moves', label: '出入库流水', anyOf: ['warehouse:view', 'warehouse:edit'] },
   { key: 'locations', label: '库位', anyOf: ['warehouse:view', 'warehouse:edit'] },

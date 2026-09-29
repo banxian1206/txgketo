@@ -286,22 +286,29 @@ try {
             h: Math.round((document.querySelector('.domain-content') || document.body).scrollHeight),
             no: inFold('.ant-breadcrumb') || txt(document.body).slice(0, 400).includes('TX'),
             stage: inFold('.ant-tag'),
-            nextBtn: Array.from(document.querySelectorAll('button')).some((b) => b.getBoundingClientRect().top < vh && /成交登记|立项|进入设计|去发运|登记回款|质保金/.test(b.innerText)),
+            // 注意：antd 会给两字按钮自动插空格（「立 项」），比对前先去掉空白
+            nextBtn: Array.from(document.querySelectorAll('button')).some((b) => b.getBoundingClientRect().top < vh && /成交登记|立项|进入设计|去发运|登记回款|质保金/.test((b.innerText ?? '').replace(/\s+/g, ''))),
+            stageText: (document.querySelector('.ant-tag')?.innerText ?? ''),
             nums: (() => {
               const s = Array.from(document.querySelectorAll('*')).filter((e) => /设备|齐套|未收|客户/.test(e.textContent ?? '') && e.children.length <= 3)
               return s.length > 0 && s[0].getBoundingClientRect().top < vh
             })(),
           }
         })
-        check('VIS-详情首屏给结论', fold.stage && fold.nextBtn && fold.nums,
-          `首屏: 阶段=${fold.stage} 下一步=${fold.nextBtn} 关键数字=${fold.nums} · 页高 ${fold.h}px`)
+        // 终态（已关闭/已归档）本来就没有「下一步」—— 护栏按阶段判，不逼产品造出动作
+        const terminal = /已关闭|已归档/.test(fold.stageText ?? '')
+        check('VIS-详情首屏给结论', fold.stage && fold.nums && (fold.nextBtn || terminal),
+          `首屏: 阶段=${fold.stageText ?? fold.stage} 下一步=${fold.nextBtn}${terminal ? '(终态豁免)' : ''} 关键数字=${fold.nums} · 页高 ${fold.h}px`)
         check('VIS-详情页≤3屏', fold.h <= 2700, `页高 ${fold.h}px（改造前 7411px）`)
         // 结构断言比像素更敏感：默认只许展开**一段**泳道（全展开就是回到 9 屏平铺的老路）
         const openLanes = await vc.page.evaluate(() => document.querySelectorAll('.ant-collapse-item-active').length)
         check('VIS-默认只展开一段泳道', openLanes === 1, `默认展开 ${openLanes} 段（>1 就是又回到平铺）`)
         // 空值不占位：只读页面上的「—」是注意力黑洞（改造前光首屏就 3 个）
-        const dashes = await vc.page.evaluate(() => (document.querySelector('.domain-content')?.innerText.match(/—/g) ?? []).length)
-        check('VIS-空值不占位', dashes <= 6, `可见文本里「—」占位 ${dashes} 处`)
+        // 只判「字段区」：表格单元格留 — 是对的（行对齐需要占位），要治的是详情页那种
+        // 一整屏 label 配 — 的空字段（改造前首屏就 3 个）
+        const emptyFields = await vc.page.evaluate(() =>
+          Array.from(document.querySelectorAll('.ef-value')).filter((e) => (e.innerText ?? '').trim() === '—').length)
+        check('VIS-空值不占位', emptyFields === 0, `字段区仍有 ${emptyFields} 个「label : —」空占位`)
         const trunc = await vc.page.evaluate(() => {
           const bad = []
           document.querySelectorAll('.ant-table td, .ant-table th').forEach((c) => {
@@ -610,6 +617,9 @@ try {
   } else check('P-02', false, `找不到 ${poNo} 验收按钮`);
 
   // —— P-11：入库库位 = 下拉（有待入库行时）——
+  // ★ P2 之后仓库台拆成 待验收/待入库/待领料 三个页签（与手机端同构）→ 先看「待入库」这一栏
+  const storageTab = page.locator('.ant-tabs-tab').filter({ hasText: /待入库/ }).first()
+  if (await storageTab.count()) { await storageTab.click(); await page.waitForTimeout(900) }
   const storeBtn = page.getByRole('button', { name: /^\s*入\s*库\s*$/ }).first();
   if (await storeBtn.count()) {
     await storeBtn.click(); await page.waitForTimeout(700);
@@ -617,7 +627,7 @@ try {
     const locSel = await sm.locator('.ant-form-item').filter({ hasText: '库位' }).locator('.ant-select-selector').count();
     check('P-11', locSel > 0, locSel ? '库位=下拉' : '仍手填 Input');
     await page.keyboard.press('Escape');
-  } else check('P-11', false, '无待入库行（先跑 e2e_baseline 造数）');
+  } else check('P-11', false, '「待入库」页签里没有入库按钮（先跑 e2e_baseline 造数）');
 
   // —— P-05：新建项目申请验收 → 被「调试完成」门禁拦 ——
   await page.goto(BASE + '/acceptance', { waitUntil: 'networkidle' });
