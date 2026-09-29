@@ -25,11 +25,14 @@ def _code(rel: str) -> str:
 
 # ── 绑定规则 ────────────────────────────────────────────────────────────────
 def test_trigger_word_table():
-    assert PAYMENT_TRIGGERS == ("发货", "到货", "验收", "质保")
+    # 「立项」排在最前 —— 它是流程里最早的节点（预收款：**立项之后就开始提醒**，客户口径 2026-09-29）
+    assert PAYMENT_TRIGGERS == ("立项", "发货", "到货", "验收", "质保")
 
 
 def test_infer_from_node_name():
-    assert infer_trigger("预付款") is None  # 纯时间点，不挂业务节点
+    # ★ 客户口径 2026-09-29：预收款/预付款由**立项**触发（不是"不触发"）
+    assert infer_trigger("预收款") == "立项"
+    assert infer_trigger("预付款") == "立项"
     assert infer_trigger("发货款") == "发货"
     assert infer_trigger("到货款") == "到货"
     assert infer_trigger("验收款") == "验收"
@@ -52,7 +55,9 @@ def test_explicit_trigger_wins_and_invalid_is_rejected():
 
 # ── 钩子摆放（只提醒、不卡流程）────────────────────────────────────────────
 def test_hooks_are_wired():
+    init = _code("api/routes/initiation.py")
     ship = _code("services/shipping.py")
+    assert "trigger_for_initiate(" in init, "立项要提醒「预收款」（客户口径：立项之后就开始提醒）"
     assert "trigger_for_shipment(" in ship, "发运要提醒「发货款」"
     assert "trigger_for_arrival(" in ship, "到货要提醒「到货款」"
     acc = _code("services/acceptance.py")

@@ -301,6 +301,11 @@ def a_s1() -> None:
     api.req("post", f"/projects/{p}/initiate", "pm1")
     got = api.req("get", f"/projects/{p}", "pm1")
     rec(got["stage"] == "执行中", f"立项后阶段={got['stage']}", "应为「执行中」")
+    # ★ G2（客户口径 2026-09-29）：**立项 → 提醒商务部收「预收款」**（只提醒，不卡流程）
+    _ts0 = notif_titles("sales1")
+    _hit0 = [x for x in _ts0 if x.startswith("该收款了") and "立项" in x]
+    rec(bool(_hit0), "★ 立项 → 提醒商务部收「预收款」",
+        f"sales1 收到：{_hit0[0][:70]}" if _hit0 else f"未收到（现有 {len(_ts0)} 条消息）")
     # ★ pm_id 必须与项目角色同步（AGENTS §8.1）
     rec(got.get("pm_id") == USERS["pm1"],
         f"project.pm_id 与项目角色「项目经理」同步（pm_id={got.get('pm_id')}）",

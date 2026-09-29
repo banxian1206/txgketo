@@ -881,6 +881,9 @@ def initiate_project(
 
     old_stage = project.stage
     project.stage = project_stage.EXECUTING
+    # ★ G2（09 卷 §3 · 客户口径 2026-09-29）：立项 → **提醒商务部收「预收款」**（只提醒，不卡流程）
+    from app.services import payment as payment_svc
+    reminded = payment_svc.trigger_for_initiate(session, project_no, actor_id=current.id)
     audit.log(
         session,
         user=current,
@@ -891,7 +894,8 @@ def initiate_project(
         f"设备 {len(equipments)} 台、节点 {len(milestones)} 个、团队 {len(members)} 人、"
         f"长周期件 {len(long_lead)} 项、已分派任务 {len(tasks)} 条"
         + (f"、生成设备总装图 {roots_created} 张" if roots_created else "")
-        + (f"（其中 {len(not_ordered)} 项未下单）" if not_ordered else ""),
+        + (f"（其中 {len(not_ordered)} 项未下单）" if not_ordered else "")
+        + (f"；已提醒商务部收预收款（{reminded} 个节点）" if reminded else ""),
         detail={
             "changes": [
                 {"field": "stage", "label": "阶段", "old": old_stage, "new": "执行中"},

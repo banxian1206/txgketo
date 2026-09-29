@@ -22,6 +22,7 @@ from sqlalchemy.orm import Session
 
 from app.models.project import (
     PAYMENT_TRIGGERS,
+    PAY_TRIGGER_INITIATE,
     PAY_TRIGGER_ACCEPT,
     PAY_TRIGGER_ARRIVE,
     PAY_TRIGGER_SHIP,
@@ -34,6 +35,9 @@ from app.services.reviewers import director_in_dept
 
 # 关键词 → 业务节点（顺序敏感：先匹配更具体的前缀）
 _KEYWORD_RULES: tuple[tuple[str, str], ...] = (
+    # 预收款/预付款 → **立项**（客户口径 2026-09-29："预收款的提醒是立项，立项之后就开始提醒"）
+    ("预收", PAY_TRIGGER_INITIATE),
+    ("预付", PAY_TRIGGER_INITIATE),
     ("质保", PAY_TRIGGER_WARRANTY),
     ("验收", PAY_TRIGGER_ACCEPT),
     ("到货", PAY_TRIGGER_ARRIVE),
@@ -123,6 +127,11 @@ def remind(session: Session, project_no: str, node: str, *, actor_id: int | None
         actor_id=actor_id,
         dedup_key=key,
     )
+
+
+def trigger_for_initiate(session: Session, project_no: str, *, actor_id: int | None = None) -> int:
+    """★ 立项 → 提醒「预收款」（客户口径：立项之后就开始提醒）。"""
+    return remind(session, project_no, PAY_TRIGGER_INITIATE, actor_id=actor_id)
 
 
 def trigger_for_shipment(session: Session, project_no: str, *, actor_id: int | None = None) -> int:

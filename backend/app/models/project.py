@@ -140,11 +140,18 @@ class Project(Base, TimestampMixin):
 
 
 # ★ G2（09 卷 §3）：付款节点要**跟业务/物流节点对上** —— 客户：“我发了之后，就必须要催商务部的人去把这个款拿下来”
+PAY_TRIGGER_INITIATE = "立项"   # ★ 预收款：**立项之后就开始提醒**（客户口径 2026-09-29）
 PAY_TRIGGER_SHIP = "发货"
 PAY_TRIGGER_ARRIVE = "到货"
 PAY_TRIGGER_ACCEPT = "验收"
 PAY_TRIGGER_WARRANTY = "质保"
-PAYMENT_TRIGGERS = (PAY_TRIGGER_SHIP, PAY_TRIGGER_ARRIVE, PAY_TRIGGER_ACCEPT, PAY_TRIGGER_WARRANTY)
+PAYMENT_TRIGGERS = (
+    PAY_TRIGGER_INITIATE,
+    PAY_TRIGGER_SHIP,
+    PAY_TRIGGER_ARRIVE,
+    PAY_TRIGGER_ACCEPT,
+    PAY_TRIGGER_WARRANTY,
+)
 
 
 class PaymentTerm(Base, TimestampMixin):

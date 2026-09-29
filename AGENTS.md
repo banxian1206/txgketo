@@ -165,6 +165,9 @@ deploy/          docker-compose.dev.yml
   原因：5 个总监里**只有工程总监**有 `design:audit`；`director()` 无 `ORDER BY` 地取一个会落到
   销售/采购/仓库/总经理 → **单据永久没人能审**（“跨部门审批卡死”）。`director()` 只留作老数据兼容且已确定性。
   铁律：**审批必须在本部门之内走**；新的单据类型一律先定“它归哪个部门批”，再找那个部门的人。
+- ★ **付款节点 → 业务节点**（G2）：**预收款 → 立项**（客户口径 2026-09-29："预收款的提醒是立项，
+  立项之后就开始提醒"）· 发货款 → 发货 · 到货款 → 到货 · 验收款 → 验收 · 质保金 → 质保。
+  `PAYMENT_TRIGGERS = (立项, 发货, 到货, 验收, 质保)`；钩子：`initiate_project` / `depart` / `arrive` / `acceptance.confirm`。
 - ★ **收款提醒只发「项目自己的销售负责人 + 销售部总监」**（Q-2，2026-09-29）：不再群发 `SALES` 角色
   （销售多于 2 人时，每人都会被**别人项目**的催款打扰）；按**部门**找总监（`director_in_dept("SALES")`）。
   **每天每节点最多催一次**（`dedup_key="payment-remind:<项目>:<节点>:<日期>"`，`notify.daily_key` 统一生成）。
@@ -476,9 +479,9 @@ POST /api/v1/warehouse/inbound                    其他入库（退料回库/�
 ### 8.6 当前环境
 
 - 后端 :8208 · 前端 :5207 · PG 35432（`docker compose -f deploy/docker-compose.dev.yml up -d`，compose 顶层写死了 `name: txgketo`）
-- 测试：`.venv/bin/python -m pytest -q` → **155 passed**；e2e 基线 `.venv/bin/python -m scripts.e2e_baseline`（★ 跑前复位业务数据；只清业务表，账户/组织/编号规则不动）→ **问题 0 / 中断 0 / 通过 139**；
+- 测试：`.venv/bin/python -m pytest -q` → **155 passed**；e2e 基线 `.venv/bin/python -m scripts.e2e_baseline`（★ 跑前复位业务数据；只清业务表，账户/组织/编号规则不动）→ **问题 0 / 中断 0 / 通过 140**；
   隔离探针 `scripts/probe_bom_math.py` → **8/8**、`scripts/probe_n24_n25.py` → **20/20**；前端 `e2e:static 22` / **`e2e:api 15+0skip`** / **`e2e:ui 58+0skip`**（两套都自建靶，可复位后单跑）
-- alembic head：**`z2f4b6d80e91`**（到期扫描去重键）
+- alembic head：**`a3b5c7d91e02`**（预收款→立项）
 - ★ 套件**执行顺序**：`e2e_baseline` → `probe_n24_n25` → `probe_bom_math`（最后一个会 TRUNCATE 业务表，放最后）
 - 账号：admin / admin12345；演示账号密码 `txgk@123`（采购链：`buyer1` 组员 / `purchase_manager` 经理 / `purchase_director` 总监 —— 三级都要有，缺经理会全程自动跳级、两级审批退化成一级）
 

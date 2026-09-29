@@ -171,6 +171,7 @@ export default function DealModals({
                           allowClear
                           placeholder="对齐节点"
                           options={[
+                            { value: '立项', label: '立项' },
                             { value: '发货', label: '发货' },
                             { value: '到货', label: '到货' },
                             { value: '验收', label: '验收' },
