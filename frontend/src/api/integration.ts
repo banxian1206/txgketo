@@ -5,13 +5,28 @@ import { api } from './http'
  * `key` **永不回传原文** —— 只有 `has_key` 与掩码 `key_masked`。
  * 写入语义：不传 key = 保持原样 · 传空串 = 清空 · 传值 = 替换。
  */
+export interface OcrApi {
+  value: string
+  label: string
+  default_model?: string | null
+}
+
 export interface OcrConfig {
   api: 'none' | 'dashscope' | 'zhipu' | string
   model?: string | null
   has_key: boolean
   key_masked?: string | null
   key_source?: string
+  /** ★ 只表示"**配好了**"，**不代表能跑通** —— 能不能用看 `state` / `last_test` */
   available: boolean
+  /** 当前 api 的默认模型（服务端权威来源，别在前端写死） */
+  default_model?: string | null
+  /** 已知识别服务 + 各自默认模型（下拉与 placeholder 都从这里取） */
+  apis?: OcrApi[]
+  /** 上次「测试连接」的结果 */
+  last_test?: { at: string; ok: boolean; verdict: string } | null
+  /** unconfigured | unverified | verified | failed */
+  state: 'unconfigured' | 'unverified' | 'verified' | 'failed'
 }
 
 export interface OcrIntegrationIn {

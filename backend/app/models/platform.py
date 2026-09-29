@@ -149,8 +149,11 @@ class AuditLog(Base):
 #   新加一个键时，同时在这里登记 + 在 `services/settings.py` 里写清它能存什么。
 SETTING_OCR_API = "ocr.api"      # none / dashscope / zhipu
 SETTING_OCR_KEY = "ocr.key"      # ★ 敏感：接口**永不回传原文**，只能整体替换或清空
-SETTING_OCR_MODEL = "ocr.model"  # 如 qwen-vl-ocr / glm-ocr
-SETTING_KEYS = (SETTING_OCR_API, SETTING_OCR_KEY, SETTING_OCR_MODEL)
+SETTING_OCR_MODEL = "ocr.model"  # 如 glm-4v-flash / qwen-vl-ocr
+# ★ 「上次测试连接的结果」—— 因为 `available` 只说明"配没配"，**不说明"能不能用"**：
+#   实测踩过：Key 已失效但 available=true，面板显示「可用」，真调才 401。
+SETTING_OCR_LAST_TEST = "ocr.last_test"  # 形如 "<iso>|ok" / "<iso>|fail:<原因>"
+SETTING_KEYS = (SETTING_OCR_API, SETTING_OCR_KEY, SETTING_OCR_MODEL, SETTING_OCR_LAST_TEST)
 
 
 class AppSetting(Base, TimestampMixin):

@@ -51,3 +51,9 @@ export const ENG_BOARD_STATE: Record<string, string> = { 审核中: 'processing'
 export const NOTIF_TYPE: Record<string, string> = {  }
 
 export const WB_TYPE: Record<string, string> = {  }
+
+// OCR 外部集成的配置状态（第十轮 R-1/§3：`available` 只说明"配没配"，徽标要按 state 说实话）
+export const OCR_STATE: Record<string, string> = { unconfigured: 'default', unverified: 'warning', verified: 'success', failed: 'error' }
+
+// 配置状态的**人话**（与 OCR_STATE 成对，别在业务文件里各写一份）
+export const OCR_STATE_TEXT: Record<string, string> = { unconfigured: '未启用', unverified: '已配置（未验证）', verified: '已验证可用', failed: '上次测试失败' }

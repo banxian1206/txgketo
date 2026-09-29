@@ -182,7 +182,7 @@ def notif_titles(who: str) -> list[str]:
 
 
 def reset() -> None:
-    _reset_business.reset_business_data()
+    _reset_business.reset_business_data(hard=True)  # 基线要连主数据一起清（它随后自己重建）
     print("🧹 业务数据已清空")
 
 
@@ -1491,6 +1491,26 @@ def c_review_authz() -> None:
         f"返回：{str(bd)[:120]}")
 
 
+def c_ocr_authz() -> None:
+    """★ OCR 门禁（第十轮报告 R-1 建议）：**没有 warehouse:edit 不能调识别接口**。
+
+    ⚠ 本探针**绝不动 OCR 配置**（不 PUT、不清 Key）—— 第十轮那次事故就是探针用 PUT 清 Key 造成的。
+    """
+    probe("C5 拍照识别库位的门禁（OCR）")
+    png = bytes.fromhex(
+        "89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c489"
+        "0000000a49444154789c6360000002000154a24f5b0000000049454e44ae426082"
+    )
+    for who in ("buyer1", "site1", "pm1"):
+        sc, _bd = api.try_("post", "/warehouse/ocr/location", who, files={"file": ("p.png", png, "image/png")})
+        rec(sc == 403, f"反控：{who}（无 warehouse:edit）调识别 → HTTP {sc}（应 403）")
+    # 正控：仓库能拿到结构化返回（未配服务也应是 200 + available:false，而不是 403/500）
+    sc, bd = api.try_("post", "/warehouse/ocr/location", "wh1", files={"file": ("p.png", png, "image/png")})
+    ok = sc == 200 and isinstance(bd, dict) and "available" in bd and "candidates" in bd
+    rec(ok, f"正控：仓管调用 → HTTP {sc}（有 available/candidates，未配时 available=false）",
+        f"available={bd.get('available') if isinstance(bd, dict) else '?'}")
+
+
 def c_write_no_perm() -> None:
     probe("C3 只校验登录的写接口")
     p = CTX["p"]
@@ -1596,7 +1616,7 @@ def main() -> None:
 
     part("Part C · 授权探针")
     for fn in (c_authz_codes, c_review_authz, c_write_no_perm, c_money_scrub, c_longlead_no_perm,
-               c_archive, c_excel_import):
+               c_archive, c_excel_import, c_ocr_authz):
         try:
             fn()
         except Exception as exc:  # noqa: BLE001

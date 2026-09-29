@@ -58,7 +58,15 @@
 
 ⚠ **踩坑记录（护栏已钉住）**：「测试连接」原来拿 1×1 占位图去问，模型回「图片输入格式/解析错误」→
 被当成**连接不通**（误报）。**能收到它的结构化报错，恰恰说明端点+密钥都对** ——
-现在 `OcrError` 带 `kind`：`auth`/`network`/`format` 才算不通，**`input`（模型嫌图）算通**。
+现在 `OcrError` 带 `kind`：`auth`/`network`/`format` 才算不通，**`input`（模型嫌图）算通**；
+识别接口对 `input` 类**软失败**（200 + 空候选 + 提示"重拍"），不抛 400 让人误以为配置坏了。
+
+**`available` 是乐观值**（"配了"就是 true，**不代表能跑通**）→ `ocr_config()` 另下发
+`state`（`unconfigured/unverified/verified/failed`）与 `last_test`（「测试连接」会记结果）；
+面板徽标按 `state` 说实话（「已配置（未验证）」而不是「可用」）。状态色/人话进 `theme/status.ts`（`OCR_STATE`/`OCR_STATE_TEXT`）。
+**已知服务与默认模型由服务端下发**（`ocr_config().apis` / `default_model`）—— 前端**不许写死**模型名
+（曾写死已被证伪的 `glm-ocr`，第十轮 R-3）。
+
 （注：配置存 `app_setting`，**不在** e2e 复位的业务表里 → 复位不会清掉 key）
 
 ## 4. 每次会话的工作流程
@@ -508,12 +516,15 @@ POST /api/v1/warehouse/inbound                    其他入库（退料回库/�
 ### 8.6 当前环境
 
 - 后端 :8208 · 前端 :5207 · PG 35432（`docker compose -f deploy/docker-compose.dev.yml up -d`，compose 顶层写死了 `name: txgketo`）
-- 测试：`.venv/bin/python -m pytest -q` → **165 passed**；e2e 基线 `.venv/bin/python -m scripts.e2e_baseline`（★ 跑前复位业务数据；只清业务表，账户/组织/编号规则不动）→ **问题 0 / 中断 0 / 通过 140**；
+- 测试：`.venv/bin/python -m pytest -q` → **169 passed**；e2e 基线 `.venv/bin/python -m scripts.e2e_baseline`（★ 跑前复位业务数据；只清业务表，账户/组织/编号规则不动）→ **问题 0 / 中断 0 / 通过 144**；
   隔离探针 `scripts/probe_bom_math.py` → **8/8**、`scripts/probe_n24_n25.py` → **20/20**；前端 `e2e:static 22` / **`e2e:api 15+0skip`** / **`e2e:ui 58+0skip`**（两套都自建靶，可复位后单跑）
 - alembic head：**`b4c6d8e02f13`**（OCR 设置表）
 - ★ 套件**执行顺序**：`e2e_baseline` → `probe_n24_n25` → `probe_bom_math`（最后一个会 TRUNCATE 业务表，放最后）
 - ★ **e2e 跑完会留测试数据**（`e2e:api` / `e2e:ui` 的自建靶每轮建一个商机/批次）→ 想回到干净态跑
-  **`npm run e2e:clean`**（= `cd backend && .venv/bin/python -m scripts.reset_business_data`，
+  **`npm run e2e:clean`**（= `--yes`）/ **`npm run e2e:clean:dry`**（**只预演不删**）。
+  ⚠ **它会连主数据一起清**（物料档/供应商与报价/库位）—— 这是 `item.project_no → project` 外键决定的，
+  **绕不开**（`TRUNCATE project CASCADE` 必然带走物料档），所以保护手段是**默认预演、`--yes` 才真删**（第十轮 R-2）。
+  实现与 `e2e_baseline` 开头那次复位**共用一份**（
   与 `e2e_baseline` 开头那次复位**共用一份实现** `scripts/_reset_business.py`）。
   **保留**账号/组织/角色/标准库；**清掉**项目与全部单据 + 物料档 + 编号流水。
   ⚠ 不清的话多轮连跑会累积测试项目（第九轮报告 Q-5 的误判就是这么来的）

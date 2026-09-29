@@ -99,6 +99,7 @@ def test_test_connection_does_not_false_alarm_on_image_errors():
     原来被当成"连接不通"。**能收到它的结构化报错，说明端点+密钥都是对的**。"""
     src = _code("services/ocr.py")
     assert 'kind = "input"' in src, "400/422 且提到图片/格式 → kind=input"
+    assert 'available": True' in src and "hint" in src, "input 类要**软失败**（200 + 空候选 + 提示重拍）"
     assert 'kind="auth"' in src, "401/403 → kind=auth"
     p = _code("api/routes/platform.py")
     i = p.index("def test_ocr_integration(")
@@ -110,3 +111,66 @@ def test_network_and_auth_are_distinguishable():
     """网络层要单独归 kind=network（而不是和业务报错混在一起）。"""
     src = _code("services/ocr.py")
     assert 'kind="network"' in src and 'kind="format"' in src
+
+
+# ── R-1（第十轮报告）：把 OCR 的关键约定钉成护栏 ─────────────────────────────
+def test_unavailable_engine_degrades_without_touching_anything(monkeypatch):
+    """★ 未配置时**纯函数级**验证降级形态（**不碰真 Key** —— 报告的探针用 PUT 清 Key 验这条，
+    结果把管理员填的 Key 覆盖掉了，那正是我要避免的）。"""
+    from app.services import ocr, settings
+
+    monkeypatch.setattr(
+        settings, "ocr_config",
+        lambda _s: {"api": "none", "model": None, "available": False},
+    )
+    out = ocr.recognize_location(None, b"x")  # session 用不到（未配置时不该碰它）
+    assert out["available"] is False and out["candidates"] == []
+    assert out["hint"], "要给出可执行提示（去后台填 / 手动选库位）"
+
+
+def test_select_location_never_auto_fills_ocr_candidates():
+    """★★ 护**铁律 7**：前端必须「人工点选」才填入，**不许**把识别结果直接 onChange。
+
+    （第十轮报告 R-1 点名的风险：有人把 `SelectLocation` 改成 `onChange(candidates[0].code)`
+     自动填入 → 直接违反铁律⑦，而当时没有任何断言会红。）
+    """
+    p = ROOT / "frontend" / "src" / "components" / "fields" / "SelectLocation.tsx"
+    src = "\n".join(
+        ln for ln in p.read_text(encoding="utf-8").splitlines() if not ln.strip().startswith(("//", "*", "/*"))
+    )
+    # ① onChange 只允许出现在 apply() 里（唯一写入点）
+    assert src.count("onChange?.(") <= 1, "onChange 必须只有一个写入点（apply）"
+    i = src.index("onChange?.(")
+    seg = src[max(0, i - 400) : i]
+    assert "const apply" in seg, "onChange 只能出现在 apply() 里"
+    # ② apply 只能被「点击」触发，不能挂在 useEffect / 候选列表渲染上
+    assert "onClick={() => apply(" in src, "apply 必须由用户点击触发"
+    assert "useEffect" not in src[src.index("const apply") : src.index("onChange?.(")], (
+        "不许在 effect 里自动 apply（那就等于自动填值）"
+    )
+    # ③ 候选列表里只给「用它」链接（人点）
+    assert "用它" in src
+
+
+def test_ocr_endpoint_requires_warehouse_edit():
+    """仓管以外的角色不能调（第十轮 R-1 建议的第二条）。"""
+    src = _code("api/routes/warehouse.py")
+    i = src.index('"/ocr/location"')
+    assert 'require_permission("warehouse:edit")' in src[i : i + 400]
+
+
+def test_config_exposes_state_not_just_available():
+    """`available` 是乐观值（配了就是 true）—— 面板要按 `state` 说实话。"""
+    src = _code("services/settings.py")
+    i = src.index("def ocr_config(")
+    seg = src[i : i + 1400]
+    assert '"state"' in seg and '"last_test"' in seg, "要下发 state 与上次测试结果"
+    panel = (ROOT / "frontend" / "src" / "features" / "admin" / "IntegrationPanel.tsx").read_text(encoding="utf-8")
+    assert "OCR_STATE_TEXT" in panel and "from '../../theme/status'" in panel, (
+        "状态色/人话必须**从共享总表导入**（本地自己定义一份 = 绕过了 theme/status，也躲过 VIS-状态色Map 的初衷）"
+    )
+    assert 'placeholder="glm-ocr' not in panel, "placeholder 不许写死已被证伪的模型名（R-3）"
+    # 状态色/人话必须在**共享总表**里（静态护栏 VIS-状态色Map 也要求这样）
+    theme = (ROOT / "frontend" / "src" / "theme" / "status.ts").read_text(encoding="utf-8")
+    assert "OCR_STATE_TEXT" in theme and "已配置（未验证）" in theme, "配置状态的人话要进 theme/status.ts"
+    assert "OCR_STATE" in theme

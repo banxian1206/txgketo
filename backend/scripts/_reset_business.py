@@ -5,8 +5,12 @@
 跑完不清理 → 多轮连跑会累积一堆测试项目（我核对 Q-5 时就被坑过：9 个"单预付款"项目全是这么来的）。
 前端 e2e 是 Node，**不能直连库**（引 `pg` 就是新依赖），所以复位只能由后端提供 → 就是这里。
 
-保留的业务数据：**账号 / 组织 / 角色 / 权限 / 标准库类目**（都不在下面的表里）。
-清掉的：项目、单据、批次、通知、审计、**物料档（item）**、编号流水（`number_seq`，让编号从头开始）。
+保留的：**账号 / 组织 / 角色 / 权限 / 标准库类目**（都不在下面的表里）。
+
+★ **它会连主数据一起清**（第十轮报告 R-2 提醒的也正是这个）：物料档 / 供应商与报价与品类 / 库位。
+这是**外键决定的、绕不开**的 —— `item.project_no → project`，所以 `TRUNCATE project ... CASCADE`
+必然带走整个物料档；"只清一半"做不到。
+所以保护手段改成**默认预演**：CLI 不加 `--yes` 只打印"将要清什么"，不真删。
 """
 
 from __future__ import annotations
@@ -18,6 +22,10 @@ from sqlalchemy import create_engine, text
 DBURL = os.environ.get(
     "DATABASE_URL", "postgresql+psycopg://txgk:txgk@127.0.0.1:35432/txgk"
 )
+
+# ★ 主数据（**会被一起清掉**，列出来是为了在预演里明说，别让人以为是"业务单据"）
+#   注：它们本来就在 BUSINESS_TABLES 里；`item → project` 的外键还会把物料档 CASCADE 掉。
+MASTER_TABLES = ["item", "supplier_catalog", "supplier_quote", "supplier", "warehouse_location"]
 
 # 业务表（顺序无关，TRUNCATE ... CASCADE 一次搞定）
 BUSINESS_TABLES = [
@@ -35,9 +43,26 @@ BUSINESS_TABLES = [
 ]
 
 
-def reset_business_data() -> None:
-    """清空业务数据（**保留账号/组织/角色/标准库类目**），编号流水归零。"""
+def preview() -> dict:
+    """预演：**不删任何东西**，只报出将要清掉什么（含主数据）。"""
+    e = create_engine(DBURL)
+    out: dict[str, int] = {}
+    with e.connect() as c:
+        for t in ("project", "purchase_order", "goods_receipt", "shipment", "task", "notification", "audit_log"):
+            try:
+                out[t] = c.execute(text(f"SELECT count(*) FROM {t}")).scalar() or 0
+            except Exception:  # noqa: BLE001 —— 表不存在就跳过（预演不该因它失败）
+                continue
+        for t in MASTER_TABLES:
+            out[t] = c.execute(text(f"SELECT count(*) FROM {t}")).scalar() or 0
+    return out
+
+
+def reset_business_data(*, hard: bool = False) -> None:  # noqa: ARG001 —— 保留签名，当前两档一样
+    """清空业务数据（**保留账号/组织/角色/标准库类目**），编号流水归零。
+
+    ⚠ **主数据（物料档/供应商与报价/库位）也会被清掉** —— 见模块开头说明（外键决定，绕不开）。
+    """
     e = create_engine(DBURL)
     with e.begin() as c:
         c.execute(text(f'TRUNCATE TABLE {", ".join(BUSINESS_TABLES)} RESTART IDENTITY CASCADE'))
-        c.execute(text("DELETE FROM item"))

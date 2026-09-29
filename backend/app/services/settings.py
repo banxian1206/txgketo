@@ -19,6 +19,7 @@ from app.models.platform import (
     SETTING_KEYS,
     SETTING_OCR_API,
     SETTING_OCR_KEY,
+    SETTING_OCR_LAST_TEST,
     SETTING_OCR_MODEL,
     AppSetting,
 )
@@ -86,6 +87,38 @@ def set_value(session: Session, key: str, value: str | None, *, actor_id: int | 
     session.flush()
 
 
+# ★ 已知的识别服务 + 各自默认模型（**单一来源**：前端下拉与 placeholder 都从这里取，
+#   免得像之前那样在界面上写死一个已经被证伪的模型名 `glm-ocr`）
+KNOWN_APIS = (
+    {"value": "zhipu", "label": "智谱（glm-4v-flash）"},
+    {"value": "dashscope", "label": "通义千问（qwen-vl-ocr）"},
+)
+
+
+def ocr_apis() -> list[dict]:
+    return [
+        {"value": k["value"], "label": k["label"], "default_model": DEFAULT_MODELS.get(k["value"])}
+        for k in KNOWN_APIS
+    ]
+
+
+def remember_test(session: Session, *, ok: bool, note: str | None = None, actor_id: int | None = None) -> None:
+    """记下「上次测试连接」的结果（供面板显示）。"""
+    from datetime import UTC, datetime
+
+    stamp = datetime.now(UTC).isoformat(timespec="seconds")
+    set_value(session, SETTING_OCR_LAST_TEST, f"{stamp}|{'ok' if ok else 'fail'}", actor_id=actor_id)
+    session.flush()
+
+
+def last_test(session: Session) -> dict | None:
+    raw = get_raw(session, SETTING_OCR_LAST_TEST)
+    if not raw or "|" not in raw:
+        return None
+    at, verdict = raw.split("|", 1)
+    return {"at": at, "ok": verdict == "ok", "verdict": verdict}
+
+
 def ocr_config(session: Session) -> dict:
     """OCR 当前配置（**给接口用**：不含密钥原文）。
 
@@ -95,11 +128,25 @@ def ocr_config(session: Session) -> dict:
     key = get(session, SETTING_OCR_KEY)
     from_db = bool(get_raw(session, SETTING_OCR_KEY))
     model = get(session, SETTING_OCR_MODEL) or DEFAULT_MODELS.get(api)
+    configured = api in ("dashscope", "zhipu") and bool(key)
+    lt = last_test(session)
+    # ★ `available` = **配好了**（不代表能跑通！能跑通要看不 `last_test`）
+    #   状态机：未启用 → 已配置(未验证) → 验证通过 / **验证失败**
+    if not configured:
+        state = "unconfigured"
+    elif lt is None:
+        state = "unverified"
+    else:
+        state = "verified" if lt["ok"] else "failed"
     return {
         "api": api,
         "model": model,
         "has_key": bool(key),
         "key_masked": mask_secret(key),
         "key_source": "后台填写" if from_db else ("环境变量" if key else "未配置"),
-        "available": api in ("dashscope", "zhipu") and bool(key),
+        "available": configured,
+        "default_model": DEFAULT_MODELS.get(api),
+        "apis": ocr_apis(),
+        "last_test": lt,
+        "state": state,
     }

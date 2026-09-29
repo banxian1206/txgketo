@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from 'react'
 
 import { getOcrIntegration, setOcrIntegration, testOcrIntegration, type OcrConfig } from '../../api/integration'
 import { errMsg } from '../../api/client'
+import { OCR_STATE as STATE_COLOR, OCR_STATE_TEXT as STATE_TEXT } from '../../theme/status'
 
 /** 外部集成（OCR）—— 后台填 API Key 的入口。
  *
@@ -74,9 +75,8 @@ export default function IntegrationPanel() {
         title="当前状态"
         extra={
           <Space size={4}>
-            <Tag color={cfg?.available ? 'success' : 'default'}>
-              {cfg?.available ? '可用' : '未启用'}
-            </Tag>
+            {/* ★ 徽标按 state 说实话：`available` 只说明"配没配"，Key 失效时它仍是 true（实测踩过） */}
+            <Tag color={STATE_COLOR[cfg?.state ?? 'unconfigured']}>{STATE_TEXT[cfg?.state ?? 'unconfigured']}</Tag>
             <Button size="small" onClick={() => void doTest()} loading={testing} disabled={!cfg?.available}>
               测试连接
             </Button>
@@ -94,6 +94,16 @@ export default function IntegrationPanel() {
               ? <span>{cfg.key_masked} <Typography.Text type="secondary">（来源：{cfg.key_source}）</Typography.Text></span>
               : <Typography.Text type="secondary">未配置</Typography.Text>}
           </div>
+          <div>
+            上次测试：
+            {cfg?.last_test
+              ? <span>
+                  {cfg.last_test.ok ? '✅ 通过' : '❌ 失败'}
+                  <Typography.Text type="secondary">（{cfg.last_test.at.slice(0, 16).replace('T', ' ')}）</Typography.Text>
+                  {!cfg.last_test.ok && <Typography.Text type="danger"> —— 点「测试连接」看具体原因</Typography.Text>}
+                </span>
+              : <Typography.Text type="secondary">还没测过</Typography.Text>}
+          </div>
         </Space>
       </Card>
 
@@ -103,17 +113,18 @@ export default function IntegrationPanel() {
             <Select
               options={[
                 { value: 'none', label: '不启用' },
-                { value: 'zhipu', label: '智谱（glm-ocr）' },
-                { value: 'dashscope', label: '通义千问（qwen-vl-ocr）' },
+                // ★ 选项与默认模型都来自服务端（后端 `DEFAULT_MODELS` 是唯一来源），
+                //   避免前端写死一个已被证伪的模型名（曾经写成 glm-ocr）
+                ...(cfg?.apis ?? []).map((a) => ({ value: a.value, label: a.label })),
               ]}
             />
           </Form.Item>
           <Form.Item
             name="model"
             label="模型（可留空，留空用默认）"
-            extra="智谱默认 glm-ocr；通义默认 qwen-vl-ocr"
+            extra={cfg?.default_model ? `当前服务的默认模型：${cfg.default_model}` : '先选识别服务，默认可留空'}
           >
-            <Input placeholder="glm-ocr / qwen-vl-ocr" />
+            <Input placeholder={cfg?.default_model ?? '留空用默认'} />
           </Form.Item>
           <Form.Item
             name="key"

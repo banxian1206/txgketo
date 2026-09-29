@@ -17,17 +17,39 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))  # 让 "按路径跑" 与 "-m 跑" 都能 import scripts.*
 
-from sqlalchemy import create_engine, text
+from scripts._reset_business import reset_business_data, preview
 
-from scripts._reset_business import DBURL, reset_business_data
+
+MASTER_NOTE = {
+    "item": "物料档（标准件/原材料/自制件）",
+    "supplier": "供应商",
+    "supplier_quote": "供应商报价/历史价",
+    "supplier_catalog": "供应商能供品类",
+    "warehouse_location": "库位",
+}
 
 
 def main() -> None:
-    e = create_engine(DBURL)
-    with e.connect() as c:
-        n = c.execute(text("SELECT count(*) FROM project")).scalar() or 0
+    """跑法：`python -m scripts.reset_business_data [--yes]`
+
+    ★ **默认只预演**（不删）—— 因为它**连主数据一起清**（`item → project` 外键决定的，绕不开），
+    而这是给人手工敲的命令，手滑一次代价不小（第十轮报告 R-2）。
+    确认无误再加 `--yes`。
+    """
+    import sys
+
+    p = preview()
+    print("将要清空（**保留**账号/组织/角色/权限/标准库类目）：")
+    for k, v in p.items():
+        note = f"   ← {MASTER_NOTE[k]}" if k in MASTER_NOTE and v else ""
+        print(f"   {k:20s} {v}{note}")
+
+    if "--yes" not in sys.argv:
+        print("\n⚠ 以上都会删（**含主数据**：物料档/供应商/报价/库位）。确认请重跑：`--yes`")
+        return
+
     reset_business_data()
-    print(f"🧹 业务数据已复位（清掉 {n} 个项目及其全部单据）。账号/组织/角色/标准库不受影响。")
+    print("\n🧹 已复位。账号/组织/角色/权限/标准库类目不受影响。")
 
 
 if __name__ == "__main__":

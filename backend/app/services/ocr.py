@@ -129,7 +129,19 @@ def recognize_location(
         return {"engine": cfg["api"], "available": False, "model": cfg["model"], "candidates": [], "hint": "不认识这个识别服务"}
 
     key = settings.get(session, settings.SETTING_OCR_KEY) or ""
-    text = _call_openai_compatible(url, key, cfg["model"] or "", image, mime)
+    try:
+        text = _call_openai_compatible(url, key, cfg["model"] or "", image, mime)
+    except OcrError as e:
+        # ★ `kind=input`（模型嫌这张图：太小/格式）**不是"引擎坏了"** —— 引擎明明通了。
+        #   所以这里**软失败**（200 + 空候选 + 让人重拍的提示），
+        #   而不是抛 400 让人以为配置有问题。只有 auth/network/format 才是硬错误。
+        if getattr(e, "kind", "") == "input":
+            return {
+                "engine": cfg["api"], "available": True, "model": cfg["model"],
+                "candidates": [],
+                "hint": "这张照片没能识别（可能太小 / 格式不被支持）—— 请重拍库位标签，或手动选库位",
+            }
+        raise
     cands = _extract_codes(text)
     hint = "" if cands else "没认出库位编号，请重拍或手动选库位"
     return {
