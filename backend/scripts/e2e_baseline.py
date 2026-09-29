@@ -304,6 +304,27 @@ def _my_task(equip: str, prof_name: str, who: str) -> int:
     raise ApiError("GET", "my-design-tasks", who, 0, f"找不到 {equip}/{prof_name}")
 
 
+def _assert_review_authz() -> None:
+    """★ 评审审核授权负控 —— **自建靶**（第九轮报告 Q-1）。
+
+    原来放在 Part C：去"找一张审核中的单"，S2 早把评审单全发布了 → `if pend:` 没有 else，
+    **0 张时连 SKIP 都不计** —— 这条断言等于不存在（而 `ALLOW` 正是靠"service 层会校验审核人"
+    给 `POST /review-tickets/{id}/review` 免挂权限码的 → 那条声称**无人证明**）。
+    现在改成"**刚提交完就去断言**"：此刻单子必然在「待经理审/待总监审」，天然可测、无需找数据。
+    """
+    tks = api.req("get", "/review-tickets", "eng_director", params={"scope": "all"})
+    pend = [x for x in tks if x["status"] in ("待经理审", "待总监审")]
+    rec(len(pend) >= 1, f"自建靶：此刻有审核中的评审单 {len(pend)} 张（刚提交完，应 ≥1）",
+        "评审授权负控的前提")
+    if not pend:
+        return
+    tk = pend[0]
+    sc, bd = api.try_("post", f"/review-tickets/{tk['id']}/review", "wh1",
+                      json={"action": "通过", "note": "越权探针"})
+    rec(sc == 403, f"★ 仓管审工程评审单 → HTTP {sc}（应 403）",
+        f"单 {tk.get('ticket_no')}({tk['status']})；返回：{str(bd)[:160]}")
+
+
 def _review_pass(tid: int, who_submit: str) -> dict:
     """经理提交 → 总监通过（经理本人提交自动跳级）。"""
     tk = api.req("get", f"/tasks/{tid}/review-ticket", "eng_director")
@@ -360,6 +381,7 @@ def a_s2() -> None:
         "items": [{"item_type": "DRAWING", "item_ref": x} for x in (root, CTX["body"], CTX["cust"], CTX["out"])]
                  + [{"item_type": "BOM_DESIGN", "item_ref": str(CTX["bstd"])}],
         "note": "机械首版"})
+    _assert_review_authz()   # ★ 正值"待经理审/待总监审"，负控在这验（自建靶）
     tk = _review_pass(t, "mech_manager")
     rec(tk["status"] == "已发布", f"机械评审发布 status={tk['status']}", "总监通过后应为「已发布」")
 
@@ -1395,16 +1417,12 @@ def c_authz_codes() -> None:
 
 def c_review_authz() -> None:
     probe("C2 评审审核的授权码")
-    # 找一张审核中的评审单，用非审核人去过
-    tks = api.req("get", "/review-tickets", "eng_director", params={"scope": "all"})
-    pend = [t for t in tks if t["status"] in ("待经理审", "待总监审")]
-    note(f"审核中的评审单 {len(pend)} 张")
-    if pend:
-        t = pend[0]
-        sc, bd = api.try_("post", f"/review-tickets/{t['id']}/review", "wh1",
-                          json={"action": "通过", "note": "越权探针"})
-        rec(sc == 403, f"★ 仓管审工程评审单 → HTTP {sc}（应 403）",
-            f"返回：{str(bd)[:200]}\nreview_flow 抛 ReviewFlowError → 路由转 400")
+    # ★ 真正的负控已前移到 S2（`_assert_review_authz`）——提交完当场断言，天然有"审核中"的单。
+    #   这里不再"找现成的单"：Part C 时评审单早已全发布，`if pend:` 会静默空转（第九轮报告 Q-1）。
+    #   此段只做一次"事后仍不可越权"的补充确认（拿已发布的单，只应得 400「不在审核中」，不得 500）。
+    sc, bd = api.try_("post", "/review-tickets/1/review", "wh1", json={"action": "通过", "note": "事后探针"})
+    rec(sc in (400, 403, 404), f"事后补探：仓管审单 → HTTP {sc}（400/403/404 均可，不得 500）",
+        f"返回：{str(bd)[:120]}")
 
 
 def c_write_no_perm() -> None:
