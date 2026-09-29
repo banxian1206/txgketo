@@ -11,7 +11,8 @@
     "e2e:static": "node e2e/run.mjs static",
     "e2e:api": "node e2e/run.mjs api",
     "e2e:ui": "node e2e/run.mjs ui",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "e2e:clean": "cd ../backend && .venv/bin/python -m scripts.reset_business_data"
   },
   "dependencies": {
     "antd": "^5.21.6",

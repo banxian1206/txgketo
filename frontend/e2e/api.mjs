@@ -339,4 +339,6 @@ const wh1 = await apiLogin('wh1', 'txgk@123');
 }
 
 const fails = summary('API 回归');
+// ★ 本套件会留测试数据（自建靶建的商机/批次等）—— 跑完想回到干净态：
+console.log('   （本套件会留测试数据；复位：npm run e2e:clean）')
 exitWith(fails);

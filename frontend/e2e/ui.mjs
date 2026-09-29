@@ -903,4 +903,6 @@ try {
 
 const fails = summary('UI 回归');
 console.log(`\n（写链产生的测试项目: ${newNo} —— E2E 回归数据，可清理）`);
+// ★ 本套件会留测试数据（自建靶建的商机/批次等）—— 跑完想回到干净态：
+console.log('   （本套件会留测试数据；复位：npm run e2e:clean）')
 exitWith(fails);

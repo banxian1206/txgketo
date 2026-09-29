@@ -19,8 +19,15 @@ from datetime import date, timedelta
 import httpx
 from sqlalchemy import create_engine, text
 
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))  # 让 "按路径跑" 与 "-m 跑" 都能 import scripts.*
+
+from scripts import _reset_business  # 复位逻辑共用一份（scripts/_reset_business.py，见第九轮报告 §7.4）
+
 BASE = "http://127.0.0.1:8208/api/v1"
-DBURL = "postgresql+psycopg://txgk:txgk@127.0.0.1:35432/txgk"
+DBURL = _reset_business.DBURL
 TODAY = date.today()
 
 
@@ -150,19 +157,6 @@ USERS: dict[str, int] = {}
 LIB: dict[str, dict] = {}
 SUP: dict[str, dict] = {}
 
-BUSINESS_TABLES = [
-    "acceptance_document", "acceptance", "spare_part_move", "spare_part", "service_order",
-    "site_incoming", "site_commission", "site_issue", "site_daily", "site_survey", "site_receipt",
-    "shipment_item", "shipment_line", "shipment", "kitting_snapshot", "assembly_record",
-    "prod_acceptance", "prod_task", "prod_order", "outsource_task", "material_issue_line",
-    "material_issue", "stock_move", "stock_item", "warehouse_location", "goods_receipt",
-    "purchase_approval", "purchase_order_line", "purchase_order",
-    "purchase_request", "supplier_quote", "supplier_catalog", "supplier", "task",
-    "review_ticket_item", "review_action", "review_ticket", "design_release", "change_request",
-    "equipment_program_version", "equipment_program", "drawing_version", "drawing", "bom_item",
-    "milestone", "project_member", "equipment", "payment_term", "contact", "customer",
-    "project", "notification", "audit_log", "number_seq", "attachment",
-]
 
 
 def q(sql: str, **kw):
@@ -188,10 +182,7 @@ def notif_titles(who: str) -> list[str]:
 
 
 def reset() -> None:
-    e = create_engine(DBURL)
-    with e.begin() as c:
-        c.execute(text(f'TRUNCATE TABLE {", ".join(BUSINESS_TABLES)} RESTART IDENTITY CASCADE'))
-        c.execute(text("DELETE FROM item"))
+    _reset_business.reset_business_data()
     print("🧹 业务数据已清空")
 
 

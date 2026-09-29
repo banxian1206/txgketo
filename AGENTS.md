@@ -483,6 +483,11 @@ POST /api/v1/warehouse/inbound                    其他入库（退料回库/�
   隔离探针 `scripts/probe_bom_math.py` → **8/8**、`scripts/probe_n24_n25.py` → **20/20**；前端 `e2e:static 22` / **`e2e:api 15+0skip`** / **`e2e:ui 58+0skip`**（两套都自建靶，可复位后单跑）
 - alembic head：**`a3b5c7d91e02`**（预收款→立项）
 - ★ 套件**执行顺序**：`e2e_baseline` → `probe_n24_n25` → `probe_bom_math`（最后一个会 TRUNCATE 业务表，放最后）
+- ★ **e2e 跑完会留测试数据**（`e2e:api` / `e2e:ui` 的自建靶每轮建一个商机/批次）→ 想回到干净态跑
+  **`npm run e2e:clean`**（= `cd backend && .venv/bin/python -m scripts.reset_business_data`，
+  与 `e2e_baseline` 开头那次复位**共用一份实现** `scripts/_reset_business.py`）。
+  **保留**账号/组织/角色/标准库；**清掉**项目与全部单据 + 物料档 + 编号流水。
+  ⚠ 不清的话多轮连跑会累积测试项目（第九轮报告 Q-5 的误判就是这么来的）
 - 账号：admin / admin12345；演示账号密码 `txgk@123`（采购链：`buyer1` 组员 / `purchase_manager` 经理 / `purchase_director` 总监 —— 三级都要有，缺经理会全程自动跳级、两级审批退化成一级）
 
 ### 8.7 产品决策（2026-09-22，客户确认）
