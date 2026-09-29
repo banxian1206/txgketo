@@ -139,3 +139,25 @@ class AuditLog(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
+
+
+# ============================================================================
+# 系统设置（KV）—— 现在只有「外部集成 / OCR」在用
+# ============================================================================
+
+# ★ 允许写入的键**白名单**（防止这个 KV 变成什么都能塞的杂物间）。
+#   新加一个键时，同时在这里登记 + 在 `services/settings.py` 里写清它能存什么。
+SETTING_OCR_API = "ocr.api"      # none / dashscope / zhipu
+SETTING_OCR_KEY = "ocr.key"      # ★ 敏感：接口**永不回传原文**，只能整体替换或清空
+SETTING_OCR_MODEL = "ocr.model"  # 如 qwen-vl-ocr / glm-ocr
+SETTING_KEYS = (SETTING_OCR_API, SETTING_OCR_KEY, SETTING_OCR_MODEL)
+
+
+class AppSetting(Base, TimestampMixin):
+    """系统设置（K-V）。★ 敏感值（如 API Key）只存不读回原文，见 `services/settings.py`。"""
+
+    __tablename__ = "app_setting"
+
+    key: Mapped[str] = mapped_column(String(64), primary_key=True)
+    value: Mapped[str | None] = mapped_column(Text)
+    updated_by: Mapped[int | None] = mapped_column(ForeignKey("app_user.id"))

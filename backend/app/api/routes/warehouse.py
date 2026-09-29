@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status, File, UploadFile
 from pydantic import BaseModel, Field
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
@@ -33,6 +33,7 @@ from app.models.warehouse import (
     WarehouseLocation,
 )
 from app.services import audit
+from app.services import ocr as ocr_svc
 from app.services.bom_math import bom_line_demand, cumulative_qty
 from app.services.numbering import next_number, year_scope_key
 
@@ -703,6 +704,41 @@ def cancel_issue(
     )
     session.commit()
     return {"ok": True, "status": issue.status, "released": released}
+
+
+# ============================================================================
+# ③b 拍照识别库位（OCR · 铁律 7：结果**只作候选**，人工确认后才写库）
+# ============================================================================
+
+
+@router.post("/ocr/location")
+async def ocr_location(
+    file: UploadFile = File(..., description="库位标签照片"),
+    session: Session = Depends(get_session),
+    current: User = Depends(require_permission("warehouse:edit")),
+):
+    """拍一张库位标签 → 返回**候选**库位码（**不写库**）。
+
+    没配识别服务时返回 `available=false`（前端按钮置灰）—— **不假装能用**。
+    """
+    data = await file.read()
+    if not data:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "照片是空的")
+    if len(data) > 8 * 1024 * 1024:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "照片太大了（上限 8MB）")
+    try:
+        out = ocr_svc.recognize_location(session, data, mime=file.content_type or "image/jpeg")
+    except ocr_svc.OcrError as e:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, str(e)) from e
+    # 只记"识别了几个候选"，**不记图/不记 key**
+    if out["available"]:
+        audit.log(
+            session, user=current, action="ocr_location", object_type="warehouse_location",
+            object_ref="ocr",
+            summary=f"拍照识别库位（{out['engine']}/{out['model']}）：{len(out['candidates'])} 个候选",
+        )
+        session.commit()
+    return out
 
 
 # ============================================================================

@@ -17,6 +17,7 @@ import {
   Typography,
 } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
+import IntegrationPanel from './IntegrationPanel'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import { useAuth } from '../../contexts/AuthContext'
@@ -676,6 +677,11 @@ export default function Users() {
                 />
               </>
             ),
+          },
+          {
+            key: 'integration',
+            label: '外部集成',
+            children: <IntegrationPanel />,
           },
           {
             key: 'logs',

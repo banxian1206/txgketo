@@ -33,6 +33,22 @@
 | 手机端 | 同一套 Web 代码（响应式）+ 后续 Capacitor 打包 |
 | 部署 | Docker Compose 单机（**不要 Redis / 消息队列 / K8s**，30 人规模用不上） |
 
+### 3.1 ★ 唯一的外部依赖：OCR（**可选、默认关闭**）
+
+客户口径 2026-09-29：*"接 API…在后台给我一个入口，让我填写这个 API key 就可以了。"*
+这**突破了 §1 那句"不集成任何外部系统"** —— 所以按例外登记在这里：
+
+- **只做一件事**：入库时「**拍照识别库位号**」（智谱 `glm-ocr` / 通义 `qwen-vl-ocr`，两家都是 **OpenAI 兼容**格式）
+- **默认关闭**：`ocr.api` 默认 `none` → 前端按钮可用但会明确提示「未启用识别服务」，**不假装能用**
+- **Key 存哪**：`app_setting` 表（后台「用户与权限 → 外部集成」填），**接口永不回传原文**（只有 `has_key` + 掩码尾 4 位）
+- **谁能改**：**只有 `system:admin`**（仓管等一律 403）
+- **照片会出内网** → 已在前端与管理页**明示**（"库位标签照片会发到该厂商"）
+- **零新依赖**：只用一个 `httpx` POST（`services/ocr.py` 是**可插拔适配器**，换内网模型只改这一处）
+- **铁律 7 不变**：识别结果**只作候选**，用户点选后才填入（识别接口**不写库存**，有护栏钉住）
+
+> 内网兜底路线（客户要离线时）：把 `services/ocr.py` 的 `_call_openai_compatible` 指向**内网模型服务**
+> （OpenAI 兼容即可），**前端与路由一行不改**。
+
 ## 4. 每次会话的工作流程
 
 1. 读 §2 对应文档章节（**需求细节以文档为准**）
@@ -261,6 +277,7 @@ deploy/          docker-compose.dev.yml
 | # | 事项 | 说明 |
 |---|---|---|
 | **0** | ★★ **采购域重构 · 第 0 期（地基）** | ★ **进度（2026-09-28）**：★ **第 0 期 ✅ 全部完成**（① `bom_math.py` 六通道统一数量口径 + ② `_cover` 四项抵扣 + ③ 领料冻结/替代行过滤 + ④ 缺料显式化/超锁/负库存 + ⑤ 齐套率含直发件+项目过滤 + ⑥ e2e 基线入库）。**基线实测（`scripts/e2e_baseline.py`）：S0→S11 中断 0、问题 27→5（余 B1 拆单=一期 / B9 税口径=二三期）、通过 75；`scripts/probe_bom_math.py` 重复进池 8/8 全绿；`pytest 68 passed`。**<br>**方案：`docs/08-采购域重构方案.md` §8 / §13；实证：`docs/99-E2E测试报告-2026-09-28-…基线.md`。不依赖建表，可立即单独开工。**<br>① ★ **同一个「要几个」五个通道五种答案**：发布进池✓ / 手动补跑（图纸分支 **qty 平方**：实测 18 vs 真 6）/ 排产✓ / 齐套率（**不乘父级累计**，实测 4 项全少一半，rate=1.0 而真实约 54%）/ 领料（标准件分支**完全不乘**）→ 抽 `services/bom_math.py` 六处共用（**含发运清单 `shipping`——文档初稿漏的第 6 个通道**）<br>② ★ **净需求缺「已完成量」抵扣** → 四种场景重复进池（已隔离实证：直发件现场验收后新增 18 / 待入库窗口新增 8 / 已入库+已领走新增 5 / 发布后立刻补跑新增 4 条）——**AGENTS §8.1 承诺的幂等只在「刚发布未执行」时成立**<br>③ `generate_issue` 不过滤 `已冻结`/`superseded_by_id` → 按草稿 BOM 领料、改版后旧行仍领料<br>④ 缺料行静默跳过（MI26005 实测：已领走但 `qty_issued=0`、审计日志谎报「1 种物料」、齐套率仍判 ready）——★ **修它会暴露备料超锁/负库存（两者都无保护），必须同时修**<br>⑤ 三处越权已实测落库：`site1` 登记长周期件 **HTTP 201**（凭空一张 ¥54,000 采购单 PO26009）、`site1` 删采购需求 **HTTP 200**（真硬删、无审计）、`wh_director` 裁决工程部改版 **HTTP 200**<br>⑥ ★ **`scripts/multiproj_walkthrough.py` 已失效**（缺 `expected_date` 被 O3-A 拦下，P1/P3 在 S3 就 halted，S4–S11 从未执行）——**“有 e2e 护栏”目前是假的**；把 `/tmp/txgk_e2e.py`+`/tmp/txgk_isolate.py` 提升为 `scripts/e2e_baseline.py`/`probe_bom_math.py` 作为回归基线<br>★ **开工前口径已定（2026-09，见 `08 §14`）**：A 要 / B 要 / C 比价分「含税/不含税」两列 + 存量标含税 / **乙 齐套率必须含直发件**（`ARRIVED_STATUS` 补「现场已验收」+ 按项目过滤，见 `08 §8.3-g`）/ 甲 已入库退货 **挂起**（另立需求） |
+| **0m** | ★ **OCR 外部集成（拍照识别库位）✅（2026-09-29）** | 见 §3.1。`app_setting`（K-V，迁移 `b4c6d8e02f13`）+ `services/settings.py`（**掩码、白名单、DB > env 兜底**）+ `services/ocr.py`（可插拔适配器，智谱/通义 **OpenAI 兼容**）+ 接口：`GET/PUT /admin/integrations/ocr`（仅 `system:admin`）、`POST /admin/integrations/ocr/test`（连通性自检）、`POST /warehouse/ocr/location`（`warehouse:edit`，**只出候选不写库**）。<br>前端：管理页新增「**外部集成**」页签（填 key/模型/测试连接）；`SelectLocation` 统一加「📷 拍照识别」→ 候选 → **人工点选**才填（所有选库位的地方都受益）。<br>护栏 `tests/test_ocr_integration.py`(7)：密钥不回原文 · 只有超管能改 · 识别接口**不写库存** · 未配时 `available=false` · 审计不记 key 值 · 两家都是 OpenAI 兼容。**实测**：掩码无泄露 · 仓管 403 · 假 key → 400 指向重填（非 500）· 清 key 回落到 env |
 | **0l** | ★ **Excel/CSV 历史采购导入 ✅（2026-09-28）**（原 §8.3 第 1 条，客户已确认要做） |
 `POST /purchase/import-history`（`purchase:edit`）→ 写**价格库**（`supplier_quote`，`price_type=成交`、`source=历史导入`）。
 表头（顺序不限，中英文都行）：**物料 / 供应商 / 单价 / 数量 / 日期**，含税可选。库里没有的物料/供应商**自动建**（并在返回里列出让你核对）。
@@ -479,9 +496,9 @@ POST /api/v1/warehouse/inbound                    其他入库（退料回库/�
 ### 8.6 当前环境
 
 - 后端 :8208 · 前端 :5207 · PG 35432（`docker compose -f deploy/docker-compose.dev.yml up -d`，compose 顶层写死了 `name: txgketo`）
-- 测试：`.venv/bin/python -m pytest -q` → **155 passed**；e2e 基线 `.venv/bin/python -m scripts.e2e_baseline`（★ 跑前复位业务数据；只清业务表，账户/组织/编号规则不动）→ **问题 0 / 中断 0 / 通过 140**；
+- 测试：`.venv/bin/python -m pytest -q` → **162 passed**；e2e 基线 `.venv/bin/python -m scripts.e2e_baseline`（★ 跑前复位业务数据；只清业务表，账户/组织/编号规则不动）→ **问题 0 / 中断 0 / 通过 140**；
   隔离探针 `scripts/probe_bom_math.py` → **8/8**、`scripts/probe_n24_n25.py` → **20/20**；前端 `e2e:static 22` / **`e2e:api 15+0skip`** / **`e2e:ui 58+0skip`**（两套都自建靶，可复位后单跑）
-- alembic head：**`a3b5c7d91e02`**（预收款→立项）
+- alembic head：**`b4c6d8e02f13`**（OCR 设置表）
 - ★ 套件**执行顺序**：`e2e_baseline` → `probe_n24_n25` → `probe_bom_math`（最后一个会 TRUNCATE 业务表，放最后）
 - ★ **e2e 跑完会留测试数据**（`e2e:api` / `e2e:ui` 的自建靶每轮建一个商机/批次）→ 想回到干净态跑
   **`npm run e2e:clean`**（= `cd backend && .venv/bin/python -m scripts.reset_business_data`，

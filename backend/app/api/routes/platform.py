@@ -11,7 +11,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
-from app.api.deps import client_ip, get_current_user
+from app.api.deps import client_ip, get_current_user, require_permission
 from app.api.schemas import UserAdminOut, UserOut
 from app.core.db import get_session
 from app.core.security import hash_password
@@ -33,6 +33,8 @@ from app.models.program import EquipmentProgram
 from app.models.review import TICKET_PENDING, ReviewTicket
 from app.models.task import Task
 from app.services import audit
+from app.services import ocr as ocr_svc
+from app.services import settings as setting_svc
 
 router = APIRouter(tags=["平台"])
 
@@ -667,3 +669,89 @@ def handover_user(
     )
     session.commit()
     return {"ok": True, "moved": moved, "deactivated": body.deactivate}
+
+
+# ============================================================================
+# 外部集成（OCR）—— ★ 只有**系统管理员**能看/改；**密钥永不回传原文**
+# ============================================================================
+
+
+class OcrIntegrationIn(BaseModel):
+    """外部集成设置。`key` 语义：不传=保持原样 · 空串=清空 · 有值=替换。"""
+
+    api: str | None = None          # none / dashscope / zhipu
+    model: str | None = None
+    key: str | None = None
+
+
+@router.get("/admin/integrations/ocr")
+def get_ocr_integration(
+    session: Session = Depends(get_session),
+    _: User = Depends(require_permission("system:admin")),
+):
+    """读 OCR 配置。★ **绝不返回密钥原文** —— 只有 `has_key` 与掩码尾 4 位。"""
+    return setting_svc.ocr_config(session)
+
+
+@router.put("/admin/integrations/ocr")
+def set_ocr_integration(
+    body: OcrIntegrationIn,
+    request: Request,
+    session: Session = Depends(get_session),
+    current: User = Depends(require_permission("system:admin")),
+):
+    """写 OCR 配置（后台填 API Key 的入口）。
+
+    ★ 审计只记**改过哪个键**与**key 现在有没有**，**不记值**（`audit_log` 不是保险箱）。
+    """
+    payload = body.model_dump(exclude_unset=True)
+    if "api" in payload and payload["api"] and payload["api"] not in ("none", "dashscope", "zhipu"):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "识别服务只能是：none / dashscope（通义）/ zhipu（智谱）")
+    changed: list[str] = []
+    # ⚠ 注意：请求字段名（`api`/`model`/`key`）≠ 设置键名（`ocr.api`/`ocr.key`）——
+    #   写错过一版：拿 `SETTING_OCR_API` 去比对 payload 的键 → 永远不匹配 → **静默不写**。
+    for field, skey, label in (
+        ("api", setting_svc.SETTING_OCR_API, "识别服务"),
+        ("model", setting_svc.SETTING_OCR_MODEL, "模型"),
+        ("key", setting_svc.SETTING_OCR_KEY, "API Key"),
+    ):
+        if field in payload:
+            setting_svc.set_value(session, skey, payload[field], actor_id=current.id)
+            changed.append(label)
+    cfg = setting_svc.ocr_config(session)
+    audit.log(
+        session,
+        user=current,
+        action="update",
+        object_type="integration",
+        object_ref="ocr",
+        summary=f"外部集成（OCR）：改了 {'、'.join(changed) or '（无变化）'}"
+        + f"；识别服务={cfg['api']}；Key={'已设置' if cfg['has_key'] else '未设置'}"
+        + f"（{cfg['key_source']}）",
+        ip=client_ip(request),
+    )
+    session.commit()
+    return cfg
+
+
+@router.post("/admin/integrations/ocr/test")
+def test_ocr_integration(
+    session: Session = Depends(get_session),
+    _: User = Depends(require_permission("system:admin")),
+):
+    """**连通性自检**：拿一张 1×1 的占位图去问一次，看 key/端点通不通。
+
+    （不追求识别出内容 —— 目的是把"401 / 404 / 超时"这类问题在后台当场暴露，而不是等现场拍照才发现。）
+    """
+    if not setting_svc.ocr_config(session)["available"]:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "还没配识别服务或 API Key")
+    png_1px = bytes.fromhex(
+        "89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c489"
+        "0000000a49444154789c6360000002000154a24f5b0000000049454e44ae426082"
+    )
+    try:
+        out = ocr_svc.recognize_location(session, png_1px, mime="image/png")
+    except ocr_svc.OcrError as e:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, str(e)) from e
+    return {"ok": True, "engine": out["engine"], "model": out["model"],
+            "note": "端点与 Key 通了（这张 1×1 图识别不出库位是正常的）"}
