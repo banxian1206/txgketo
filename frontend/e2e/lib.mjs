@@ -100,6 +100,13 @@ export async function apiLogin(username, password, opts = {}) {
   const d = await r.json();
   return d.access_token;
 }
+export const apiPost = (url, token, body) =>
+  fetch(url.startsWith('http') ? url : `${API}/api/v1${url}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify(body ?? {}),
+  });
+
 export const apiGet = (url, token) => fetch(url.startsWith('http') ? url : `${API}/api/v1${url}`, {
   headers: token ? { Authorization: `Bearer ${token}` } : {},
 });

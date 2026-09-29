@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""护栏的护栏：`e2e/api.mjs` 不允许再出现「休眠断言」（SKIP）。
+"""护栏的护栏：`e2e/api.mjs` 与 `e2e/ui.mjs` 都不允许再出现「休眠断言」（SKIP）。
 
 来源：第八轮报告 §4 —— *"休眠的护栏永远绿 = 没有"*。
 当时 `api.mjs` 有 5 条断言靠"扫库碰运气"，数据不合就 `check(id, true, '...跳过', 'SKIP')`：
@@ -15,11 +15,13 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-API_MJS = Path(__file__).resolve().parents[2] / "frontend" / "e2e" / "api.mjs"
+E2E = Path(__file__).resolve().parents[2] / "frontend" / "e2e"
+# 两套 UI/API e2e 都在此列（新增套件时一并加进来）
+SUITES = ("api.mjs", "ui.mjs")
 
 
 def _src() -> str:
-    return API_MJS.read_text(encoding="utf-8")
+    return "\n".join((E2E / f).read_text(encoding="utf-8") for f in SUITES)
 
 
 def test_no_fake_green_skip():
@@ -31,21 +33,30 @@ def test_no_fake_green_skip():
     assert not bad, f"发现假绿（把失败当跳过）：{bad[:2]}"
 
 
-def test_api_suite_has_no_sleeping_assertions():
-    """★ `api.mjs` 必须 0 SKIP（自建靶，不靠残留数据）。
+def test_suites_have_no_sleeping_assertions():
+    """★ `api.mjs` / `ui.mjs` 都必须 0 SKIP（自建靶，不靠残留数据）。
 
     真要加跳过 → 先改这条护栏，并写清为什么这条**没法**造靶。
+    实测（2026-09-28）：两套都已做到 0 SKIP —— api `15 PASS`、ui `58 PASS`。
     """
-    hits = re.findall(r"'SKIP'", _src())
+    hits = []
+    for f in SUITES:
+        n = len(re.findall(r"'SKIP'", (E2E / f).read_text(encoding="utf-8")))
+        if n:
+            hits.append(f"{f}({n})")
     assert not hits, (
-        f"e2e/api.mjs 里还有 {len(hits)} 处 SKIP —— 休眠的断言永远是绿的，等于没测；"
-        "请改成自建靶（造数据 → 断言），不要靠扫库碰运气"
+        f"这些 e2e 套件里还有 SKIP：{hits} —— 休眠的断言永远是绿的，等于没测；"
+        "请改成自建靶（造数据 → 断言）：api 用 API 造，ui 用 API 造靶 + UI 断言"
     )
 
 
 def test_self_seeding_probes_are_present():
-    """三个自建靶的关键动作必须在（防止有人"清理"掉造数逻辑又变回扫库）。"""
+    """自建靶的关键动作必须在（防止有人"清理"掉造数逻辑又变回扫库）。"""
     src = _src()
     assert "purchase/manual-request" in src, "P-02 要自己造一条辅料（无项目）需求"
-    assert "assembly/records" in src, "R5 要自己造一台装配完成的设备"
-    assert "method: 'POST', headers:" in src and "/api/v1/projects" in src, "P-05 要自己建一个商机"
+    assert "assembly/records" in src, "R5 / P-08 要自己造装配记录"
+    assert "/api/v1/projects" in src, "P-05 要自己建一个商机"
+    # ui.mjs 的 P-08：造「已装车 + 部分已发」（靠登记未装零件凑出 ≥2 项）
+    ui = (E2E / "ui.mjs").read_text(encoding="utf-8")
+    assert "unassembled" in ui, "P-08 要造出「1 组装体 + N 零件」才能演示“部分已发”"
+    assert "request-vehicle" in ui, "P-08 造靶要走到装车（§2.2 采购叫车是前置）"

@@ -6,7 +6,7 @@
  *  Part 4 本轮口径：O1 侧栏不再重名 · R4-01 移动端已下线 PC-only 卡
  *  注意：本脚本会创建 1 个测试商机（E2E回归-*）并走完 建图/下单/验收，属护栏正常代价
  */
-import { newCtx, login, body, shot, check, summary, exitWith, results, BASE, API, FILES, apiLogin, apiGet } from './lib.mjs';
+import { newCtx, login, body, shot, check, summary, exitWith, results, BASE, API, FILES, apiLogin, apiGet, apiPost } from './lib.mjs';
 import path from 'node:path';
 
 const PHOTO = path.join(FILES, 'photo.png');
@@ -158,7 +158,7 @@ try {
       } catch { return null }
     })
     if (!counts) {
-      check('NAV-台Tab角标', true, '取 counts 失败（SKIP 语义）', 'SKIP')
+      check('NAV-台Tab角标', false, '取不到 counts —— 台角标无法验证（先跑 e2e_baseline 造数）')
     } else {
       const probes = [
         ['我的', counts.my_tasks + counts.to_review + counts.to_decide + counts.to_change],
@@ -176,7 +176,7 @@ try {
         else if (hasDigit) bad.push(`${name}台 counts=0 却显示(${line.trim()})`)
       }
       if (!anyPositive && bad.length === 0) {
-        check('NAV-台Tab角标', true, '业务台 counts 当前全 0（按设计不显示角标）— SKIP 语义通过', 'SKIP')
+        check('NAV-台Tab角标', false, '业务台 counts 全 0 —— 没角标可验（先跑 e2e_baseline 造数）')
       } else {
         check('NAV-台Tab角标', bad.length === 0, bad.length ? bad.join(' | ') : '角标数值与 counts 逐台一致（0 不显示）')
       }
@@ -519,7 +519,7 @@ try {
     const locSel = await sm.locator('.ant-form-item').filter({ hasText: '库位' }).locator('.ant-select-selector').count();
     check('P-11', locSel > 0, locSel ? '库位=下拉' : '仍手填 Input');
     await page.keyboard.press('Escape');
-  } else check('P-11', false, '无待入库行', 'SKIP');
+  } else check('P-11', false, '无待入库行（先跑 e2e_baseline 造数）');
 
   // —— P-05：新建项目申请验收 → 被「调试完成」门禁拦 ——
   await page.goto(BASE + '/acceptance', { waitUntil: 'networkidle' });
@@ -584,16 +584,53 @@ try {
     await page.keyboard.press('Escape');
   } else check('P-18', false, '无铃铛');
 
+  // —— P-08 ★自建靶：（原来"当前无「已装车」批次"就永远 SKIP —— 休眠的护栏永远绿 = 没有）
+  //   造一个「已装车 + **部分已发**」的批次：装配时登记未装零件 → 清单 = 1 组装体 + N 零件
+  //   → 只勾「组装体」一项（部分）→ 采购叫车 → 装车。
+  {
+    const pmTok = await apiLogin('pm1', 'txgk@123');
+    const buyerTok = await apiLogin('buyer1', 'txgk@123');
+    const shopTok = await apiLogin('shop1', 'txgk@123');
+    const ps2 = (await (await apiGet('/projects', pmTok)).json()) ?? [];
+    for (const p of (Array.isArray(ps2) ? ps2 : [])) {
+      const ts = (await (await apiGet(`/shipping/to-ship?project_no=${p.project_no}`, pmTok)).json()) ?? [];
+      if ((Array.isArray(ts) ? ts : []).some((r) => r.ready && !r.in_open_shipment)) continue;
+      const ov = (await (await apiGet(`/projects/${p.project_no}/design-overview`, pmTok)).json()) ?? [];
+      const cand = (Array.isArray(ov) ? ov : []).find((o) => (o.parts ?? 0) > 0);
+      if (!cand) continue;
+      const rec = await (await apiPost('/assembly/records', shopTok, { project_no: p.project_no, equip_no: cand.equip_no, sub_assembly: '整机装配' })).json();
+      if (!rec?.id) continue;
+      // ★ 登记 1 条未装零件 → 发运清单 = 组装体 + 1 零件 = 2 项，勾 1 项就是"部分已发"
+      const fin = await apiPost(`/assembly/records/${rec.id}/finish`, shopTok, {
+        unassembled: [{ ref: `P08-MISSING-${cand.equip_no}`, name: 'P-08 探针未装件', qty: 1 }],
+      });
+      if (fin.status >= 300) continue;
+      const ts2 = (await (await apiGet(`/shipping/to-ship?project_no=${p.project_no}`, pmTok)).json()) ?? [];
+      const row = (Array.isArray(ts2) ? ts2 : []).filter((r) => r.ready && !r.in_open_shipment)[0];
+      if (!row) continue;
+      const ins = await (await apiPost('/shipping/instructions', pmTok, { project_no: p.project_no, equip_nos: [row.equip_no] })).json();
+      if (!ins?.id) continue;
+      await apiPost(`/shipping/${ins.id}/items/generate`, pmTok, {});
+      const its = (await (await apiGet(`/shipping/${ins.id}/items`, pmTok)).json()) ?? [];
+      if (!Array.isArray(its) || its.length < 2) continue;  // 必须 ≥2 项才能"部分"
+      await apiPost(`/shipping/${ins.id}/request-vehicle`, buyerTok, { count: 1, fee: 500, note: 'P-08 探针叫车' });
+      await apiPost('/shipping/items/ship', pmTok, { item_ids: [its[0].id], photos: ['p08.png'] });
+      const ld = await apiPost(`/shipping/${ins.id}/load`, pmTok, { photos: ['p08-load.png'] });
+      if (ld.status < 300) break;
+    }
+  }
+
   // —— P-08：API 预查有批次的项目 → UI 精准选择（不遍历下拉：antd 虚拟滚动下 nth(i) 随数据规模失效）——
   await page.goto(BASE + '/shipping', { waitUntil: 'networkidle' });
   await page.waitForTimeout(900);
-  let p08 = 'SKIP', p08note = '当前无「已装车」批次（软提示由 UI 探针 Z 系列 + API R5 链覆盖）';
+  let p08 = 'FAIL', p08note = '当前无「已装车」批次（软提示由 UI 探针 Z 系列 + API R5 链覆盖）';
   {
     const tok = await apiLogin('pm1', 'txgk@123');
     const all = await (await apiGet('/shipping/list', tok)).json();
     // D3 收紧后「发运」只在「已装车」档出现（勾已发 → 装车 → 发运）
     const open = (Array.isArray(all) ? all : []).find((x) => x.status === '已装车');
-    if (open && open.project_no) {
+    if (!open) { p08 = 'FAIL'; p08note = '自建靶失败：没能造出「已装车 + 部分已发」的批次'; }
+    else if (open.project_no) {
       const projSel = page.locator('.ant-select-selector').first();
       await projSel.click(); await page.waitForTimeout(400);
       await page.keyboard.type(open.project_no); await page.waitForTimeout(700);
@@ -611,7 +648,7 @@ try {
           else { p08 = 'FAIL'; p08note = '有确认框但无清单提示: ' + txt.slice(0, 80); }
           await page.keyboard.press('Escape');
         }
-      } else { p08note = `批次 ${open.shipment_no}(${open.status}) 行内无发运链接`; }
+      } else { p08 = 'FAIL'; p08note = `批次 ${open.shipment_no}(${open.status}) 行内无发运链接`; }
     }
   }
     check('P-08', p08 === 'PASS', p08note, p08);
@@ -764,7 +801,7 @@ try {
       const u = await page.locator('.ant-modal-content input#username').inputValue().catch(() => '');
       check('PREFILL-用户编辑', !!u, u ? `username=${u}` : '账号未预填');
       await closeModal();
-    } else check('PREFILL-用户编辑', true, '无编辑入口', 'SKIP');
+    } else check('PREFILL-用户编辑', false, '无编辑入口');
 
     // 供应商编辑
     await page.goto(BASE + '/suppliers', { waitUntil: 'networkidle' }); await page.waitForTimeout(1200);
@@ -774,7 +811,7 @@ try {
       const n = await page.locator('.ant-modal-content input#name').inputValue().catch(() => '');
       check('PREFILL-供应商编辑', !!n, n ? `name=${n}` : '名称未预填');
       await closeModal();
-    } else check('PREFILL-供应商编辑', true, '无编辑入口', 'SKIP');
+    } else check('PREFILL-供应商编辑', false, '无编辑入口');
 
     // 标准库物料编辑
     await page.goto(BASE + '/library', { waitUntil: 'networkidle' }); await page.waitForTimeout(1200);
@@ -784,9 +821,12 @@ try {
       const u2 = await page.locator('.ant-modal-content input#unit').inputValue().catch(() => '');
       check('PREFILL-标准库编辑', !!u2, u2 ? `unit=${u2}` : '单位未预填');
       await closeModal();
-    } else check('PREFILL-标准库编辑', true, '无编辑入口', 'SKIP');
+    } else check('PREFILL-标准库编辑', false, '无编辑入口');
 
     // 装配开始（PC）
+    // ★ 装配是车间/装配的活（mfg:edit）—— 工程总监本来就看不到「开始装配」，
+    //   用他断言等于把"看不到"当"没入口"（休眠）。换真能干这活的角色。
+    await login(page, 'assy1', 'txgk@123');
     await page.goto(BASE + '/assembly', { waitUntil: 'networkidle' }); await page.waitForTimeout(1400);
     const sel = page.locator('.ant-select').first();
     if (await sel.count()) { await sel.click(); await page.waitForTimeout(400); const opt = page.locator('.ant-select-item-option').first(); if (await opt.count()) { await opt.click(); await page.waitForTimeout(1200); } }
@@ -795,7 +835,7 @@ try {
       await asm.click(); await page.waitForTimeout(700);
       const checked = await page.locator('.ant-modal-content .ant-radio-button-wrapper-checked').innerText().catch(() => '');
       check('PREFILL-装配开始', /整机装配/.test(checked), checked ? `装配形态=${checked.trim()}` : '未预选整机装配');
-    } else check('PREFILL-装配开始', true, '无开始装配入口', 'SKIP');
+    } else check('PREFILL-装配开始', false, '装配角色也看不到「开始装配」入口（是 bug，不是跳过）');
     // 现场来货清点（PC）：默认结论「齐」必须预选（曾先设后开丢值，护栏也只认 destroyOnHidden 而漏扫）
     let projWithIncoming = null;
     const toks = await apiLogin('pm1', 'txgk@123');
@@ -808,8 +848,10 @@ try {
       const inc = await (await apiGet(`/site/incoming?project_no=${p.project_no}`, toks)).json();
       if ((inc.pending ?? []).length) { projWithIncoming = p.project_no; break; }
     }
-    if (!projWithIncoming) check('PREFILL-现场清点', true, '无待清点直发行，跳过', 'SKIP');
+    if (!projWithIncoming) check('PREFILL-现场清点', false, '找不到含待清点直发行的项目');
     else {
+      // ★ 清点是现场的活（site:edit）—— 前面的角色看不到「清点验收」，换现场的人来断言
+      await login(page, 'site1', 'txgk@123');
       await page.goto(BASE + '/delivery/site', { waitUntil: 'networkidle' }); await page.waitForTimeout(1400);
       await page.locator('.ant-select-selector').first().click(); await page.waitForTimeout(400);
       await page.keyboard.type(projWithIncoming); await page.waitForTimeout(900);
@@ -817,7 +859,7 @@ try {
       const tab = page.locator('.ant-tabs-tab').filter({ hasText: /来货清点/ }).first();
       if (await tab.count()) { await tab.click(); await page.waitForTimeout(1200); }
       const link = page.locator('a').filter({ hasText: /清点验收/ }).first();
-      if (!(await link.count())) check('PREFILL-现场清点', true, '该行无清点入口，跳过', 'SKIP');
+      if (!(await link.count())) check('PREFILL-现场清点', false, '现场角色也看不到清点入口（是 bug，不是跳过）');
       else {
         await link.click(); await page.waitForTimeout(900);
         const ck = (await page.locator('.ant-modal-content .ant-radio-button-wrapper-checked').first().innerText().catch(() => '')).replace(/\s+/g, '');
