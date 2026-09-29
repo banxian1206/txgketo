@@ -24,9 +24,13 @@ from app.models.platform import (
 )
 
 # 各家的默认模型（后台只填 key 也能跑起来）
+# ★ 默认模型（实测 2026-09-29）：
+#   · dashscope → qwen-vl-ocr（专用 OCR，走标准 chat+image_url）
+#   · zhipu     → **glm-4v-flash** —— 注意 ** 不能走 chat 格式**（它会报
+#     "OCR仅支持PDF/JPG/PNG/JPEG"），那是智谱**文件级 OCR 接口**，与这里的 OpenAI 兼容调用不兼容
 DEFAULT_MODELS = {
     "dashscope": "qwen-vl-ocr",
-    "zhipu": "glm-ocr",
+    "zhipu": "glm-4v-flash",
 }
 # 环境变量兜底（部署时可用，但后台填的优先）
 ENV_KEYS = {

@@ -752,6 +752,12 @@ def test_ocr_integration(
     try:
         out = ocr_svc.recognize_location(session, png_1px, mime="image/png")
     except ocr_svc.OcrError as e:
+        # ★ 关键：模型说「**图片**有问题」= **鉴权与端点都通了**（它只是在嫌这张 1×1 测试图）。
+        #   否则会误报"连接不通" —— 实测踩过：glm-4v-flash 对 1×1 图回「图片输入格式/解析错误」。
+        if getattr(e, "kind", "") == "input":
+            return {"ok": True, "engine": setting_svc.ocr_config(session)["api"],
+                    "model": setting_svc.ocr_config(session)["model"],
+                    "note": "端点与 Key 通了（这张 1×1 测试图模型会报「图片格式」，属正常）"}
         raise HTTPException(status.HTTP_400_BAD_REQUEST, str(e)) from e
     return {"ok": True, "engine": out["engine"], "model": out["model"],
             "note": "端点与 Key 通了（这张 1×1 图识别不出库位是正常的）"}

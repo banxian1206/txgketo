@@ -37,7 +37,19 @@ PROMPT = (
 
 
 class OcrError(Exception):
-    """OCR 调用失败（网络/鉴权/返回格式）。"""
+    """OCR 调用失败（网络/鉴权/返回格式）。
+
+    `kind` 用来区分**是哪种**失败 —— 「测试连接」要据此判断：
+    · `auth`    密钥不对 / 过期      → **不通**
+    · `network` 连不上 / 超时        → **不通**
+    · `format`  返回不是 OpenAI 兼容 → **不通**
+    · `input`   模型说**图片**有问题  → **通了**！（能收到它的结构化报错，说明端点+密钥都对）
+                  典型：拿 1×1 占位图去问，模型回「图片输入格式/解析错误」
+    """
+
+    def __init__(self, message: str, *, kind: str = "http") -> None:
+        super().__init__(message)
+        self.kind = kind
 
 
 def _extract_codes(text: str) -> list[dict]:
@@ -80,16 +92,22 @@ def _call_openai_compatible(url: str, key: str, model: str, image: bytes, mime: 
             timeout=30.0,
         )
     except httpx.HTTPError as e:  # 网络层
-        raise OcrError(f"调用识别服务失败：{type(e).__name__}") from e
-    if r.status_code == 401:
-        raise OcrError("识别服务的 API Key 不对（401）—— 请到「用户与权限 → 外部集成」重新填")
+        raise OcrError(f"调用识别服务失败：{type(e).__name__}", kind="network") from e
+    if r.status_code in (401, 403):
+        raise OcrError("识别服务的 API Key 不对或没权限（401/403）—— 请到「用户与权限 → 外部集成」重新填", kind="auth")
     if r.status_code >= 400:
         # ⚠ 不回显请求（含 base64 图）与 Authorization；只截一小段响应体
-        raise OcrError(f"识别服务返回 {r.status_code}：{r.text[:180]}")
+        body = r.text[:180]
+        # 400/422：多半是它嫌**图片**（太小/太大/格式），说明鉴权已经过了 → kind=input
+        lower = body.lower()
+        kind = "input" if r.status_code in (400, 422) and any(
+            k in lower for k in ("图片", "image", "format", "格式", "解析", "file", "文件")
+        ) else "http"
+        raise OcrError(f"识别服务返回 {r.status_code}：{body}", kind=kind)
     try:
         return (r.json()["choices"][0]["message"]["content"] or "")
     except (KeyError, IndexError, ValueError) as e:
-        raise OcrError("识别服务返回的格式看不懂（不是 OpenAI 兼容？）") from e
+        raise OcrError("识别服务返回的格式看不懂（不是 OpenAI 兼容？）", kind="format") from e
 
 
 def recognize_location(

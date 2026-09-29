@@ -84,3 +84,29 @@ def test_endpoints_are_openai_compatible():
     assert src.count("/chat/completions") == 2
     assert "dashscope.aliyuncs.com" in src and "open.bigmodel.cn" in src
     assert "image_url" in src and "base64" in src
+
+
+# ── 失败分类：别把"模型嫌图"误报成"连接不通"（实测踩过）────────────────────
+def test_ocr_error_carries_a_kind():
+    from app.services.ocr import OcrError
+
+    assert OcrError("x").kind == "http"
+    assert OcrError("x", kind="auth").kind == "auth"
+
+
+def test_test_connection_does_not_false_alarm_on_image_errors():
+    """★ 实测踩过：拿 1×1 占位图问 glm-4v-flash，它回「图片输入格式/解析错误」→
+    原来被当成"连接不通"。**能收到它的结构化报错，说明端点+密钥都是对的**。"""
+    src = _code("services/ocr.py")
+    assert 'kind = "input"' in src, "400/422 且提到图片/格式 → kind=input"
+    assert 'kind="auth"' in src, "401/403 → kind=auth"
+    p = _code("api/routes/platform.py")
+    i = p.index("def test_ocr_integration(")
+    seg = p[i : i + 2000]
+    assert 'getattr(e, "kind", "") == "input"' in seg, "测试连接要把 input 类错误当「通了」"
+
+
+def test_network_and_auth_are_distinguishable():
+    """网络层要单独归 kind=network（而不是和业务报错混在一起）。"""
+    src = _code("services/ocr.py")
+    assert 'kind="network"' in src and 'kind="format"' in src
