@@ -22,6 +22,7 @@ import { TASK_STATUS as TASK_STATUS_COLOR } from '../../theme/status'
 import { T } from '../../theme/tokens'
 import { ENG_TABS, filterTabs } from '../../configs/tabs'
 import { useTab } from '../../hooks/useTab'
+import { useGoFrom } from '../../hooks/useFrom'
 
 const PROFS = ['机械', '电气', '程序', '工艺']
 
@@ -29,6 +30,8 @@ const PROFS = ['机械', '电气', '程序', '工艺']
 export default function EngWorkbench() {
   const { message } = App.useApp()
   const nav = useNavigate()
+  // ★ docs/11：跳去别的域时带上 ?from= （来源台/来源页），回来还在原来那一层
+  const go = useGoFrom()
   const [me, setMe] = useState<WorkbenchMe | null>(null)
   const [board, setBoard] = useState<EngBoard | null>(null)
   const [myTasks, setMyTasks] = useState<TaskItem[]>([])
@@ -86,7 +89,7 @@ export default function EngWorkbench() {
       key: 'equip',
       width: 150,
       render: (_: unknown, r) => (
-        <a onClick={() => r.equip_no && nav(`/projects/${r.project_no}/design/${r.equip_no}`)}>
+        <a onClick={() => r.equip_no && go(`/projects/${r.project_no}/design/${r.equip_no}`)}>
           {r.project_no} {r.equip_no ?? ''}
         </a>
       ),
@@ -128,7 +131,7 @@ export default function EngWorkbench() {
       title: '操作',
       key: 'action',
       width: 90,
-      render: () => <a onClick={() => nav('/workbench/reviews')}>去处理</a>,
+      render: () => <a onClick={() => go('/workbench/reviews')}>去处理</a>,
     },
   ]
 
@@ -138,7 +141,7 @@ export default function EngWorkbench() {
       key: 'equip',
       width: 200,
       render: (_: unknown, r) => (
-        <a onClick={() => nav(`/projects/${r.project_no}/design/${r.equip_no}`)}>
+        <a onClick={() => go(`/projects/${r.project_no}/design/${r.equip_no}`)}>
           {r.project_no} {r.equip_no} {r.equip_name}
         </a>
       ),

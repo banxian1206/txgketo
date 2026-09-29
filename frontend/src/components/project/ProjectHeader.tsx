@@ -20,6 +20,7 @@ import {
   type DesignOverviewRow,
   type ProjectDetail as Detail,
 } from '../../api/client'
+import { useBack } from '../../hooks/useFrom'
 
 export default function ProjectHeader({
   NEXT_HINT,
@@ -43,13 +44,15 @@ export default function ProjectHeader({
   projectNo: any;
 }) {
   const nav = useNavigate()
+  // ★ docs/11：从台里点进来的，返回口要回**那个台**（并回到原来那个页签）；没有来源时行为完全不变
+  const back = useBack('/projects', '← 返回列表')
   return (
     <>
       <Card style={{ marginBottom: 16 }} styles={{ body: { padding: '16px 20px' } }}>
         <Row align="middle" gutter={16}>
           <Col flex="auto">
             <Space size={8} wrap>
-              <a onClick={() => nav('/projects')}>← 返回列表</a>
+              <a onClick={() => nav(back.to)}>{back.label}</a>
               <Typography.Text strong style={{ fontSize: 16 }}>
                 {p.project_no}
               </Typography.Text>

@@ -1,6 +1,7 @@
 import { Link, Outlet, useLocation } from 'react-router-dom'
 
 import { hasPerm } from '../../api/user'
+import { contextPath } from '../../hooks/useFrom'
 
 import type { TabItem } from '../../configs/domain'
 
@@ -13,6 +14,8 @@ import type { TabItem } from '../../configs/domain'
  */
 export default function DomainShell({ tabs, children }: { tabs: TabItem[]; children?: React.ReactNode }) {
   const loc = useLocation()
+  // ★ 有 ?from= 时按来源高亮（从采购台点进项目详情，台条仍应指出「采购工作台」）
+  const here = contextPath(loc.pathname, loc.search)
   // ★ 重整 P0（docs/10 §3.2）：域/台这一层也按**真实权限码**过滤 ——
   //   原来 6 项「交付执行」谁都看全，现场/售后角色点进去就是空表或 403。
   const visible = tabs.filter((x) => !('anyOf' in x) || !x.anyOf?.length || x.anyOf.some((c) => hasPerm(c)))
@@ -23,8 +26,8 @@ export default function DomainShell({ tabs, children }: { tabs: TabItem[]; child
     tabs
       .filter(
         (t) =>
-          loc.pathname === t.path ||
-          (t.path !== '/' && loc.pathname.startsWith(t.path + '/')),
+          here === t.path ||
+          (t.path !== '/' && here.startsWith(t.path + '/')),
       )
       .sort((a, b) => b.path.length - a.path.length)[0]?.path ?? ''
   if (visible.length <= 1) {

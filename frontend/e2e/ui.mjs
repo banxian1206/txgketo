@@ -259,6 +259,39 @@ try {
       `台内页签条=${innerTabs.length}（应 0）· 卡片深链 → /workbench/tasks=${urlOk} · 内容挂载=${contentOk}`)
   }
 
+  // ── docs/11 导航上下文：从台点进项目，不许"换了个地方" ──
+  // ★ 自建靶（不许"没数据就跳过"——那是休眠护栏，第九轮报告点过名）：
+  //   用当前角色自己的台 + 真实点击链路，断言侧栏/台条/返回口三件事都没漂。
+  {
+    const nc = await newCtx()
+    try {
+      await login(nc.page, 'sales1', 'txgk@123')
+      await nc.page.goto(BASE + '/workbench/sales', { waitUntil: 'networkidle' })
+      await nc.page.waitForTimeout(1200)
+      const tabsBefore = await nc.page.locator('.domain-tabs a').count()
+      const row = nc.page.locator('.ant-table-row').first()
+      let url = '', sideSel = '', tabsAfter = 0, backTxt = '', backUrl = ''
+      if (await row.count()) {
+        await row.click()
+        await nc.page.waitForTimeout(1400)
+        url = nc.page.url()
+        sideSel = (await nc.page.locator('.ant-menu-item-selected').first().innerText().catch(() => '')).replace(/\s+/g, ' ').trim()
+        tabsAfter = await nc.page.locator('.domain-tabs a').count()
+        backTxt = await nc.page.locator('a').filter({ hasText: /^←/ }).first().innerText().catch(() => '')
+        const bk = nc.page.locator('a').filter({ hasText: /^← 返回/ }).first()
+        if (await bk.count()) { await bk.click(); await nc.page.waitForTimeout(1200); backUrl = nc.page.url() }
+      }
+      // （台里没项目行也必须红 —— 不许「没数据就跳过」的休眠护栏）
+      check('NAV-drill-in 带来源', url.includes('from='), url ? `点项目行 → ${url.replace(BASE, '')}` : '台里没有可点的项目行')
+      check('NAV-侧栏不被抢走', sideSel.includes('工作台'), `侧栏选中=「${sideSel}」（曾是「项目」）`)
+      check('NAV-台条不消失', tabsBefore >= 1 && tabsAfter === tabsBefore, `台条 ${tabsBefore} → ${tabsAfter}`)
+      check('NAV-返回口是来源台', /返回.*(工作台|列表)/.test(backTxt) && backTxt.includes('商务部'), `返回口=「${backTxt}」`)
+      check('NAV-点返回回原台', backUrl.includes('/workbench/sales'), backUrl.replace(BASE, '') || '（返回口没点动）')
+    } finally {
+      await nc.browser.close()
+    }
+  }
+
   // ── B1 三角色开台（拍板④）：发运/现场/售后各见自己的台 + 台Tab直达交付域 ──
   {
     const roles = [['delivery1', '发运工作台'], ['site1', '现场工作台'], ['service1', '售后工作台']]

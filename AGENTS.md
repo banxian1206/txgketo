@@ -186,6 +186,12 @@ deploy/          docker-compose.dev.yml
   因为采购台「到货跟踪」的排序/超期红/临期黄全靠这个字段（手工单无周期 → 不强制就会整屏「未约期」）
 - ★ **状态枚举 = 契约**：给单据新增一个状态值（如到货单「现场待验收」）必须同步进 `RECEIPT_STATUS`/`SHIP_STATUS` 等词表，
   否则就是“实现跑出了契约里没有的状态”（`tests/test_status_contract.py` 兰住）
+- ★ **drill-in 必须带来源 `?from=`**（客户实测：商务部台点项目，侧栏跳去「业务→项目」→ docs/11）：
+  「我从哪个台进来」这一维过去**不存在**，于是侧栏被前缀反推抢走、台条整条消失、返回口把人踢出台。
+  规则：跨域跳转一律用 `hooks/useFrom.useGoFrom()` 的 `go(path)`（不许裸 `nav('/projects…')`）；
+  侧栏与台/域条高亮一律走 `contextPath()`；详情页/设计面/立项/新建的返回口一律 `useBack()`
+  （有来源=「← 返回某某工作台」并回原页签，无来源才用默认）；手机端底部条用 `ALL_TABS[].match` 归位；
+  `RequirePerm` 无权限时弹回**来时的台**。**来源放 URL 不放 router state**（刷新/收藏/新标签要还在，且 e2e 断言得到）。
 - ★ **业务线只在「工作台」里跑，不再设「按流程分段」的域**（客户口径 2026-09-29，docs/10 §8.1 D1–D3）：
   一个角色一台，`WORKBENCHES`（后端）是台清单的**唯一事实源**，侧栏/域壳不许再造一层导航；
   「属于谁就放谁那」——供应商/价格参考在采购台、库位在仓库台；**PC 端不做客户验收签认**（动线在手机端）。
@@ -267,6 +273,7 @@ deploy/          docker-compose.dev.yml
 | **改版申请 ECN（05 卷 P6）** | ✅ | `models/change.py` + `services/change_flow.py`（申请/裁决/下发/修订/影响面/完成）+ `routes/changes.py`；图纸/程序/BOM 行的 new-version 被门禁拦住（必须先批准并下发）；BOM 替代行 `superseded_by_id`（旧行排除出需求）；`pages/Changes.tsx`、`components/ChangeRequestModal.tsx`/`ChangeDetailModal.tsx` |
 | **移动端 / 工作台（05 卷 P7）** | ✅ | `GET /drawings/{no}/file`、`/programs/{id}/file`（电子图纸/程序下载）；`goods_receipt.photos` + `POST/GET /goods-receipts/{id}/photos`；`routes/mobile.py`（`/m/home`、`/m/materials/{id}`）；`layouts/MobileLayout.tsx` + `pages/m/*`（仓库验收动线：看图→拍照→合格/不合格→入库；领料）；`utils/image.ts` 前端压缩；PWA manifest |
 | **用户·角色·组织（06 卷 A 步）** | ✅ | 岗位三级 + `title`（迁移 `d0f4a6c83b25`）；组织增改停用 `POST/PATCH /orgs`；`GET /my-scope`；用户管理按部门范围（总监只能管本部门/只能勾本部门角色）；审核链 `director_for`（按部门找总监）+ 自动跳级；`pages/Users.tsx`（用户 / 组织架构 / 角色说明 三页签） |
+| **★ 导航上下文（docs/11）** | ✅ | `hooks/useFrom.ts`：`useGoFrom` 给 19 处跨域跳转带上 `?from=<来源含页签>`；`contextPath` 让侧栏选中与台/域条按来源高亮；`useBack` 出「← 返回商务部工作台」并回原页签（无来源保持原文案）；四个项目相关页挂进 `WorkbenchShell`（台条不再消失、URL 未变）；`MobileLayout` 底部条加 `match`（`/m/accept` 归回「仓库」）；`RequirePerm` 无权限时弹回**来时的台**。护栏 `e2e:ui` 5 条（自建靶，**注入反例自证能红**：去掉 from → 12 项掉到 3 通过 9 失败） |
 | **★ 后台信息架构重整（docs/10 · P0/P1/P3）** | ✅ | **「交付执行」域已删除**：业务线只在「台」里跑（`WORKBENCHES` 是唯一事实源，含发运/现场/售后三台），侧栏 **5→4 项**（工作台·项目·基础数据·用户与权限）；制造/装配**唯一入口=车间工作台**（旧 `/delivery/mfg` 等 redirect 一跳，站内引用已换新路径）。页签统一机制：`configs/tabs.ts` 注册表 + `filterTabs()` 按**真实权限码**过滤 + `hooks/useTab.ts`（`?tab=` 深链，15 页一致）；「我的工作台」不再自带页签条（曾一屏叠 4 条），待办卡直接深链到「台+页签」。**派生权限码** `admin:users`/`admin:audit`（`deps.effective_permissions ← platform._scope`）随登录下发 → 前端一律 `hasPerm(...)`，**不再用 `position==='总监'` 猜岗位**（那曾让 4 总监+gm 看得到「外部集成」、点了必 403）。`App.tsx` 加 **`RequirePerm` 路由守卫**（无权限回工作台，不再白屏）；`GET /users` 对非管理者**降级视图**（无 roles/permissions/phone），`GET /audit-logs` 全局需 `admin:audit`（总监只看本部门子树）、**按对象查仍放行**（项目详情「操作记录」在用）。护栏：`e2e:static` 4 条（一屏一条页签条／页签必须来自注册表／可见性不猜岗位／anyOf 码必须真实，**均注入反例自证能红**）+ `tests/test_tab_permissions.py` 前后端码对账 + 基线 `C6 后台读接口的门禁与降级视图` 5 条 |
 | **工作台框架（06 卷 B 步）** | ✅ | `GET /workbench/me`（可见工作台 + 待办数字 + 我的项目）；侧栏三分组 + 按角色显示工作台；登录默认进「我的工作台」；`pages/Workbench.tsx` + `pages/workbench/DeptWorkbench.tsx`（部门台统一外壳）；`routes/workbench.py` |
 | **站内消息 + 红点（06 卷 C 步）** | ✅ | `models/notify.py` + `services/notify.py` + `routes/notifications.py`；触发钩子：任务派工/转派/拆分、评审提交/通过/退回/发布、改版申请/裁决/下发/完成、验收合格→仓库·不合格→采购·直发现场→项目经理、**入库完成→采购+项目经理**、发布进采购池；**发布扇出**（项目团队全员 + 下游工艺 + 采购）；`components/NotificationsDrawer.tsx` + 顶栏铃铛红点（PC/移动端 60s 轮询）+ **我的工作台消息区**；**经理空缺自动跳级**、改版裁决通知只发申请人所在部门的总监、移动端消息链接映射 |
@@ -527,7 +534,7 @@ POST /api/v1/warehouse/inbound                    其他入库（退料回库/�
 
 - 后端 :8208 · 前端 :5207 · PG 35432（`docker compose -f deploy/docker-compose.dev.yml up -d`，compose 顶层写死了 `name: txgketo`）
 - 测试：`.venv/bin/python -m pytest -q` → **174 passed**；e2e 基线 `.venv/bin/python -m scripts.e2e_baseline`（★ 跑前复位业务数据；只清业务表，账户/组织/编号规则不动）→ **问题 0 / 中断 0 / 通过 149**；
-  隔离探针 `scripts/probe_bom_math.py` → **8/8**、`scripts/probe_n24_n25.py` → **20/20**；前端 `e2e:static 26` / **`e2e:api 15+0skip`** / **`e2e:ui 58+0skip`**（两套都自建靶，可复位后单跑）
+  隔离探针 `scripts/probe_bom_math.py` → **8/8**、`scripts/probe_n24_n25.py` → **20/20**；前端 `e2e:static 26` / **`e2e:api 15+0skip`** / **`e2e:ui 63+0skip`**（两套都自建靶，可复位后单跑）
 - alembic head：**`b4c6d8e02f13`**（OCR 设置表）
 - ★ 套件**执行顺序**：`e2e_baseline` → `probe_n24_n25` → `probe_bom_math`（最后一个会 TRUNCATE 业务表，放最后）
 - ★ **e2e 跑完会留测试数据**（`e2e:api` / `e2e:ui` 的自建靶每轮建一个商机/批次）→ 想回到干净态跑

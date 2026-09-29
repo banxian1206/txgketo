@@ -9,6 +9,7 @@ import {
   Tag,
   Typography,
 } from 'antd'
+import { useBack } from '../../hooks/useFrom'
 
 
 
@@ -37,13 +38,15 @@ data: DesignTree | null;
   setPurchaseOpen: (...args: any[]) => any;
   setPurchaseResult: (...args: any[]) => any;
 }) {
+  // ★ docs/11：从台里点进来的，返回口回**那个台**（含原页签）；无来源时保持「← 返回项目」
+  const back = useBack(`/projects/${projectNo}`, '← 返回项目')
   return (
     <>
         <Card style={{ marginBottom: 16 }}>
           <Row align="middle">
             <Col flex="auto">
               <Space size={8} wrap>
-                <a onClick={() => nav(`/projects/${projectNo}`)}>← 返回项目</a>
+                <a onClick={() => nav(back.to)}>{back.label}</a>
                 <Typography.Text strong style={{ fontSize: 16 }}>
                   {equipNo} 设计工作面
                 </Typography.Text>

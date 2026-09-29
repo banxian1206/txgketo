@@ -15,6 +15,7 @@ import { Link, Outlet, useLocation } from 'react-router-dom'
 
 import NotificationsDrawer from '../components/NotificationsDrawer'
 import { SIDEBAR_ROOTS, matchSidebarKey } from '../configs/domain'
+import { contextPath } from '../hooks/useFrom'
 import { useAuth } from '../contexts/AuthContext'
 import {
   hasPerm,
@@ -55,8 +56,9 @@ export default function AppLayout() {
   }, [refreshMe])
 
 
-  // P0：最长前缀匹配（/delivery/site → 现场工作台所在的工作台组）
-  const selected = matchSidebarKey(loc.pathname)
+  // ★ 导航上下文（docs/11）：有 ?from= 就按来源算 —— 否则从台上点进项目详情，侧栏会被
+  //   「项目」抢走（用户明明是从采购台来的），这是体检里最刺眼的一条
+  const selected = matchSidebarKey(contextPath(loc.pathname, loc.search))
 
   const SIDEBAR_ICONS: Record<string, React.ReactNode> = {
     home: <HomeOutlined />, checklist: <OrderedListOutlined />, folder: <FolderOutlined />,

@@ -1,7 +1,7 @@
 import { lazy, Suspense } from 'react'
 
 import { Spin } from 'antd'
-import { Navigate, Route, Routes } from 'react-router-dom'
+import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
 
 import AppLayout from './layouts/AppLayout'
 import DomainShell from './components/domain/DomainShell'
@@ -66,7 +66,12 @@ function RequireAuth({ children }: { children: JSX.Element }) {
  * 现在：无权限 → 回「我的工作台」（那里人人可进），不渲染空页。
  */
 function RequirePerm({ anyOf, children }: { anyOf: string[]; children: JSX.Element }) {
-  if (!anyOf.some((c) => hasPerm(c))) return <Navigate to="/workbench" replace />
+  const loc = useLocation()
+  if (!anyOf.some((c) => hasPerm(c))) {
+    // ★ docs/11：带着 ?from= 进来却没权限 → 送回他来的那个台（比一律丢去「我的工作台」更近）
+    const from = new URLSearchParams(loc.search).get('from')
+    return <Navigate to={from ? decodeURIComponent(from) : '/workbench'} replace />
+  }
   return children
 }
 
@@ -129,9 +134,15 @@ export default function App() {
         <Route path="delivery/service" element={<RequirePerm anyOf={['service:edit']}><Service /></RequirePerm>} />
         </Route>
         <Route path="projects" element={<Projects />} />
+        {/* ★ docs/11：这些页都可能从某个台点进来（26 处跳转），所以一并挂进工作台壳 ——
+            台条不再整条消失，配合 ?from= 还能高亮「我从哪个台来」。
+            RequirePerm 守卫 + from 传递见 hooks/useFrom。 */}
+        <Route element={<WorkbenchShell />}>
         <Route path="projects/new" element={<ProjectCreate />} />
         <Route path="projects/:projectNo" element={<ProjectDetailPage />} />
         <Route path="projects/:projectNo/initiate" element={<ProjectInitiate />} />
+        <Route path="projects/:projectNo/design/:equipNo" element={<EquipmentDesign />} />
+        </Route>
         {/* ★ 交付域壳已删：制造/装配唯一入口=车间台；发运/现场/售后见上面 WorkbenchShell 内。
             /delivery、/delivery/mfg、/delivery/acceptance 等旧路径走 ROUTE_REDIRECTS 一跳到位。 */}
         <Route path="/admin" element={<DomainShell tabs={ADMIN_TABS} />}>
@@ -143,7 +154,6 @@ export default function App() {
           <Route path="numbering" element={<NumberRules />} />
         </Route>
         {redirectRoutes()}
-        <Route path="projects/:projectNo/design/:equipNo" element={<EquipmentDesign />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

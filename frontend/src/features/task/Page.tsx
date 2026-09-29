@@ -15,8 +15,6 @@ import {
 } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import { useCallback, useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-
 import PurchaseActions from '../../components/PurchaseActions'
 import {
   errMsg,
@@ -36,11 +34,12 @@ import { TASK_STATUS as STATUS_COLOR } from '../../theme/status'
 import { TASK_TYPE as TYPE_COLOR } from '../../theme/status'
 import { TASK_TABS } from '../../configs/tabs'
 import { useTab } from '../../hooks/useTab'
-
+import { useGoFrom } from '../../hooks/useFrom'
 /** 我的任务（工作台）：我的任务 / 我组任务（经理，05 卷 §2.2） */
 export default function MyTasks() {
   const { message } = App.useApp()
-  const nav = useNavigate()
+  // ★ docs/11：跳去别的域时带上 ?from= （来源台/来源页），回来还在原来那一层
+  const go = useGoFrom()
   const [rows, setRows] = useState<TaskItem[]>([])
   const [loading, setLoading] = useState(false)
   // ★ 重整 P0：状态页签状态进 URL（?tab=），刷新/分享不丢
@@ -53,11 +52,9 @@ export default function MyTasks() {
   const [splitTarget, setSplitTarget] = useState<TaskItem | null>(null)
   const [selected, setSelected] = useState<number[]>([])
   const [splitting, setSplitting] = useState(false)
-
   const isLead =
     ['经理', '组长', '设计组长', '主管'].includes(profile?.position ?? '') ||
     ['总监', '部门负责人', '工程总监'].includes(profile?.position ?? '')
-
   /** ★ M-04/M-05：与后端 `tasks._can_act_on_task` 同一口径 ——
    * 「能不能动**这张**任务」而不是看有没有 `project:edit`。
    * 不是负责人却看得到「开始/完成」→ 点了必 403（铁律：前端必须反映后端门禁）。 */
@@ -68,7 +65,6 @@ export default function MyTasks() {
       !!profile?.profession &&
       profile.profession === r.profession) ||
     profile?.position === '总监'
-
   const load = useCallback(async () => {
     setLoading(true)
     try {
@@ -89,18 +85,15 @@ export default function MyTasks() {
       setLoading(false)
     }
   }, [message, scope])
-
   useEffect(() => {
     void load()
   }, [load])
-
   const filtered =
     tab === '未完成'
       ? rows.filter((r) => r.status === '待开始' || r.status === '进行中')
       : tab === '全部'
         ? rows
         : rows.filter((r) => r.status === tab)
-
   const setStatus = async (id: number, status: string) => {
     try {
       await updateTask(id, { status })
@@ -110,7 +103,6 @@ export default function MyTasks() {
       message.error(errMsg(e))
     }
   }
-
   const openSplit = async (task: TaskItem) => {
     setSplitTarget(task)
     setSelected([])
@@ -125,7 +117,6 @@ export default function MyTasks() {
       message.error(errMsg(e))
     }
   }
-
   const doSplit = async () => {
     if (!splitTarget || !selected.length) return
     setSplitting(true)
@@ -143,7 +134,6 @@ export default function MyTasks() {
       setSplitting(false)
     }
   }
-
   const columns: ColumnsType<TaskItem> = [
     {
       title: '任务号',
@@ -192,7 +182,7 @@ export default function MyTasks() {
       dataIndex: 'project_no',
       width: 180,
       render: (v: string, r) => (
-        <a onClick={() => nav(`/projects/${v}`)}>
+        <a onClick={() => go(`/projects/${v}`)}>
           {v} {r.project_name ?? ''}
         </a>
       ),
@@ -235,7 +225,7 @@ export default function MyTasks() {
             <Button
               type="primary"
               size="small"
-              onClick={() => nav(`/projects/${r.project_no}/design/${r.equip_no}`)}
+              onClick={() => go(`/projects/${r.project_no}/design/${r.equip_no}`)}
             >
               去设计
             </Button>
@@ -276,7 +266,6 @@ export default function MyTasks() {
       ),
     },
   ]
-
   return (
     <Card
       title="我的任务"
@@ -323,7 +312,6 @@ export default function MyTasks() {
         任务在「立项」时生成：每台设备 × 专业 → 设计任务，直接派给各专业经理，经理再拆给组员；
         工艺挂在机械之后，机械首次发布即可开工（05 卷 §0.1）。
       </Typography.Paragraph>
-
       <Modal
         open={!!splitTarget}
         title={`拆分派工：${splitTarget?.title ?? ''}`}

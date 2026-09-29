@@ -1,19 +1,17 @@
 import { App, Button, Card, Col, Row, Space, Spin, Table, Tag, Typography } from 'antd'
 import { useCallback, useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-
 import { errMsg, salesBoard, workbenchMe, type SalesBoard, type WorkbenchMe } from '../../api/client'
 import { PROJECT_STAGE as STAGE_COLOR } from '../../theme/status'
 import { T } from '../../theme/tokens'
-
+import { useGoFrom } from '../../hooks/useFrom'
 /** 商务部工作台（06 卷 §3）：我的商机 → 成交待立项 → 执行中 + 回款 */
 export default function SalesWorkbench() {
   const { message } = App.useApp()
-  const nav = useNavigate()
+  // ★ docs/11：跳去别的域时带上 ?from= （来源台/来源页），回来还在原来那一层
+  const go = useGoFrom()
   const [me, setMe] = useState<WorkbenchMe | null>(null)
   const [data, setData] = useState<SalesBoard | null>(null)
   const [loading, setLoading] = useState(true)
-
   const load = useCallback(async () => {
     setLoading(true)
     try {
@@ -26,13 +24,10 @@ export default function SalesWorkbench() {
       setLoading(false)
     }
   }, [message])
-
   useEffect(() => {
     void load()
   }, [load])
-
   const s = data?.summary
-
   return (
     <Spin spinning={loading}>
       <Card size="small" style={{ marginBottom: 12 }}>
@@ -44,12 +39,11 @@ export default function SalesWorkbench() {
           <Button size="small" onClick={() => void load()}>
             刷新
           </Button>
-          <Button size="small" type="primary" onClick={() => nav('/projects/new')}>
+          <Button size="small" type="primary" onClick={() => go('/projects/new')}>
             新建商机
           </Button>
         </Space>
       </Card>
-
       <Row gutter={[12, 12]} style={{ marginBottom: 12 }}>
         {[
           { label: '商机（线索）', value: s?.my_leads ?? 0, color: T.brand },
@@ -67,14 +61,13 @@ export default function SalesWorkbench() {
           </Col>
         ))}
       </Row>
-
       <Card size="small" title="我的商机 / 项目" style={{ marginBottom: 12 }}>
         <Table
           rowKey="project_no"
           size="small"
           dataSource={data?.projects ?? []}
           pagination={{ pageSize: 15, showSizeChanger: false }}
-          onRow={(r) => ({ onClick: () => nav(`/projects/${r.project_no}`), style: { cursor: 'pointer' } })}
+          onRow={(r) => ({ onClick: () => go(`/projects/${r.project_no}`), style: { cursor: 'pointer' } })}
           columns={[
             { title: '项目号', dataIndex: 'project_no', width: 110 },
             { title: '项目名称', dataIndex: 'project_name' },
@@ -98,7 +91,6 @@ export default function SalesWorkbench() {
           ]}
         />
       </Card>
-
       <Card size="small" title="待回款节点">
         <Table
           rowKey={(r) => `${r.project_no}-${r.node_name}`}

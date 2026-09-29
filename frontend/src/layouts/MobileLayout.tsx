@@ -23,15 +23,17 @@ import { T } from '../theme/tokens'
 
 // 底部入口按角色/权限显示（03 卷）：仓库看仓库、车间看制造/装配、交付/现场看发运
 // 图标用 antd icons（视觉规范 §4：emoji 不进 UI chrome，跨平台渲染一致）
-const ALL_TABS: { key: string; label: string; icon: ReactNode; show: () => boolean }[] = [
+const ALL_TABS: { key: string; label: string; icon: ReactNode; show: () => boolean; match?: string[] }[] = [
   { key: '/m', label: '首页', icon: <HomeOutlined />, show: () => true },
   {
     key: '/m/warehouse',
+    // ★ docs/11：accept 是仓库动线的子页 —— 不带 match 时底部条会掉回「首页」
+    match: ['/m/warehouse', '/m/accept'],
     label: '仓库',
     icon: <InboxOutlined />,
     show: () => hasPerm('warehouse:edit') || hasPerm('warehouse:view'),
   },
-  { key: '/m/issues', label: '领料', icon: <ExportOutlined />, show: () => true },
+  { key: '/m/issues', label: '领料', icon: <ExportOutlined />, show: () => true, match: ['/m/issues'] },
   { key: '/m/production', label: '制造', icon: <SettingOutlined />, show: () => hasPerm('mfg:view') },
   { key: '/m/assembly', label: '装配', icon: <ApartmentOutlined />, show: () => hasPerm('mfg:view') },
   {
@@ -79,7 +81,8 @@ export default function MobileLayout() {
   }, [refreshUnread])
 
   const active =
-    TABS.filter((t) => t.key !== '/m').find((t) => loc.pathname.startsWith(t.key))?.key ?? '/m'
+    TABS.filter((t) => t.key !== '/m')
+      .find((t) => (t.match ?? [t.key]).some((pre) => loc.pathname.startsWith(pre)))?.key ?? '/m'
 
   return (
     <div style={{ minHeight: '100vh', background: T.bgPage, paddingBottom: 64 }}>

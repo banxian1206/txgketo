@@ -17,6 +17,7 @@ import { hasPerm } from '../../api/user'
 import { WB_TYPE as TYPE_COLOR } from '../../theme/status'
 import { PROJECT_STAGE as STAGE_COLOR } from '../../theme/status'
 import { T } from '../../theme/tokens'
+import { useGoFrom } from '../../hooks/useFrom'
 // A2（v2 拍板②）：三业务页组件复用挂入我的台（lazy import 与 App 同 chunk）
 const MyTasks = lazy(() => import('../task/Page'))
 const Reviews = lazy(() => import('../review/Page'))
@@ -35,6 +36,8 @@ interface TodoCard {
 export default function Workbench() {
   const { message } = App.useApp()
   const nav = useNavigate()
+  // ★ docs/11：跳去别的域时带上 ?from= （来源台/来源页），回来还在原来那一层
+  const go = useGoFrom()
   const loc = useLocation()
   const [data, setData] = useState<WorkbenchMe | null>(null)
   const [messages, setMessages] = useState<NotificationRow[]>([])
@@ -188,7 +191,7 @@ export default function Workbench() {
           pagination={false}
           dataSource={data?.my_projects ?? []}
           locale={{ emptyText: '还没有参与的项目' }}
-          onRow={(r) => ({ onClick: () => nav(`/projects/${r.project_no}`), style: { cursor: 'pointer' } })}
+          onRow={(r) => ({ onClick: () => go(`/projects/${r.project_no}`), style: { cursor: 'pointer' } })}
           columns={[
             { title: '项目号', dataIndex: 'project_no', width: 110 },
             { title: '项目名称', dataIndex: 'project_name' },

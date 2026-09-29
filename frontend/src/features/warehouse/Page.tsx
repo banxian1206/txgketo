@@ -23,23 +23,17 @@ import {
 } from 'antd'
 import dayjs from 'dayjs'
 import {useEffect, useRef, useState} from 'react'
-import { useNavigate } from 'react-router-dom'
-
 import AuthedImage from '../../components/AuthedImage'
 import AppModal from '../../components/AppModal'
 import { SelectLocation } from '../../components/fields'
 import { useRequest } from '../../hooks/useRequest'
 import { useSubmit } from '../../hooks/useSubmit'
-
 import {api, createLocation, errMsg, generateEquipmentIssue, hasPerm, inspectPurchase, listEquipment, listLocations, listProjects, manualInbound, searchItems, storeReceipt, type ItemLite, type LocationRow} from '../../api/client'
 import { WH_ISSUE_STATUS as ISSUE_COLOR } from '../../theme/status'
 import { T } from '../../theme/tokens'
 import { WAREHOUSE_TABS, filterTabs } from '../../configs/tabs'
 import { useTab } from '../../hooks/useTab'
-
-
-
-
+import { useGoFrom } from '../../hooks/useFrom'
 /**
  * 仓库只有两个动作：
  *   ① 验收（货到了就验，合格 / 不合格）→ 合格进「待入库」，不合格回采购「验收不合格」协商
@@ -47,7 +41,8 @@ import { useTab } from '../../hooks/useTab'
  */
 export default function Warehouse() {
   const { message } = App.useApp()
-  const nav = useNavigate()
+  // ★ docs/11：跳去别的域时带上 ?from= （来源台/来源页），回来还在原来那一层
+  const go = useGoFrom()
   const canStore = hasPerm('warehouse:edit')
   // 生成领料单（按设备）
   const [genProject, setGenProject] = useState<string | undefined>()
@@ -77,10 +72,8 @@ export default function Warehouse() {
   const [acceptForm] = Form.useForm()
   const [storeForm] = Form.useForm()
   const acceptResult = Form.useWatch('result', acceptForm)
-
   // 重构 2.0：数据与刷新走共享 hook（与移动端同源，计数必然一致）
   const { wb, stock, moves, issueCount, loading, reload: load } = useWarehouseBoard({ full: true })
-
   // 生成领料单用：项目列表
   useEffect(() => {
     listProjects()
@@ -90,7 +83,6 @@ export default function Warehouse() {
   // ↓ 试点（重构 1.2）：库位选项改用 useRequest 三态（原 useEffect + useState 手写）
   const locsReq = useRequest(() => listLocations(), [])
   const locs = locsReq.data ?? []
-
   const searchItemOptions = (q: string) => {
     if (itemSearchTimer.current) clearTimeout(itemSearchTimer.current)
     itemSearchTimer.current = setTimeout(() => {
@@ -99,7 +91,6 @@ export default function Warehouse() {
         .catch(() => undefined)
     }, 250)
   }
-
   const doInbound = async () => {
     let v
     try { v = await inboundForm.validateFields() } catch { return }
@@ -123,7 +114,6 @@ export default function Warehouse() {
       setSaving(false)
     }
   }
-
   const doCreateLocation = async () => {
     let v
     try { v = await locForm.validateFields() } catch { return }
@@ -140,7 +130,6 @@ export default function Warehouse() {
       setSaving(false)
     }
   }
-
   const onGenProject = async (no?: string) => {
     setGenProject(no)
     setGenEquip(undefined)
@@ -153,7 +142,6 @@ export default function Warehouse() {
       message.error(errMsg(e))
     }
   }
-
   const doGenerateIssue = async () => {
     if (!genProject || !genEquip) return
     setGenLoading(true)
@@ -172,13 +160,11 @@ export default function Warehouse() {
       setGenLoading(false)
     }
   }
-
   const openAccept = (r: IncomingRow) => {
     // 重构 1.2：不再手工 setFieldsValue —— 预填交给 AppModal 的 initialValues（打开即挂载即读）
     setAcceptTarget(r)
     setAcceptOpen(true)
   }
-
   // 重构 1.2：提交走 useSubmit（validate/catch/防重/反馈一条龙，根治 P-09 类裸 await）
   const acceptSubmit = useSubmit(acceptForm, {
     request: (v) => {
@@ -201,12 +187,10 @@ export default function Warehouse() {
     close: () => setAcceptOpen(false),
     after: () => load(),
   })
-
   const openStore = (r: StorageRow) => {
     setStoreTarget(r)
     setStoreOpen(true)
   }
-
   const storeSubmit = useSubmit(storeForm, {
     request: (v) => {
       if (!storeTarget) throw new Error('无入库目标')
@@ -216,7 +200,6 @@ export default function Warehouse() {
     close: () => setStoreOpen(false),
     after: () => load(),
   })
-
   const issueAction = async (id: number, action: 'pick' | 'hand-over') => {
     if (action === 'hand-over') {
       // 领料人用弹窗录入（P-12：不再用浏览器原生 prompt）
@@ -232,7 +215,6 @@ export default function Warehouse() {
       message.error(errMsg(e))
     }
   }
-
   const doHandOver = async () => {
     if (!handOverId) return
     if (!handOverTo.trim()) {
@@ -248,7 +230,6 @@ export default function Warehouse() {
       message.error(errMsg(e))
     }
   }
-
   return (
     <Card
       title={
@@ -371,7 +352,7 @@ export default function Warehouse() {
                       render: (_: unknown, r) => (
                         <>
                           {r.project_no ? (
-                            <a onClick={() => nav(`/projects/${r.project_no}`)}>{r.project_no}</a>
+                            <a onClick={() => go(`/projects/${r.project_no}`)}>{r.project_no}</a>
                           ) : (
                             <Tag>{r.attribution ?? '辅料'}</Tag>
                           )}
@@ -398,7 +379,6 @@ export default function Warehouse() {
                     },
                   ]}
                 />
-
                 <Typography.Title level={5} style={{ marginTop: 24 }}>② 入库（验收合格，选库位入库）</Typography.Title>
                 <Table<StorageRow>
                   rowKey="id" size="small" loading={loading}
@@ -425,7 +405,7 @@ export default function Warehouse() {
                       render: (_: unknown, r) => (
                         <>
                           {r.project_no ? (
-                            <a onClick={() => nav(`/projects/${r.project_no}`)}>{r.project_no}</a>
+                            <a onClick={() => go(`/projects/${r.project_no}`)}>{r.project_no}</a>
                           ) : (
                             <Tag>{r.attribution ?? '辅料'}</Tag>
                           )}
@@ -457,7 +437,6 @@ export default function Warehouse() {
                     },
                   ]}
                 />
-
                 <Typography.Title level={5} style={{ marginTop: 24 }}>③ 领料单（仓库备料 → 车间领走）</Typography.Title>
                 <Table<IssueRow>
                   rowKey="id" size="small"
@@ -479,7 +458,7 @@ export default function Warehouse() {
                   }}
                   columns={[
                     { title: '领料单', dataIndex: 'issue_no', width: 110, render: (v: string) => <Typography.Text strong>{v}</Typography.Text> },
-                    { title: '项目 / 设备', key: 'p', render: (_: unknown, r) => <a onClick={() => nav(`/projects/${r.project_no}`)}>{r.project_no} · {r.equip_no ?? ''}</a> },
+                    { title: '项目 / 设备', key: 'p', render: (_: unknown, r) => <a onClick={() => go(`/projects/${r.project_no}`)}>{r.project_no} · {r.equip_no ?? ''}</a> },
                     { title: '物料数', dataIndex: 'line_count', width: 90 },
                     { title: '缺料', dataIndex: 'shortage_count', width: 90, render: (v: number) => (v ? <Tag color="red">{v} 种</Tag> : <Tag color="green">齐</Tag>) },
                     { title: '状态', dataIndex: 'status', width: 100, render: (v: string) => <Tag color={ISSUE_COLOR[v]}>{v}</Tag> },
@@ -577,7 +556,6 @@ export default function Warehouse() {
           },
         ].filter((x) => visKeys.includes(x.key))}
       />
-
       {/* 其他入库 */}
       <Modal
         title="其他入库（退料回库 / 盘盈）"
@@ -628,7 +606,6 @@ export default function Warehouse() {
           </Form.Item>
         </Form>
       </Modal>
-
       {/* 新建库位 */}
       <Modal
         title="新建库位"
@@ -654,7 +631,6 @@ export default function Warehouse() {
           </Form.Item>
         </Form>
       </Modal>
-
       {/* 验收（合格 / 不合格）—— 重构 1.2 试点：AppModal + useSubmit（预填走 initialValues，打开即生效） */}
       <AppModal
         open={acceptOpen}
@@ -753,7 +729,6 @@ export default function Warehouse() {
             <Input.TextArea rows={2} placeholder={acceptResult === '不合格' ? '如：尺寸超差 / 外观划伤，采购去协商' : '可不填'} />
           </Form.Item>
       </AppModal>
-
       {/* 入库 —— 重构 1.2 试点：AppModal + useSubmit */}
       <AppModal
         open={storeOpen}
@@ -779,7 +754,6 @@ export default function Warehouse() {
             <Input placeholder="可不填" />
           </Form.Item>
       </AppModal>
-
       {/* 车间领走：录领料人（P-12） */}
       <Modal
         title="车间领走"

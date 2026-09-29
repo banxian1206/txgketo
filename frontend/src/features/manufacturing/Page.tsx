@@ -23,8 +23,6 @@ import {
 } from 'antd'
 import dayjs from 'dayjs'
 import {useEffect, useState} from 'react'
-import { useNavigate } from 'react-router-dom'
-
 import {
   acceptOutsource,
   acceptProdOrder,
@@ -52,27 +50,23 @@ import { OUTSOURCE_STATUS as OS_COLOR } from '../../theme/status'
 import { T } from '../../theme/tokens'
 import { MFG_TABS, filterTabs } from '../../configs/tabs'
 import { useTab } from '../../hooks/useTab'
-
+import { useGoFrom } from '../../hooks/useFrom'
 const TEAMS = ['下料', '机加', '焊接', '钣金', '喷涂']
-
 type ActionKind = 'dispatch' | 'accept' | 'transfer' | 'os-send' | 'os-accept'
-
 export default function Manufacturing() {
   const { message } = App.useApp()
-  const nav = useNavigate()
+  // ★ docs/11：跳去别的域时带上 ?from= （来源台/来源页），回来还在原来那一层
+  const go = useGoFrom()
   const canEdit = hasPerm('mfg:edit')
-
   // ★ 重整 P0（docs/10 §3.2/§3.3）：页签条按**真实权限码**过滤，状态写进 URL（?tab=）
   const visKeys = filterTabs(MFG_TABS).map((x) => x.key)
   const [tab, setTab] = useTab(visKeys, 'wait')
-
   // 生成排产
   const [genProject, setGenProject] = useState<string | undefined>()
   const [genEquip, setGenEquip] = useState<string | undefined>()
   const [projects, setProjects] = useState<{ project_no: string; project_name: string }[]>([])
   const [equips, setEquips] = useState<{ equip_no: string; equip_name: string }[]>([])
   const [genLoading, setGenLoading] = useState(false)
-
   // 动作弹窗
   const [action, setAction] = useState<{ kind: ActionKind; order?: ProdOrderRow; os?: OutsourceRow } | null>(
     null,
@@ -81,19 +75,15 @@ export default function Manufacturing() {
   const [saving, setSaving] = useState(false)
   const [form] = Form.useForm()
   const [actionInitial, setActionInitial] = useState<Record<string, unknown>>({})
-
   // 详情
   const [detail, setDetail] = useState<ProdOrderRow | null>(null)
-
   // 重构 2.3：看板数据走共享 hook（与另一端同源）
   const { wb, loading, reload: load } = useMfgBoard()
-
   useEffect(() => {
     listProjects()
       .then((rows) => setProjects(rows.map((p) => ({ project_no: p.project_no, project_name: p.project_name }))))
       .catch(() => undefined)
   }, [])
-
   const onGenProject = async (no?: string) => {
     setGenProject(no)
     setGenEquip(undefined)
@@ -105,7 +95,6 @@ export default function Manufacturing() {
       message.error(errMsg(e))
     }
   }
-
   const doGenerate = async () => {
     if (!genProject || !genEquip) return
     setGenLoading(true)
@@ -120,7 +109,6 @@ export default function Manufacturing() {
       setGenLoading(false)
     }
   }
-
   const openAction = (kind: ActionKind, order?: ProdOrderRow, os?: OutsourceRow) => {
     setPhotos([])
     // 预填交给 AppModal initialValues（挂载时读）
@@ -133,7 +121,6 @@ export default function Manufacturing() {
     setActionInitial(init)
     setAction({ kind, order, os })
   }
-
   const submitAction = async () => {
     if (!action) return
     let v
@@ -187,7 +174,6 @@ export default function Manufacturing() {
       setSaving(false)
     }
   }
-
   const doStart = async (o: ProdOrderRow) => {
     try {
       await startProdOrder(o.id)
@@ -197,7 +183,6 @@ export default function Manufacturing() {
       message.error(errMsg(e))
     }
   }
-
   const doReturn = async (o: OutsourceRow) => {
     try {
       await returnOutsource(o.id, {})
@@ -207,9 +192,7 @@ export default function Manufacturing() {
       message.error(errMsg(e))
     }
   }
-
   const canGo = hasPerm('mfg:view')
-
   const orderColumns = (kind: 'wait' | 'running' | 'transfer' | 'rework') => [
     {
       title: '单号',
@@ -222,7 +205,7 @@ export default function Manufacturing() {
       key: 'pe',
       width: 150,
       render: (_: unknown, r: ProdOrderRow) => (
-        <a onClick={() => nav(`/projects/${r.project_no}`)}>
+        <a onClick={() => go(`/projects/${r.project_no}`)}>
           {r.project_no} · {r.equip_no ?? ''}
         </a>
       ),
@@ -274,7 +257,6 @@ export default function Manufacturing() {
       ),
     },
   ]
-
   const osColumns = [
     { title: '单号', dataIndex: 'outsource_no', width: 110 },
     {
@@ -317,9 +299,7 @@ export default function Manufacturing() {
       ),
     },
   ]
-
   const c = wb?.counts
-
   return (
     <Card
       title="制造（S5）"
@@ -330,7 +310,6 @@ export default function Manufacturing() {
       }
     >
       {!canGo && <Empty description="没有查看制造任务的权限（找管理员开 mfg:view）" />}
-
       {canGo && (
         <>
           <Row gutter={12} style={{ marginBottom: 12 }}>
@@ -342,7 +321,6 @@ export default function Manufacturing() {
             <Col span={3}><Statistic title="外协在途" value={c?.outsource ?? 0} /></Col>
             <Col span={3}><Statistic title="已转运" value={c?.transferred ?? 0} /></Col>
           </Row>
-
           <Card size="small" title="生成排产单（按设备）" style={{ marginBottom: 12 }}>
             <Space wrap>
               <Select
@@ -371,7 +349,6 @@ export default function Manufacturing() {
               </Typography.Text>
             </Space>
           </Card>
-
           <Tabs
             activeKey={tab}
             onChange={setTab}
@@ -415,7 +392,6 @@ export default function Manufacturing() {
           />
         </>
       )}
-
       {/* 动作弹窗 */}
       <AppModal
         open={!!action}
@@ -460,7 +436,6 @@ export default function Manufacturing() {
               </Space>
             </>
           )}
-
           {action?.kind === 'accept' && (
             <>
               <Form.Item name="result" label="验收结论" rules={[{ required: true }]}>
@@ -475,13 +450,11 @@ export default function Manufacturing() {
               </Form.Item>
             </>
           )}
-
           {action?.kind === 'transfer' && (
             <Form.Item name="transfer_to" label="转运到" rules={[{ required: true }]}>
               <Select style={{ width: 200 }} options={['装配区', '半成品区', '待发区'].map((t) => ({ value: t, label: t }))} />
             </Form.Item>
           )}
-
           {action?.kind === 'os-send' && (
             <>
               <Space style={{ display: 'flex' }} size="middle" align="start">
@@ -505,7 +478,6 @@ export default function Manufacturing() {
               </Space>
             </>
           )}
-
           {action?.kind === 'os-accept' && (
             <>
               <Form.Item name="result" label="验收结论" rules={[{ required: true }]}>
@@ -519,7 +491,6 @@ export default function Manufacturing() {
               </Form.Item>
             </>
           )}
-
           {action && (
             <Form.Item label="拍照留痕（必须）" required>
               <MfgPhotoPicker
@@ -531,7 +502,6 @@ export default function Manufacturing() {
             </Form.Item>
           )}
       </AppModal>
-
       {/* 详情 */}
       <Drawer
         width={560}

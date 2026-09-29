@@ -17,8 +17,6 @@ import {
   Typography,
 } from 'antd'
 import {useState} from 'react'
-import { useNavigate } from 'react-router-dom'
-
 import {
   acceptSiteIncoming,
   commissionArrive,
@@ -43,18 +41,18 @@ import { SITE_COMMISSION_STATUS as COMMISSION_COLOR } from '../../theme/status'
 import { T } from '../../theme/tokens'
 import { SITE_TABS, filterTabs } from '../../configs/tabs'
 import { useTab } from '../../hooks/useTab'
-
+import { useGoFrom } from '../../hooks/useFrom'
 /** 现场台（PC，S8）：给项目经理/现场负责人看整体 —— 手机端是现场的主终端。 */
 export default function Site() {
   const { message } = App.useApp()
-  const nav = useNavigate()
+  // ★ docs/11：跳去别的域时带上 ?from= （来源台/来源页），回来还在原来那一层
+  const go = useGoFrom()
   const canEdit = hasPerm('site:edit') || hasPerm('project:edit')
   const [target, setTarget] = useState<SiteIncomingPending | null>(null)
   const [targetInitial, setTargetInitial] = useState<Record<string, unknown>>({})
   const [photos, setPhotos] = useState<string[]>([])
   const [saving, setSaving] = useState(false)
   const [form] = Form.useForm()
-
   // 重构 2.1：看板数据走共享 hook（与移动端同源）
   const { projectNo, setProjectNo, projects, wb, incoming, reload: load } = useSiteBoard()
   const doIncoming = async () => {
@@ -82,10 +80,7 @@ export default function Site() {
       setSaving(false)
     }
   }
-
   const c = wb?.counts
-
-
   // ★ 重整 P0（docs/10 §3.2/§3.3）：页签条按**真实权限码**过滤，状态写进 URL（?tab=）
   const visKeys = filterTabs(SITE_TABS).map((x) => x.key)
   const [tab, setTab] = useTab(visKeys, 'incoming')
@@ -110,9 +105,7 @@ export default function Site() {
         />
         {!canEdit && <Tag>只读</Tag>}
       </Space>
-
       {!projectNo && <Empty description="先选一个项目（现场日常用手机端 /m/site）" />}
-
       {projectNo && (
         <>
           <Alert
@@ -129,7 +122,6 @@ export default function Site() {
             <Col span={4}><Statistic title="待派调试" value={c?.to_dispatch ?? 0} /></Col>
             <Col span={4}><Statistic title="调试中" value={c?.debugging ?? 0} /></Col>
           </Row>
-
           <Tabs
             activeKey={tab}
             onChange={setTab}
@@ -225,7 +217,7 @@ export default function Site() {
                                 <a onClick={() => void linkSiteIssue(r.id, { close: true }).then(() => void load(projectNo))}>闭环</a>
                               </>
                             )}
-                            {r.related_change_id && <a onClick={() => nav('/workbench/changes')}>看变更</a>}
+                            {r.related_change_id && <a onClick={() => go('/workbench/changes')}>看变更</a>}
                           </Space>
                         ),
                       },
@@ -290,7 +282,6 @@ export default function Site() {
           />
         </>
       )}
-
       <AppModal
         open={!!target}
         title={`现场清点 · ${target?.item_no ?? ''}`}

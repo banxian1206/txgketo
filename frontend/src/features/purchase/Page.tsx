@@ -1,8 +1,6 @@
 import { App, Button, Card, Col, Empty, Row, Space, Table, Tabs, Tag, Typography } from 'antd'
 import dayjs from 'dayjs'
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-
 import SuppliersPage from './SuppliersPage'
 import ManualPurchaseModal from '../../components/ManualPurchaseModal'
 import PoApproveModal from '../../components/PoApproveModal'
@@ -28,9 +26,8 @@ import { RECEIPT_STATUS as RECEIPT_STATUS_COLOR } from '../../theme/status'
 import { T } from '../../theme/tokens'
 import { PURCHASE_TABS, filterTabs } from '../../configs/tabs'
 import { useTab } from '../../hooks/useTab'
-
+import { useGoFrom } from '../../hooks/useFrom'
 const today = () => dayjs().format('YYYY-MM-DD')
-
 /**
  * 采购工作台：采购只做三件事：下单（采购池合并）· 取消 · 更改供应商。
  * 验收不合格的货会回到这里（「验收不合格」页签），采购跟供应商协商换货/退货。
@@ -38,7 +35,8 @@ const today = () => dayjs().format('YYYY-MM-DD')
  */
 export default function PurchaseWorkbench() {
   const { message } = App.useApp()
-  const nav = useNavigate()
+  // ★ docs/11：跳去别的域时带上 ?from= （来源台/来源页），回来还在原来那一层
+  const go = useGoFrom()
   const [pool, setPool] = useState<PurchasePoolGroup[]>([])
   const [orders, setOrders] = useState<PurchaseOrderSummary[]>([])
   const [failedReceipts, setFailedReceipts] = useState<GoodsReceiptRow[]>([])
@@ -69,7 +67,6 @@ export default function PurchaseWorkbench() {
     leadDays?: number | null
   }>({ open: false, orderKey: null, requestIds: [] })
   const [loading, setLoading] = useState(false)
-
   const load = useCallback(async () => {
     setLoading(true)
     try {
@@ -96,11 +93,9 @@ export default function PurchaseWorkbench() {
       setLoading(false)
     }
   }, [message])
-
   useEffect(() => {
     void load()
   }, [load])
-
   const poolRequests = pool.reduce((s, g) => s + g.request_count, 0)
   const openOrders = orders.filter(
     (o) => !['已取消', '已完成', '草稿', '待经理审', '待总监审', '已退回'].includes(o.status),
@@ -113,34 +108,28 @@ export default function PurchaseWorkbench() {
     .sort((a, b) => String(a.expected_date ?? '9999-99-99').localeCompare(String(b.expected_date ?? '9999-99-99')))
   const overdueCount = arrivals.filter((o) => o.expected_date && dayjs(o.expected_date).isBefore(dayjs(), 'day')).length
   const canBuy = hasPerm('purchase:edit')
-
   const selectedGroups = useMemo(
     () => pool.filter((g) => selected.includes(g.item_no)),
     [pool, selected],
   )
   const selectedLines = selectedGroups.reduce((s, g) => s + g.request_count, 0)
-
   const openMerge = (groups: PurchasePoolGroup[]) => {
     setSelected(groups.map((g) => g.item_no))
     setMergeOpen(true)
   }
-
   const handleMerged = () => {
     setMergeOpen(false)
     setSelected([])
     void load()
   }
-
   const openOrder = (key: string) => {
     setOrderKey(key)
     setDrawerOpen(true)
   }
-
   const handleNegotiated = () => {
     setNegotiate((n) => ({ ...n, open: false }))
     void load()
   }
-
   return (
     <Card title="采购工作台" extra={<Button onClick={() => void load()}>刷新</Button>}>
       {/* 待办头（06 卷 §8）：进页面第一眼看到该处理什么 */}
@@ -267,7 +256,7 @@ export default function PurchaseWorkbench() {
                             width: 260,
                             render: (v: string | null, r) =>
                               v ? (
-                                <a onClick={() => nav(`/projects/${v}`)}>
+                                <a onClick={() => go(`/projects/${v}`)}>
                                   {v} {r.project_name ?? ''}
                                 </a>
                               ) : (
@@ -442,7 +431,6 @@ export default function PurchaseWorkbench() {
               </>
             ),
           },
-
           // ---------------------------------------------------------------- ② 采购单
           {
             key: 'orders',
@@ -561,7 +549,6 @@ export default function PurchaseWorkbench() {
               </>
             ),
           },
-
           // A4：到货跟踪（v2 §2.0.4「催到货」—— 只聚合在途信息，不发明催货动作）
           {
             key: 'arrivals',
@@ -631,7 +618,6 @@ export default function PurchaseWorkbench() {
               />
             ),
           },
-
           // ---------------------------------------------------------------- ③ 验收不合格（采购协商）
           {
             key: 'failed',
@@ -744,7 +730,6 @@ export default function PurchaseWorkbench() {
               </>
             ),
           },
-
           // ---------------------------------------------------------------- ④ 退换记录
           {
             key: 'resolve',
@@ -892,7 +877,6 @@ export default function PurchaseWorkbench() {
               </>
             ),
           },
-
           // ---------------------------------------------------------------- ⑤ 入库记录
           {
             key: 'storage',
@@ -999,7 +983,6 @@ export default function PurchaseWorkbench() {
           },
         ].filter((x) => visKeys.includes(x.key))}
       />
-
       <PoApproveModal
         open={approveKey !== null}
         orderKey={approveKey}
@@ -1035,4 +1018,3 @@ export default function PurchaseWorkbench() {
     </Card>
   )
 }
-

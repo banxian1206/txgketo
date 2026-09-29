@@ -1,23 +1,21 @@
 import { App, Button, Card, Col, Progress, Row, Space, Spin, Table, Tabs, Tag, Typography } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import { useCallback, useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-
 import { errMsg, pmBoard, workbenchMe, type PmBoard, type PmProjectRow, type WorkbenchMe } from '../../api/client'
 import { PM_TABS, filterTabs } from '../../configs/tabs'
 import { useTab } from '../../hooks/useTab'
 import AcceptancePage from '../acceptance/Page'
 import { PROJECT_STAGE as STAGE_COLOR } from '../../theme/status'
 import { T } from '../../theme/tokens'
-
+import { useGoFrom } from '../../hooks/useFrom'
 /** 项目经理台（06 卷 §3）：我项目的全链进度（设计 → 采购 → 到货/入库）+ 风险/待办 */
 function PmBoardPage() {
   const { message } = App.useApp()
-  const nav = useNavigate()
+  // ★ docs/11：跳去别的域时带上 ?from= （来源台/来源页），回来还在原来那一层
+  const go = useGoFrom()
   const [me, setMe] = useState<WorkbenchMe | null>(null)
   const [data, setData] = useState<PmBoard | null>(null)
   const [loading, setLoading] = useState(true)
-
   const load = useCallback(async () => {
     setLoading(true)
     try {
@@ -30,20 +28,17 @@ function PmBoardPage() {
       setLoading(false)
     }
   }, [message])
-
   useEffect(() => {
     void load()
   }, [load])
-
   const s = data?.summary
-
   const columns: ColumnsType<PmProjectRow> = [
     {
       title: '项目',
       key: 'project',
       width: 220,
       render: (_: unknown, r: PmProjectRow) => (
-        <a onClick={() => nav(`/projects/${r.project_no}`)}>
+        <a onClick={() => go(`/projects/${r.project_no}`)}>
           {r.project_no} {r.project_name}
         </a>
       ),
@@ -100,7 +95,6 @@ function PmBoardPage() {
         ),
     },
   ]
-
   return (
     <Spin spinning={loading}>
       <Card size="small" style={{ marginBottom: 12 }}>
@@ -112,12 +106,11 @@ function PmBoardPage() {
           <Button size="small" onClick={() => void load()}>
             刷新
           </Button>
-          <Button size="small" onClick={() => nav('/projects')}>
+          <Button size="small" onClick={() => go('/projects')}>
             商机 / 项目
           </Button>
         </Space>
       </Card>
-
       <Row gutter={[12, 12]} style={{ marginBottom: 12 }}>
         {[
           { label: '我负责的项目', value: s?.projects ?? 0, color: T.brand },
@@ -134,7 +127,6 @@ function PmBoardPage() {
           </Col>
         ))}
       </Row>
-
       <Card size="small" title="我负责的项目（全链进度）">
         <Table
           rowKey="project_no"
@@ -147,7 +139,6 @@ function PmBoardPage() {
     </Spin>
   )
 }
-
 /**
  * 项目经理台 = 台内页签（docs/10 §8.5 拍板 A 的默认归属）：
  *   看板 · 验收与质保（PM 有 acceptance:edit；质保到期/质保金本就是 PM 与商务关心的）

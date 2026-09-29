@@ -18,8 +18,6 @@ import {
   Typography,
 } from 'antd'
 import {useEffect, useState} from 'react'
-import { useNavigate } from 'react-router-dom'
-
 import {
   debugAssembly,
   errMsg,
@@ -43,18 +41,16 @@ import AppModal from '../../components/AppModal'
 import { mfgPhotoUrl } from '../../api/client'
 import { ASSEMBLY_STATUS as STATUS_COLOR } from '../../theme/status'
 import { T } from '../../theme/tokens'
-
+import { useGoFrom } from '../../hooks/useFrom'
 const rateColor = (r: number) => (r >= 1 ? T.success : r >= 0.6 ? T.brand : T.warning)
-
 export default function Assembly() {
   const { message } = App.useApp()
-  const nav = useNavigate()
+  // ★ docs/11：跳去别的域时带上 ?from= （来源台/来源页），回来还在原来那一层
+  const go = useGoFrom()
   const canEdit = hasPerm('mfg:edit')
-
   const [projects, setProjects] = useState<{ project_no: string; project_name: string }[]>([])
   const [projectNo, setProjectNo] = useState<string | undefined>()
   const [detail, setDetail] = useState<{ equip_no: string; data: KittingResult } | null>(null)
-
   // 弹窗
   const [startTarget, setStartTarget] = useState<{ equip_no: string; rate: number } | null>(null)
   const [startInitial, setStartInitial] = useState<Record<string, unknown>>({})
@@ -63,10 +59,8 @@ export default function Assembly() {
   const [photos, setPhotos] = useState<string[]>([])
   const [saving, setSaving] = useState(false)
   const [form] = Form.useForm()
-
   // 重构 2.3：看板数据走共享 hook（与另一端同源）
   const { overview, records, loading, reload: load } = useAsmBoard()
-
   // ★ G5：项目漏斗（未买/在途/已入库/已领料/已做成成品）+ 跨项目汇总
   const [funnel, setFunnel] = useState<KittingFunnel | null>(null)
   const [crossRows, setCrossRows] = useState<ProjectFunnelRow[]>([])
@@ -77,19 +71,16 @@ export default function Assembly() {
   useEffect(() => {
     kittingProjects().then(setCrossRows).catch(() => setCrossRows([]))
   }, [overview])
-
   useEffect(() => {
     listProjects()
       .then((rows) => setProjects(rows.map((p) => ({ project_no: p.project_no, project_name: p.project_name }))))
       .catch(() => undefined)
   }, [])
-
   const pickProject = (pno?: string) => {
     setProjectNo(pno)
     setDetail(null)
     void load(pno)
   }
-
   const openDetail = async (equipNo: string) => {
     if (!projectNo) return
     try {
@@ -98,7 +89,6 @@ export default function Assembly() {
       message.error(errMsg(e))
     }
   }
-
   const doStart = async () => {
     if (!startTarget || !projectNo) return
     let v
@@ -122,11 +112,9 @@ export default function Assembly() {
       setSaving(false)
     }
   }
-
   const [finishTarget, setFinishTarget] = useState<AssemblyRecordRow | null>(null)
   const [finishInitial, setFinishInitial] = useState<Record<string, unknown>>({})
   const [finishForm] = Form.useForm()
-
   const doFinish = async () => {
     if (!finishTarget) return
     let v: { unassembled?: { ref?: string; name?: string; qty?: number }[] }
@@ -145,13 +133,11 @@ export default function Assembly() {
       setSaving(false)
     }
   }
-
   const openDebug = (r: AssemblyRecordRow) => {
     setPhotos([])
     setDebugInitial({ result: '合格' })
     setDebugTarget(r)
   }
-
   const doDebug = async () => {
     if (!debugTarget) return
     let v
@@ -169,7 +155,6 @@ export default function Assembly() {
       setSaving(false)
     }
   }
-
   return (
     <Card
       title="装配 · 齐套率（S6）"
@@ -193,9 +178,7 @@ export default function Assembly() {
           齐套率 = 到位零件种数 / 全部零件种数（自制件已转运、外协合格、采购件已到/入库、库存够）
         </Typography.Text>
       </Space>
-
       {!projectNo && <Empty description="先选一个项目" />}
-
       {/* ★ G5 项目视角（主）：整个项目要的东西现在分布在哪一格 */}
       {projectNo && funnel && funnel.total > 0 && (
         <Card
@@ -227,7 +210,6 @@ export default function Assembly() {
           </Row>
         </Card>
       )}
-
       {/* ★ G5 跨项目汇总：同时多个项目在跑（采购/管理层看一眼全局） */}
       {crossRows.length > 1 && (
         <Card size="small" style={{ marginBottom: 16 }} title="跨项目齐套汇总（多项目并行）">
@@ -249,7 +231,6 @@ export default function Assembly() {
           />
         </Card>
       )}
-
       {projectNo && (
         <Row gutter={12} style={{ marginBottom: 16 }}>
           {overview.length === 0 && <Empty description="这个项目还没有设备" />}
@@ -286,7 +267,6 @@ export default function Assembly() {
           ))}
         </Row>
       )}
-
       {detail && (
         <Card
           size="small"
@@ -316,7 +296,6 @@ export default function Assembly() {
           />
         </Card>
       )}
-
       <Typography.Title level={5}>装配 / 厂内调试记录</Typography.Title>
       <Table<AssemblyRecordRow>
         rowKey="id"
@@ -331,7 +310,7 @@ export default function Assembly() {
             key: 'pe',
             width: 160,
             render: (_: unknown, r: AssemblyRecordRow) => (
-              <a onClick={() => nav(`/projects/${r.project_no}`)}>
+              <a onClick={() => go(`/projects/${r.project_no}`)}>
                 {r.project_no} · {r.equip_no}
               </a>
             ),
@@ -384,7 +363,6 @@ export default function Assembly() {
           },
         ]}
       />
-
       {/* ★ §2.1 装配完成 + 未装清单（客户：一个设备 100 个零件只装了 80 → 发「1 组装体 + 20 零件」） */}
       <AppModal
         open={!!finishTarget}
@@ -434,7 +412,6 @@ export default function Assembly() {
           )}
         </Form.List>
       </AppModal>
-
       {/* 开始装配 */}
       <AppModal
         open={!!startTarget}
@@ -471,7 +448,6 @@ export default function Assembly() {
             />
           </Form.Item>
       </AppModal>
-
       {/* 厂内调试 */}
       <AppModal
         open={!!debugTarget}

@@ -40,6 +40,7 @@ import {
   type ProjectDetail,
   type PurchaseRequestItem,
 } from '../../api/client'
+import { useBack } from '../../hooks/useFrom'
 
 /**
  * 立项（00 卷 §3 S1）：项目组全体会议要定的三件事
@@ -51,6 +52,8 @@ import {
 export default function ProjectInitiate() {
   const { projectNo = '' } = useParams()
   const nav = useNavigate()
+  // ★ docs/11：从台里点进来的，返回口要回**那个台**（并回到原来那个页签）；没有来源时行为完全不变
+  const back = useBack(`/projects/${projectNo}`, '← 返回项目')
   const { message } = App.useApp()
 
   const [detail, setDetail] = useState<ProjectDetail | null>(null)
@@ -174,7 +177,7 @@ export default function ProjectInitiate() {
         <Row align="middle">
           <Col flex="auto">
             <Space size={8}>
-              <a onClick={() => nav(`/projects/${projectNo}`)}>← 返回项目</a>
+              <a onClick={() => nav(back.to)}>{back.label}</a>
               <Typography.Text strong style={{ fontSize: 16 }}>
                 立项 · {projectNo}
               </Typography.Text>

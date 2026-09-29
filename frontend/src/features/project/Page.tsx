@@ -1,26 +1,23 @@
 import { App, Button, Card, Space, Table, Tag, Tooltip, Typography } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import { useCallback, useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-
 import AttachmentPreviewModal, { type PreviewState } from '../../components/AttachmentPreviewModal'
 import { errMsg, listProjects, previewAttachment, type Project } from '../../api/client'
 import { PROJECT_STAGE as STAGE_COLOR } from '../../theme/status'
-
+import { useGoFrom } from '../../hooks/useFrom'
 function isImage(name: string) {
   return ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'svg'].includes(
     name.split('.').pop()?.toLowerCase() ?? '',
   )
 }
-
 export default function Projects() {
   const { message } = App.useApp()
-  const nav = useNavigate()
+  // ★ docs/11：跳去别的域时带上 ?from= （来源台/来源页），回来还在原来那一层
+  const go = useGoFrom()
   const [rows, setRows] = useState<Project[]>([])
   const [loading, setLoading] = useState(false)
   const [preview, setPreview] = useState<PreviewState | null>(null)
   const [hoverNo, setHoverNo] = useState<string | null>(null)
-
   const load = useCallback(async () => {
     setLoading(true)
     try {
@@ -31,14 +28,11 @@ export default function Projects() {
       setLoading(false)
     }
   }, [message])
-
   useEffect(() => {
     void load()
   }, [load])
-
   /** 打开项目详情页（独立页面，有 URL，可刷新/收藏/后退） */
-  const openDetail = (projectNo: string) => nav(`/projects/${projectNo}`)
-
+  const openDetail = (projectNo: string) => go(`/projects/${projectNo}`)
   /** 点资料标签 → 就地预览，不跳转 */
   const previewFile = async (projectNo: string, id: number, filename: string) => {
     try {
@@ -54,7 +48,6 @@ export default function Projects() {
       message.error(errMsg(e))
     }
   }
-
   const columns: ColumnsType<Project> = [
     {
       title: '项目编号',
@@ -163,7 +156,6 @@ export default function Projects() {
         ) : null,
     },
   ]
-
   return (
     <Card
       title="商机 / 项目"
@@ -173,7 +165,7 @@ export default function Projects() {
             点任意一行看详情 · 点资料标签就地预览
           </Typography.Text>
           <Button onClick={() => void load()}>刷新</Button>
-          <Button type="primary" onClick={() => nav('/projects/new')}>
+          <Button type="primary" onClick={() => go('/projects/new')}>
             新建商机
           </Button>
         </Space>
@@ -195,9 +187,7 @@ export default function Projects() {
           style: { cursor: 'pointer' },
         })}
       />
-
       <AttachmentPreviewModal state={preview} onClose={() => setPreview(null)} />
-
     </Card>
   )
 }
