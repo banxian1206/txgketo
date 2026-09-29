@@ -171,6 +171,22 @@ def q(sql: str, **kw):
         return [dict(r._mapping) for r in c.execute(text(sql), kw)]
 
 
+def ex(sql: str, **kw) -> None:
+    """★ **测试夹具写入**（只用来造前置，不改应用行为 —— 与 `q()`/`reset()` 同源）。
+    用途：归档那条要把质保期挪到过去，而 `PATCH /projects` 改不了 `warranty_end`。
+    """
+    e = create_engine(DBURL)
+    with e.begin() as c:
+        c.execute(text(sql), kw)
+
+
+def notif_titles(who: str) -> list[str]:
+    """某人的站内消息标题（/notifications 返回 {unread, items:[…]}）。"""
+    d = api.req("get", "/notifications", who)
+    rows = d.get("items") if isinstance(d, dict) else d
+    return [str(x.get("title") or "") for x in (rows or [])]
+
+
 def reset() -> None:
     e = create_engine(DBURL)
     with e.begin() as c:
@@ -650,6 +666,11 @@ def a_s7() -> None:
             json={"vehicle": "平板车", "driver": "张三", "plate_no": "粤B12345", "photos": CTX["ph"]})
     # ★ depart 只接受「已装车」
     api.req("post", f"/shipping/{sid}/depart", "pm1", json={})
+    # ★ G2（09 卷 §3）：发运 → **提醒商务部收「发货款」**（只提醒，不卡流程）
+    _ts = notif_titles("sales1")
+    _hit = [x for x in _ts if x.startswith("该收款了") and "发货" in x]
+    rec(bool(_hit), "★ 发运 → 提醒商务部收「发货款」",
+        f"sales1 收到：{_hit[0][:70]}" if _hit else f"未收到（现有 {len(_ts)} 条消息）")
     api.req("post", f"/shipping/{sid}/arrive", "pm1", json={})
     det = api.req("get", f"/shipping/{sid}", "pm1")
     rec(det["status"] == "已到货", f"发运终态={det['status']}")
@@ -712,6 +733,11 @@ def a_s10() -> None:
                 data={"doc_type": dt}, files=[("files", (f"{dt}.pdf", PDF, "application/pdf"))])
     api.req("post", f"/acceptance/{aid}/confirm", "pm1", json={
         "result": "通过", "signed_by": "客户 赵经理", "accepted_at": d(0)})
+    # ★ G2：验收通过 → **提醒「验收款」+「质保金」**
+    _ts2 = notif_titles("sales1")
+    _hit2 = [x for x in _ts2 if x.startswith("该收款了") and ("验收" in x or "质保" in x)]
+    rec(len(_hit2) >= 1, "★ 验收通过 → 提醒商务部收「验收款/质保金」",
+        f"sales1 收到：{_hit2[0][:70]}" if _hit2 else "未收到")
     got = api.req("get", f"/projects/{p}", "pm1")
     rec(got["stage"] == "质保", f"验收通过 → 项目阶段={got['stage']}", "应为「质保」")
     rec(bool(got.get("warranty_start")) and bool(got.get("warranty_end")),
@@ -1415,6 +1441,50 @@ def c_authz_codes() -> None:
         CTX["cr_id"] = crid
 
 
+def c_archive() -> None:
+    """★ G1（09 卷 §3）：质保期过 → **自动归档**（惰性扫描）——本条全链路断言原先缺失（Q-4）。"""
+    probe("C3 项目自动归档（G1 · 09 卷 §3）")
+    p = CTX["p"]
+    before = q("SELECT warranty_end FROM project WHERE project_no=:p", p=p)[0]["warranty_end"]
+    ex("UPDATE project SET warranty_end = current_date - 5 WHERE project_no=:p", p=p)
+    api.req("get", "/projects", "sales1")  # 惰性扫描入口
+    row = q("SELECT stage, archived_at FROM project WHERE project_no=:p", p=p)[0]
+    rec(row["stage"] == "已归档" and row["archived_at"] is not None,
+        f"★ 质保期过 → 自动归档（stage={row['stage']}）", "在 GET /projects 时惰性扫描")
+    api.req("get", f"/projects/{p}", "sales1")
+    n = q("SELECT count(*) c FROM project WHERE project_no=:p AND stage='已归档'", p=p)[0]["c"]
+    rec(n == 1, "再读两次仍幂等（只归档一次）")
+    sc, bd = api.try_("patch", f"/projects/{p}", "sales1", json={"project_desc": "想改归档项目"})
+    rec(sc == 400, f"★ 已归档 = 只读（改字段 → HTTP {sc}，应 400）", str(bd)[:110])
+    # 还原环境（让终态仍停在「质保」，与报告 §5 的口径一致）
+    ex("UPDATE project SET warranty_end=:w, stage='质保', archived_at=NULL WHERE project_no=:p",
+       w=before, p=p)
+
+
+def c_excel_import() -> None:
+    """★ Excel/CSV 历史采购导入（§8.3 第 1 条）——本条全链路断言原先缺失（Q-4）。"""
+    probe("C4 Excel/CSV 历史采购导入")
+    csv = "物料,供应商,单价,数量,日期\nE2E-IMP-1,E2E导入供应商,88.5,3,2025-06-01\n".encode()
+    r = api.raw("post", "/purchase/import-history", "buyer1",
+                files={"file": ("hist.csv", csv, "text/csv")})
+    rec(r.status_code == 200, f"上传 CSV → HTTP {r.status_code}", r.text[:140])
+    if r.status_code != 200:
+        return
+    j = r.json()
+    rec(j["imported"] == 1 and "E2E-IMP-1" in j["created_items"],
+        f"导入 1 条 + 库外物料自动建（created_items={j['created_items']}）")
+    r2 = api.raw("post", "/purchase/import-history", "buyer1",
+                 files={"file": ("hist.csv", csv, "text/csv")})
+    j2 = r2.json()
+    rec(j2["imported"] == 0 and j2["skipped_duplicate"] == 1,
+        "同一份再导 → 跳过重复（幂等）", f"imported={j2['imported']} skipped={j2['skipped_duplicate']}")
+    ref = api.req("get", "/purchase/price-reference/E2E-IMP-1", "buyer1")
+    rec("88.5" in str(ref) or 88.5 in str(ref), "导入的价在「价格参考」里查得到", str(ref)[:150])
+    r3 = api.raw("post", "/purchase/import-history", "wh1",
+                 files={"file": ("h.csv", csv, "text/csv")})
+    rec(r3.status_code == 403, f"反控：仓管导入 → HTTP {r3.status_code}（应 403，需 purchase:edit）")
+
+
 def c_review_authz() -> None:
     probe("C2 评审审核的授权码")
     # ★ 真正的负控已前移到 S2（`_assert_review_authz`）——提交完当场断言，天然有"审核中"的单。
@@ -1529,7 +1599,8 @@ def main() -> None:
                 sev="失败")
 
     part("Part C · 授权探针")
-    for fn in (c_authz_codes, c_review_authz, c_write_no_perm, c_money_scrub, c_longlead_no_perm):
+    for fn in (c_authz_codes, c_review_authz, c_write_no_perm, c_money_scrub, c_longlead_no_perm,
+               c_archive, c_excel_import):
         try:
             fn()
         except Exception as exc:  # noqa: BLE001
