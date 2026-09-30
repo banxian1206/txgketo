@@ -10,15 +10,18 @@ import PriceReferencePanel from '../../components/PriceReferencePanel'
 import { REBUY_SOURCES } from '../../configs/domain'
 import PurchaseOrderDrawer from '../../components/PurchaseOrderDrawer'
 import ReceiptNegotiateModal from '../../components/ReceiptNegotiateModal'
+import VehicleModal from '../../components/VehicleModal'
 import {
   errMsg,
   listSuppliers,
   listGoodsReceipts,
   purchaseOrders,
   purchasePool,
+  purchaseToVehicle,
   hasPerm,
   type GoodsReceiptRow,
   type PurchaseOrderSummary,
+  type ToVehicleRow,
   type PurchasePoolDemand,
   type PurchasePoolGroup,
 } from '../../api/client'
@@ -52,6 +55,9 @@ export default function PurchaseWorkbench() {
   const [mergeOpen, setMergeOpen] = useState(false)
   const [orderKey, setOrderKey] = useState<string | null>(null)
   const [approveKey, setApproveKey] = useState<string | null>(null)
+  // ★ §2.2 叫车是采购的活，而采购进不去发运台 → 采购台里必须能叫（2026-09-30 P1-1 发运死锁）
+  const [toVehicle, setToVehicle] = useState<ToVehicleRow[]>([])
+  const [vehicleTarget, setVehicleTarget] = useState<ToVehicleRow | null>(null)
   // A4：到货跟踪行内带供应商联系方式（催货一屏可见 —— 方案 §2.0.4）
   const [supMap, setSupMap] = useState<Record<number, { contact_name?: string | null; phone?: string | null }>>({})
   useEffect(() => {
@@ -71,7 +77,7 @@ export default function PurchaseWorkbench() {
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const [p, o, failed, replaced, returned, pending, done, site] = await Promise.all([
+      const [p, o, failed, replaced, returned, pending, done, site, veh] = await Promise.all([
         purchasePool(),
         purchaseOrders(),
         listGoodsReceipts({ status: '不合格' }),
@@ -80,6 +86,7 @@ export default function PurchaseWorkbench() {
         listGoodsReceipts({ status: '待入库' }),
         listGoodsReceipts({ status: '已入库' }),
         listGoodsReceipts({ status: '现场已验收' }),
+        hasPerm('purchase:edit') ? purchaseToVehicle().catch(() => []) : Promise.resolve([]),
       ])
       setPool(p)
       setOrders(o)
@@ -88,6 +95,7 @@ export default function PurchaseWorkbench() {
         [...replaced, ...returned].sort((a, b) => (b.resolved_at ?? '').localeCompare(a.resolved_at ?? '')),
       )
       setDoneReceipts([...pending, ...done, ...site])
+      setToVehicle(veh)
     } catch (e) {
       message.error(errMsg(e))
     } finally {
@@ -101,7 +109,9 @@ export default function PurchaseWorkbench() {
   const openOrders = orders.filter(
     (o) => !['已取消', '已完成', '草稿', '待经理审', '待总监审', '已退回'].includes(o.status),
   )
-  const toApprove = orders.filter((o) => ['待经理审', '待总监审'].includes(o.po_status ?? ''))
+  // ★ 只列**当前这一级真的轮到我**的单（后端 can_approve 判定）。
+  //   过去按 po_status 取「待经理审 + 待总监审」两种 → 经理列表里混着待总监审的单、点了必 403（P2-1）
+  const toApprove = orders.filter((o) => o.can_approve)
   // 到货跟踪 = 没到齐的单（在途/部分到货），按预计到货日升序；超期红、3天内临期黄
   const arrivals = orders
     .filter((o) => o.status === '在途' || o.status === '部分到货')
@@ -174,6 +184,60 @@ export default function PurchaseWorkbench() {
                       render: (_: unknown, r: PurchaseOrderSummary) => (
                         <Button type="primary" size="small" onClick={() => setApproveKey(r.key)}>
                           审批
+                        </Button>
+                      ),
+                    },
+                  ]}
+                />
+              </>
+            ),
+          },
+          // ---------------------------------------------------------------- ①b 待叫车（§2.2 一条指令、两个部门）
+          {
+            key: 'vehicle',
+            label: `待叫车 (${toVehicle.length})`,
+            children: (
+              <>
+                <Typography.Paragraph type="secondary" style={{ fontSize: 12 }}>
+                  项目经理下达发货指令后，<b>车由采购叫</b>：按发货日当天把车订好，
+                  登记「几辆车 + 本次运费」。装货的人据此知道当天装几车 ——
+                  <b>没叫车，发运那边装不了车</b>。车辆费用只记本次金额，不进价格库。
+                </Typography.Paragraph>
+                <Table<ToVehicleRow>
+                  rowKey="id"
+                  size="small"
+                  loading={loading}
+                  dataSource={toVehicle}
+                  pagination={false}
+                  locale={{ emptyText: <Empty description="没有等着叫车的发货批次" /> }}
+                  columns={[
+                    { title: '发运单号', dataIndex: 'shipment_no', width: 130 },
+                    {
+                      title: '项目 / 发货日',
+                      key: 'p',
+                      render: (_: unknown, r: ToVehicleRow) => (
+                        <Space direction="vertical" size={0}>
+                          <span>{r.project_no} {r.project_name ?? ''}</span>
+                          <Typography.Text type={r.plan_ship_date ? 'secondary' : 'warning'} style={{ fontSize: 12 }}>
+                            {r.plan_ship_date ? `发货日 ${r.plan_ship_date}` : '⚠ 没填发货日 —— 请找项目经理确认哪天发'}
+                          </Typography.Text>
+                        </Space>
+                      ),
+                    },
+                    { title: '批次状态', dataIndex: 'status', width: 100 },
+                    {
+                      title: '指令时间',
+                      dataIndex: 'instruct_at',
+                      width: 130,
+                      render: (v?: string | null) => (v ? dayjs(v).format('MM-DD HH:mm') : '—'),
+                    },
+                    {
+                      title: '',
+                      key: 'a',
+                      width: 100,
+                      render: (_: unknown, r: ToVehicleRow) => (
+                        <Button type="primary" size="small" onClick={() => setVehicleTarget(r)}>
+                          叫车
                         </Button>
                       ),
                     },
@@ -997,6 +1061,11 @@ export default function PurchaseWorkbench() {
         open={drawerOpen}
         onClose={() => setDrawerOpen(false)}
         onChanged={() => void load()}
+      />
+      <VehicleModal
+        target={vehicleTarget}
+        onClose={() => setVehicleTarget(null)}
+        onDone={() => void load()}
       />
       <ReceiptNegotiateModal
         open={negotiate.open}

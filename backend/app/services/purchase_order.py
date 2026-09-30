@@ -157,6 +157,24 @@ def submit_order(session: Session, po: PurchaseOrder, submitter: User) -> str:
     return po.status
 
 
+def can_approve(session: Session, po: PurchaseOrder, user: User) -> bool:
+    """这张单**当前这一级**是不是我能批。
+
+    ★ 与 `approve_order` 同一套判定（同一个 `resolve_po_chain`），绝不让前端拿 `position` 去猜。
+    2026-09-30 UI 真实场景测试 P2-1：经理的「待我审批」里混着「待总监审」的单、
+    总监列表里混着「待经理审」的单，按钮照样能点 → 点了必 403
+    （AGENTS 明令禁止的那种“看得见、点不了”）。
+    """
+    if po.status not in (PO_PENDING_LEAD, PO_PENDING_DIRECTOR):
+        return False
+    submitter = session.get(User, po.created_by) if po.created_by else None
+    if submitter is None:
+        return False
+    lead, boss = resolve_po_chain(session, submitter)
+    who = lead if po.status == PO_PENDING_LEAD else boss
+    return who is not None and who.id == user.id
+
+
 def approve_order(
     session: Session,
     po: PurchaseOrder,

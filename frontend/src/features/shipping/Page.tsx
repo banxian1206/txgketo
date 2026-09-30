@@ -11,7 +11,6 @@ import {
   Empty,
   Form,
   Input,
-  InputNumber,
   Modal,
   Row,
   Select,
@@ -37,7 +36,6 @@ import {
   loadShipment,
   markShipItems,
   receiptShipment,
-  requestVehicle,
   setItemPlacePhotos,
   shipPhotoUrl,
   uploadShipPhotos,
@@ -46,6 +44,7 @@ import {
   type ToShipRow,
 } from '../../api/client'
 import AuthedImage from '../../components/AuthedImage'
+import VehicleModal from '../../components/VehicleModal'
 import MfgPhotoPicker from '../../components/MfgPhotoPicker'
 import { SHIP_STATUS as SHIP_COLOR } from '../../theme/status'
 import { T } from '../../theme/tokens'
@@ -75,7 +74,6 @@ export default function Shipping() {
 
   // ★ §2.2 叫车（采购）
   const [vehicleTarget, setVehicleTarget] = useState<ShipmentRow | null>(null)
-  const [vehicleForm] = Form.useForm()
 
   // 现场清点
   const [receiptTarget, setReceiptTarget] = useState<ShipmentRow | null>(null)
@@ -381,7 +379,7 @@ export default function Shipping() {
                   <Space size={4} wrap>
                     {canEdit && ['已指令', '发货中', '已装车'].includes(r.status) && <a onClick={() => void openItems(r)}>发运清单</a>}
                     {canBuy && r.vehicle_status !== '已叫车' && ['已指令', '发货中'].includes(r.status) && (
-                      <a onClick={() => { setVehicleTarget(r); vehicleForm.resetFields() }}>叫车</a>
+                      <a onClick={() => setVehicleTarget(r)}>叫车</a>
                     )}
                     {canEdit && ['已指令', '发货中', '已装车'].includes(r.status) && <a onClick={() => { setLoadPhotos([]); setLoadTarget(r) }}>装车</a>}
                     {canEdit && r.status === '已装车' && <a onClick={() => void doDepart(r)}>发运</a>}
@@ -453,44 +451,13 @@ export default function Shipping() {
         )}
       </Modal>
 
-      {/* ★ §2.2 采购叫车（一条指令、两个部门：PM 定发货日 → 采购叫车 → 发运装车） */}
-      <Modal
-        open={!!vehicleTarget}
-        title={`采购叫车 · ${vehicleTarget?.shipment_no ?? ''}`}
-        onCancel={() => setVehicleTarget(null)}
-        onOk={() =>
-          vehicleForm.validateFields().then(async (v) => {
-            if (!vehicleTarget) return
-            try {
-              await requestVehicle(vehicleTarget.id, { count: Number(v.count), fee: v.fee ? Number(v.fee) : undefined, note: v.note })
-              message.success('已叫车，发运可以装车了')
-              setVehicleTarget(null)
-              await load(projectNo)
-            } catch (e) { message.error(errMsg(e)) }
-          })
-        }
-        confirmLoading={saving}
-        okText="确认已叫车"
-        destroyOnHidden
-      >
-        <Typography.Paragraph type="secondary" style={{ fontSize: 12 }}>
-          按 PM 定的「发货日」当天把车订好；装货的人据此知道当天装几车。
-          车辆费用只记**本次**金额，不进价格库。
-        </Typography.Paragraph>
-        <Form form={vehicleForm} layout="vertical" preserve={false}>
-          <Space style={{ display: 'flex' }} size="middle" align="start">
-            <Form.Item name="count" label="几辆车" rules={[{ required: true, message: '装货的人要知道当天几车' }]}>
-              <InputNumber min={1} style={{ width: 110 }} />
-            </Form.Item>
-            <Form.Item name="fee" label="本次运费（不进价格库）">
-              <InputNumber min={0} style={{ width: 150 }} placeholder="如 1800" />
-            </Form.Item>
-            <Form.Item name="note" label="承运商 / 备注">
-              <Input style={{ width: 200 }} placeholder="如 顺达物流 17.5米" />
-            </Form.Item>
-          </Space>
-        </Form>
-      </Modal>
+      {/* ★ §2.2 采购叫车（一条指令、两个部门：PM 定发货日 → 采购叫车 → 发运装车）
+          弹窗实现**只有一个**（components/VehicleModal），采购台「待叫车」页签共用 —— 不在两处各写一套。 */}
+      <VehicleModal
+        target={vehicleTarget}
+        onClose={() => setVehicleTarget(null)}
+        onDone={() => void load(projectNo)}
+      />
 
       {/* 装车 */}
       <Modal

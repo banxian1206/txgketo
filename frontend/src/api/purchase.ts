@@ -23,6 +23,8 @@ export interface PurchaseOrderSummary {
   deliver_address?: string | null
   status: string
   po_status?: string | null
+  /** ★ 当前这一级是否我可以批（后端算，前端不再按 position 猜 —— 2026-09-30 P2-1） */
+  can_approve?: boolean
   pay_status?: string | null
   line_count: number
   item_kinds: number
@@ -621,5 +623,24 @@ export async function importPurchaseHistory(file: File) {
   const form = new FormData()
   form.append('file', file)
   const { data } = await api.post<ImportHistoryResult>('/purchase/import-history', form)
+  return data
+}
+
+// ---------------------- 待叫车（09 卷 §2.2：一条发货指令指挥两个部门） ----------------------
+// PM 下发货指令 → **采购叫车**（当天把车订回来，登记几车 + 本次运费）→ 发运才能装车。
+// ★ 采购员没有 ship:edit / project:edit，进不去发运台（2026-09-30 UI 测试 P1-1：
+//   接口早就有、前端从没调用过 → 叫车无入口 → 装车被硬拦 → 发运死锁）。
+export interface ToVehicleRow {
+  id: number
+  shipment_no: string
+  project_no: string
+  project_name?: string | null
+  plan_ship_date?: string | null
+  status: string
+  instruct_at?: string | null
+}
+
+export async function purchaseToVehicle() {
+  const { data } = await api.get<ToVehicleRow[]>('/purchase/to-vehicle')
   return data
 }

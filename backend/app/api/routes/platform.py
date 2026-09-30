@@ -346,6 +346,26 @@ def list_roles(session: Session = Depends(get_session), _: User = Depends(get_cu
     return [RoleOut(id=r.id, code=r.code, name=r.name) for r in rows]
 
 
+def _lite_row(u: User) -> UserAdminOut:
+    """降级视图（无 `admin:users` 的人读 /users）。
+
+    ★ 只遮**身份凭证类**字段：roles / permissions / phone / title（重整方案 docs/10 §8.1 拍板#5）。
+    ★ **不遮部门属性** org_id / position / profession —— 它们不是秘密（项目详情、任务单上本来就处处显示），
+      而且「经理拆分派工」止 (`features/task/Page.tsx`) 就是按 `profession + position` 筛组员的：
+      一并抹成 null 会让经理看到“本专业还没有组员”→ 05 卷 P2 派工链在 UI 上直接断掉（2026-09-30 实测 P0-1）。
+    """
+    return UserAdminOut(
+        id=u.id,
+        username=u.username,
+        name=u.name,
+        org_id=u.org_id,
+        position=u.position,
+        profession=u.profession,
+        is_active=u.is_active,
+        is_superuser=u.is_superuser,
+    )
+
+
 @router.get("/users", response_model=list[UserAdminOut])
 def list_users(
     org_id: int | None = Query(default=None, description="按组织（含下级）过滤"),
@@ -359,8 +379,8 @@ def list_users(
 
     ★ 分级返回（重整方案 docs/10 §8.1 拍板#5）：
       · 有 `admin:users`（管理员=全部 / 总监=本部门）→ 全字段，含 roles/permissions/phone，供用户管理页用
-      · 其他人 → **降级视图**（只 id/username/name/org_id/is_superuser）：选人控件、成员归属显示照常能用了，
-        但不再把「每个人的角色与权限清单 + 手机号」摊给全员（原来只要登录就能读全量）
+      · 其他人 → **降级视图**（遮 roles/permissions/phone，保留部门属性）：选人控件、
+        成员归属、**经理拆分派工筛组员**照常能用，但不再把「每个人的角色与权限清单 + 手机号」摊给全员
     """
     can_manage = _scope(session, current)["can_manage"]
     stmt = select(User).order_by(User.id)
@@ -376,18 +396,7 @@ def list_users(
         rows = [u for u in rows if any(r.code == role_code for r in u.roles)]
     if not can_manage:
         # 显式构造（不靠 response_model 把缺的字段悄悄补成默认值）
-        # 前端三处选人控件只声明 { id, name }（CreatePage/InitiatePage/DetailPage）→ 不受影响
-        return [
-            UserAdminOut(
-                id=u.id,
-                username=u.username,
-                name=u.name,
-                org_id=u.org_id,
-                is_active=u.is_active,
-                is_superuser=u.is_superuser,
-            )
-            for u in rows
-        ]
+        return [_lite_row(u) for u in rows]
     return [
         UserAdminOut(**UserOut.model_validate(u).model_dump(), roles=[x.code for x in u.roles])
         for u in rows

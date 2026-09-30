@@ -2724,6 +2724,7 @@ def _po_order_summary(
     projects: dict,
     equips: dict,
     agg: dict[int, dict[str, float]],
+    can_approve: bool = False,
 ) -> dict:
     projs: list[dict] = []
     eqs: list[dict] = []
@@ -2753,6 +2754,8 @@ def _po_order_summary(
         "deliver_address": po.deliver_address,
         "status": _po_display_status(po, lines),
         "po_status": po.status,
+        # ★ 当前这一级是不是**我**能批（后端单一口径，前端不再按 position 猜 —— P2-1）
+        "can_approve": can_approve,
         "pay_status": po.pay_status,
         "line_count": len(lines),
         "item_kinds": len({ln.item_no for ln in lines}),
@@ -2885,7 +2888,21 @@ def list_purchase_orders(
         by_po.setdefault(ln.po_id, []).append(ln)
     rids = [ln.request_id for lns in by_po.values() for ln in lns if ln.request_id]
     agg = _receipt_qty_map(session, rids)
-    out = [_po_order_summary(po, by_po.get(po.id, []), projects, equips, agg) for po in pos]
+    from app.services import purchase_order as po_svc
+
+    # 「待我审批」的归属只算**审批中**的单（其余状态 can_approve 永远 False，不必查库）
+    approvable = {p.id for p in pos if p.status in ("待经理审", "待总监审")}
+    out = [
+        _po_order_summary(
+            po,
+            by_po.get(po.id, []),
+            projects,
+            equips,
+            agg,
+            can_approve=po.id in approvable and po_svc.can_approve(session, po, current),
+        )
+        for po in pos
+    ]
     out.sort(key=lambda o: (o["ordered_at"] or date.min, o["key"]), reverse=True)
     # ★ G5：单据视角是采购/仓库的日常工作口，但**保留项目筛选**（“这个项目的件验收/入库没有”要能查）
     if project_no:

@@ -53,6 +53,8 @@ export function tabLabel(def: TabDef, counts?: Record<string, number> | null): s
 /** 采购工作台（键与页面现状一一对应；「验收不合格 + 退换记录 → 异常处理」的内容合并留给 P2） */
 export const PURCHASE_TABS: TabDef[] = [
   { key: 'approve', label: '待我审批', anyOf: ['purchase:edit'], writeOnly: true },
+  // ★ §2.2 叫车是采购的活，而采购进不去发运台 → 必须在采购台里能干（2026-09-30 P1-1）
+  { key: 'vehicle', label: '待叫车', anyOf: ['purchase:edit'], writeOnly: true },
   { key: 'pool', label: '采购池', anyOf: ['purchase:view', 'purchase:edit'] },
   { key: 'orders', label: '采购单', anyOf: ['purchase:view', 'purchase:edit'] },
   { key: 'arrivals', label: '到货跟踪', anyOf: ['purchase:view', 'purchase:edit'] },
