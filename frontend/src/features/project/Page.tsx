@@ -1,53 +1,47 @@
-import { App, Button, Card, Space, Table, Tag, Tooltip, Typography } from 'antd'
+import { App, Button, Card, Input, Select, Space, Table, Tag, Tooltip, Typography } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import { useCallback, useEffect, useState } from 'react'
-import AttachmentPreviewModal, { type PreviewState } from '../../components/AttachmentPreviewModal'
-import { errMsg, listProjects, previewAttachment, type Project } from '../../api/client'
+import { errMsg, listProjects, type Project } from '../../api/client'
 import { PROJECT_STAGE as STAGE_COLOR } from '../../theme/status'
 import { useGoFrom } from '../../hooks/useFrom'
-function isImage(name: string) {
-  return ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'svg'].includes(
-    name.split('.').pop()?.toLowerCase() ?? '',
-  )
-}
+import { useUrlState } from '../../hooks/useUrlState'
+const STAGES = ['线索', '成交待立项', '执行中', '交付中', '质保', '已归档', '已关闭']
+
 export default function Projects() {
   const { message } = App.useApp()
   // ★ docs/11：跳去别的域时带上 ?from= （来源台/来源页），回来还在原来那一层
   const go = useGoFrom()
   const [rows, setRows] = useState<Project[]>([])
   const [loading, setLoading] = useState(false)
-  const [preview, setPreview] = useState<PreviewState | null>(null)
   const [hoverNo, setHoverNo] = useState<string | null>(null)
+  // ★ P3：筛选条件进 URL（docs/12 §2-A）——「筛好一轮回头还要用」不该被刷新抹掉
+  const [filters, setFilters] = useUrlState({ stage: undefined, q: undefined })
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      setRows(await listProjects())
+      const all = await listProjects()
+      const q = (filters.q ?? '').trim().toLowerCase()
+      setRows(
+        all.filter(
+          (r: Project) =>
+            (!filters.stage || r.stage === filters.stage) &&
+            (!q ||
+              r.project_no.toLowerCase().includes(q) ||
+              (r.project_name ?? '').toLowerCase().includes(q) ||
+              (r.customer_name ?? '').toLowerCase().includes(q)),
+        ),
+      )
     } catch (e) {
       message.error(errMsg(e))
     } finally {
       setLoading(false)
     }
-  }, [message])
+  }, [message, filters.stage, filters.q])
   useEffect(() => {
     void load()
   }, [load])
   /** 打开项目详情页（独立页面，有 URL，可刷新/收藏/后退） */
   const openDetail = (projectNo: string) => go(`/projects/${projectNo}`)
-  /** 点资料标签 → 就地预览，不跳转 */
-  const previewFile = async (projectNo: string, id: number, filename: string) => {
-    try {
-      const r = await previewAttachment(projectNo, {
-        id,
-        filename,
-        category: '',
-        is_frozen: false,
-        uploaded_at: '',
-      })
-      setPreview({ name: filename, kind: r.kind, url: r.url, text: r.text })
-    } catch (e) {
-      message.error(errMsg(e))
-    }
-  }
   const columns: ColumnsType<Project> = [
     {
       title: '项目编号',
@@ -72,11 +66,11 @@ export default function Projects() {
       width: 110,
       render: (v: string) => <Tag color={STAGE_COLOR[v] ?? 'default'}>{v}</Tag>,
     },
-    { title: '线索来源', dataIndex: 'source', width: 110 },
     {
-      title: '销售负责人',
+      // ★ 列治理（docs/12 §2-A：A 型页列 ≤7）：销售为主、来源为辅合成一列，省掉一整列
+      title: '销售 / 来源',
       dataIndex: 'sales_name',
-      width: 110,
+      width: 130,
       render: (v: string) => v || '—',
     },
     {
@@ -109,51 +103,15 @@ export default function Projects() {
     {
       title: '资料',
       key: 'attachments',
-      width: 330,
-      render: (_: unknown, r: Project) => {
-        const list = r.attachments_brief ?? []
-        if (!list.length) return <Typography.Text type="secondary">—</Typography.Text>
-        return (
-          <Space size={4} wrap onClick={(e) => e.stopPropagation()}>
-            <Tooltip title={`共 ${r.attachment_count} 份资料`}>
-              <Tag color="blue" style={{ marginInlineEnd: 0 }}>
-                {r.attachment_count} 份
-              </Tag>
-            </Tooltip>
-            {list.map((a) => (
-              <Tag
-                key={a.id}
-                style={{ cursor: 'pointer', marginInlineEnd: 0 }}
-                onClick={() => void previewFile(r.project_no, a.id, a.filename)}
-                title={`${a.category} · 点击预览`}
-              >
-                {isImage(a.filename) ? '🖼' : '📄'} {a.filename}
-              </Tag>
-            ))}
-            {(r.attachment_count ?? 0) > list.length && (
-              <Tag
-                style={{ cursor: 'pointer', marginInlineEnd: 0 }}
-                color="blue"
-                onClick={() => openDetail(r.project_no)}
-              >
-                +{(r.attachment_count ?? 0) - list.length}
-              </Tag>
-            )}
-          </Space>
-        )
-      },
-    },
-    {
-      title: '',
-      key: 'hint',
       width: 92,
-      align: 'right',
       render: (_: unknown, r: Project) =>
-        hoverNo === r.project_no ? (
-          <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-            查看详情 →
-          </Typography.Text>
-        ) : null,
+        (r.attachment_count ?? 0) > 0 ? (
+          <a onClick={(e) => { e.stopPropagation(); openDetail(r.project_no) }} title="到项目详情「范围与资料」里查看/预览">
+            {r.attachment_count} 份
+          </a>
+        ) : (
+          <Typography.Text type="secondary">—</Typography.Text>
+        ),
     },
   ]
   return (
@@ -162,7 +120,7 @@ export default function Projects() {
       extra={
         <Space>
           <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-            点任意一行看详情 · 点资料标签就地预览
+            点任意一行看详情 · 可按阶段/关键字筛选（筛选条件在 URL 里，可分享）
           </Typography.Text>
           <Button onClick={() => void load()}>刷新</Button>
           <Button type="primary" onClick={() => go('/projects/new')}>
@@ -171,6 +129,28 @@ export default function Projects() {
         </Space>
       }
     >
+      <Space wrap style={{ marginBottom: 12 }}>
+        <Select
+          allowClear
+          placeholder="阶段"
+          style={{ width: 150 }}
+          value={filters.stage}
+          onChange={(v: string | undefined) => setFilters({ stage: v })}
+          options={STAGES.map((s) => ({ value: s, label: s }))}
+        />
+        <Input.Search
+          allowClear
+          placeholder="项目号 / 名称 / 客户"
+          style={{ width: 260 }}
+          defaultValue={filters.q}
+          onSearch={(v: string) => setFilters({ q: v || undefined })}
+        />
+        {(filters.stage || filters.q) && (
+          <Button type="link" size="small" onClick={() => setFilters({ stage: undefined, q: undefined })}>
+            清空筛选
+          </Button>
+        )}
+      </Space>
       <Table<Project>
         rowKey="project_no"
         size="middle"
@@ -187,7 +167,6 @@ export default function Projects() {
           style: { cursor: 'pointer' },
         })}
       />
-      <AttachmentPreviewModal state={preview} onClose={() => setPreview(null)} />
     </Card>
   )
 }

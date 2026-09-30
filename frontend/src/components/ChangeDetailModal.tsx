@@ -5,6 +5,7 @@ import {
   Descriptions,
   Divider,
   Form,
+  Drawer,
   Input,
   InputNumber,
   Modal,
@@ -119,7 +120,7 @@ export default function ChangeDetailModal({ crId, open, onClose, onChanged }: Pr
   )
 
   return (
-    <Modal
+    <Drawer
       title={
         cr ? (
           <Space>
@@ -131,8 +132,8 @@ export default function ChangeDetailModal({ crId, open, onClose, onChanged }: Pr
         )
       }
       open={open}
-      width={760}
-      onCancel={onClose}
+      width={720}
+      onClose={onClose}
       footer={
         <Space>
           {canRevise && <Button onClick={() => setReviseOpen(true)}>修订 BOM 行</Button>}
@@ -308,6 +309,6 @@ export default function ChangeDetailModal({ crId, open, onClose, onChanged }: Pr
           </Form.Item>
         </Form>
       </Modal>
-    </Modal>
+    </Drawer>
   )
 }

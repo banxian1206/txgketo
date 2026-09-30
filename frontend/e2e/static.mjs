@@ -436,5 +436,39 @@ const FEATS = path.join(SRC, 'features');
     dup.length ? `这些台又加了数字卡，与页签计数重复：${dup.join(', ')}` : '采购/仓库/制造/现场台计数只在页签上（独有指标已上标题徽标）')
 }
 
+/* ══════════ P3 列表与详情（docs/12 §2-A / §5）══════════ */
+{
+  // 详情视图必须用抽屉（规范 §5.1：详情 Drawer 560~720；Modal 只留给动作）
+  const detailFiles = []
+  const walk = (d) => {
+    for (const f of fs.readdirSync(d)) {
+      const p2 = path.join(d, f)
+      if (fs.statSync(p2).isDirectory()) { walk(p2); continue }
+      if (/Detail(Modal)?\.tsx$/.test(f)) detailFiles.push(p2)
+    }
+  }
+  walk(path.join(SRC, 'components'))
+  const bad = detailFiles.filter((f) => {
+    const s = fs.readFileSync(f, 'utf8')
+    return !/<Drawer\b/.test(s)
+  })
+  check('DRAWER-详情用抽屉', detailFiles.length > 0 && bad.length === 0,
+    bad.length ? `这些详情视图还在用 Modal 当外壳（内容多、要滚动，抽屉才装得下）: ${bad.map((x) => x.replace(SRC, 'src')).join(', ')}`
+      : `${detailFiles.length} 个详情视图都是抽屉（内层动作弹窗允许保留）`)
+
+  // A 型页：筛选条件必须在 URL 里（刷新不丢、可分享），列表列数有上限
+  const LIST = { 'features/project/Page.tsx': 8, 'features/admin/LibraryPage.tsx': 10 }   // 基线棘轮：只许降
+  const bad2 = []
+  for (const [rel, maxCols] of Object.entries(LIST)) {
+    const f = path.join(SRC, rel)
+    if (!fs.existsSync(f)) { bad2.push(`${rel} 文件不见了`); continue }
+    const s = fs.readFileSync(f, 'utf8')
+    if (!/useUrlState\(/.test(s)) bad2.push(`${rel} 的筛选没进 URL（刷新就丢、链接发不出去）`)
+    const cols = (s.match(/title: '/g) || []).length
+    if (cols > maxCols) bad2.push(`${rel} 列数 ${cols} > 上限 ${maxCols}`)
+  }
+  check('LIST-筛选进URL且列数受控', bad2.length === 0, bad2.join('; ') || '项目列表：筛选在 URL、列数 7（≤8 基线）')
+}
+
 const fails = summary('静态回归');
 exitWith(fails);

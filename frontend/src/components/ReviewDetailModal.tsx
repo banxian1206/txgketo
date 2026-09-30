@@ -1,4 +1,4 @@
-import { Alert, App, Button, Descriptions, Divider, Input, Modal, Popconfirm, Space, Tag, Timeline, Typography } from 'antd'
+import { Alert, App, Button, Descriptions, Divider, Drawer, Input, Popconfirm, Space, Tag, Timeline, Typography } from 'antd'
 import { useCallback, useEffect, useState } from 'react'
 
 import {
@@ -91,7 +91,7 @@ export default function ReviewDetailModal({ ticketId, open, onClose, onChanged }
   const rounds = Array.from(new Set((detail?.items ?? []).map((i) => i.round_no))).sort((a, b) => a - b)
 
   return (
-    <Modal
+    <Drawer
       title={
         detail ? (
           <Space>
@@ -103,8 +103,8 @@ export default function ReviewDetailModal({ ticketId, open, onClose, onChanged }
         )
       }
       open={open}
-      width={760}
-      onCancel={onClose}
+      width={720}
+      onClose={onClose}
       footer={
         <Space>
           {canWithdraw && (
@@ -212,6 +212,6 @@ export default function ReviewDetailModal({ ticketId, open, onClose, onChanged }
           })}
         </>
       )}
-    </Modal>
+    </Drawer>
   )
 }

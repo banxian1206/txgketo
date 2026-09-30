@@ -1,3 +1,4 @@
+import { useUrlState } from '../../hooks/useUrlState'
 import {
   App,
   Button,
@@ -39,7 +40,9 @@ export default function Library() {
   const [cats, setCats] = useState<StdCategoryInfo[]>([])
   const [activeClass, setActiveClass] = useState<StdClassInfo | null>(null)
   const [items, setItems] = useState<StdItem[]>([])
-  const [q, setQ] = useState('')
+  // ★ P3：搜索词进 URL（/library?q=方通 可分享、刷新不丢）
+  const [libState, setLibState] = useUrlState({ q: undefined })
+  const q = libState.q ?? ''
   const [loading, setLoading] = useState(false)
   const [open, setOpen] = useState(false)
   const [initial, setInitial] = useState<Record<string, unknown>>({})
@@ -210,7 +213,8 @@ export default function Library() {
                 allowClear
                 placeholder="搜编码 / 品名 / 规格 / 品牌"
                 style={{ width: 240 }}
-                onSearch={(v) => setQ(v)}
+                onSearch={(v: string) => setLibState({ q: v || undefined })}
+                defaultValue={q}
               />
               <Button type="primary" disabled={!activeClass} onClick={openCreate}>
                 新建物料
