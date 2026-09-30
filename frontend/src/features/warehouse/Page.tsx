@@ -147,9 +147,14 @@ export default function Warehouse() {
     setGenErr(null)
     try {
       const r = await generateEquipmentIssue(genProject, genEquip)
-      message.success(
-        `已生成领料单 ${r.issue_no}（${r.line_count} 种${r.shortage_count ? `，缺料 ${r.shortage_count} 种` : '，库存都够'}）—— 到「领料」里去备料`,
-      )
+      // ★ 幂等（P1-7）：已有一张未结的领料单就复用它，不再重复建第二张
+      if (r.reused) {
+        message.info(r.reuse_hint ?? `已有一张未结的领料单 ${r.issue_no}，继续用它`)
+      } else {
+        message.success(
+          `已生成领料单 ${r.issue_no}（${r.line_count} 种${r.shortage_count ? `，缺料 ${r.shortage_count} 种` : '，库存都够'}）—— 到「领料」里去备料`,
+        )
+      }
       await load()
     } catch (e) {
       // P-20：错误常驻在卡片上，不只一闪而过的 toast

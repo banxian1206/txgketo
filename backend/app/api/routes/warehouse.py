@@ -432,6 +432,32 @@ def generate_issue(
             "这台设备还没有可领的料（标准件或材料 BOM 都是空的）",
         )
 
+    # ★ 幂等（2026-09-30 UI 真实场景测试 P1-7）：
+    #   同一设备连点两次「生成领料单」曾建出两张一模一样的单（MI26001 部分领料 + MI26002 待备料，
+    #   都是 5 行 3 种缺料）—— 库存只有一份，第二张永远备不齐，还长期占着「待领料」待办。
+    #   未关闭的单（待备料/已备料/部分领料）直接**复用**，不再重复建。
+    open_issue = session.scalar(
+        select(MaterialIssue)
+        .where(
+            MaterialIssue.project_no == project_no,
+            MaterialIssue.equip_no == equip_no,
+            MaterialIssue.status.in_((ISSUE_DRAFT, ISSUE_PICKED, ISSUE_PARTIAL)),
+        )
+        .order_by(MaterialIssue.id.desc())
+    )
+    if open_issue is not None:
+        items0 = {i.item_no: i for i in session.scalars(select(Item)).all()}
+        locs0 = {l.id: l for l in session.scalars(select(WarehouseLocation)).all()}
+        lines0 = session.scalars(
+            select(MaterialIssueLine).where(MaterialIssueLine.issue_id == open_issue.id)
+        ).all()
+        d = _issue_dict(open_issue, lines0, items0, locs0)
+        d["reused"] = True
+        d["reuse_hint"] = (
+            f"这台设备已有一张未结的领料单 {open_issue.issue_no}（{open_issue.status}）—— 继续用它，不用重复建"
+        )
+        return d
+
     issue_no = next_number(session, "ISSUE", scope_key=year_scope_key())
     issue = MaterialIssue(
         issue_no=issue_no,

@@ -184,6 +184,9 @@ export async function generateEquipmentIssue(projectNo: string, equipNo: string)
     line_count: number
     shortage_count: number
     lines: { display_name: string; qty_required: number; shortage: boolean }[]
+    /** ★ 幂等：这台设备已有未结的领料单 → 复用，没有再建一张（P1-7） */
+    reused?: boolean
+    reuse_hint?: string
   }>(`/warehouse/projects/${projectNo}/equipment/${equipNo}/generate-issue`)
   return data
 }

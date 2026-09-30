@@ -50,6 +50,28 @@ router = APIRouter(tags=["工程设计"])
 SOURCE_KINDS = ("自制件", "外协件", "外购件")
 
 
+def split_components_parts(
+    rows: list[tuple[str, str | None]], root_no: str | None = None
+) -> tuple[set[str], set[str]]:
+    """把图纸树切成（组件图号集, 零件图号集）—— 全站唯一口径。
+
+    · 零件 = **没有子图**的图纸；组件 = 有子图的图纸
+    · 设备总装图（root_no）是设备本身，**不算零件也不算组件**
+    · ★ 与“这张图有没有挂标准件”**无关**（2026-09-30 UI 真实场景测试 P1-8：
+      过去把挂了标准件的自制件踢出叶子 → 它不计入零件数、也不再被“必须配原材料”检查到，
+      实测“有 1 个自制件还没挂原材料（工艺部）”的提醒会在挂上标准件后凭空消失）
+
+    rows: [(drawing_no, parent_drawing_no), ...]
+    """
+    children: dict[str, int] = {}
+    for _no, parent in rows:
+        if parent:
+            children[parent] = children.get(parent, 0) + 1
+    comps = {no for no, _p in rows if no != root_no and children.get(no, 0) > 0}
+    parts = {no for no, _p in rows if no != root_no and children.get(no, 0) == 0}
+    return comps, parts
+
+
 def _get_project(session: Session, project_no: str) -> Project:
     p = session.get(Project, project_no)
     if p is None:
@@ -180,6 +202,13 @@ def get_design_tree(
     ]
 
     # 叶子 = 零件（不再按层级码判断 —— 零件可以挂在任意层级）
+    #
+    # ★ 2026-09-30 UI 真实场景测试 P1-8：原来叶子还额外要求“没有标准件行”：
+    #   一个自制件（如机架框架）只要挂了标准件（螺丝/导轨），它就被踢出 `leaves`：
+    #     · 不再计入零件数（实测：设备头显示“零件 1（自制1/外协0）”，其实是 3 个零件）
+     #     · **不再被“自制件必须配原材料”检查到**（实测：挂上标准件后，那条
+     #       “有 1 个自制件还没挂原材料（工艺部）”的提醒直接消失了）—— 工艺漏配材料从此隐形。
+    #   正确口径：叶子只看“有没有子图”；总装图是设备本身，不算零件/组件。
     children_of: dict[str, int] = {}
     for d in tree:
         if d["parent_drawing_no"]:
@@ -187,12 +216,15 @@ def get_design_tree(
     std_count_of: dict[str, int] = {}
     for b in std_bom:
         std_count_of[b["parent_ref"]] = std_count_of.get(b["parent_ref"], 0) + 1
+    # 组件/零件的判定走全站唯一口径（不看有没有挂标准件 —— P1-8）
+    classify_parts = split_components_parts(
+        [(d["drawing_no"], d["parent_drawing_no"]) for d in tree], root_no
+    )
 
-    leaves = [
-        d
-        for d in tree
-        if children_of.get(d["drawing_no"], 0) == 0 and std_count_of.get(d["drawing_no"], 0) == 0
-    ]
+    non_root = [d for d in tree if d["drawing_no"] != root_no]
+    part_nos = classify_parts[1]
+    leaves = [d for d in non_root if d["drawing_no"] in part_nos]
+    components = [d for d in non_root if d["drawing_no"] in classify_parts[0]]
     # 空壳：既没有子件、也没有标准件的“组件”（比如只有一张总装图，下面什么都没有）
     empty_shells = [
         d["drawing_no"]
@@ -248,7 +280,8 @@ def get_design_tree(
         },
         "counts": {
             "drawings": len(tree),
-            "components": len(tree) - len(leaves) - len(std_bom),
+            # 组件 = 有子图的非总装图；零件 = 没子图的非总装图
+            "components": len(components),
             "parts": len(leaves),
             "self_made": len([p for p in leaves if p["source_type"] == "自制件"]),
             "outsource": len([p for p in leaves if p["source_type"] == "外协件"]),
@@ -834,8 +867,13 @@ def design_overview(
             if d.parent_drawing_no:
                 children[d.parent_drawing_no] = children.get(d.parent_drawing_no, 0) + 1
         refs = {b.parent_ref for b in bom_rows if b.bom_source == BOM_DESIGN}
-        leaves = [d for d in ds if children.get(d.drawing_no, 0) == 0 and d.drawing_no not in refs]
         mats = {b.parent_ref for b in bom_rows if b.bom_source == BOM_MATERIAL}
+        # ★ P1-8：同 design 详情页的口径（全站唯一口径函数）—— 叶子只看“有没有子图”，
+        #   总装图不算零件；不能因为挂了标准件就把自制件踢出“待配材料”的检查。
+        _comps, part_nos = split_components_parts(
+            [(d.drawing_no, d.parent_drawing_no) for d in ds], root_no
+        )
+        leaves = [d for d in ds if d.drawing_no in part_nos]
         missing_mat = [p for p in leaves if p.source_type == "自制件" and p.drawing_no not in mats]
         unpublished = [d for d in ds if d.status != "已发布"]
         orphans = [
