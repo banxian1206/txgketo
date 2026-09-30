@@ -57,6 +57,15 @@ export default function DealModals({
   submitDeal: (...args: any[]) => any;
   projectNo: any;
 }) {
+  // ★ 付款节点比例要有**实时合计**（2026-09-30 P1-2：文案写着“应为 100%”却没人算过账，
+  //   实测 8 条合计 170% 也能成交，而且成交后改不了 —— 错数据一旦进来就是永久的）
+  const watchTerms = Form.useWatch('payment_terms', dealForm) as
+    | { percent?: number | null }[]
+    | undefined
+  const pctList = (watchTerms ?? []).map((t) => t?.percent).filter((x) => x !== null && x !== undefined) as number[]
+  const pctSum = Math.round(pctList.reduce((a, b) => a + Number(b), 0) * 100) / 100
+  const pctOff = pctList.length > 0 && Math.abs(pctSum - 100) > 0.5
+
   return (
     <>
       <AppModal
@@ -131,6 +140,12 @@ export default function DealModals({
           <Divider orientation="left" plain>
             付款方式（比例合计应为 100%）
           </Divider>
+          <Typography.Paragraph style={{ marginTop: -8 }}>
+            <Typography.Text type={pctOff ? 'danger' : 'secondary'} style={{ fontSize: 12 }}>
+              当前比例合计：{pctList.length ? `${pctSum}%` : '—'}
+              {pctOff ? '（不是 100%，改完再提交）' : pctList.length ? ' ✓' : ''}
+            </Typography.Text>
+          </Typography.Paragraph>
           <Typography.Paragraph type="secondary" style={{ fontSize: 12, marginTop: -8 }}>
             质保金 = 节点名含「质保」的那一条（客户从货款里扣留、质保期满才付给我们），系统自动带出
           </Typography.Paragraph>
@@ -142,6 +157,14 @@ export default function DealModals({
                   if (!value || value.length === 0) throw new Error('至少登记 1 个付款节点')
                   const first = value[0] ?? {}
                   if (!first.node_name) throw new Error('第 1 个付款节点的节点名必填')
+                  // ★ 比例合计必须 100%（与后端同一口径，两边都拦）
+                  const ps = (value as { percent?: number | null }[])
+                    .map((t) => t?.percent)
+                    .filter((x) => x !== null && x !== undefined) as number[]
+                  if (ps.length) {
+                    const sum = Math.round(ps.reduce((a, b) => a + Number(b), 0) * 100) / 100
+                    if (Math.abs(sum - 100) > 0.5) throw new Error(`比例合计 ${sum}%，必须是 100%`)
+                  }
                 },
               },
             ]}

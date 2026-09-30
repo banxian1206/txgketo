@@ -1,11 +1,13 @@
 import { useWarehouseBoard } from './hooks'
 import type { StorageRow } from './types'
-import { App, Button, Card, Empty, Input, Modal, Space, Spin, Tabs, Tag, Typography } from 'antd'
+import { App, Button, Card, Empty, Modal, Space, Spin, Tabs, Tag, Typography } from 'antd'
 import {useState} from 'react'
 import { useNavigate } from 'react-router-dom'
 
 import {errMsg, storeReceipt} from '../../api/client'
 import AuthedImage from '../../components/AuthedImage'
+import SelectLocation from '../../components/fields/SelectLocation'
+import { Muted } from '../../components/ui/Primitives'
 
 
 /** 手机端仓库：待验收 / 待入库 / 领料（03 卷：清单 + 勾选 + 拍照） */
@@ -145,14 +147,10 @@ export default function WarehouseM() {
         confirmLoading={saving}
         okText="入库"
       >
-        <Typography.Paragraph type="secondary" style={{ fontSize: 12 }}>
-          库位填法：深圳仓 A-03-12（不填就进「待定」）
+        <Typography.Paragraph>
+          <Muted>入库必须定库位：没有的先到仓库台「库位」页新建，也可以拍库位标签自动认。</Muted>
         </Typography.Paragraph>
-        <Input
-          placeholder="如：深圳仓 A-03-12"
-          value={location}
-          onChange={(e) => setLocation(e.target.value)}
-        />
+        <SelectLocation value={location || undefined} onChange={(v) => setLocation(String(v ?? ''))} />
       </Modal>
     </>
   )

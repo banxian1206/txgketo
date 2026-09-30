@@ -1173,28 +1173,46 @@ def _ensure_site_pending_receipt(
 
 
 def _resolve_location(session: Session, location: str | None):
-    """入库库位：填了就找/建，没填用「待定」。"""
+    """入库库位：按「仓库 库位编码」找，找不到就**建一个新的库位**（但仓库名必须由人给，不能替他想）。
+
+    ★ 2026-09-30 UI 真实场景测试 P1-4：原来未填就默默造一个 `warehouse="深圳仓", code="待定"`
+      ——“深圳仓”这个地名根本是界面示例文案（公司在肇庆），却成了**正式主数据**，
+      库存页上真真假假多出一个仓库；而手机端入库又没有选库位的控件（自由文本）。
+      现在：
+        · 空 值 → 400 明确要求定库位（入库不定库位，以后就找不着货）
+        · `仓库 编码` → 按仓库+编码找，找不到则建（保留“就地建新库位”的便利）
+        · 只给编码 → 全库按编码找；找到就用，找不到就 400 让他写全或先去建
+    """
     from app.models.warehouse import WarehouseLocation
 
-    loc = None
-    if location:
-        wh, _, code = location.partition(" ")
+    text = (location or "").strip()
+    if not text:
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            "入库必须定库位（仓库 + 库位编码，如 常规件区 A-01-01）—— 不然以后找不到这批货",
+        )
+    wh, sep, code = text.partition(" ")
+    if sep and wh.strip():
+        wh, code = wh.strip(), code.strip()
+        if not code:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, "库位要写全：仓库 + 编码（如 常规件区 A-01-01）")
         loc = session.scalar(
             select(WarehouseLocation).where(
-                WarehouseLocation.warehouse == (wh or "深圳仓"),
-                WarehouseLocation.code == (code or location),
+                WarehouseLocation.warehouse == wh, WarehouseLocation.code == code
             )
         )
         if loc is None:
-            loc = WarehouseLocation(warehouse=wh or "深圳仓", code=code or location)
+            loc = WarehouseLocation(warehouse=wh, code=code)
             session.add(loc)
             session.flush()
+        return loc
+    # 只给了一段：先当编码在全库找（库位编码本来就唯一）
+    loc = session.scalar(select(WarehouseLocation).where(WarehouseLocation.code == text))
     if loc is None:
-        loc = session.scalar(select(WarehouseLocation).where(WarehouseLocation.code == "待定"))
-    if loc is None:
-        loc = WarehouseLocation(warehouse="深圳仓", code="待定", name="未指派库位")
-        session.add(loc)
-        session.flush()
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            f"没有「{text}」这个库位。写全「仓库 + 编码」，或先到仓库台「库位」页新建",
+        )
     return loc
 
 
@@ -1529,7 +1547,7 @@ def inspect_purchase_request_any(
 
 
 class StoreIn(BaseModel):
-    location: str = Field(..., description="入库库位（如 深圳仓 A-01-01）—— 入库必须定库位")
+    location: str = Field(..., description="入库库位（仓库 + 编码，如 常规件区 A-01-01）—— 入库必须定库位")
     note: str | None = None
 
 

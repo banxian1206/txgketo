@@ -691,7 +691,7 @@ export default function Warehouse() {
               name="qty"
               label={acceptResult === '不合格' ? '不合格数量' : '本次到货数量'}
               style={{ minWidth: 180 }}
-              rules={[{ required: true }]}
+              rules={[{ required: true, message: '请填本次到货数量（入库/结算的依据，不能空）' }]}
             >
               <InputNumber
                 style={{ width: '100%' }}

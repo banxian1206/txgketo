@@ -22,6 +22,8 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 
 import AuthedImage from '../../components/AuthedImage'
+import SelectLocation from '../../components/fields/SelectLocation'
+import { Muted } from '../../components/ui/Primitives'
 import {
   errMsg,
   fetchFileBlob,
@@ -43,7 +45,10 @@ export default function AcceptM() {
   const [data, setData] = useState<MobileMaterial | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
-  const [qty, setQty] = useState<number>(1)
+  // ★ 2026-09-30 UI 真实场景测试 P1-3：清空「本次到货数量」曾静默变成 1
+  //   （`Number(v ?? 1)`）→ 订 40 件记成 1 件，库存/齐套/对账全偏小且没人报。
+  //  现在留 null 状态，提交时拦住并说清楚。
+  const [qty, setQty] = useState<number | null>(null)
   const [qtyOk, setQtyOk] = useState<number | null>(null)
   const [poLineId, setPoLineId] = useState<number | null>(null)
   const [result, setResult] = useState<'合格' | '不合格'>('合格')
@@ -97,6 +102,10 @@ export default function AcceptM() {
 
   const doInspect = async () => {
     if (!data) return
+    if (qty === null || Number.isNaN(qty) || qty <= 0) {
+      message.warning('请填「本次到货数量」—— 这是入库和结算的依据，不能空着')
+      return
+    }
     setSaving(true)
     try {
       const qtyOkVal = result === '合格' && qtyOk !== null ? qtyOk : undefined
@@ -238,7 +247,7 @@ export default function AcceptM() {
           )}
           <Space>
             <span>本次到货数量</span>
-            <InputNumber min={0.001} max={data ? Math.max(0.001, data.qty - data.qty_received) : undefined} value={qty} onChange={(v) => setQty(Number(v ?? 1))} style={{ width: 120 }} />
+            <InputNumber min={0.001} max={data ? Math.max(0.001, data.qty - data.qty_received) : undefined} value={qty ?? undefined} onChange={(v) => setQty(v === null || v === undefined ? null : Number(v))} style={{ width: 120 }} />
           </Space>
           <Radio.Group value={result} onChange={(e) => setResult(e.target.value)}>
             <Radio.Button value="合格">合格</Radio.Button>
@@ -249,8 +258,8 @@ export default function AcceptM() {
               <span>其中合格数（不填 = 全部合格）</span>
               <InputNumber
                 min={0}
-                max={qty}
-                value={qtyOk}
+                max={qty ?? undefined}
+                value={qtyOk ?? undefined}
                 onChange={(v) => setQtyOk(v === null || v === undefined ? null : Number(v))}
                 style={{ width: 120 }}
               />
@@ -345,10 +354,10 @@ export default function AcceptM() {
         confirmLoading={saving}
         okText="入库"
       >
-        <Typography.Paragraph type="secondary" style={{ fontSize: 12 }}>
-          库位填法：深圳仓 A-03-12（不填就进「待定」）
+        <Typography.Paragraph>
+          <Muted>入库必须定库位：没有的先到仓库台「库位」页新建，也可以拍库位标签自动认。</Muted>
         </Typography.Paragraph>
-        <Input placeholder="如：深圳仓 A-03-12" value={location} onChange={(e) => setLocation(e.target.value)} />
+        <SelectLocation value={location || undefined} onChange={(v) => setLocation(String(v ?? ''))} />
       </Modal>
     </>
   )

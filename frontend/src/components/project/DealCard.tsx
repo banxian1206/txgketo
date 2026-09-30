@@ -201,6 +201,10 @@ export default function DealCard({
                       render: (_: unknown, t: { seq: number; node_name: string; amount?: number | null; received_amount?: number | null }) => {
                         const unpaid = Math.max(0, Number(t.amount ?? 0) - Number(t.received_amount ?? 0))
                         if (!hasPerm('payment:edit')) return <Typography.Text type="secondary">—</Typography.Text>
+                        // ★ 这一条没录金额（amount 空）→ 不是“已收齐”，是“还没定”（2026-09-30 P2）
+                        if (t.amount === null || t.amount === undefined) {
+                          return <Tag>未录金额</Tag>
+                        }
                         return unpaid > 0 ? (
                           <a onClick={() => openReceive(t)}>登记回款</a>
                         ) : (

@@ -270,6 +270,33 @@ def register_deal(
         setattr(project, field, new_value)
 
     # 付款节点整体替换；有比例没金额的，按合同金额自动折算
+    # ★ 2026-09-30 UI 真实场景测试 P1-2：界面写着「比例合计应为 100%」但前后端都没校验，
+    #   实测 8 条节点合计 170%、金额 ¥6.12M > 合同 ¥3.6M 照样成交，而且成交后就改不了了。
+    #   先算账、后落库 —— 不合规的直接 400，别把错数据写进去。
+    pct_sum = 0.0
+    pct_any = False
+    pct_parts: list[str] = []
+    amt_sum = 0.0
+    for t in body.payment_terms:
+        amt = float(t.amount or 0)
+        if not amt and t.percent and body.amount:
+            amt = float(body.amount) * float(t.percent) / 100
+        amt_sum += amt
+        if t.percent is not None:
+            pct_any = True
+            pct_sum += float(t.percent)
+            pct_parts.append(f"{t.node_name} {t.percent}%")
+    if pct_any and abs(pct_sum - 100) > 0.5:
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            f"付款节点比例合计 {round(pct_sum, 2)}%，必须是 100%（当前：{' + '.join(pct_parts)}）",
+        )
+    if body.amount and amt_sum - float(body.amount) > 1:
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            f"付款节点金额合计 ¥{amt_sum:,.0f} 超过合同金额 ¥{float(body.amount):,.0f}",
+        )
+
     session.execute(delete(PaymentTerm).where(PaymentTerm.project_no == project_no))
     total = 0.0
     warranty_from_terms = 0.0
