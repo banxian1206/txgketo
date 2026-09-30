@@ -436,6 +436,23 @@ const FEATS = path.join(SRC, 'features');
     dup.length ? `这些台又加了数字卡，与页签计数重复：${dup.join(', ')}` : '采购/仓库/制造/现场台计数只在页签上（独有指标已上标题徽标）')
 }
 
+
+/** 把 `[a, b, {..}, c]` 按顶层逗号切开（忽略字符串/嵌套括号里的逗号） */
+function topItems(block) {
+  const out = []
+  let depth = 0, cur = '', q = null
+  for (const ch of block) {
+    if (q) { cur += ch; if (ch === q) q = null; continue }
+    if (ch === "'" || ch === '"' || ch === '`') { q = ch; cur += ch; continue }
+    if ('[({'.includes(ch)) depth++
+    if (']})'.includes(ch)) depth--
+    if (ch === ',' && depth <= 1) { out.push(cur); cur = ''; continue }
+    cur += ch
+  }
+  if (cur.trim()) out.push(cur)
+  return out
+}
+
 /* ══════════ P3 列表与详情（docs/12 §2-A / §5）══════════ */
 {
   // 详情视图必须用抽屉（规范 §5.1：详情 Drawer 560~720；Modal 只留给动作）
@@ -506,6 +523,48 @@ const FEATS = path.join(SRC, 'features');
   check('SCOPE-页面作用域进URL', bad.length === 0,
     bad.length ? `这些页面的作用域选择器/筛选还锁在组件 state（刷新即丢、不可分享）: ${bad.join(', ')}`
       : '装配/发运/现场(双端共用 hook)/后台用户筛选 的作用域都在 URL 里')
+}
+
+{
+  // ★ 每张表的列数上限（docs/12 §2-A：A 型页列 ≤7）。静态解析 columns={[...]}，不依赖数据、不会休眠。
+  //   退换记录原来是 11 列 —— 靠"主+副叠行"合并到 7 列，信息一条不少。
+  const MAX_COLS = {
+    'features/purchase/Page.tsx': 7,
+    'features/warehouse/Page.tsx': 7,
+    'features/project/Page.tsx': 7,
+    'features/admin/LibraryPage.tsx': 6,
+  }
+  const bad = []
+  for (const [rel, max] of Object.entries(MAX_COLS)) {
+    const f = path.join(SRC, rel)
+    if (!fs.existsSync(f)) { bad.push(`${rel} 不见了`); continue }
+    const s = fs.readFileSync(f, 'utf8')
+    // 两种写法都要盖到：内联 columns={[...]} 与 const columns: ColumnsType<T> = [...]
+    // （第一版只盖了前者，注入第 8 列没变红 —— 护栏不咬人的护栏比没护栏更危险）
+    const starts = []
+    for (const m of s.matchAll(/columns=\{\[/g)) starts.push(m.index + m[0].length - 1)
+    for (const m of s.matchAll(/ColumnsType<[^>]*>\s*=\s*\[/g)) starts.push(m.index + m[0].length - 1)
+    for (const st of starts) {
+      let depth = 0, k = st
+      for (; k < s.length; k++) {
+        if (s[k] === '[' || s[k] === '{' || s[k] === '(') depth++
+        else if (s[k] === ']' || s[k] === '}' || s[k] === ')') {
+          depth--
+          if (depth === 0) break
+        }
+      }
+      const block = s.slice(st, k + 1)
+      const inner = (block.match(/columns=\{\[/g) || []).length + (block.match(/ColumnsType</g) || []).length
+      if (inner > 0) continue // 带展开行子表的，由子表自己的 start 去数
+      // 只数数组**顶层元素**里的 title —— 否则 Popconfirm/Modal 的 title 会被当成列（第一版就误报过）
+      const colItems = topItems(block).filter((x) => /\btitle:/.test(x))
+      if (colItems.length > max) {
+        const names = colItems.map((x) => (x.match(/title:\s*'([^']*)'/) ?? [, '?'])[1]).join(' / ')
+        bad.push(`${rel}:${s.slice(0, st).split('\n').length} 某表 ${colItems.length} 列 > 上限 ${max}【${names}】`)
+      }
+    }
+  }
+  check('TABLE-每表列数≤上限', bad.length === 0, bad.join('; ') || '采购/仓库/项目/标准库 的每张表列数都在上限内')
 }
 
 const fails = summary('静态回归');

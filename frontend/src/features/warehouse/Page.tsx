@@ -327,7 +327,16 @@ export default function Warehouse() {
                   scroll={{ x: 1200 }}
                   locale={{ emptyText: <Empty description="没有等待入库的货" /> }}
                   columns={[
-                    { title: '到货单', dataIndex: 'receipt_no', width: 110, fixed: 'left', render: (v: string) => <Typography.Text strong>{v}</Typography.Text> },
+                    {
+                      // ★ 列治理：到货单为主、采购单号为副（原来占两列）
+                      title: '到货单 / 采购单', dataIndex: 'receipt_no', width: 140, fixed: 'left',
+                      render: (v: string, r) => (
+                        <>
+                          <Typography.Text strong>{v}</Typography.Text>
+                          <div style={{ fontSize: 12, color: T.textSecondary }}>{r.po_no ?? '未编号'}</div>
+                        </>
+                      ),
+                    },
                     {
                       title: '物料', key: 'item', width: 230,
                       render: (_: unknown, r) => (
@@ -340,7 +349,6 @@ export default function Warehouse() {
                       ),
                     },
                     { title: '数量', dataIndex: 'qty', width: 85, render: (v: number | null, r) => `${v ?? ''} ${r.unit ?? ''}` },
-                    { title: '采购单号', dataIndex: 'po_no', width: 125, render: (v: string | null) => v ?? '未编号' },
                     {
                       title: '项目 / 设备', key: 'belong', width: 190,
                       render: (_: unknown, r) => (

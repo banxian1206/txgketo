@@ -535,7 +535,7 @@ POST /api/v1/warehouse/inbound                    其他入库（退料回库/�
 
 - 后端 :8208 · 前端 :5207 · PG 35432（`docker compose -f deploy/docker-compose.dev.yml up -d`，compose 顶层写死了 `name: txgketo`）
 - 测试：`.venv/bin/python -m pytest -q` → **174 passed**；e2e 基线 `.venv/bin/python -m scripts.e2e_baseline`（★ 跑前复位业务数据；只清业务表，账户/组织/编号规则不动）→ **问题 0 / 中断 0 / 通过 149**；
-  隔离探针 `scripts/probe_bom_math.py` → **8/8**、`scripts/probe_n24_n25.py` → **20/20**；前端 `e2e:static 37` / **`e2e:api 15+0skip`** / **`e2e:ui 71+0skip`**（两套都自建靶，可复位后单跑）
+  隔离探针 `scripts/probe_bom_math.py` → **8/8**、`scripts/probe_n24_n25.py` → **20/20**；前端 `e2e:static 38` / **`e2e:api 15+0skip`** / **`e2e:ui 71+0skip`**（两套都自建靶，可复位后单跑）
 - alembic head：**`b4c6d8e02f13`**（OCR 设置表）
 - ★ 套件**执行顺序**：`e2e_baseline` → `probe_n24_n25` → `probe_bom_math`（最后一个会 TRUNCATE 业务表，放最后）
 - ★ **e2e 跑完会留测试数据**（`e2e:api` / `e2e:ui` 的自建靶每轮建一个商机/批次）→ 想回到干净态跑

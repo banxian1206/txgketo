@@ -1,3 +1,4 @@
+import { Muted } from '../../components/ui/Primitives'
 import { App, Button, Card, Empty, Space, Table, Tabs, Tag, Tooltip, Typography } from 'antd'
 import dayjs from 'dayjs'
 import { useCallback, useEffect, useMemo, useState } from 'react'
@@ -241,23 +242,23 @@ export default function PurchaseWorkbench() {
                         scroll={{ x: 1160 }}
                         columns={[
                           {
-                            title: '项目 / 归属',
+                            // ★ 列治理：项目为主、设备为副（合并单里每行需求本来就带着归属）
+                            title: '项目 / 设备（归属）',
                             dataIndex: 'project_no',
-                            width: 260,
+                            width: 240,
                             render: (v: string | null, r) =>
                               v ? (
-                                <a onClick={() => go(`/projects/${v}`)}>
-                                  {v} {r.project_name ?? ''}
-                                </a>
+                                <>
+                                  <a onClick={() => go(`/projects/${v}`)}>
+                                    {v} {r.project_name ?? ''}
+                                  </a>
+                                  <div style={{ fontSize: 12, color: T.textSecondary }}>
+                                    {r.equip_no ?? '未分到设备'}
+                                  </div>
+                                </>
                               ) : (
                                 <Tag color="blue">{r.attribution ?? '公司级'}</Tag>
                               ),
-                          },
-                          {
-                            title: '设备',
-                            dataIndex: 'equip_no',
-                            width: 130,
-                            render: (v: string | null) => v ?? '—',
                           },
                           {
                             title: '零件',
@@ -282,18 +283,21 @@ export default function PurchaseWorkbench() {
                             render: (v: number) => `${v} ${g.unit ?? ''}`,
                           },
                           {
-                            title: '需要到货',
+                            // 主=需要到货日，副=该物料的采购周期（下单前一眼看出赶不赶得上）
+                            title: '需要到货（· 采购周期）',
                             dataIndex: 'need_date',
-                            width: 120,
-                            render: (v: string | null) =>
-                              v && v < today() ? (
+                            width: 150,
+                            render: (v: string | null, r) => (
+                              <>
                                 <Space size={4}>
-                                  <span>{v}</span>
-                                  <Tag color="red">已过期</Tag>
+                                  <span>{v ?? '—'}</span>
+                                  {v && v < today() && <Tag color="red">已过期</Tag>}
                                 </Space>
-                              ) : (
-                                (v ?? '—')
-                              ),
+                                <div style={{ fontSize: 12, color: T.textSecondary }}>
+                                  周期 {r.lead_days ? `${r.lead_days} 天` : '未配'}
+                                </div>
+                              </>
+                            ),
                           },
                           {
                             title: '来源',
@@ -326,12 +330,6 @@ export default function PurchaseWorkbench() {
                                   )}
                                 </>
                               ),
-                          },
-                          {
-                            title: '采购周期',
-                            dataIndex: 'lead_days',
-                            width: 100,
-                            render: (v: number | null) => (v ? `${v} 天` : '—'),
                           },
                           { title: '备注', dataIndex: 'remark', render: (v) => v ?? '—' },
                         ]}
@@ -482,18 +480,21 @@ export default function PurchaseWorkbench() {
                         </>
                       ),
                     },
-                    { title: '下单日期', dataIndex: 'ordered_at', width: 105, render: (v) => v ?? '—' },
                     {
-                      title: '预计到货',
-                      dataIndex: 'expected_date',
-                      width: 130,
-                      render: (v: string | null, o) => (
-                        <Space size={4}>
-                          <span>{v ?? '—'}</span>
-                          {v && v < today() && ['在途', '部分到货'].includes(o.status) && (
-                            <Tag color="orange">已超期</Tag>
-                          )}
-                        </Space>
+                      // 主=下单日期，副=预计到货（超期照旧标橙）
+                      title: '日期（下单 → 预计到货）',
+                      key: 'dates',
+                      width: 165,
+                      render: (_: unknown, o) => (
+                        <>
+                          <div>{o.ordered_at ?? '—'}</div>
+                          <Space size={4}>
+                            <Muted>{o.expected_date ?? '—'}</Muted>
+                            {o.expected_date && o.expected_date < today() && ['在途', '部分到货'].includes(o.status) && (
+                              <Tag color="orange">已超期</Tag>
+                            )}
+                          </Space>
+                        </>
                       ),
                     },
                     {
@@ -629,11 +630,19 @@ export default function PurchaseWorkbench() {
                   locale={{ emptyText: <Empty description="没有验收不合格的货" /> }}
                   columns={[
                     {
-                      title: '到货单',
+                      // ★ 列治理（docs/12 §2-A）：到货单为主、采购单号为副，一列顶原来两列
+                      title: '到货单 / 采购单',
                       dataIndex: 'receipt_no',
-                      width: 110,
+                      width: 140,
                       fixed: 'left',
-                      render: (v: string) => <Typography.Text strong>{v}</Typography.Text>,
+                      render: (v: string, r: GoodsReceiptRow) => (
+                        <>
+                          <Typography.Text strong>{v}</Typography.Text>
+                          <div style={{ fontSize: 12 }}>
+                            {r.po_no ? <a onClick={() => openOrder(r.po_no as string)}>{r.po_no}</a> : <Muted>未编号</Muted>}
+                          </div>
+                        </>
+                      ),
                     },
                     {
                       title: '物料',
@@ -651,14 +660,6 @@ export default function PurchaseWorkbench() {
                       dataIndex: 'qty',
                       width: 85,
                       render: (v: number | null, r) => (v ? `${v} ${r.unit ?? ''}` : '—'),
-                    },
-                    {
-                      title: '采购单号',
-                      dataIndex: 'po_no',
-                      width: 125,
-                      render: (v: string | null, r) => (
-                        <a onClick={() => r.po_no && openOrder(r.po_no)}>{v ?? '—'}</a>
-                      ),
                     },
                     {
                       title: '项目 / 设备',
@@ -687,7 +688,7 @@ export default function PurchaseWorkbench() {
                         <>
                           <div>{r.inspected_by ?? '—'}</div>
                           <div style={{ fontSize: 12, color: T.textSecondary }}>
-                            {r.inspected_at ? dayjs(r.inspected_at).format('MM-DD HH:mm') : ''}
+                            {r.inspected_at ? dayjs(r.inspected_at ?? '').format('MM-DD HH:mm') : ''}
                           </div>
                         </>
                       ),
@@ -741,18 +742,19 @@ export default function PurchaseWorkbench() {
                   locale={{ emptyText: <Empty description="还没有换货 / 退货记录" /> }}
                   columns={[
                     {
-                      title: '到货单',
+                      // ★ 列治理（docs/12 §2-A）：到货单为主、采购单号为副，一列顶原来两列
+                      title: '到货单 / 采购单',
                       dataIndex: 'receipt_no',
-                      width: 110,
+                      width: 140,
                       fixed: 'left',
-                      render: (v: string) => <Typography.Text strong>{v}</Typography.Text>,
-                    },
-                    {
-                      title: '处理',
-                      dataIndex: 'status',
-                      width: 90,
-                      render: (v: string) =>
-                        v === '已换货' ? <Tag color="orange">换货</Tag> : <Tag>退货</Tag>,
+                      render: (v: string, r: GoodsReceiptRow) => (
+                        <>
+                          <Typography.Text strong>{v}</Typography.Text>
+                          <div style={{ fontSize: 12 }}>
+                            {r.po_no ? <a onClick={() => openOrder(r.po_no as string)}>{r.po_no}</a> : <Muted>未编号</Muted>}
+                          </div>
+                        </>
+                      ),
                     },
                     {
                       title: '物料',
@@ -772,14 +774,6 @@ export default function PurchaseWorkbench() {
                       render: (v: number | null, r) => (v ? `${v} ${r.unit ?? ''}` : '—'),
                     },
                     {
-                      title: '采购单号',
-                      dataIndex: 'po_no',
-                      width: 125,
-                      render: (v: string | null, r) => (
-                        <a onClick={() => r.po_no && openOrder(r.po_no)}>{v ?? '—'}</a>
-                      ),
-                    },
-                    {
                       title: '项目 / 设备',
                       key: 'belong',
                       width: 180,
@@ -793,32 +787,34 @@ export default function PurchaseWorkbench() {
                       ),
                     },
                     {
-                      title: '不合格原因（仓库验收）',
-                      dataIndex: 'inspect_note',
-                      width: 170,
-                      render: (v: string | null) => v ?? '—',
+                      // 主=仓库给的原因，副=采购的协商备注（原来两列并一列，读起来还是"问题→怎么谈"）
+                      title: '问题与协商',
+                      key: 'notes',
+                      width: 240,
+                      render: (_: unknown, r) => (
+                        <>
+                          <div>{r.inspect_note ?? '—'}</div>
+                          <Muted>协商：{r.resolve_note ?? '（无）'}</Muted>
+                        </>
+                      ),
                     },
                     {
-                      title: '协商备注（采购）',
-                      dataIndex: 'resolve_note',
-                      width: 190,
-                      render: (v: string | null) => v ?? '—',
-                    },
-                    {
-                      title: '后续',
+                      title: '处理与后续',
                       key: 'retry',
-                      width: 170,
+                      width: 190,
                       render: (_: unknown, r) => {
-                        if (r.status === '已换货') {
-                          return (
-                            <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-                              留在原单等补发
-                            </Typography.Text>
-                          )
-                        }
+                        // 主行=采购怎么处理的（换货/退货），副行=后续去向（重采单号 / 回池）
+                        const tag =
+                          r.status === '已换货' ? <Tag color="orange">换货</Tag> : <Tag>退货</Tag>
                         const rs = r.retries ?? []
-                        if (rs.length === 0) return '—'
-                        return rs.map((x) =>
+                        const next =
+                          r.status === '已换货' ? (
+                            <Muted>留在原单等补发</Muted>
+                          ) : rs.length === 0 ? (
+                            <Muted>—</Muted>
+                          ) : (
+                            <span>
+                              {rs.map((x) =>
                           x.po_no ? (
                             <Tag
                               key={x.id}
@@ -829,35 +825,36 @@ export default function PurchaseWorkbench() {
                               重采 {x.po_no}
                             </Tag>
                           ) : (
-                            <Tag key={x.id} color="gold">
-                              回采购池 #{x.id}（{x.status}）
-                            </Tag>
-                          ),
+                              <Tag key={x.id} color="gold">
+                                回采购池 #{x.id}（{x.status}）
+                              </Tag>
+                            ),
+                          )
+                            }
+                          </span>
+                        )
+                        return (
+                          <>
+                            <div>{tag}</div>
+                            <div style={{ fontSize: 12 }}>{next}</div>
+                          </>
                         )
                       },
                     },
                     {
-                      title: '验收人 / 时间',
-                      key: 'inspector',
-                      width: 140,
+                      // 验收与处理两笔经办合成一列（上=谁验的，下=谁处理的）
+                      title: '经办（验收 / 处理）',
+                      key: 'who',
+                      width: 150,
                       render: (_: unknown, r) => (
                         <>
-                          <div>{r.inspected_by ?? '—'}</div>
-                          <div style={{ fontSize: 12, color: T.textSecondary }}>
-                            {r.inspected_at ? dayjs(r.inspected_at).format('MM-DD HH:mm') : ''}
+                          <div>
+                            {r.inspected_by ?? '—'}
+                            <Muted> {r.inspected_at ? dayjs(r.inspected_at ?? '').format('MM-DD HH:mm') : ''}</Muted>
                           </div>
-                        </>
-                      ),
-                    },
-                    {
-                      title: '处理人 / 时间',
-                      key: 'resolver',
-                      width: 140,
-                      render: (_: unknown, r) => (
-                        <>
-                          <div>{r.resolved_by ?? '—'}</div>
-                          <div style={{ fontSize: 12, color: T.textSecondary }}>
-                            {r.resolved_at ? dayjs(r.resolved_at).format('MM-DD HH:mm') : ''}
+                          <div>
+                            {r.resolved_by ?? '—'}
+                            <Muted> {r.resolved_at ? dayjs(r.resolved_at ?? '').format('MM-DD HH:mm') : ''}</Muted>
                           </div>
                         </>
                       ),
@@ -888,11 +885,19 @@ export default function PurchaseWorkbench() {
                   locale={{ emptyText: <Empty description="还没有到货记录" /> }}
                   columns={[
                     {
-                      title: '到货单',
+                      // ★ 列治理（docs/12 §2-A）：到货单为主、采购单号为副，一列顶原来两列
+                      title: '到货单 / 采购单',
                       dataIndex: 'receipt_no',
-                      width: 110,
+                      width: 140,
                       fixed: 'left',
-                      render: (v: string) => <Typography.Text strong>{v}</Typography.Text>,
+                      render: (v: string, r: GoodsReceiptRow) => (
+                        <>
+                          <Typography.Text strong>{v}</Typography.Text>
+                          <div style={{ fontSize: 12 }}>
+                            {r.po_no ? <a onClick={() => openOrder(r.po_no as string)}>{r.po_no}</a> : <Muted>未编号</Muted>}
+                          </div>
+                        </>
+                      ),
                     },
                     {
                       title: '物料',
@@ -912,14 +917,6 @@ export default function PurchaseWorkbench() {
                       render: (v: number | null, r) => (v ? `${v} ${r.unit ?? ''}` : '—'),
                     },
                     {
-                      title: '采购单号',
-                      dataIndex: 'po_no',
-                      width: 125,
-                      render: (v: string | null, r) => (
-                        <a onClick={() => r.po_no && openOrder(r.po_no)}>{v ?? '—'}</a>
-                      ),
-                    },
-                    {
                       title: '项目 / 设备',
                       key: 'belong',
                       width: 180,
@@ -932,7 +929,18 @@ export default function PurchaseWorkbench() {
                         </>
                       ),
                     },
-                    { title: '到货日期', dataIndex: 'receipt_date', width: 105 },
+                    {
+                      // 主=到货日期，副=入库时间
+                      title: '时间（到货 → 入库）',
+                      key: 'times',
+                      width: 140,
+                      render: (_: unknown, r) => (
+                        <>
+                          <div>{r.receipt_date ?? '—'}</div>
+                          <Muted>{r.stored_at ? dayjs(r.stored_at ?? '').format('MM-DD HH:mm') : '未入库'}</Muted>
+                        </>
+                      ),
+                    },
                     {
                       title: '状态',
                       dataIndex: 'status',
@@ -944,12 +952,6 @@ export default function PurchaseWorkbench() {
                       dataIndex: 'location',
                       width: 140,
                       render: (v: string | null) => v ?? '—',
-                    },
-                    {
-                      title: '入库时间',
-                      dataIndex: 'stored_at',
-                      width: 130,
-                      render: (v: string | null) => (v ? dayjs(v).format('MM-DD HH:mm') : '—'),
                     },
                   ]}
                 />
