@@ -1,3 +1,4 @@
+import { useUrlState } from '../../hooks/useUrlState'
 import {
   App,
   Button,
@@ -137,11 +138,17 @@ export default function Users() {
   const visKeys = filterTabs(USERS_TABS).map((x) => x.key)
   const [tab, setTab] = useTab(visKeys, 'users')
 
-  // 用户筛选
-  const [fOrg, setFOrg] = useState<number | undefined>()
-  const [fRole, setFRole] = useState<string | undefined>()
-  const [fActive, setFActive] = useState<boolean | undefined>()
-  const [fQ, setFQ] = useState('')
+  // 用户筛选 —— ★ P5：进 URL（/admin/users?org=&role=&active=&q=）
+  //   总监/管理员常要「回到同一组筛选条件继续查人」，组件 state 一刷新就没了
+  const [uf, setUf] = useUrlState({ org: undefined, role: undefined, active: undefined, q: undefined })
+  const fOrg = uf.org ? Number(uf.org) : undefined
+  const fRole = uf.role
+  const fActive = uf.active === undefined ? undefined : uf.active === '1'
+  const fQ = uf.q ?? ''
+  const setFOrg = (v?: number) => setUf({ org: v === undefined || v === null ? undefined : String(v) })
+  const setFRole = (v?: string) => setUf({ role: v })
+  const setFActive = (v?: boolean) => setUf({ active: v === undefined ? undefined : v ? '1' : '0' })
+  const setFQ = (v: string) => setUf({ q: v || undefined })
 
   // 用户编辑
   const [editUser, setEditUser] = useState<UserRow | null>(null)
@@ -554,6 +561,7 @@ export default function Users() {
                     allowClear
                     style={{ width: 180 }}
                     placeholder="账号 / 姓名"
+                    defaultValue={fQ}   /* ★ URL 里有 q 就要看得见条件，否则「筛选生效却看不到条件」很困惑 */
                     onSearch={setFQ}
                   />
                   {scope?.can_manage_users && (

@@ -444,7 +444,8 @@ const FEATS = path.join(SRC, 'features');
     for (const f of fs.readdirSync(d)) {
       const p2 = path.join(d, f)
       if (fs.statSync(p2).isDirectory()) { walk(p2); continue }
-      if (/Detail(Modal)?\.tsx$/.test(f)) detailFiles.push(p2)
+      // 详情视图：*Detail(Modal).tsx 以及「对账单」这类名字不带 Detail 但实质是只读详情的组件
+      if (/Detail(Modal)?\.tsx$/.test(f) || /Statement/.test(f)) detailFiles.push(p2)
     }
   }
   walk(path.join(SRC, 'components'))
@@ -491,6 +492,20 @@ const FEATS = path.join(SRC, 'features');
   check('MOBILE-不用emoji图标', bad.length === 0,
     bad.length ? `移动端又出现 emoji 当图标（改用 @ant-design/icons）: ${bad.slice(0, 5).join(' | ')}`
       : `${MOBILE.length} 个移动页零 emoji 图标`)
+}
+
+{
+  // ★ P5：页面作用域（看哪个项目 / 哪组筛选）必须在 URL 里；动作弹窗里的表单字段不算
+  const SCOPE = ['features/assembly/Page.tsx', 'features/shipping/Page.tsx', 'features/site/hooks.ts', 'features/admin/Page.tsx']
+  const bad = SCOPE.filter((rel) => {
+    const f = path.join(SRC, rel)
+    if (!fs.existsSync(f)) return true
+    const s = fs.readFileSync(f, 'utf8')
+    return !/useUrlState\(/.test(s)
+  })
+  check('SCOPE-页面作用域进URL', bad.length === 0,
+    bad.length ? `这些页面的作用域选择器/筛选还锁在组件 state（刷新即丢、不可分享）: ${bad.join(', ')}`
+      : '装配/发运/现场(双端共用 hook)/后台用户筛选 的作用域都在 URL 里')
 }
 
 const fails = summary('静态回归');

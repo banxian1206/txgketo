@@ -894,6 +894,35 @@ try {
   await c.browser.close();
 }
 
+  // ── docs/12 §14 P5：页面作用域进 URL —— 深链能落到同一个项目/同一组筛选，刷新不回退 ──
+  {
+    const sc = await newCtx()
+    try {
+      await sc.page.setViewportSize({ width: 1440, height: 900 })
+      await login(sc.page, 'assy1', 'txgk@123')
+      const pno = await sc.page.evaluate(async (api) => {
+        const raw = JSON.parse(localStorage.getItem('txgk_session') || '{}')
+        const r = await fetch(api + '/api/v1/projects', { headers: { Authorization: 'Bearer ' + raw.token } })
+        const j = await r.json()
+        return Array.isArray(j) && j.length ? j[0].project_no : null
+      }, API)
+      if (!pno) {
+        check('SCOPE-作用域深链', false, '库里没有项目（基线未跑）—— 护栏不空转，直接红')
+      } else {
+        await sc.page.goto(`${BASE}/workbench/shop/assembly?p=${pno}`, { waitUntil: 'domcontentloaded' })
+        await sc.page.waitForTimeout(2200)
+        const sel1 = await sc.page.evaluate(() => document.querySelector('.ant-select-selection-item')?.innerText?.trim() ?? '')
+        await sc.page.reload({ waitUntil: 'domcontentloaded' }); await sc.page.waitForTimeout(2000)
+        const sel2 = await sc.page.evaluate(() => document.querySelector('.ant-select-selection-item')?.innerText?.trim() ?? '')
+        const url2 = await sc.page.evaluate(() => location.search)
+        check('SCOPE-作用域深链', sel1.includes(pno) && sel2.includes(pno) && url2.includes('p=' + pno),
+          `?p=${pno} → 首屏选中「${sel1}」· 刷新后「${sel2}」· URL=${url2}`)
+      }
+    } finally {
+      await sc.browser.close()
+    }
+  }
+
   // ── docs/12 §2-E：移动端触控目标（规范 §5.2 ≥44px；仓库/车间戴手套操作，24px 按不准）──
   {
     const tc = await newCtx({ mobile: true })

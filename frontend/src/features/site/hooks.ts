@@ -1,5 +1,6 @@
 import { App } from 'antd'
-import { useCallback, useEffect, useState } from 'react'
+import { useUrlState } from '../../hooks/useUrlState'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
 import {
   errMsg,
@@ -20,12 +21,17 @@ import {
  */
 export function useSiteBoard({ withAcceptance = false }: { withAcceptance?: boolean } = {}) {
   const { message } = App.useApp()
-  const [projectNo, setProjectNo] = useState<string | undefined>()
+  // ★ P5：页面作用域的项目选择器进 URL（?p=TX26001）——刷新/分享/通知深链都回得到同一个项目
+  //   注意与「动作弹窗里的表单字段」区分：那种是 form state，不该进 URL
+  const [siteUrl, setSiteUrl] = useUrlState({ p: undefined })
+  const projectNo = siteUrl.p
+  const setProjectNo = (v?: string) => setSiteUrl({ p: v })
   const [projects, setProjects] = useState<{ project_no: string; project_name: string }[]>([])
   const [wb, setWb] = useState<SiteWorkbench | null>(null)
   const [incoming, setIncoming] = useState<{ pending: SiteIncomingPending[]; done: SiteIncomingPending[] }>({ pending: [], done: [] })
   const [accs, setAccs] = useState<AcceptanceRow[]>([])
   const [loading, setLoading] = useState(false)
+  const projectNoRef = useRef<string | undefined>(projectNo)
 
   const reload = useCallback(
     async (pno?: string) => {
@@ -52,7 +58,7 @@ export function useSiteBoard({ withAcceptance = false }: { withAcceptance?: bool
     listProjects()
       .then((rows) => setProjects(rows.map((p) => ({ project_no: p.project_no, project_name: p.project_name }))))
       .catch(() => undefined)
-    void reload()
+    void reload(projectNoRef.current)   // 带 ?p= 进来就直接看那个项目
   }, [reload])
 
   return { projectNo, setProjectNo, projects, wb, incoming, accs, loading, reload }

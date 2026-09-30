@@ -1,3 +1,4 @@
+import { useUrlState } from '../../hooks/useUrlState'
 import { useShipBoard } from '../../hooks/useShipBoard'
 import {
   App,
@@ -55,7 +56,10 @@ export default function Shipping() {
   const canBuy = hasPerm('purchase:edit')  // ★ §2.2：叫车是采购做的事
 
   const [projects, setProjects] = useState<{ project_no: string; project_name: string }[]>([])
-  const [projectNo, setProjectNo] = useState<string | undefined>()
+  // ★ P5：项目选择器进 URL（?p=），刷新/分享回得到
+  const [bUrl, setBUrl] = useUrlState({ p: undefined })
+  const projectNo = bUrl.p
+  const setProjectNo = (v?: string) => setBUrl({ p: v })
   const [selectedEquips, setSelectedEquips] = useState<string[]>([])
 
   // 发运清单勾选

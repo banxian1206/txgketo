@@ -1,3 +1,4 @@
+import { useUrlState } from '../../hooks/useUrlState'
 import { useAsmBoard } from '../../hooks/useAsmBoard'
 import {
   App,
@@ -49,7 +50,10 @@ export default function Assembly() {
   const go = useGoFrom()
   const canEdit = hasPerm('mfg:edit')
   const [projects, setProjects] = useState<{ project_no: string; project_name: string }[]>([])
-  const [projectNo, setProjectNo] = useState<string | undefined>()
+  // ★ P5：项目选择器进 URL（?p=），刷新/分享回得到
+  const [bUrl, setBUrl] = useUrlState({ p: undefined })
+  const projectNo = bUrl.p
+  const setProjectNo = (v?: string) => setBUrl({ p: v })
   const [detail, setDetail] = useState<{ equip_no: string; data: KittingResult } | null>(null)
   // 弹窗
   const [startTarget, setStartTarget] = useState<{ equip_no: string; rate: number } | null>(null)

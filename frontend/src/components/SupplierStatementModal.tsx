@@ -1,4 +1,4 @@
-import { App, Modal, Table, Tabs, Tag, Typography } from 'antd'
+import { App, Drawer, Table, Tabs, Tag, Typography } from 'antd'
 import { useEffect, useState } from 'react'
 
 import { errMsg, supplierStatement, type StatementPo, type SupplierStatement } from '../api/client'
@@ -66,11 +66,11 @@ export default function SupplierStatementModal({
   }, [open, supplierId, message])
 
   return (
-    <Modal
+    <Drawer
       title={`往来对账${st ? ` · ${st.supplier.name}` : ''}`}
       open={open}
-      width={1000}
-      onCancel={onClose}
+      width={720}
+      onClose={onClose}
       footer={null}
     >
       {st && (
@@ -114,6 +114,6 @@ export default function SupplierStatementModal({
           />
         </>
       )}
-    </Modal>
+    </Drawer>
   )
 }
