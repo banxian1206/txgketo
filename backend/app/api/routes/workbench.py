@@ -254,6 +254,10 @@ def sales_board(session: Session = Depends(get_session), current: User = Depends
             payments.append(
                 {
                     "project_no": t.project_no,
+                    # ★ seq 是付款节点的主键级序号 —— 列表渲染要拿它做 key：
+                    #   同一项目里出现两个同名节点（如两条「发货款」）时，按 node_name 做 key 会撞，
+                    #   React 会告警并可能漏渲染（2026-09-30 实测：TX26001 的两条发货款）。
+                    "seq": t.seq,
                     "node_name": t.node_name,
                     "amount": float(t.amount or 0),
                     "unpaid": round(unpaid, 2),

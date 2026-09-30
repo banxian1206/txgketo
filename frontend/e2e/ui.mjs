@@ -532,7 +532,13 @@ try {
   await page.locator('.ant-select-dropdown:visible .ant-select-item').filter({ hasText: '辅料' }).first().click();
   await mm.locator('.ant-form-item').filter({ hasText: '物料' }).first().locator('.ant-select-selector').click();
   await page.waitForTimeout(300);
-  await page.keyboard.type('方通'); await page.waitForTimeout(700);
+  // ★ 不硬编「方通」：复位主数据后标准库里可能没有它（P1 报告里 e2e:clean 会连主数据一起清）。
+  //   先读下拉里的第一条候选，再用它的前两个字去搜 —— 既测了搜索，又不依赖具体哪个物料。
+  await page.waitForTimeout(600);
+  const firstOpt = page.locator('.ant-select-dropdown:visible .ant-select-item').first();
+  const firstText = (await firstOpt.innerText().catch(() => '')).trim();
+  const term = firstText.replace(/^[A-Z0-9-]+\s*/, '').slice(0, 2) || firstText.slice(0, 2);
+  if (term) { await page.keyboard.type(term); await page.waitForTimeout(700); }
   await page.locator('.ant-select-dropdown:visible .ant-select-item').first().click();
   await mm.locator('.ant-form-item').filter({ hasText: '数量' }).locator('input').fill('3');
   await mm.getByRole('button', { name: /提\s*交\s*进\s*池/ }).click();
@@ -981,8 +987,16 @@ try {
       await closeModal();
     } else check('PREFILL-供应商编辑', false, '无编辑入口');
 
-    // 标准库物料编辑
+    // 标准库物料编辑（★ 挑一个有物料的品类：复位后“方通”这类品类可能是空的，
+    //   写死第一个品类会假红 —— 见 2026-09-30 报告 P1 小节里的复位说明）
     await page.goto(BASE + '/library', { waitUntil: 'networkidle' }); await page.waitForTimeout(1200);
+    const classes = page.locator('a.lib-class');
+    const cN = await classes.count();
+    for (let i = 0; i < cN; i++) {
+      const tx = (await classes.nth(i).innerText().catch(() => '')).trim();
+      const m = tx.match(/(\d+)\s*$/);
+      if (m && Number(m[1]) > 0) { await classes.nth(i).click(); await page.waitForTimeout(1000); break; }
+    }
     edit = page.locator('a,button').filter({ hasText: /^编\s*辑$/ }).first();
     if (await edit.count()) {
       await edit.click(); await page.waitForTimeout(800);

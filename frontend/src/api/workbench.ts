@@ -137,6 +137,8 @@ export interface SalesBoard {
   }[]
   payments: {
     project_no: string
+    /** ★ 节点序号：列表 key 用它（同一项目可能有同名节点） */
+    seq?: number | null
     node_name: string
     amount: number
     unpaid: number

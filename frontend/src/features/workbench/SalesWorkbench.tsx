@@ -93,7 +93,8 @@ export default function SalesWorkbench() {
       </Card>
       <Card size="small" title="待回款节点">
         <Table
-          rowKey={(r) => `${r.project_no}-${r.node_name}`}
+          // ★ key 用 seq（同一项目可能有同名节点 —— 见 workbench.py 注释）
+          rowKey={(r) => `${r.project_no}-${r.seq ?? r.node_name}`}
           size="small"
           dataSource={data?.payments ?? []}
           pagination={false}
