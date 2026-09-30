@@ -135,7 +135,7 @@ export default function AssemblyM() {
                 {detail.lines.map((l: KittingLine) => (
                   <div key={l.ref} style={{ fontSize: 12, padding: '3px 0', borderBottom: `1px solid ${T.border}` }}>
                     <span>{l.ref}</span>{' '}
-                    {l.ready ? <Tag color="success">✅ {l.state}</Tag> : <Tag color="error">缺 · {l.state}</Tag>}
+                    {l.ready ? <Tag color="success">{l.state}</Tag> : <Tag color="error">缺 · {l.state}</Tag>}
                   </div>
                 ))}
               </div>

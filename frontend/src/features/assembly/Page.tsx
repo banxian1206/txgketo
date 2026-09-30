@@ -290,7 +290,7 @@ export default function Assembly() {
                 key: 'ready',
                 width: 160,
                 render: (_: unknown, r: KittingLine) =>
-                  r.ready ? <Tag color="success">✅ {r.state}</Tag> : <Tag color="error">缺 · {r.state}</Tag>,
+                  r.ready ? <Tag color="success">{r.state}</Tag> : <Tag color="error">缺 · {r.state}</Tag>,
               },
             ]}
           />

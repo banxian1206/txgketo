@@ -1,3 +1,4 @@
+import { CheckCircleOutlined, CloseCircleOutlined } from '@ant-design/icons'
 import { App, Alert, AutoComplete, Button, Card, Form, Input, Select, Space, Tag, Typography } from 'antd'
 import { useCallback, useEffect, useState } from 'react'
 
@@ -98,7 +99,7 @@ export default function IntegrationPanel() {
             上次测试：
             {cfg?.last_test
               ? <span>
-                  {cfg.last_test.ok ? '✅ 通过' : '❌ 失败'}
+                  {cfg.last_test.ok ? <CheckCircleOutlined /> : <CloseCircleOutlined />} {cfg.last_test.ok ? '通过' : '失败'}
                   <Typography.Text type="secondary">（{cfg.last_test.at.slice(0, 16).replace('T', ' ')}）</Typography.Text>
                   {!cfg.last_test.ok && <Typography.Text type="danger"> —— 点「测试连接」看具体原因</Typography.Text>}
                 </span>

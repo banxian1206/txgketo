@@ -382,3 +382,29 @@ body {
   overflow: auto;
   padding: 16px;
 }
+
+
+/* ── 移动端触控目标（视觉规范 §5.2：≥44px）docs/12 §2-E ─────────────────
+   仓库/车间的人戴手套、站在货架旁边点手机，24px 的小按钮按不准。
+   用一处作用域 CSS 解决，而不是给每个页面各加 size="large"（那必然漏）。 */
+.m-shell .ant-btn { min-height: 40px; }
+.m-shell .ant-btn-sm { min-height: 38px; }
+.m-shell .ant-btn-lg, .m-shell .ant-btn-primary { min-height: 44px; }
+.m-shell .ant-radio-button-wrapper { min-height: 44px; line-height: 42px; }
+.m-shell .ant-segmented-item { min-height: 40px; }
+.m-shell .ant-list-item { min-height: 48px; }
+.m-shell .ant-tabs-tab { padding-top: 10px; padding-bottom: 10px; }
+
+/* 吸底主操作条：一屏一个主动作，拇指不用往上够 */
+.m-actionbar {
+  position: sticky;
+  bottom: 0;
+  z-index: 10;
+  display: flex;
+  gap: 8px;
+  padding: 10px 12px;
+  margin: 12px -12px -12px;
+  background: #fff;
+  border-top: 1px solid #f0f0f0;
+}
+.m-actionbar .ant-btn { flex: 1; min-height: 48px; font-size: 15px; }

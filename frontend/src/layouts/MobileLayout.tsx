@@ -85,7 +85,7 @@ export default function MobileLayout() {
       .find((t) => (t.match ?? [t.key]).some((pre) => loc.pathname.startsWith(pre)))?.key ?? '/m'
 
   return (
-    <div style={{ minHeight: '100vh', background: T.bgPage, paddingBottom: 64 }}>
+    <div className="m-shell" style={{ minHeight: '100vh', background: T.bgPage, paddingBottom: 64 }}>
       <div
         style={{
           position: 'sticky',
@@ -104,13 +104,17 @@ export default function MobileLayout() {
           <img src="/brand/logo-white.png" alt="同兴高科 TXGK" style={{ height: 22 }} />
           <Typography.Text style={{ color: T.bg, fontSize: 12, opacity: 0.85 }}>移动端</Typography.Text>
         </Space>
-        <a style={{ color: T.bg }} onClick={() => setNotifOpen(true)}>
+        {/* ★ 触控目标（规范 §5.2）：铃铛与退出是移动端仅有的两个顶栏动作，20px 按不准 */}
+        <a
+          style={{ color: T.bg, minWidth: 40, minHeight: 40, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
+          onClick={() => setNotifOpen(true)}
+        >
           <Badge count={unread} size="small">
             <span style={{ fontSize: 16 }}><BellOutlined /></span>
           </Badge>
         </a>
         <a
-          style={{ color: T.bg, fontSize: 13 }}
+          style={{ color: T.bg, fontSize: 13, minWidth: 44, minHeight: 40, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', padding: '0 6px' }}
           onClick={() => logout()}
         >
           {name} · 退出

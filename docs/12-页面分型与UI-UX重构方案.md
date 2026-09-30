@@ -256,3 +256,62 @@
 
 ## 12. 剩余（P4）
 移动对齐复核 —— 注意里面有**有意不同构**的（PC 不做客户验收签认，docs/10 §8.1 D3），别当 bug 顺手"修一致"。
+
+---
+
+## 13. P4 移动对齐（2026-09-29 完成 · 四期收官）
+
+### 13.1 实测到的真问题（不是审美）
+
+浏览器逐页量了移动端**可点元素的真实高度**（规范 §5.2 要求 ≥44px）：
+
+| 位置 | 实测 | 问题 |
+|---|---|---|
+| 仓库「备料完成」按钮 | **24px** | 车间/仓库戴手套、站在货架边点手机 —— 按不准 |
+| 售后「＋ 报修（新建工单）」 | **32px** | 同上 |
+| 顶栏 消息铃铛 / 「退出」 | **22px / 20px** | 移动端仅有的两个全局动作，比正文还难按 |
+| 代码里 `size="large"` / `min-height` 声明 | **0 处** | 规范 §5.2 落地率 0% |
+
+### 13.2 修法：一处作用域 CSS，不给每个按钮加 size
+
+`MobileLayout` 根容器加 `className="m-shell"`，`styles.css` 里按作用域统一抬升：
+```
+.m-shell .ant-btn { min-height: 40px }   .m-shell .ant-btn-sm { min-height: 38px }
+.m-shell .ant-btn-primary / -lg { min-height: 44px }
+.m-shell .ant-radio-button-wrapper { min-height: 44px }   ← 验收「合格/不合格」是拇指活
+.m-shell .ant-list-item { min-height: 48px }   .m-shell .ant-tabs-tab { padding 10px }
+.m-actionbar { position: sticky; bottom: 0 }   .m-actionbar .ant-btn { flex:1; min-height:48px }
+```
+> 为什么这样做：给每个页面各写 `size="large"` 一定会漏（10 个移动页 × 几十个按钮），作用域 CSS 一处生效、新页面自动继承。
+
+**吸底主操作条**：验收动线页（`/m/accept/:id`）的「提交验收」改成 `.m-actionbar` —— 单手作业，主按钮不该在屏幕外要往上够。实测 `{bar:true, h:48, position:"sticky"}`。
+
+### 13.3 emoji 图标清零（规范 §4）
+
+移动端 5 处 emoji 当图标 → `@ant-design/icons`：`📷 拍照`→`CameraOutlined`、`📐 看电子图纸`→`FileTextOutlined`、`✅ 完成项/处理方案`→`CheckCircleFilled`、`⚠ 问题`→`WarningOutlined`（颜色一律用 `T.success/T.error`，裸 hex 被自家 `VIS-hex` 护栏当场拦下）。
+
+### 13.4 有意不同构的（别当 bug 修）
+
+- **PC 现场台不做客户验收签认**（docs/10 §8.1 D3 客户拍板：验收发生在现场、由手机拍与确认）→ 现场台 PC 5 页签、移动 6 页签是**设计决定**；
+- 仓库/制造/装配两端**同构**（同一批人做同一动作）：PC 仓库台已按 P2 拆成 待验收/待入库/待领料，与 `/m/warehouse` 一致。
+
+### 13.5 新增护栏（注入反例自证能红）
+
+| 护栏 | 内容 | 自证 |
+|---|---|---|
+| `MOBILE-不用emoji图标`（static） | 10 个移动页 JSX 文案里出现 emoji 即红（注释豁免） | 注入 `🚚` 到 Empty 文案 → **红**；第一次注入到注释里 → 正确地不红（说明豁免逻辑生效）；还原回绿 |
+| `MOBILE-触控目标≥40px`（ui 浏览器实测） | 7 个移动页所有可点元素高度 ≥40px | **修复前实测就是红的**（24/32/22/20px 全被抓出），修复后 0 个偏小 |
+| `MOBILE-作用域壳在位`（ui） | `.m-shell` 根容器必须在（触控 CSS 与吸底条都挂它） | 摘掉 class 即失效 |
+
+### 13.6 四期收官 · 最终验证
+
+| 期 | 交付 |
+|---|---|
+| P0 | token 刻度 / `MONO` 等宽编号 / 5 个轻组件 / inline 棘轮 / 禁 10px / 禁内部口径上屏 |
+| P1 | 项目详情 **9 屏 → 1.3 屏**（结论条 + 4 泳道 + 交付摘要 + 抽屉），顺带修「PM 看到商务字段的 ✎ 点了必 403」 |
+| P2 | 台类页统一壳：删双份计数（含自相矛盾的「库存 4 种 vs 库存(5)」）、去三层标题、长说明进 Tooltip |
+| P3 | 筛选进 URL（`useUrlState`）、列表列治理（8→7、330px 资料墙→92px）、详情视图 Modal→Drawer 720 |
+| P4 | 移动端触控 ≥40–44px（一处作用域 CSS）、吸底主操作条、emoji 图标清零 |
+
+**全量**：`pytest 174` · 基线 **0 问题 / 0 中断 / 149 通过** · `probe_bom_math 8/8` · `probe_n24_n25 20/20` · 对抗 `adv 71 / v9 13 / v10 6` · `tsc 0 错` · `build OK` · **`static 36 / api 15 / ui 70`，三套 0 FAIL 0 SKIP**。
+护栏从本轮开始前（docs/10 时点）的 static 22 增长到 **36**，e2e:ui 从 55 增长到 **70**，且每一条都做过注入自证。

@@ -470,5 +470,28 @@ const FEATS = path.join(SRC, 'features');
   check('LIST-筛选进URL且列数受控', bad2.length === 0, bad2.join('; ') || '项目列表：筛选在 URL、列数 7（≤8 基线）')
 }
 
+/* ══════════ P4 移动对齐（docs/12 §2-E · 规范 §4/§5.2）══════════ */
+{
+  // 移动端不许再拿 emoji 当图标（跨平台渲染不一致，Windows 上尤其难看）
+  const MOBILE = ['features/acceptance/MobilePage.tsx', 'features/assembly/MobilePage.tsx', 'features/home/MobilePage.tsx',
+    'features/manufacturing/MobilePage.tsx', 'features/service/MobilePage.tsx', 'features/shipping/MobilePage.tsx',
+    'features/site/MobilePage.tsx', 'features/warehouse/MobilePage.tsx', 'features/warehouse/IssuesPage.tsx', 'features/home/MePage.tsx']
+  const EM = new RegExp('[\\u{1F300}-\\u{1FAFF}\\u{2600}-\\u{27BF}]', 'gu')
+  const bad = []
+  for (const rel of MOBILE) {
+    const f = path.join(SRC, rel)
+    if (!fs.existsSync(f)) { bad.push(`${rel} 文件不见了`); continue }
+    f && fs.readFileSync(f, 'utf8').split('\n').forEach((l, i) => {
+      const s = l.trim()
+      if (s.startsWith('//') || s.startsWith('*') || s.startsWith('{/*')) return
+      if (EM.test(s)) bad.push(`${rel}:${i + 1} ${s.slice(0, 28)}`)
+      EM.lastIndex = 0
+    })
+  }
+  check('MOBILE-不用emoji图标', bad.length === 0,
+    bad.length ? `移动端又出现 emoji 当图标（改用 @ant-design/icons）: ${bad.slice(0, 5).join(' | ')}`
+      : `${MOBILE.length} 个移动页零 emoji 图标`)
+}
+
 const fails = summary('静态回归');
 exitWith(fails);

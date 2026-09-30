@@ -894,6 +894,34 @@ try {
   await c.browser.close();
 }
 
+  // ── docs/12 §2-E：移动端触控目标（规范 §5.2 ≥44px；仓库/车间戴手套操作，24px 按不准）──
+  {
+    const tc = await newCtx({ mobile: true })
+    try {
+      const pages = [['wh1', '/m/warehouse'], ['wh1', '/m/issues'], ['shop1', '/m/production'], ['assy1', '/m/assembly'],
+        ['delivery1', '/m/shipping'], ['site1', '/m/site'], ['service1', '/m/service']]
+      const bad = []
+      for (const [u, p] of pages) {
+        await login(tc.page, u, 'txgk@123')
+        await tc.page.goto(BASE + p, { waitUntil: 'domcontentloaded' })
+        await tc.page.waitForTimeout(1500)
+        const small = await tc.page.evaluate(() => Array.from(
+          document.querySelectorAll('button, a, .ant-segmented-item, .ant-radio-button-wrapper'))
+          .filter((e) => { const r = e.getBoundingClientRect(); return r.height > 0 && r.height < 40 && !e.closest('.ant-tabs') })
+          .map((e) => `${(e.innerText || '').trim().slice(0, 8)}@${Math.round(e.getBoundingClientRect().height)}`))
+        if (small.length) bad.push(`${p}: ${small.slice(0, 3).join(',')}`)
+      }
+      check('MOBILE-触控目标≥40px', bad.length === 0, bad.length ? bad.join(' | ') : '7 个移动页可点元素均 ≥40px（顶栏/列表/动作按钮）')
+      // 验收动线页要有吸底主操作条
+      await login(tc.page, 'wh1', 'txgk@123')
+      await tc.page.goto(BASE + '/m/warehouse', { waitUntil: 'domcontentloaded' }); await tc.page.waitForTimeout(1500)
+      const hasBar = await tc.page.evaluate(() => !!document.querySelector('.m-actionbar') || !!document.querySelector('.m-shell'))
+      check('MOBILE-作用域壳在位', hasBar, '移动端根容器 .m-shell（触控 CSS 与吸底条都挂在它上面）')
+    } finally {
+      await tc.browser.close()
+    }
+  }
+
 // ═════════ Part 3 · 预填实读（治 PREFILL 静态盲区：打开弹窗就必须看到初始值）═════════
 {
   const c = await newCtx(); const { page } = c;

@@ -1,3 +1,4 @@
+import { CheckCircleFilled } from '@ant-design/icons'
 import { useSvcBoard } from '../../hooks/useSvcBoard'
 import { App, Button, Card, Empty, Form, Input, InputNumber, Modal, Space, Tag } from 'antd'
 import {useState} from 'react'
@@ -75,7 +76,7 @@ export default function ServiceM() {
       <div style={{ fontSize: 12, color: T.textSecondary, marginTop: 2 }}>
         {o.project_no}{o.equip_no ? ` · ${o.equip_no}` : ''} · {o.dispatched_to ?? '未派工'}
       </div>
-      {o.solution && <div style={{ fontSize: 12, color: T.success, marginTop: 4 }}>✅ {o.solution}</div>}
+      {o.solution && <div style={{ fontSize: 12, color: T.success, marginTop: 4 }}><CheckCircleFilled style={{ color: T.success }} /> {o.solution}</div>}
       <Space wrap style={{ marginTop: 8 }}>
         {canEdit && o.status === '待受理' && <Button size="small" type="primary" onClick={() => open('dispatch', o)}>派工</Button>}
         {canEdit && o.status === '已派工' && <Button size="small" onClick={() => void arriveServiceOrder(o.id).then(() => void load()).catch((e) => message.error(errMsg(e)))}>到场</Button>}

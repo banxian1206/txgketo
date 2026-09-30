@@ -1,3 +1,4 @@
+import { CameraOutlined, FileTextOutlined } from '@ant-design/icons'
 import {
   App,
   Button,
@@ -182,14 +183,14 @@ export default function AcceptM() {
         </Space>
         {data.drawing && (
           <Button type="primary" ghost size="small" style={{ marginTop: 10 }} onClick={() => void openDrawing()}>
-            📐 看电子图纸 {data.drawing.drawing_no}（{data.drawing.version}）
+            <FileTextOutlined /> 看电子图纸 {data.drawing.drawing_no}（{data.drawing.version}）
           </Button>
         )}
       </Card>
 
       <Card size="small" title="① 拍照" style={{ marginBottom: 10 }}>
         <Space wrap>
-          <Button onClick={() => fileRef.current?.click()}>📷 拍照 / 选图</Button>
+          <Button onClick={() => fileRef.current?.click()}><CameraOutlined /> 拍照 / 选图</Button>
           <input
             ref={fileRef}
             type="file"
@@ -261,9 +262,12 @@ export default function AcceptM() {
             value={note}
             onChange={(e) => setNote(e.target.value)}
           />
-          <Button type="primary" block loading={saving} disabled={!canStore} onClick={() => void doInspect()}>
-            提交验收{photos.length ? `（含 ${photos.length} 张照片）` : ''}
-          </Button>
+          {/* ★ 吸底主操作条（规范 §5.2）：站在货架边单手作业，主按钮不该在屏幕外要往上够 */}
+          <div className="m-actionbar">
+            <Button type="primary" block loading={saving} disabled={!canStore} onClick={() => void doInspect()}>
+              提交验收{photos.length ? `（含 ${photos.length} 张照片）` : ''}
+            </Button>
+          </div>
         </Space>
       </Card>
 

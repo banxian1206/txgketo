@@ -1,7 +1,7 @@
+import { CheckCircleFilled, MinusCircleOutlined, PlusOutlined, WarningOutlined } from '@ant-design/icons'
 import { useSiteBoard } from './hooks'
 import IncomingCheckFields from './components/IncomingCheckFields'
 import { App, Button, Card, DatePicker, Empty, Form, Input, InputNumber, Radio, Select, Space, Tabs, Tag, Typography } from 'antd'
-import { MinusCircleOutlined, PlusOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import {useEffect, useState} from 'react'
 
@@ -148,8 +148,8 @@ export default function SiteM() {
         {d.people != null && <Typography.Text type="secondary" style={{ fontSize: 12 }}>现场 {d.people} 人</Typography.Text>}
       </Space>
       <div style={{ fontSize: 12, marginTop: 4 }}>
-        {d.done_items.map((x, i) => <div key={i}>✅ {x}</div>)}
-        {d.problem && <div style={{ color: T.error }}>⚠ {d.problem}</div>}
+        {d.done_items.map((x, i) => <div key={i}><CheckCircleFilled style={{ color: T.success }} /> {x}</div>)}
+        {d.problem && <div style={{ color: T.error }}><WarningOutlined style={{ color: 'inherit' }} /> {d.problem}</div>}
       </div>
       <div style={{ fontSize: 12, color: T.textSecondary, marginTop: 4 }}>照片 {d.photos.length} · 视频 {d.videos.length}</div>
     </Card>
