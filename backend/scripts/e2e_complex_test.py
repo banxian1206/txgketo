@@ -398,9 +398,9 @@ def main() -> None:
     # ================= S7 发运（两批 + 重复拦截 + 缺件签收） =================
     stage("S7 发运（pm1 指令 / delivery1 执行 / site1 清点）：第一批 01A 齐；第二批 02A 缺件")
     sh1 = req("post", "/api/v1/shipping/instructions", "pm1", (201,),
-              json={"project_no": p, "equip_nos": [A], "remark": "第一批：先发主机"})
+              json={"project_no": p, "equip_nos": [A], "plan_ship_date": (date.today() + timedelta(days=7)).isoformat(), "remark": "第一批：先发主机"})
     r = c.post("/api/v1/shipping/instructions", headers=login("pm1"),
-               json={"project_no": p, "equip_nos": [A]})
+               json={"project_no": p, "equip_nos": [A], "plan_ship_date": (date.today() + timedelta(days=7)).isoformat(),})
     flag("S7", r.status_code == 400, "01A 已在未完成批次，重复下单应被拦")
     # 按结构生成发运清单
     req("post", f"/api/v1/shipping/{sh1['id']}/items/generate", "pm1", (201,))
@@ -430,7 +430,7 @@ def main() -> None:
 
     # 第二批：02A —— 漏发一项，现场清点时必须逐项暴露
     sh2 = req("post", "/api/v1/shipping/instructions", "pm1", (201,),
-              json={"project_no": p, "equip_nos": ["02A"], "remark": "第二批：线体分段"})
+              json={"project_no": p, "equip_nos": ["02A"], "plan_ship_date": (date.today() + timedelta(days=7)).isoformat(), "remark": "第二批：线体分段"})
     req("post", f"/api/v1/shipping/{sh2['id']}/items/generate", "pm1", (201,))
     sh2 = next(x for x in req("get", "/api/v1/shipping/list", "pm1", params={"project_no": p}) if x["id"] == sh2["id"])
     ship_ids = [i["id"] for i in sh2["items"]][:-1]  # 故意漏发最后一项

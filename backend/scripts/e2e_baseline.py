@@ -634,7 +634,7 @@ def a_s7() -> None:
     ts = api.req("get", "/shipping/to-ship", "pm1", params={"project_no": p})
     rec(len(ts) >= 1, f"待发设备 {len(ts)} 台")
     sh = api.req("post", "/shipping/instructions", "pm1", (200, 201),
-                 json={"project_no": p, "equip_nos": [eq]})
+                 json={"project_no": p, "equip_nos": [eq], "plan_ship_date": (date.today() + timedelta(days=7)).isoformat(),})
     sid = sh["id"] if isinstance(sh, dict) and "id" in sh else sh
     CTX["ship_id"] = sid
     api.req("post", f"/shipping/{sid}/items/generate", "pm1", (200, 201))

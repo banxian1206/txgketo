@@ -329,7 +329,7 @@ def main() -> None:
     tos = req("get", "/api/v1/shipping/to-ship", "pm1", params={"project_no": p})
     flag("S7", tos and tos[0]["ready"], "01A 装配完成后应「可发」")
     sh = req("post", "/api/v1/shipping/instructions", "pm1", (201,),
-             json={"project_no": p, "equip_nos": ["01A"], "remark": "先发 01A"})
+             json={"project_no": p, "equip_nos": ["01A"], "plan_ship_date": (date.today() + timedelta(days=7)).isoformat(), "remark": "先发 01A"})
     sph = photos("pm1", "shipping", p, sh["shipment_no"])
     # 发运清单（S7 重构后：按结构生成 → 逐项勾「已发」→ 装车/发运/到货/现场逐项清点）
     req("post", f"/api/v1/shipping/{sh['id']}/items/generate", "pm1", (201,))

@@ -294,7 +294,7 @@ def main() -> None:
 
         # ---------- S7 发运 ----------
         call("post", "/api/v1/shipping/instructions", who="pm1", ok=(201,),
-             label="发货指令：本次只发 01A", json={"project_no": p, "equip_nos": ["01A"], "remark": "先发 01A"})
+             label="发货指令：本次只发 01A", json={"project_no": p, "equip_nos": ["01A"], "plan_ship_date": (date.today() + timedelta(days=7)).isoformat(), "remark": "先发 01A"})
         ships = c.get("/api/v1/shipping/list", headers=login("pm1"), params={"project_no": p}).json()
         sh = ships[0]
         sph = photos("pm1", "shipping", p, sh["shipment_no"])

@@ -38,7 +38,7 @@ export default function AssemblyM() {
   const [form] = Form.useForm()
 
   // 重构 2.3：看板数据走共享 hook（与另一端同源）
-  const { overview, records, reload: load } = useAsmBoard()
+  const { overview, records, reload: load } = useAsmBoard(projectNo)
 
   useEffect(() => {
     listProjects()

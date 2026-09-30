@@ -716,7 +716,7 @@ try {
       const ts2 = (await (await apiGet(`/shipping/to-ship?project_no=${p.project_no}`, pmTok)).json()) ?? [];
       const row = (Array.isArray(ts2) ? ts2 : []).filter((r) => r.ready && !r.in_open_shipment)[0];
       if (!row) continue;
-      const ins = await (await apiPost('/shipping/instructions', pmTok, { project_no: p.project_no, equip_nos: [row.equip_no] })).json();
+      const ins = await (await apiPost('/shipping/instructions', pmTok, { project_no: p.project_no, equip_nos: [row.equip_no], plan_ship_date: new Date(Date.now() + 7 * 864e5).toISOString().slice(0, 10) })).json();
       if (!ins?.id) continue;
       await apiPost(`/shipping/${ins.id}/items/generate`, pmTok, {});
       const its = (await (await apiGet(`/shipping/${ins.id}/items`, pmTok)).json()) ?? [];

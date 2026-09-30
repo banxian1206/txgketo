@@ -819,10 +819,10 @@ def s7(pj: dict) -> None:
     batches = [[e] for e in assembled] if prof["multi_ship"] else [assembled]
     for bi, batch in enumerate(batches, 1):
         sh = api.req("post", "/shipping/instructions", "pm1", (201,),
-                     json={"project_no": p, "equip_nos": batch, "remark": f"第 {bi} 批发运"})
+                     json={"project_no": p, "equip_nos": batch, "plan_ship_date": (date.today() + timedelta(days=7)).isoformat(), "remark": f"第 {bi} 批发运"})
         # 重复下单应拦
         dup = api.raw("post", "/shipping/instructions", "pm1",
-                      json={"project_no": p, "equip_nos": batch})
+                      json={"project_no": p, "equip_nos": batch, "plan_ship_date": (date.today() + timedelta(days=7)).isoformat(),})
         flag(dup.status_code == 400, f"重复下发货指令应 400，实际 {dup.status_code}")
         api.req("post", f"/shipping/{sh['id']}/items/generate", "pm1", (201,))
         sh = [x for x in api.req("get", "/shipping/list", "pm1", params={"project_no": p})

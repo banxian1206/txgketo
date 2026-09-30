@@ -105,6 +105,10 @@ def create_shipment(
 ) -> Shipment:
     if not equip_nos:
         raise ShippingError("至少勾选一台要发的设备")
+    # ★ 发货日是这条指令的另一半（§2.2）：PM 定哪天发 → 采购按那天叫车 → 装货的人知道当天几车。
+    #   过去接口可选、两端 UI 又根本没采集 → 字段永远是 NULL，叫车的人只能猜（2026-09-30 P1-6）。
+    if plan_ship_date is None:
+        raise ShippingError("请定「发货日」—— 采购按这天叫车，装货的人据此知道当天装几车")
     equips = {
         e.equip_no: e
         for e in session.scalars(select(Equipment).where(Equipment.project_no == project_no)).all()
@@ -112,10 +116,21 @@ def create_shipment(
     missing = [n for n in equip_nos if n not in equips]
     if missing:
         raise ShippingError(f"设备不存在：{'、'.join(missing)}")
-    shipped = {x["equip_no"] for x in to_ship(session, project_no) if x["in_open_shipment"]}
+    ship_rows = {x["equip_no"]: x for x in to_ship(session, project_no)}
+    shipped = {n for n, x in ship_rows.items() if x["in_open_shipment"]}
     dup = [n for n in equip_nos if n in shipped]
     if dup:
         raise ShippingError(f"这些设备已经在一个未完成的发运批次里：{'、'.join(dup)}")
+    # ★ 只能发「装配完成」的设备（§8.1 口径：待发设备 = 装配完成且不在未完成批次）。
+    #   以前只在界面上标了「未装配完成」但勾选框不禁、后端也不拦 →
+    #   造出「批次里有这台设备、发运清单里却没它的任何一项」的裂开数据（2026-09-30 P1-5）
+    not_ready = [n for n in equip_nos if not ship_rows.get(n, {}).get("ready")]
+    if not_ready:
+        detail = "、".join(
+            f"{n} {ship_rows.get(n, {}).get('equip_name') or ''}（{ship_rows.get(n, {}).get('assembly_status') or '未装配'}）"
+            for n in not_ready
+        )
+        raise ShippingError(f"这些设备还没装配完成，不能进发货批次：{detail}")
     sh = Shipment(
         shipment_no=next_number(session, ObjectType.SHIPMENT, scope_key=year_scope_key()),
         project_no=project_no,

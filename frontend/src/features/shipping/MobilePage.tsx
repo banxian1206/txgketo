@@ -1,5 +1,5 @@
 import { useShipBoard } from '../../hooks/useShipBoard'
-import { App, Button, Card, Checkbox, Empty, Form, Input, Modal, Select, Space, Tag, Typography } from 'antd'
+import { App, Button, Card, Checkbox, DatePicker, Empty, Form, Input, Modal, Select, Space, Tag, Typography } from 'antd'
 import {useEffect, useState} from 'react'
 
 import {
@@ -18,6 +18,7 @@ import {
   type ShipmentRow,
 } from '../../api/client'
 import AuthedImage from '../../components/AuthedImage'
+import { Muted } from '../../components/ui/Primitives'
 import MfgPhotoPicker from '../../components/MfgPhotoPicker'
 import { SHIP_STATUS as SHIP_COLOR } from '../../theme/status'
 import { T } from '../../theme/tokens'
@@ -30,6 +31,9 @@ export default function ShippingM() {
   const [projects, setProjects] = useState<{ project_no: string; project_name: string }[]>([])
   const [projectNo, setProjectNo] = useState<string | undefined>()
   const [selected, setSelected] = useState<string[]>([])
+  // ★ §2.2：手机上也要定发货日（采购按这天叫车）
+  const [instructOpen, setInstructOpen] = useState(false)
+  const [instructForm] = Form.useForm()
   const [expanded, setExpanded] = useState<number | null>(null)
   const [loadTarget, setLoadTarget] = useState<ShipmentRow | null>(null)
   const [loadPhotos, setLoadPhotos] = useState<string[]>([])
@@ -43,7 +47,7 @@ export default function ShippingM() {
   const [saving, setSaving] = useState(false)
 
   // 重构 2.3：看板数据走共享 hook（与另一端同源）
-  const { toShipRows, shipments, reload: load } = useShipBoard()
+  const { toShipRows, shipments, reload: load } = useShipBoard(projectNo)
 
   useEffect(() => {
     listProjects()
@@ -53,10 +57,22 @@ export default function ShippingM() {
 
   const doInstruct = async () => {
     if (!projectNo || selected.length === 0) return
+    let v: { plan_ship_date: { format: (f: string) => string }; remark?: string }
     try {
-      const r = await createShipment({ project_no: projectNo, equip_nos: selected })
-      message.success(`已下达发货指令 ${r.shipment_no}，请勾选发运项`)
+      v = await instructForm.validateFields()
+    } catch {
+      return
+    }
+    try {
+      const r = await createShipment({
+        project_no: projectNo,
+        equip_nos: selected,
+        plan_ship_date: v.plan_ship_date.format('YYYY-MM-DD'),
+        remark: v.remark || undefined,
+      })
+      message.success(`已下达发货指令 ${r.shipment_no}（发货日 ${v.plan_ship_date.format('MM-DD')}），已通知采购叫车`)
       setSelected([])
+      setInstructOpen(false)
       await load(projectNo)
     } catch (e) {
       message.error(errMsg(e))
@@ -159,11 +175,11 @@ export default function ShippingM() {
 
       {projectNo && (
         <Card size="small" title="待发设备（勾本次要发的）" style={{ marginBottom: 10 }}>
-          {toShipRows.length === 0 && <Empty description="没有设备" />}
+          {toShipRows.length === 0 && <Empty description="没有可发的设备（未装配完成，或已在未完成批次里）" />}
           {toShipRows.map((t) => (
             <div key={t.equip_no} style={{ padding: '6px 0', borderBottom: `1px solid ${T.border}`, opacity: t.in_open_shipment ? 0.5 : 1 }}>
               <Checkbox
-                disabled={t.in_open_shipment}
+                disabled={t.in_open_shipment || !t.ready}
                 checked={selected.includes(t.equip_no)}
                 onChange={(e) => setSelected((s) => (e.target.checked ? [...s, t.equip_no] : s.filter((x) => x !== t.equip_no)))}
               >
@@ -174,7 +190,7 @@ export default function ShippingM() {
               </Checkbox>
             </div>
           ))}
-          <Button type="primary" block style={{ marginTop: 10 }} disabled={!canShip || selected.length === 0} onClick={() => void doInstruct()}>
+          <Button type="primary" block style={{ marginTop: 10 }} disabled={!canShip || selected.length === 0} onClick={() => setInstructOpen(true)}>
             下达发货指令（{selected.length} 台）
           </Button>
         </Card>
@@ -322,6 +338,32 @@ export default function ShippingM() {
         <Form layout="vertical" style={{ marginTop: 10 }}>
           <Form.Item label="清点照片（必须）" required>
             <MfgPhotoPicker projectNo={receiptTarget?.project_no ?? ''} refNo={receiptTarget?.shipment_no ?? ''} value={receiptPhotos} onChange={setReceiptPhotos} upload={uploadShipPhotos} photoUrl={shipPhotoUrl} label="拍照" />
+          </Form.Item>
+        </Form>
+      </Modal>
+
+      {/* ★ 下达发货指令（§2.2）：发货日必填 —— 采购按这天叫车、装货的人按这天知道几车 */}
+      <Modal
+        open={instructOpen}
+        title={`下达发货指令 · ${selected.length} 台`}
+        onCancel={() => setInstructOpen(false)}
+        onOk={() => void doInstruct()}
+        okText="确认下达"
+        destroyOnHidden
+      >
+        <Typography.Paragraph>
+          <Muted>本次要发：{selected.join('、')}。指令下达后采购要去叫车，所以发货日必须定下来。</Muted>
+        </Typography.Paragraph>
+        <Form form={instructForm} layout="vertical" preserve={false}>
+          <Form.Item
+            name="plan_ship_date"
+            label="发货日（PM 定）"
+            rules={[{ required: true, message: '请定发货日 —— 采购按这天叫车' }]}
+          >
+            <DatePicker style={{ width: '100%' }} placeholder="哪天发出去" />
+          </Form.Item>
+          <Form.Item name="remark" label="备注" style={{ marginBottom: 0 }}>
+            <Input placeholder="如：分两车，第二车下午到" />
           </Form.Item>
         </Form>
       </Modal>

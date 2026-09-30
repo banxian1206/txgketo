@@ -64,7 +64,7 @@ export default function Assembly() {
   const [saving, setSaving] = useState(false)
   const [form] = Form.useForm()
   // 重构 2.3：看板数据走共享 hook（与另一端同源）
-  const { overview, records, loading, reload: load } = useAsmBoard()
+  const { overview, records, loading, reload: load } = useAsmBoard(projectNo)
   // ★ G5：项目漏斗（未买/在途/已入库/已领料/已做成成品）+ 跨项目汇总
   const [funnel, setFunnel] = useState<KittingFunnel | null>(null)
   const [crossRows, setCrossRows] = useState<ProjectFunnelRow[]>([])

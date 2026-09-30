@@ -397,7 +397,7 @@ const FEATS = path.join(SRC, 'features');
     if (/from '[^']*ui\/Primitives'/.test(src) && /CodeNo|NumCell/.test(src)) monoCols++
   }
   // ★ 棘轮基线（2026-09-29 实测）：改完一期就下调一次，绝不许往上抬
-  const BASE_INLINE = 857
+  const BASE_INLINE = 851  // 2026-09-30：叫车弹窗抽公共件 + 说明段换 Muted（原 857）
   const BASE_DOCREF = 0
   check('VIS-inline棘轮', inline <= BASE_INLINE, `inline style ${inline} 处（基线 ${BASE_INLINE}，只许降）`)
   check('VIS-字号在刻度内', offScale.length === 0, offScale.length ? `不在 FS 刻度(12/13/14/16/20/24)里的字号: ${offScale.slice(0, 5).join(', ')}` : '全部字号来自 FS 刻度')

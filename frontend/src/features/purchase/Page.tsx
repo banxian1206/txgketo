@@ -198,10 +198,11 @@ export default function PurchaseWorkbench() {
             label: `待叫车 (${toVehicle.length})`,
             children: (
               <>
-                <Typography.Paragraph type="secondary" style={{ fontSize: 12 }}>
-                  项目经理下达发货指令后，<b>车由采购叫</b>：按发货日当天把车订好，
-                  登记「几辆车 + 本次运费」。装货的人据此知道当天装几车 ——
-                  <b>没叫车，发运那边装不了车</b>。车辆费用只记本次金额，不进价格库。
+                <Typography.Paragraph>
+                  <Muted>
+                    项目经理下达发货指令后，<b>车由采购叫</b>：按发货日当天把车订好，登记「几辆车 + 本次运费」。
+                    装货的人据此知道当天装几车 ——<b>没叫车，发运那边装不了车</b>。车辆费用只记本次金额，不进价格库。
+                  </Muted>
                 </Typography.Paragraph>
                 <Table<ToVehicleRow>
                   rowKey="id"

@@ -9,6 +9,7 @@ import {
   Descriptions,
   Drawer,
   Empty,
+  DatePicker,
   Form,
   Input,
   Modal,
@@ -45,6 +46,7 @@ import {
 } from '../../api/client'
 import AuthedImage from '../../components/AuthedImage'
 import VehicleModal from '../../components/VehicleModal'
+import { Muted } from '../../components/ui/Primitives'
 import MfgPhotoPicker from '../../components/MfgPhotoPicker'
 import { SHIP_STATUS as SHIP_COLOR } from '../../theme/status'
 import { T } from '../../theme/tokens'
@@ -60,6 +62,9 @@ export default function Shipping() {
   const projectNo = bUrl.p
   const setProjectNo = (v?: string) => setBUrl({ p: v })
   const [selectedEquips, setSelectedEquips] = useState<string[]>([])
+  // ★ §2.2：下达指令时**必须定发货日**（采购按这天叫车、装货的人按这天知道几车）
+  const [instructOpen, setInstructOpen] = useState(false)
+  const [instructForm] = Form.useForm()
 
   // 发运清单勾选
   const [itemsShip, setItemsShip] = useState<ShipmentRow | null>(null)
@@ -88,7 +93,7 @@ export default function Shipping() {
   const [placePhotos, setPlacePhotos] = useState<string[]>([])
 
   // 重构 2.3：看板数据走共享 hook（与另一端同源）
-  const { toShipRows, shipments, setShipments, loading, reload: load } = useShipBoard()
+  const { toShipRows, shipments, setShipments, loading, reload: load } = useShipBoard(projectNo)
 
   useEffect(() => {
     listProjects()
@@ -98,9 +103,21 @@ export default function Shipping() {
 
   const doInstruct = async () => {
     if (!projectNo || selectedEquips.length === 0) return
+    let v: { plan_ship_date: { format: (f: string) => string }; remark?: string }
     try {
-      const r = await createShipment({ project_no: projectNo, equip_nos: selectedEquips })
-      message.success(`已下达发货指令 ${r.shipment_no}，请按结构勾选发运清单`)
+      v = await instructForm.validateFields()
+    } catch {
+      return // 表单自己会标红，不另弹提示
+    }
+    try {
+      const r = await createShipment({
+        project_no: projectNo,
+        equip_nos: selectedEquips,
+        plan_ship_date: v.plan_ship_date.format('YYYY-MM-DD'),
+        remark: v.remark || undefined,
+      })
+      message.success(`已下达发货指令 ${r.shipment_no}（发货日 ${v.plan_ship_date.format('YYYY-MM-DD')}），已通知采购叫车`)
+      setInstructOpen(false)
       setSelectedEquips([])
       const list = await load(projectNo)
       const fresh = list.find((s) => s.id === r.id)
@@ -312,11 +329,14 @@ export default function Shipping() {
               loading={loading}
               dataSource={toShipRows}
               pagination={false}
-              locale={{ emptyText: <Empty description="这个项目还没有设备" /> }}
+              locale={{ emptyText: <Empty description="没有可发的设备（设各未装配完成、或已在本轮未完成的批次里）" /> }}
               rowSelection={{
                 selectedRowKeys: selectedEquips,
                 onChange: (keys) => setSelectedEquips(keys as string[]),
-                getCheckboxProps: (r) => ({ disabled: r.in_open_shipment }),
+                getCheckboxProps: (r) => ({
+                  // ★ 已在批次里 或 还没装配完成 → 不能勾（后端同步硬拦，两边一个口径 —— P1-5）
+                  disabled: r.in_open_shipment || !r.ready,
+                }),
               }}
               columns={[
                 { title: '设备', key: 'eq', width: 220, render: (_: unknown, r: ToShipRow) => `${r.equip_no} ${r.equip_name}` },
@@ -333,7 +353,7 @@ export default function Shipping() {
               ]}
             />
             <Space style={{ marginTop: 10 }}>
-              <Button type="primary" disabled={!canEdit || selectedEquips.length === 0} onClick={() => void doInstruct()}>
+              <Button type="primary" disabled={!canEdit || selectedEquips.length === 0} onClick={() => setInstructOpen(true)}>
                 下达发货指令（{selectedEquips.length} 台）
               </Button>
               <Typography.Text type="secondary" style={{ fontSize: 12 }}>
@@ -449,6 +469,34 @@ export default function Shipping() {
             <Button onClick={() => itemsShip && void addManual(itemsShip)}>加补充项</Button>
           </Space>
         )}
+      </Modal>
+
+      {/* ★ §2.2 下达发货指令：一条指令指挥两个部门，**发货日是必填项** */}
+      <Modal
+        open={instructOpen}
+        title={`下达发货指令 · ${selectedEquips.length} 台`}
+        onCancel={() => setInstructOpen(false)}
+        onOk={() => void doInstruct()}
+        okText="确认下达"
+        destroyOnHidden
+      >
+        <Typography.Paragraph>
+          <Muted>
+            本次要发：{selectedEquips.join('、')}。指令下达后采购要去叫车、发运负者据此装车 —— 所以发货日必须定下来。
+          </Muted>
+        </Typography.Paragraph>
+        <Form form={instructForm} layout="vertical" preserve={false}>
+          <Form.Item
+            name="plan_ship_date"
+            label="发货日（PM 定）"
+            rules={[{ required: true, message: '请定发货日 —— 采购按这天叫车' }]}
+          >
+            <DatePicker style={{ width: 220 }} placeholder="哪天发出去" />
+          </Form.Item>
+          <Form.Item name="remark" label="备注" style={{ marginBottom: 0 }}>
+            <Input.TextArea rows={2} placeholder="如：分两车，第二车下午到" />
+          </Form.Item>
+        </Form>
       </Modal>
 
       {/* ★ §2.2 采购叫车（一条指令、两个部门：PM 定发货日 → 采购叫车 → 发运装车）

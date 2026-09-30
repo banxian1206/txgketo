@@ -75,3 +75,57 @@ def test_vehicle_fee_is_not_written_to_price_library():
     body = src[j : j + 900]
     for forbidden in ("SupplierQuote", "PriceReference", "supplier_quote", "price_reference"):
         assert forbidden not in body, f"叫车不该写入价格库（出现 {forbidden}）"
+
+
+def test_plan_ship_date_is_required_when_creating_instruction():
+    """★ 发货日是这条指令的另一半（2026-09-30 UI 真实场景测试 P1-6）。
+
+    接口一直支持这个字段，但**两端 UI 都没有采集口**，e2e 脚本站接口时也没传 →
+    字段永远是 NULL、批次列表「发货日」永远「—」，而叫车弹窗还写着“按 PM 定的发货日当天订车”。
+    """
+    src = _code(BE / "services" / "shipping.py")
+    j = src.index("def create_shipment(")
+    body = src[j : j + 1200]
+    assert "if plan_ship_date is None:" in body, "没有发货日必须拦下来（400），不能默默建 NULL"
+    assert "发货日" in body
+
+
+def test_only_assembled_equipment_can_enter_a_shipment():
+    """★ 只能发「装配完成」的设备（P1-5）。
+
+    修前：待发设备表里 02A 标着「未装配完成」，但勾选框不禁、后端也不拦 →
+    批次里挂着 02A、发运清单里却没有它的任何一项；而批次又没有取消口 → 02A 卡在批次里出不来。
+    """
+    src = _code(BE / "services" / "shipping.py")
+    j = src.index("def create_shipment(")
+    body = src[j : j + 2000]
+    assert "not_ready" in body and '"ready"' in body, "建批次时必须校验 ready（装配完成）"
+    assert "不能进发货批次" in body
+    # 前端两端也要禁用（不然后端 400 变成“点了才报错”）
+    fe = ROOT / "frontend" / "src" / "features" / "shipping"
+    pc = _read(fe / "Page.tsx")
+    assert "disabled: r.in_open_shipment || !r.ready" in pc, "PC 端未装配完成的设备不该能勾"
+    mob = _read(fe / "MobilePage.tsx")
+    assert "disabled={t.in_open_shipment || !t.ready}" in mob, "手机端未装配完成的设备不该能勾"
+
+
+def test_both_ends_collect_plan_ship_date():
+    """PC 与手机端都要有「发货日」输入口（P1-6：修前两端都没有）。"""
+    fe = ROOT / "frontend" / "src" / "features" / "shipping"
+    for name in ("Page.tsx", "MobilePage.tsx"):
+        s = _read(fe / name)
+        assert 'name="plan_ship_date"' in s, f"{name} 没有发货日字段"
+        assert "plan_ship_date: v.plan_ship_date.format('YYYY-MM-DD')" in s, f"{name} 提交时没带发货日"
+
+
+def test_purchase_workbench_has_vehicle_tab():
+    """★ 叫车必须在采购台里能干（P1-1 发运死锁）。
+
+    采购员没有 ship:edit/project:edit → 进不去发运台；而叫车弹窗只在发运台。
+    后端 since 09-28 就有 /purchase/to-vehicle，但前端从没调用 → 叫车无入口 → 装车被硬拦。
+    """
+    tabs = _read(ROOT / "frontend" / "src" / "configs" / "tabs.ts")
+    assert "key: 'vehicle'" in tabs and "待叫车" in tabs, "采购台注册表里要有「待叫车」页签"
+    page = _read(ROOT / "frontend" / "src" / "features" / "purchase" / "Page.tsx")
+    assert "purchaseToVehicle" in page, "采购台要真的调 /purchase/to-vehicle"
+    assert "VehicleModal" in page, "叫车弹窗与发运台共用同一个实现（不许两处各写一套）"

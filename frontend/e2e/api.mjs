@@ -295,7 +295,7 @@ const wh1 = await apiLogin('wh1', 'txgk@123');
     check('R5-01-已装车可补勾', false, '同上');
     check('R5-02-锁死报400非500', false, '同上');
   } else {
-    const ins = await post('/shipping/instructions', { project_no: target.pno, equip_nos: [target.equip] });
+    const ins = await post('/shipping/instructions', { project_no: target.pno, equip_nos: [target.equip], plan_ship_date: new Date(Date.now() + 7 * 864e5).toISOString().slice(0, 10) });
     const sid = ins.j?.id;
     await post(`/shipping/${sid}/items/generate`, {});
     const its = (await (await apiGet(`/shipping/${sid}/items`, pm)).json()) ?? [];
