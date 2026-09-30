@@ -63,7 +63,8 @@ export default function Workbench() {
     } catch {
       /* 忽略 */
     }
-    if (n.link) nav(n.link)
+    // ★ 站内消息点开 = 跨域下钻：带上来源，详情页才有「← 返回某某工作台」（P2-7）
+    if (n.link) go(n.link)
     else await load()
   }
 

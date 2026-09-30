@@ -167,7 +167,8 @@ export default function ReviewDetailModal({ ticketId, open, onClose, onChanged }
                       children: (
                         <span>
                           <Tag>{i.item_label}</Tag>
-                          {i.item_ref}
+                          {/* ★ BOM 行不要只甩一个数据库 id（P2-4）：审核人要看得见是什么料、多少 */}
+                          {i.item_detail ?? i.item_ref}
                           {i.version ? ` ${i.version}` : ''}
                           <Typography.Text type="secondary" style={{ marginLeft: 8, fontSize: 12 }}>
                             {i.submitted_by_name} {i.submitted_at?.slice(5, 16).replace('T', ' ')}

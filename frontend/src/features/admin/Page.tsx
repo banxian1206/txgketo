@@ -540,6 +540,8 @@ export default function Users() {
                   />
                   <Select
                     allowClear
+                    showSearch
+                    optionFilterProp="label"
                     style={{ width: 170 }}
                     placeholder="角色"
                     value={fRole}
@@ -797,7 +799,14 @@ export default function Users() {
             <Select allowClear options={PROFESSIONS.map((p) => ({ value: p, label: p }))} />
           </Form.Item>
           <Form.Item name="role_codes" label="角色">
-            <Select mode="multiple" options={assignableRoles.map((r) => ({ value: r.code, label: r.name }))} />
+            {/* ★ 搜索按 label 匹配（P2-2）：默认按 value（角色编码 ADMIN/DELIVERY…）过滤，
+                管理员输中文角色名会得到“暂无数据”，看起来像系统里没有这个角色 */}
+            <Select
+              mode="multiple"
+              showSearch
+              optionFilterProp="label"
+              options={assignableRoles.map((r) => ({ value: r.code, label: r.name }))}
+            />
           </Form.Item>
           {editUser && (
             <Form.Item name="is_active" label="启用" valuePropName="checked">

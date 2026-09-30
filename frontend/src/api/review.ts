@@ -24,6 +24,8 @@ export interface ReviewTicketItemRow {
   item_type: string
   item_label: string
   item_ref: string
+  /** ★ 人看得懂的补充（BOM 行 = 物料名×数量·挂在哪个件下）—— P2-4 */
+  item_detail?: string | null
   version?: string | null
   snapshot?: Record<string, unknown> | null
   submitted_by_name?: string | null

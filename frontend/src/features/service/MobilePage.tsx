@@ -1,7 +1,7 @@
 import { CheckCircleFilled } from '@ant-design/icons'
 import { useSvcBoard } from '../../hooks/useSvcBoard'
-import { App, Button, Card, Empty, Form, Input, InputNumber, Modal, Space, Tag } from 'antd'
-import {useState} from 'react'
+import { App, Button, Card, Empty, Form, Input, InputNumber, Modal, Select, Space, Tag } from 'antd'
+import {useCallback, useEffect, useState} from 'react'
 
 import {
   arriveServiceOrder,
@@ -16,6 +16,8 @@ import {
   type ServiceOrderRow,
 } from '../../api/client'
 import MfgPhotoPicker from '../../components/MfgPhotoPicker'
+import { listEquipment } from '../../api/initiate'
+import { listProjects } from '../../api/project'
 import { SERVICE_ORDER_STATUS as SO_COLOR } from '../../theme/status'
 import { T } from '../../theme/tokens'
 
@@ -27,6 +29,16 @@ export default function ServiceM() {
   const [photos, setPhotos] = useState<string[]>([])
   const [saving, setSaving] = useState(false)
   const [form] = Form.useForm()
+  // ★ 报修的项目/设备改成选，不让人手打（P2-10）：选错设备 → 工单挂错机器，售后白跑一趟
+  const [projOpts, setProjOpts] = useState<{ value: string; label: string }[]>([])
+  const [equipOpts, setEquipOpts] = useState<{ value: string; label: string }[]>([])
+  const [pickProject, setPickProject] = useState<string | undefined>()
+  const loadProjects = useCallback(() => {
+    listProjects()
+      .then((rows) => setProjOpts(rows.map((p) => ({ value: p.project_no, label: `${p.project_no} ${p.project_name}` }))))
+      .catch(() => setProjOpts([]))
+  }, [])
+  useEffect(() => { loadProjects() }, [loadProjects])
 
   // 重构 2.3：看板数据走共享 hook（与另一端同源）
   const { wb, reload: load } = useSvcBoard()
@@ -119,8 +131,23 @@ export default function ServiceM() {
         <Form form={form} layout="vertical" preserve={false}>
           {modal?.kind === 'create' && (
             <>
-              <Form.Item name="project_no" label="项目号" rules={[{ required: true }]}><Input placeholder="如 TX26001" /></Form.Item>
-              <Form.Item name="equip_no" label="设备号"><Input placeholder="如 01A" /></Form.Item>
+              <Form.Item name="project_no" label="项目" rules={[{ required: true, message: '选项目' }]}>
+                <Select
+                  showSearch
+                  optionFilterProp="label"
+                  placeholder="选项目"
+                  options={projOpts}
+                  onChange={(v: string) => {
+                    setPickProject(v)
+                    setEquipOpts([])
+                    form.setFieldValue('equip_no', undefined)
+                    if (v) listEquipment(v).then((rows) => setEquipOpts(rows.map((e) => ({ value: e.equip_no, label: `${e.equip_no} ${e.equip_name}` })))).catch(() => setEquipOpts([]))
+                  }}
+                />
+              </Form.Item>
+              <Form.Item name="equip_no" label="设备">
+                <Select allowClear placeholder={pickProject ? '选设备（可不选）' : '先选项目'} options={equipOpts} />
+              </Form.Item>
               <Form.Item name="fault" label="故障描述" rules={[{ required: true, message: '必填：出了什么问题' }]}><Input.TextArea rows={2} /></Form.Item>
             </>
           )}

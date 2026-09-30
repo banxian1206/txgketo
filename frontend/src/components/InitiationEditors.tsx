@@ -814,6 +814,14 @@ function StdItemSelect({
       onChange={(v) => onChange?.(v as string | undefined)}
       options={options}
       style={{ width: '100%' }}
+      // ★ 空库/没搜到时给条出路（P2-9）：原来只显示“暂无数据”，
+      //   全新系统里项目经理不知道“长周期件必须先有标准库型号”这层依赖。
+      notFoundContent={
+        <Typography.Text type="secondary">
+          {q ? `没搜到「${q}」—— ` : '标准库里还没有物料 —— '}
+          先到 <a onClick={() => window.open('/library', '_blank')}>基础数据 → 标准库</a> 建码（工艺/采购建）
+        </Typography.Text>
+      }
     />
   )
 }

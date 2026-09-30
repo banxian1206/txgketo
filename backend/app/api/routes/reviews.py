@@ -15,6 +15,8 @@ from app.api.deps import client_ip, get_current_user
 from app.core.db import get_session
 from app.models.platform import POSITION_DIRECTOR, POSITION_LEAD, User
 from app.models.review import (
+    ITEM_BOM_DESIGN,
+    ITEM_BOM_MATERIAL,
     REVIEW_ITEM_LABELS,
     TICKET_PENDING_DIRECTOR,
     TICKET_PENDING_LEAD,
@@ -23,6 +25,8 @@ from app.models.review import (
     ReviewTicket,
     ReviewTicketItem,
 )
+from app.models.engineering import BomItem
+from app.models.library import Item
 from app.models.task import Task
 from app.services import review_flow
 from app.services.review_flow import ReviewFlowError
@@ -78,6 +82,30 @@ def _ticket_detail(session: Session, t: ReviewTicket) -> dict:
         select(DesignRelease).where(DesignRelease.ticket_id == t.id).order_by(DesignRelease.id)
     ).all()
     out = _ticket_brief(session, t, names, tasks)
+    # ★ 评审单明细要让总监看得懂（P2-4）：原来 BOM 行只存了 BomItem.id，
+    #   界面显示「设计 BOM 行1 / 行2」——审核人根本不知道要冻结/发布的是哪些料，
+    #   而“通过”就直接触发采购进池。这里按 id 富化出“什么料、多少、挂在哪个件下”。
+    bom_ids = [
+        int(it.item_ref)
+        for it in items
+        if it.item_type in (ITEM_BOM_DESIGN, ITEM_BOM_MATERIAL) and (it.item_ref or "").isdigit()
+    ]
+    bom_rows = {
+        b.id: b
+        for b in (session.scalars(select(BomItem).where(BomItem.id.in_(bom_ids))).all() if bom_ids else [])
+    }
+    bom_items = {i.item_no: i for i in session.scalars(select(Item)).all()}
+
+    def _item_detail(it: ReviewTicketItem) -> str | None:
+        b = bom_rows.get(int(it.item_ref)) if (it.item_ref or "").isdigit() else None
+        if b is None:
+            return None
+        mat = bom_items.get(b.child_item_no)
+        name = (mat.display_name if mat else None) or b.child_item_no
+        qty = f"× {float(b.qty):g}" if b.qty is not None else ""
+        unit = (mat.unit if mat else None) or ""
+        return f"{name} {qty}{unit} · 挂在 {b.parent_ref}"
+
     out["items"] = [
         {
             "id": it.id,
@@ -85,6 +113,7 @@ def _ticket_detail(session: Session, t: ReviewTicket) -> dict:
             "item_type": it.item_type,
             "item_label": REVIEW_ITEM_LABELS.get(it.item_type, it.item_type),
             "item_ref": it.item_ref,
+            "item_detail": _item_detail(it),
             "version": it.version,
             "snapshot": it.snapshot,
             "submitted_by": it.submitted_by,

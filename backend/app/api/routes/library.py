@@ -63,6 +63,10 @@ def list_categories(session: Session = Depends(get_session), _: User = Depends(g
                 {
                     "code": k.code,
                     "name": k.name,
+                    # ★ 带上父类别码（P2-3）：标准库「新建物料」弹窗要显示
+                    #   “编码由系统自动发（YL-LC-0001 形式）”，少了这个字段就会渲染成
+                    #   「undefined-LC-0001」——用户可见的 undefined。
+                    "category_code": k.category_code,
                     "spec_template": k.spec_template,
                     "item_count": counts.get(k.code, 0),
                 }

@@ -1,6 +1,5 @@
 import { App, Badge, Button, Drawer, Empty, List, Space, Tag, Typography } from 'antd'
 import { useCallback, useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
 
 import {
   errMsg,
@@ -10,6 +9,7 @@ import {
   type NotificationRow,
 } from '../api/client'
 import { NOTIF_TYPE as TYPE_COLOR } from '../theme/status'
+import { useGoFrom } from '../hooks/useFrom'
 
 // 通知类型中文名（P-18：不再裸露英文 type）
 const TYPE_LABEL: Record<string, string> = {
@@ -37,7 +37,8 @@ interface Props {
 /** 站内消息抽屉（PC / 移动端共用，06 卷 §9）：永久保留、点开跳单据、全部已读 */
 export default function NotificationsDrawer({ open, onClose, onReadChange }: Props) {
   const { message } = App.useApp()
-  const nav = useNavigate()
+  // ★ 站内消息也是“跨域下钻”的一种：带上来源，详情页才能给出「← 返回某某工作台」（P2-7）
+  const go = useGoFrom()
   const [items, setItems] = useState<NotificationRow[]>([])
   const [unread, setUnread] = useState(0)
   const [loading, setLoading] = useState(false)
@@ -69,7 +70,7 @@ export default function NotificationsDrawer({ open, onClose, onReadChange }: Pro
     onClose()
     if (n.link) {
       const onMobile = typeof window !== 'undefined' && window.location.pathname.startsWith('/m')
-      nav(onMobile ? (MOBILE_LINK[n.link] ?? n.link) : n.link)
+      go(onMobile ? (MOBILE_LINK[n.link] ?? n.link) : n.link)
     } else {
       void load()
     }

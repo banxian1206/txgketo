@@ -20,6 +20,7 @@ import {
   Statistic,
   Table,
   Tag,
+  Tooltip,
   Typography,
 } from 'antd'
 import {useEffect, useState} from 'react'
@@ -448,16 +449,24 @@ export default function Shipping() {
               {(itemsShip?.items ?? []).length === 0 && <Empty description="清单为空" />}
               {(itemsShip?.items ?? []).map((it) => (
                 <div key={it.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 0', borderBottom: `1px solid ${T.border}` }}>
-                  <Checkbox
-                    checked={it.shipped}
-                    onChange={() => void toggleShipped(it)}
-                  >
-                    <Typography.Text strong={it.kind === '组件'}>{it.ref}</Typography.Text>
-                    <Typography.Text type="secondary" style={{ fontSize: 12, marginLeft: 6 }}>
-                      {it.name ?? ''} · {it.qty} {it.kind}
-                    </Typography.Text>
-                    {it.shipped && <Tag color="success" style={{ marginLeft: 6 }}>已发</Tag>}
-                  </Checkbox>
+                  {/* ★ 没拍照就不能勾（P2-8）：
+                    原来复选框不禁，点了只闪一下 warning，界面毫无变化 —— 用户以为点坏了；
+                    而且反手点「完成」时才发现 0/N 项已发。现在直接置灰 + 悬浮说明。 */}
+                  <Tooltip title={!it.shipped && !shipPhotos.length ? '先拍这个件的发货照片，再勾「已发」' : undefined}>
+                    <span>
+                      <Checkbox
+                        checked={it.shipped}
+                        disabled={!it.shipped && !shipPhotos.length}
+                        onChange={() => void toggleShipped(it)}
+                      >
+                        <Typography.Text strong={it.kind === '组件'}>{it.ref}</Typography.Text>
+                        <Typography.Text type="secondary" style={{ fontSize: 12, marginLeft: 6 }}>
+                          {it.name ?? ''} · {it.qty} {it.kind}
+                        </Typography.Text>
+                        {it.shipped && <Tag color="success" style={{ marginLeft: 6 }}>已发</Tag>}
+                      </Checkbox>
+                    </span>
+                  </Tooltip>
                 </div>
               ))}
             </>

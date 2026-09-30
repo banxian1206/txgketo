@@ -123,9 +123,15 @@ export default function ProjectDetailPage() {
     } catch {
       setDesign([])
     }
-    try {
-      setKitting(await kittingOverview(projectNo))
-    } catch {
+    // ★ 齐套率需要 mfg:view —— 没权限的角色（销售/采购…）不要发这个请求，
+    //   否则每次进项目详情都在控制台留两条 403 红字（2026-09-30 P2-6）。
+    if (hasPerm('mfg:view')) {
+      try {
+        setKitting(await kittingOverview(projectNo))
+      } catch {
+        setKitting([])
+      }
+    } else {
       setKitting([])
     }
     // ★ 泳道④「交付与售后」摘要：复用各台现成接口，只读、失败不拦主流程（docs/12 §3.2）

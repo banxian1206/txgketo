@@ -38,6 +38,7 @@ import {
 import MfgPhotoPicker from '../../components/MfgPhotoPicker'
 import AppModal from '../../components/AppModal'
 import { SelectEquipment, SelectProject } from '../../components/fields'
+import ItemSelect from '../../components/fields/ItemSelect'
 import { SERVICE_ORDER_STATUS as SO_COLOR } from '../../theme/status'
 import { T } from '../../theme/tokens'
 import { SERVICE_TABS, filterTabs } from '../../configs/tabs'
@@ -300,11 +301,14 @@ export default function Service() {
           )}
           {modal?.kind === 'part' && (
             <>
-              <Form.Item name="item_no" label="物料号" rules={[{ required: true }]}><Input placeholder="标准库物料号 / 图号" /></Form.Item>
-              <Form.Item name="item_name" label="名称"><Input /></Form.Item>
+              {/* ★ 备件也走「搜物料 + 选项目/设备」（P2-10）：手打物料号会建出库里有码但拼错的备件档 */}
+              <Form.Item name="item_no" label="物料" rules={[{ required: true, message: '选一个物料' }]}>
+                <ItemSelect />
+              </Form.Item>
+              <Form.Item name="item_name" label="名称（不填用库里的）"><Input /></Form.Item>
               <Space>
-                <Form.Item name="project_no" label="项目（可选）"><Input style={{ width: 140 }} /></Form.Item>
-                <Form.Item name="equip_no" label="设备（可选）"><Input style={{ width: 100 }} /></Form.Item>
+                <Form.Item name="project_no" label="项目（可选）"><SelectProject /></Form.Item>
+                <Form.Item name="equip_no" label="设备（可选）"><Input style={{ width: 100 }} placeholder="如 01A" /></Form.Item>
               </Space>
               <Space>
                 <Form.Item name="qty_stock" label="备件库存"><InputNumber min={0} style={{ width: 120 }} /></Form.Item>
