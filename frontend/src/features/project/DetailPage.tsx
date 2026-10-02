@@ -6,6 +6,7 @@ import CustomerCard from '../../components/project/CustomerCard'
 import RequireCard from '../../components/project/RequireCard'
 import TimeCard from '../../components/project/TimeCard'
 import DealCard from '../../components/project/DealCard'
+import PaymentChangeCard from '../../components/project/PaymentChangeCard'
 import DesignProgressCard from '../../components/project/DesignProgressCard'
 import EquipmentsCard from '../../components/project/EquipmentsCard'
 import InitiateCards from '../../components/project/InitiateCards'
@@ -406,6 +407,13 @@ export default function ProjectDetailPage() {
                 <CustomerCard detail={detail} openContact={openContact} save={save} DASH={DASH} p={p} />
                 <TimeCard save={save} DASH={DASH} p={p} />
                 <DealCard detail={detail} doReceive={doReceive} message={message} openDeal={openDeal} openReceive={openReceive} receiveForm={receiveForm} receiveTarget={receiveTarget} save={save} saving={saving} setReceiveTarget={setReceiveTarget} DASH={DASH} p={p} />
+                {/* ★ 成交后改付款计划的唯一入口（要商务总监审批，只改未收节点） */}
+                <PaymentChangeCard
+                  projectNo={projectNo}
+                  terms={detail?.payment_terms ?? []}
+                  amount={detail?.project?.amount ?? null}
+                  onChanged={load}
+                />
               </>
             ),
           },

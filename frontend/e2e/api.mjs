@@ -338,6 +338,80 @@ const wh1 = await apiLogin('wh1', 'txgk@123');
   }
 }
 
+// ── PC-01：付款计划变更单（成交后改计划：只改未收节点 + 商务总监审批）──
+//    2026-09-30 客户拍板；自建靶（不复用库里的脏数据 —— 护栏不得依赖环境）
+{
+  const H = (t) => ({ 'Content-Type': 'application/json', Authorization: `Bearer ${t}` });
+  const post = async (url, body, token) => {
+    const r = await fetch(`${API}/api/v1${url}`, { method: 'POST', headers: H(token), body: JSON.stringify(body ?? {}) });
+    let j = null; try { j = await r.json(); } catch { /* noop */ }
+    return { code: r.status, j };
+  };
+  const sales = await apiLogin('sales1', 'txgk@123');
+  const salesDir = await apiLogin('sales_director', 'txgk@123');
+  // ① 自建靶：建商机 → 成交登记（4 节点 30/40/30/10）→ 第 1 个节点收一笔
+  const me = (await (await apiGet('/auth/me', sales)).json()) ?? {};
+  const created = await post('/projects', {
+    project_name: `E2E护栏-付款变更-${Date.now() % 100000}`, project_desc: '付款计划变更单护栏自建靶',
+    customer_name: 'E2E客户', contacts: [{ name: '张工', phone: '13800000000' }],
+    sales_id: me.id,
+    deadline: new Date(Date.now() + 90 * 864e5).toISOString().slice(0, 10),
+    site_address: 'E2E 探针地址',
+  }, sales);
+  const pno = created.j?.project_no;
+  const deal = await post(`/projects/${pno}/deal`, {
+    period_start: new Date().toISOString().slice(0, 10),
+    period_end: new Date(Date.now() + 120 * 864e5).toISOString().slice(0, 10),
+    amount: 3_000_000, warranty_months: 12, warranty_amount: 300_000,
+    payment_terms: [
+      { node_name: '预付款', percent: 30, amount: 900_000 },
+      { node_name: '发货款', percent: 40, amount: 1_200_000 },
+      { node_name: '质保金', percent: 30, amount: 900_000 },
+    ],
+  }, sales);
+  const recv = await post(`/projects/${pno}/payment-terms/1/receive`, { received_amount: 900_000 }, sales);
+  check('PC-01-自建靶', created.code < 300 && deal.code < 300 && recv.code < 300,
+    `项目 ${pno} · 成交 ${deal.code} · 收预付款 ${recv.code}`);
+
+  // ② 改已收节点 → 必须 400（只改未来节点）
+  const touchPaid = await post(`/projects/${pno}/payment-changes`, {
+    reason: '试图改已收的预付款', terms: [{ node_name: '预付款', percent: 30 }],
+  }, sales);
+  check('PC-01-已收节点不可改',
+    touchPaid.code === 400 && /已经收到过款/.test(String(touchPaid.j?.detail)),
+    `→${touchPaid.code}「${String(touchPaid.j?.detail ?? '').slice(0, 40)}」`);
+
+  // ③ 比例对不上 → 400（已收 30% + 新计划 40% = 70%）
+  const badPct = await post(`/projects/${pno}/payment-changes`, {
+    reason: '比例故意不对', terms: [{ node_name: '发货款', percent: 40 }],
+  }, sales);
+  check('PC-01-比例合计必须100%',
+    badPct.code === 400 && /必须是 100%/.test(String(badPct.j?.detail)),
+    `→${badPct.code}「${String(badPct.j?.detail ?? '').slice(0, 40)}」`);
+
+  // ④ 正常提交（未收 40%+30% = 70%，加已收 30% = 100%）→ 非总监审 → 400；总监批 → 已批准
+  const ok = await post(`/projects/${pno}/payment-changes`, {
+    reason: '客户把发货/质保谈成 40%/30%', terms: [
+      { node_name: '发货款', percent: 40, trigger_node: '发货' },
+      { node_name: '质保金', percent: 30, trigger_node: '质保' },
+    ],
+  }, sales);
+  const cid = ok.j?.id;
+  const notBoss = await post(`/payment-changes/${cid}/decide`, { approve: true }, sales);
+  const passed = await post(`/payment-changes/${cid}/decide`, { approve: true, note: '按新比例' }, salesDir);
+  const det = (await (await apiGet(`/projects/${pno}/detail`, sales)).json()) ?? {};
+  const terms = det.payment_terms ?? [];
+  const paidKept = terms.find((t) => t.seq === 1);
+  check('PC-01-提交与审批链',
+    ok.code < 300 && notBoss.code === 400 && passed.j?.status === '已批准',
+    `提交→${ok.code} · 非总监→${notBoss.code}「${String(notBoss.j?.detail ?? '').slice(0, 18)}」 · 总监→${passed.j?.status}`);
+  check('PC-01-只改未收节点',
+    terms.length === 3 && Number(paidKept?.received_amount ?? 0) === 900_000 &&
+      Number(terms.find((t) => t.node_name === '质保金')?.percent ?? 0) === 30,
+    `节点 ${terms.length} 条 · 已收预付款保持 ¥${Number(paidKept?.received_amount ?? 0).toLocaleString()} · ` +
+      `质保金 ${terms.find((t) => t.node_name === '质保金')?.percent}%`);
+}
+
 const fails = summary('API 回归');
 // ★ 本套件会留测试数据（自建靶建的商机/批次等）—— 跑完想回到干净态：
 console.log('   （本套件会留测试数据；复位：npm run e2e:clean）')

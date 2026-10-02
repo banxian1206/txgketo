@@ -398,6 +398,29 @@ def shop_board(session: Session = Depends(get_session), _: User = Depends(get_cu
     return mfg.workbench_view(session)
 
 
+def _pay_change_todo(session: Session, current: User) -> int:
+    """待我批的付款计划变更单数（2026-09-30）。
+
+    ★ 按单据归属部门找人（铁律 13）：付款归商务 → 只有**商务部总监**该看到，
+      不能拿 position=='总监' 猜（那会漂移成“看得见、点了必 403”）。
+    """
+    from app.models.payment_change import PAY_CHANGE_OPEN, PaymentChange
+    from app.services import payment_change as pay_change_svc
+
+    boss = pay_change_svc.approver_for(session)
+    if boss is None or boss.id != current.id:
+        return 0
+    return _count(
+        session,
+        select(func.count())
+        .select_from(PaymentChange)
+        .where(
+            PaymentChange.status.in_(PAY_CHANGE_OPEN),
+            PaymentChange.requested_by != current.id,  # 不能审自己提交的
+        ),
+    )
+
+
 @router.get("/me")
 def workbench_me(session: Session = Depends(get_session), current: User = Depends(get_current_user)):
     # ★ 到期扫描（AGENTS §8.3 第 6 条）：惰性扫描 —— 工作台人人都会开，
@@ -574,6 +597,8 @@ def workbench_me(session: Session = Depends(get_session), current: User = Depend
             "my_projects": len(project_nos),
             "overdue_tasks": deadline_svc.overdue_tasks_count(session, current.id),
             "unread": notify.unread_count(session, current.id),
+            # ★ 付款计划变更待我批（商务总监）：单据归属部门找人 —— 不是“所有总监都看到”
+            "pay_change_todo": _pay_change_todo(session, current),
         },
         "my_projects": [
             {"project_no": p.project_no, "project_name": p.project_name, "stage": p.stage}

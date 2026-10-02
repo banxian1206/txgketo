@@ -408,3 +408,12 @@ body {
   border-top: 1px solid #f0f0f0;
 }
 .m-actionbar .ant-btn { flex: 1; min-height: 48px; font-size: 15px; }
+
+/* ── 紧凑表单行 + 控件拉满宽（2026-09-30）──
+   付款计划变更弹窗里一行 6 个字段，以往会在每个 Form.Item 上写 style={{marginBottom:4}}、
+   每个控件上写 style={{width:'100%'}}（inline style 棘轮只允许降）。
+   抽成两个类：data-dense 给行、w-full 给控件。 */
+.form-dense .ant-form-item { margin-bottom: 4px; }
+.w-full.ant-input-number,
+.w-full.ant-picker,
+.w-full.ant-select { width: 100%; }

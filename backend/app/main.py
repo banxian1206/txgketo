@@ -19,6 +19,7 @@ from app.api.routes import (
     mobile,
     numbering,
     notifications,
+    payment_changes,
     platform,
     programs,
     project,
@@ -38,6 +39,7 @@ from app.services.change_flow import ChangeFlowError
 from app.services.manufacturing import ManufacturingError
 from app.services.numbering import NumberingError
 from app.services.project_stage import StageError
+from app.services.payment_change import PaymentChangeError
 from app.services.purchase_order import PurchaseOrderError
 from app.services.review_flow import ReviewFlowError
 from app.services.reviewers import ReviewerError
@@ -59,6 +61,7 @@ async def _forbidden_operation(request: Request, exc: ForbiddenOperation):
 
 @app.exception_handler(SiteError)
 @app.exception_handler(AcceptanceError)
+@app.exception_handler(PaymentChangeError)
 @app.exception_handler(PurchaseOrderError)
 @app.exception_handler(ChangeFlowError)
 @app.exception_handler(ReviewFlowError)
@@ -111,6 +114,7 @@ for r in (
     changes,
     mobile,
     notifications,
+    payment_changes,
     workbench,
     service,
     suppliers,

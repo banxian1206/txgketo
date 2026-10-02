@@ -16,6 +16,7 @@ from app.models.production import (
     ProdTask,
 )
 from app.models.change import ChangeRequest
+from app.models.payment_change import PaymentChange, PaymentChangeLine
 from app.models.notify import Notification
 from app.models.warehouse import (
     MaterialIssue,
@@ -119,6 +120,8 @@ __all__ = [
     "ProdOrder",
     "ProdTask",
     "Org",
+    "PaymentChange",
+    "PaymentChangeLine",
     "PaymentTerm",
     "Permission",
     "Project",

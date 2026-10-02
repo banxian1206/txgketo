@@ -127,6 +127,8 @@ export interface ProjectDetail {
   contacts: ProjectContact[]
   attachments: Attachment[]
   payment_terms: PaymentTerm[]
+  /** 合同金额（无 `project:amount` 权限时后端回 null） */
+  amount?: number | null
   sales_name?: string | null
   pm_name?: string | null
 }

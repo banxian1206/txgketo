@@ -155,7 +155,16 @@ deploy/          docker-compose.dev.yml
 > ③ **付款节点没有任何合计校验**（实测 170%/¥6.12M > 合同也能成交，且成交后改不了）→ 前后端双边校验；
 > ④ **手机端入库库位是自由文本**（不填就造出「深圳仓/待定」这个假仓库）→ 改统一 `SelectLocation` + 库位必填。
 > 交互层新规见`docs/前端交互设计规范.md` §9（危险默认值 / 勾选前置条件 / 主数据不能随手造 / 空间与来源等十条）。
-> 护栏基线：`pytest 203` · `e2e:static 38` · `e2e:api 15` · `e2e:ui 71` —— 全绿。
+>
+> **同一天还落地了两件客户拍板的事**：
+> ① **付款计划变更单**（成交后改付款计划的**唯一入口**，走商务总监审批）——
+>    `models/payment_change.py` + `services/payment_change.py` + `routes/payment_changes.py` + 迁移 `c5d7e9f13a24`（编号 `PC{YY}{NNN}`）；
+>    口径：**只改未来节点**（已收款的原样保留）、比例合计（已收+新计划）=100%、金额不超合同额；
+>    入口在项目详情「合同与商务」泳道（`PaymentChangeCard`），待办进 `GET /workbench/me.counts.pay_change_todo`。
+> ② **存量脏数据定点清理** `scripts/cleanup_dirty_data.py`（默认预演、`--yes` 才写、每次都落 audit_log）：
+>    付款计划异常（**只报告/生成变更单草案，不直接改钱**）、重复领料单（作废留痕）、假库位（停用+库存迁出）。
+>    本轮已执行：MI26002 作废、库位「深圳仓/待定」停用、TX26001 的 8 条错付款节点经**两张变更单**修正为 30/40/25/5。
+> 护栏基线：`pytest 212` · `e2e:static 38` · `e2e:api 20` · `e2e:ui 71` —— 全绿。
 >
 > 更新于：**06 卷 F 步（账号权限收尾）**落地：接口级权限强校验（`require_permission`，采购下单类→`purchase:edit`、验收/入库/领料→`warehouse:edit`）、金额分档（`purchase:price` 采购价 / `project:amount` 项目金额，无权限返回 null）、**离职/停用一键转交**（任务/待审/项目角色/图·程序·BOM 归属）。
 > **全部完成：S0 商机 → S1 立项 → S2 工程设计 → S3 采购 → S4 仓库 → S5 制造 → S6 装配与齐套率 → S7 发运 → S8 现场安装 → S9 现场调试 → S10 客户验收与质保 → S11 质保与售后。**
@@ -236,7 +245,9 @@ deploy/          docker-compose.dev.yml
   铁律：**审批必须在本部门之内走**；新的单据类型一律先定“它归哪个部门批”，再找那个部门的人。
 - ★ **付款节点比例必须有合计校验**（2026-09-30 修 P1-2）：前后端双边拦（比例合计≠100% / 金额合计>合同额 → 400），
   弹窗实时显示「当前比例合计」；金额为空的节点显示「未录金额」而不是「已收齐」。
-  ⚠️ **成交登记只在「线索」阶段** → 录错了**目前改不了**（要开“付款计划变更”口必须先定：谁能改、是否走审批、已发生回款怎么算 —— 见报告“仍待决策”）。
+  ★ **改的入口 = 付款计划变更单**（2026-09-30 客户拍板，已落地）：**只改未来节点**（已收款的节点原样保留、不许删），
+  比例（已收 + 新计划）必须合计 100%、金额不超合同额；**商务总监**审批（按单据归属部门找人，铁律 13），提交人不能自审。
+  编号 `PC{YY}{NNN}`；改前快照存 `payment_change.before_terms`（批准后旧行被替换，快照是唯一证据）；质保金按变更后的完整计划重算。
 - ★ **付款节点 → 业务节点**（G2）：**预收款 → 立项**（客户口径 2026-09-29："预收款的提醒是立项，
   立项之后就开始提醒"）· 发货款 → 发货 · 到货款 → 到货 · 验收款 → 验收 · 质保金 → 质保。
   `PAYMENT_TRIGGERS = (立项, 发货, 到货, 验收, 质保)`；钩子：`initiate_project` / `depart` / `arrive` / `acceptance.confirm`。
@@ -407,6 +418,11 @@ deploy/          docker-compose.dev.yml
 ### 8.4 关键接口速查（新增的）
 
 ```
+GET  /api/v1/projects/{no}/payment-changes        付款计划变更记录（项目详情「合同与商务」在用）
+POST /api/v1/projects/{no}/payment-changes        发起变更 {reason, terms[]（只填未收节点）}（payment:edit）
+GET  /api/v1/payment-changes?scope=pending|mine|all   变更单列表（pending=**该我批**的，后端判定，前端不猜岗位）
+POST /api/v1/payment-changes/{id}/decide          商务总监审批 {approve, note}（否决必填理由）
+POST /api/v1/payment-changes/{id}/withdraw        提交人撤回
 GET  /api/v1/purchase/to-vehicle                 采购待叫车（跨项目；采购台「待叫车」页签在用 —— 采购进不了发运台，叫车必须在采购台能干）
 GET  /api/v1/purchase/pool                       采购池（按物料归拢，标 mergeable）
 POST /api/v1/purchase/merge-order                合并下单（多条需求 → 一个 po_no）
@@ -561,13 +577,14 @@ POST /api/v1/warehouse/inbound                    其他入库（退料回库/�
 ### 8.6 当前环境
 
 - 后端 :8208 · 前端 :5207 · PG 35432（`docker compose -f deploy/docker-compose.dev.yml up -d`，compose 顶层写死了 `name: txgketo`）
-- 测试：`.venv/bin/python -m pytest -q` → **203 passed**；e2e 基线 `.venv/bin/python -m scripts.e2e_baseline`（★ 跑前复位业务数据；只清业务表，账户/组织/编号规则不动）→ **问题 0 / 中断 0 / 通过 149**；
-  隔离探针 `scripts/probe_bom_math.py` → **8/8**、`scripts/probe_n24_n25.py` → **20/20**；前端 `e2e:static 38` / **`e2e:api 15+0skip`** / **`e2e:ui 71+0skip`**（两套都自建靶，可复位后单跑）
+- 测试：`.venv/bin/python -m pytest -q` → **212 passed**；e2e 基线 `.venv/bin/python -m scripts.e2e_baseline`（★ 跑前复位业务数据；只清业务表，账户/组织/编号规则不动）→ **问题 0 / 中断 0 / 通过 149**；
+  隔离探针 `scripts/probe_bom_math.py` → **8/8**、`scripts/probe_n24_n25.py` → **20/20**；前端 `e2e:static 38` / **`e2e:api 20+0skip`** / **`e2e:ui 71+0skip`**（两套都自建靶，可复位后单跑）
   ★ **UI 真实场景走查（2026-09-30）**：只用浏览器点 UI 走完 S0→S11 + 双端，报告（含逐条修复记录与 commit）在
   `docs/99-E2E测试报告-2026-09-30-UI真实场景.md`；驱动脚本在 `/tmp/txgk-ui-e2e/`（**未入库**）。
   ⚠️ 那轮把主数据清了（`e2e:clean` 会连物料档/供应商/库位一起清），**重新跑 `e2e:ui` 前最好跑一次
   `scripts/seed_s0_s1.py` 把常用标准库物料补回去**（两条依赖“库里有物料”的探针已改成读现场数据，但长周期件等业务操作仍需有码可选）。
-- alembic head：**`b4c6d8e02f13`**（OCR 设置表）
+- alembic head：**`c5d7e9f13a24`**（付款计划变更单）
+- 脏数据清理：`cd backend && .venv/bin/python -m scripts.cleanup_dirty_data`（默认预演；`--yes` 才写）
 - ★ 套件**执行顺序**：`e2e_baseline` → `probe_n24_n25` → `probe_bom_math`（最后一个会 TRUNCATE 业务表，放最后）
 - ★ **e2e 跑完会留测试数据**（`e2e:api` / `e2e:ui` 的自建靶每轮建一个商机/批次）→ 想回到干净态跑
   **`npm run e2e:clean`**（= `--yes`）/ **`npm run e2e:clean:dry`**（**只预演不删**）。

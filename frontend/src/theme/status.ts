@@ -12,6 +12,9 @@ export const CHANGE_STATUS: Record<string, string> = { 已下发: 'gold', 已否
 
 export const TASK_STATUS: Record<string, string> = { 已取消: 'default', 已完成: 'success', 待开始: 'default', 进行中: 'processing' }
 
+// 付款计划变更单（2026-09-30）：状态值来自 models/payment_change.PAY_CHANGE_STATUS
+export const PAY_CHANGE_STATUS: Record<string, string> = { 已否决: 'error', 已批准: 'success', 已撤销: 'default', 待商务总监审: 'processing' }
+
 export const TASK_TYPE: Record<string, string> = { 制造: 'purple', 现场: 'magenta', 装配: 'cyan', 设计: 'blue', 调试: 'orange', 采购: 'gold' }
 
 export const DRAWING_STATUS: Record<string, string> = { 审核中: 'processing', 已作废: 'default', 已发布: 'success', 草稿: 'default' }

@@ -313,6 +313,15 @@ CHANGE_REQUEST_RULE: dict = {
     "remark": "冻结版本变更的唯一入口，全局按年取号",
 }
 
+# 付款计划变更单编号规则（2026-09-30）：成交后改付款计划的**唯一入口**（要审批）
+PAY_CHANGE_RULE: dict = {
+    "object_type": "PAY_CHANGE",
+    "name": "付款计划变更单",
+    "template": "PC{YY}{seq:03}",
+    "scope": "global_year",
+    "remark": "成交后改付款计划的唯一入口，走商务总监审批；全局按年取号",
+}
+
 # 设计发布（冻结）批次编号规则（05 卷 §8.1）
 DESIGN_RELEASE_RULE: dict = {
     "object_type": "DESIGN_RELEASE",
