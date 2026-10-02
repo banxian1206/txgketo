@@ -38,7 +38,8 @@ BUSINESS_TABLES = [
     "purchase_request", "supplier_quote", "supplier_catalog", "supplier", "task",
     "review_ticket_item", "review_action", "review_ticket", "design_release", "change_request",
     "equipment_program_version", "equipment_program", "drawing_version", "drawing", "bom_item",
-    "milestone", "project_member", "equipment", "payment_term", "contact", "customer",
+    "milestone", "project_member", "equipment", "payment_change_line", "payment_change",
+    "payment_term", "contact", "customer",
     "project", "notification", "audit_log", "number_seq", "attachment",
 ]
 
