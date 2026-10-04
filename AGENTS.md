@@ -154,7 +154,8 @@ deploy/          docker-compose.dev.yml
 > **同型第二台 01B 出现后 01A/01B 互相看到对方的标准件/材料（计数翻倍、列表重复 → 误导设计/采购）**。
 > 修：`BomItem.parent_ref.in_(本设备图纸集合)`（`design_overview` 同步收紧）；钉子
 > `test_design_parts_and_issue_idempotency.py::test_design_tree_bom_rows_are_scoped_to_equipment`（注入反例能红）。
-> 基线 `pytest 233 · e2e:static 41`。
+> **报告：`docs/99-端到端走查报告-2026-10-04-S0-S11全功能.md`**（含覆盖矩阵 + 脚手架坑）。
+> 基线 `pytest 233 · e2e:static 41 · e2e_baseline 0/0/149`。
 >
 > 更新于：**端到端走查 + P2 修复（2026-10-04 · 晚）**：从干净库用真实浏览器走完 S0→S11（PC 1440×900 + 手机 390×844），
 > 近期 10-04 那批修复**逐条核实 17/17 通过**；报告 `docs/99-端到端走查报告-2026-10-04-近期改动核实.md`。
