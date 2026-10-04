@@ -418,7 +418,7 @@ export default function EquipmentDesign({ projectNo: p0, equipNo: e0, embedded }
       )}
 
       {/* 图纸树 */}
-      <DrawingsCard addForm={addForm} doNewDrawingVersion={doNewDrawingVersion} doRename={doRename} loading={loading} matForm={matForm} message={message} openVersions={openVersions} profile={profile} root={root} rows={rows} searchItems={searchItems} selected={selected} setAddOpen={setAddOpen} setChangeTarget={setChangeTarget} setMatOpen={setMatOpen} setSelected={setSelected} setSubmitOpen={setSubmitOpen} submitForm={submitForm} load={load} />
+      <DrawingsCard addForm={addForm} doNewDrawingVersion={doNewDrawingVersion} doRename={doRename} loading={loading} message={message} openVersions={openVersions} profile={profile} root={root} rows={rows} searchItems={searchItems} selected={selected} setAddOpen={setAddOpen} setChangeTarget={setChangeTarget} setMatOpen={setMatOpen} setSelected={setSelected} setSubmitOpen={setSubmitOpen} load={load} />
 
       {/* 标准件 + 材料 */}
       <Row gutter={16} style={{ marginTop: 16 }}>
@@ -431,13 +431,13 @@ export default function EquipmentDesign({ projectNo: p0, equipNo: e0, embedded }
       </Row>
 
       {/* PLC 程序版本（程序专业）：走评审单发布，不采购 */}
-      <ProgramsCard doNewProgramVersion={doNewProgramVersion} openProgramVersions={openProgramVersions} profile={profile} progForm={progForm} progUploadForm={progUploadForm} programs={programs} removeProgram={removeProgram} setChangeTarget={setChangeTarget} setProgCreateOpen={setProgCreateOpen} setProgUploadOpen={setProgUploadOpen} setProgUploadTarget={setProgUploadTarget} />
+      <ProgramsCard doNewProgramVersion={doNewProgramVersion} openProgramVersions={openProgramVersions} profile={profile} programs={programs} removeProgram={removeProgram} setChangeTarget={setChangeTarget} setProgCreateOpen={setProgCreateOpen} setProgUploadOpen={setProgUploadOpen} setProgUploadTarget={setProgUploadTarget} />
 
       {/* 新增组件/零件 */}
       {/* 生成采购需求（BOM → 净需求 → 进池） */}
       <DrawingsModals addForm={addForm} addOpen={addOpen} doAdd={doAdd} doAddMaterial={doAddMaterial} equipNo={equipNo} items={items} load={load} matForm={matForm} matOpen={matOpen} message={message} nav={nav} parentOptions={parentOptions} purchaseForm={purchaseForm} purchaseOpen={purchaseOpen} rows={rows} saving={saving} searchItems={searchItems} selected={selected} setAddOpen={setAddOpen} setMatOpen={setMatOpen} setPurchaseOpen={setPurchaseOpen} setPurchaseResult={setPurchaseResult} setSaving={setSaving} setSubmitOpen={setSubmitOpen} setVerOpen={setVerOpen} submitForm={submitForm} submitOpen={submitOpen} submitPurchase={submitPurchase} verOpen={verOpen} versions={versions} purchaseResult={purchaseResult} />
       {/* 新建程序 */}
-      <ProgramsModals doCreateProgram={doCreateProgram} doUploadProgram={doUploadProgram} equipNo={equipNo} progCreateOpen={progCreateOpen} progForm={progForm} progUploadForm={progUploadForm} progUploadOpen={progUploadOpen} progUploadTarget={progUploadTarget} progVerOpen={progVerOpen} progVerTarget={progVerTarget} progVersions={progVersions} saving={saving} setProgCreateOpen={setProgCreateOpen} setProgUploadOpen={setProgUploadOpen} setProgVerOpen={setProgVerOpen} />
+      <ProgramsModals doCreateProgram={doCreateProgram} doUploadProgram={doUploadProgram} equipNo={equipNo} progForm={progForm} progUploadForm={progUploadForm} progCreateOpen={progCreateOpen} progUploadOpen={progUploadOpen} progUploadTarget={progUploadTarget} progVerOpen={progVerOpen} progVerTarget={progVerTarget} progVersions={progVersions} saving={saving} setProgCreateOpen={setProgCreateOpen} setProgUploadOpen={setProgUploadOpen} setProgVerOpen={setProgVerOpen} />
 
       {/* 提改版申请 */}
       <ChangeRequestModal

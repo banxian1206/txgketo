@@ -159,12 +159,12 @@ export default function IntegrationPanel() {
                   }
                   if (v.key) payload.key = v.key
                   return save(payload)
-                })
+                }).catch(() => { /* ★ F3：不接住 validateFields 的非 Error reject → console 未处理拒绝 */ })
               }
             >
               保存
             </Button>
-            <Button onClick={() => form.validateFields().then((v) => save({ api: v.api, model: v.model ?? null, key: '' }))}>
+            <Button onClick={() => form.validateFields().then((v) => save({ api: v.api, model: v.model ?? null, key: '' })).catch(() => {})}>
               清除 API Key
             </Button>
           </Space>

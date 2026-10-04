@@ -76,7 +76,9 @@ export default function SelectLocation({ valueMode = 'text', activeOnly = true, 
         {...rest}
       />
       <Tooltip title="拍库位标签，自动认库位号">
-        <Button icon={<CameraOutlined />} loading={picking} onClick={() => fileRef.current?.click()} />
+        {/* ★ F5（2026-10-04 走查核实）：纯图标按钮在手机上没有 hover → Tooltip 永远读不到；
+            aria-label + title 双保险（读屏软件/浏览器原生提示都接住） */}
+        <Button aria-label="拍照识别库位号" title="拍照识别库位号（识别结果只是候选，点选才填入）" icon={<CameraOutlined />} loading={picking} onClick={() => fileRef.current?.click()} />
       </Tooltip>
       <input
         ref={fileRef}

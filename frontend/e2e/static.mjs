@@ -169,6 +169,62 @@ check('SUBMIT-无裸validate', bareValidate.length === 0,
     `补勾允许已装车=${/SHIP_LOADED/.test(gateLine(mk))} 发运后锁死=${!/SHIP_TRANSIT/.test(gateLine(mk))}`);
 }
 
+// F3（2026-10-04 走查核实）：`validateFields().then(...)` 必须接 `.catch` ——
+// 校验失败的 reject 值不是 Error，不接住就是未处理拒绝（console 报错）。
+// 正确写法（try { await form.validateFields() } catch { return }）天然不命中这条。
+{
+  const bad = [];
+  const walk = (dir) => {
+    for (const f of fs.readdirSync(dir)) {
+      const p2 = path.join(dir, f);
+      const st = fs.statSync(p2);
+      if (st.isDirectory()) { walk(p2); continue; }
+      if (!/\.tsx?$/.test(f)) continue;
+      const src = fs.readFileSync(p2, 'utf8');
+      const re = /validateFields\(\)\.then\(/g;
+      let m;
+      while ((m = re.exec(src))) {
+        // 从匹配点往后数花括号，找到该 .then( 回调的闭合，判窗口内有没有 .catch(
+        let depth = 1, j = m.index + m[0].length;
+        while (j < src.length && depth > 0) {
+          if (src[j] === '{') depth++;
+          else if (src[j] === '}') depth--;
+          j++;
+        }
+        const stmt = src.slice(m.index, j + 12);
+        if (!stmt.includes('.catch(')) bad.push(`${p2.replace(SRC, 'src')}:${src.slice(0, m.index).split('\n').length}`);
+      }
+    }
+  };
+  walk(path.join(SRC, 'features'));
+  walk(path.join(SRC, 'components'));
+  check('F3-validateFields必接catch', bad.length === 0,
+    bad.length ? `裸 validateFields().then 未接 catch: ${bad.slice(0, 4).join(', ')}` : 'promise 风校验全部接了 .catch');
+}
+
+// F14（2026-10-04）：destroyOnHidden 弹窗未挂载时调 resetFields → console 警告“useForm not connected”；
+// destroyOnHidden + preserve={false} 的新实例本就干净，「开弹窗前 reset」一律是多余写法。
+{
+  const bad = [];
+  const walk = (dir) => {
+    for (const f of fs.readdirSync(dir)) {
+      const p2 = path.join(dir, f);
+      const st = fs.statSync(p2);
+      if (st.isDirectory()) { walk(p2); continue; }
+      if (!/\.tsx$/.test(f)) continue;
+      fs.readFileSync(p2, 'utf8').split('\n').forEach((l, i) => {
+        const t = l.trim();
+        if (t.startsWith('//') || t.startsWith('*') || t.startsWith('/*')) return;
+        if (/resetFields\(\)/.test(t) && /set[A-Z]\w*(Open|Target|For)/.test(t)) bad.push(`src/${path.relative(SRC, p2)}:${i + 1}`);
+      });
+    }
+  };
+  walk(path.join(SRC, 'features'));
+  walk(path.join(SRC, 'components'));
+  check('F14-不开弹窗前reset', bad.length === 0,
+    bad.length ? `同一行“先 reset 再开弹窗”（destroyOnHidden 下报 useForm 未连接警告）: ${bad.slice(0, 4).join(', ')}` : '没有“开弹窗前 resetFields”的写法');
+}
+
 // R4-01（客户口径 A）+ F2（2026-10-04 走查核实）：移动端不得链到 PC-only 工作台路由。
 // 修前 MePage 就挂着「采购工作台(/purchase)」「用户与权限(/admin/users)」——手机点进去长出侧栏。
 // ★ 豁免：/projects 在 MePage 是「回到电脑版」逃生口（有意为之），不在禁列。
@@ -187,6 +243,33 @@ check('SUBMIT-无裸validate', bareValidate.length === 0,
   }
   check('R4-01-移动不链PC台', bad.length === 0,
     bad.length ? `移动端又链到 PC-only 路由: ${bad.join(', ')}` : '移动首页/我的页已无 PC-only 入口（任务/评审/改版）');
+}
+
+// ★ F5（2026-10-04 走查核实）：图标-only 按钮（自闭合、无文字子项）必须带可访问名 ——
+//   手机端没有 hover，Tooltip 永远读不到；读屏/截图反馈都靠 aria-label/title。
+{
+  const bad = [];
+  const walk = (dir) => {
+    for (const f of fs.readdirSync(dir)) {
+      const p = path.join(dir, f);
+      const st = fs.statSync(p);
+      if (st.isDirectory()) { walk(p); continue; }
+      if (!/\.tsx$/.test(f)) continue;
+      fs.readFileSync(p, 'utf8').split('\n').forEach((l, i) => {
+        const t = l.trim();
+        if (t.startsWith('//') || t.startsWith('*')) return;
+        // 只拦同一行写完整且**无文字子项**的（以 /> 自闭合结尾 = 结构上不可能有子项）
+        if (t.includes('<Button') && /icon=\{<[A-Za-z]+ ?\/>/.test(t) && t.endsWith('/>') && !/aria-label|title=/.test(t)) {
+          bad.push(`${p.replace(SRC, 'src')}:${i + 1} ${t.slice(0, 60)}`);
+        }
+      });
+    }
+  };
+  walk(path.join(SRC, 'features'));
+  walk(path.join(SRC, 'components'));
+  walk(path.join(SRC, 'layouts'));
+  check('F5-图标按钮有可访问名', bad.length === 0,
+    bad.length ? `图标-only 按钮缺 aria-label/title: ${bad.slice(0, 3).join(' | ')}` : '图标-only 按钮全部带可访问名');
 }
 
 // ══ 双端一致性护栏（本轮起：PC 与移动端不再各改各的）══════════════════
@@ -503,7 +586,7 @@ function topItems(block) {
     if (!fs.existsSync(f)) { bad.push(`${rel} 文件不见了`); continue }
     f && fs.readFileSync(f, 'utf8').split('\n').forEach((l, i) => {
       const s = l.trim()
-      if (s.startsWith('//') || s.startsWith('*') || s.startsWith('{/*')) return
+      if (s.startsWith('//') || s.startsWith('*') || s.startsWith('/*') || s.startsWith('{/*')) return
       if (EM.test(s)) bad.push(`${rel}:${i + 1} ${s.slice(0, 28)}`)
       EM.lastIndex = 0
     })

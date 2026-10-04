@@ -160,7 +160,17 @@ deploy/          docker-compose.dev.yml
 >    静态护栏 R4-01 禁列加进 `/purchase`·`/admin/users`）；
 > ④ **F11 验收列表按项目收口**（`GET /acceptance/workbench?project_no=` 计数/列表/质保提醒同步过滤；
 >    前端筛选进 `?project=`、未筛时黄字警示 + 项目号等宽强标识 —— 签字是法律动作）。
-> 护栏基线：**`pytest 220` · `e2e:static 38` · `e2e:api 21` · `e2e:ui 72`** —— 全绿（新护栏均注入反例自证能红）。
+> **同日第二波（“攒一轮”那批也收了）**：F3（4 处 `validateFields().then` 裸 reject 全部接住，静态护栏「必接 catch」）·
+> F5（图标-only 按钮补 `aria-label/title`，护栏禁再犯）· F12（未知路由真 **404 页**「页面不存在」且保留原 URL，
+> 不再静默踢回工作台；旧路径仍走 `ROUTE_REDIRECTS` 兼容层）· F14（**destroyOnHidden 弹窗开前 `resetFields()` 全仓清零**
+> —— 未挂载实例上调就是 console 警告，新实例本就干净不需要 reset；另修 antd 5.29 的 `InputNumber.addonBefore` 废弃 → `prefix`）·
+> F15（「下达发货指令(0台)」禁用理由双端说清：PC 给 title、手机把理由写成看得见的字）·
+> F16（手机端发运清单底部「完成」→「关闭（勾选已实时保存）」并提醒未拍照的勾）·
+> F17（无 `mfg:view` 进 `/m/production`：`useMfgBoard` 内部短路**不发请求**，页面明说“你没有权限、回首页选自己的台”）·
+> N1（★ **被派的调试工程师本人能记自己的进度**：`arrive/start/finish` 门禁从 `site:edit` 改为
+> 现场/PM **或 dispatch_to 里写了 TA 的姓名/账号**（`_can_act_on_commission`，双端同口径），修前 assy1 按钮数=0、接口 403 = 派了活没法干）·
+> N3（图纸全部发布后卡头加一句实话：“从这里新增的条目/材料是【草稿】，要再走评审发布才计入采购/排产；改已发布的走改版（ECN）”）。
+> 护栏基线：**`pytest 221` · `e2e:static 41` · `e2e:api 21` · `e2e:ui 73`** —— 全绿（新护栏均注入反例自证能红）。
 >
 > 更新于：**UI 真实场景测试修复轮（2026-09-30）**：全程只用浏览器点 UI 走完 S0→S11 后，把报告里的
 > **P0×1 / P1×8 / P2×10 全部修掉**（测试报告与逐条修复记录：`docs/99-E2E测试报告-2026-09-30-UI真实场景.md`）。
@@ -600,8 +610,8 @@ POST /api/v1/warehouse/inbound                    其他入库（退料回库/�
 ### 8.6 当前环境
 
 - 后端 :8208 · 前端 :5207 · PG 35432（`docker compose -f deploy/docker-compose.dev.yml up -d`，compose 顶层写死了 `name: txgketo`）
-- 测试：`.venv/bin/python -m pytest -q` → **220 passed**；e2e 基线 `.venv/bin/python -m scripts.e2e_baseline`（★ 跑前复位业务数据；只清业务表，账户/组织/编号规则不动）→ **问题 0 / 中断 0 / 通过 149**；
-  隔离探针 `scripts/probe_bom_math.py` → **8/8**、`scripts/probe_n24_n25.py` → **20/20**；前端 `e2e:static 38` / **`e2e:api 21+0skip`** / **`e2e:ui 72+0skip`**（两套都自建靶，可复位后单跑）
+- 测试：`.venv/bin/python -m pytest -q` → **221 passed**；e2e 基线 `.venv/bin/python -m scripts.e2e_baseline`（★ 跑前复位业务数据；只清业务表，账户/组织/编号规则不动）→ **问题 0 / 中断 0 / 通过 149**；
+  隔离探针 `scripts/probe_bom_math.py` → **8/8**、`scripts/probe_n24_n25.py` → **20/20**；前端 `e2e:static 41` / **`e2e:api 21+0skip`** / **`e2e:ui 73+0skip`**（两套都自建靶，可复位后单跑）
   ★ **UI 真实场景走查（2026-09-30）**：只用浏览器点 UI 走完 S0→S11 + 双端，报告（含逐条修复记录与 commit）在
   `docs/99-E2E测试报告-2026-09-30-UI真实场景.md`；驱动脚本在 `/tmp/txgk-ui-e2e/`（**未入库**）。
   ⚠️ 那轮把主数据清了（`e2e:clean` 会连物料档/供应商/库位一起清），**重新跑 `e2e:ui` 前最好跑一次

@@ -96,3 +96,25 @@ def test_acceptance_page_has_project_filter_in_url():
     src = _src(FE / "features" / "acceptance" / "Page.tsx")
     assert "useUrlState({ project" in src, "项目筛选进 ?project="
     assert "acceptanceWorkbench(filterNo" in src, "筛选值要真的传给后端（不是摆设）"
+
+
+# ══ N1：被派的调试工程师本人能记自己的进度（行为级）══════════════════
+def test_commission_dispatched_engineer_can_act():
+    from types import SimpleNamespace
+
+    from app.api.routes.site import _can_act_on_commission
+
+    def user(name, username, roles=()):
+        return SimpleNamespace(name=name, username=username, is_superuser=False,
+                               roles=[SimpleNamespace(permissions=[SimpleNamespace(code=c) for c in roles])])
+
+    row = lambda d: SimpleNamespace(dispatch_to=d)
+    site1 = user("李现场", "site1", roles=("site:edit",))
+    assy1 = user("王装配", "assy1")          # 无 site:edit —— 修前一律 403
+    other = user("张三", "zhang3")
+
+    assert _can_act_on_commission(site1, row("调试组 王工"))            # 原有门禁不动
+    assert _can_act_on_commission(assy1, row("调试组 王装配"))           # 姓名写在派单里 → 本人可操作
+    assert _can_act_on_commission(assy1, row("assy1"))                  # 账号也算
+    assert not _can_act_on_commission(other, row("调试组 王装配"))       # 路人仍然不行
+    assert not _can_act_on_commission(assy1, row(None))                 # 没派人 → 只有现场/PM 能推进

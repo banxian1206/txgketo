@@ -5,6 +5,8 @@ import { App, Button, Card, DatePicker, Empty, Form, Input, InputNumber, Radio, 
 import dayjs from 'dayjs'
 import {useEffect, useState} from 'react'
 
+import { useAuth } from '../../contexts/AuthContext'
+
 import {
   acceptSiteIncoming,
   addSiteDaily,
@@ -39,7 +41,14 @@ type Kind = 'survey' | 'daily' | 'issue' | 'commission' | 'incoming' | 'acc-appl
 /** 现场手机端（S8）：现场以手机为唯一终端 —— 勘测 / 来货清点 / 每日汇报 / 问题 / 申请调试。 */
 export default function SiteM() {
   const { message } = App.useApp()
+  // ★ N1（2026-10-04 走查核实）：被派的调试工程师本人也能记自己的进度（与后端 _can_act_on_commission 同口径）
+  const { user: me } = useAuth()
   const canEdit = hasPerm('site:edit') || hasPerm('project:edit')
+  const canActOnCommission = (m: { dispatch_to?: string | null }) => {
+    const d = (m.dispatch_to ?? '').trim()
+    if (!d || !me) return false
+    return d.includes(me.name) || d.includes(me.username)
+  }
   const [photos, setPhotos] = useState<string[]>([])
   const [videos, setVideos] = useState<string[]>([])
   const [modal, setModal] = useState<{ kind: Kind; target?: SiteIncomingPending; issue?: SiteIssueRow; acc?: AcceptanceRow } | null>(null)
@@ -242,9 +251,11 @@ export default function SiteM() {
                         <span>{m.plan_date ?? '待定'}</span>
                         <span>{m.dispatch_to ?? '待派'}</span>
                       </Space>
-                      {canEdit && m.status === '已申请' && <Button size="small" style={{ marginTop: 8 }} onClick={() => void commissionArrive(m.id).then(() => void load(projectNo))}>已到现场</Button>}
-                      {canEdit && m.status === '已到现场' && <Button size="small" type="primary" style={{ marginTop: 8 }} onClick={() => void commissionStart(m.id).then(() => void load(projectNo))}>开始调试</Button>}
-                      {canEdit && m.status === '已开始调试' && <Button size="small" type="primary" style={{ marginTop: 8 }} onClick={() => void finishCommission(m.id).then(() => void load(projectNo))}>调试完成</Button>}
+                      {/* ★ N1（2026-10-04 走查核实）：被派的调试工程师本人也能记自己的进度 ——
+                          修前只有 site:edit 能点，派了活被派的人却看不到入口（后端同步放行） */}
+                      {(canEdit || canActOnCommission(m)) && m.status === '已申请' && <Button size="small" style={{ marginTop: 8 }} onClick={() => void commissionArrive(m.id).then(() => void load(projectNo))}>已到现场</Button>}
+                      {(canEdit || canActOnCommission(m)) && m.status === '已到现场' && <Button size="small" type="primary" style={{ marginTop: 8 }} onClick={() => void commissionStart(m.id).then(() => void load(projectNo))}>开始调试</Button>}
+                      {(canEdit || canActOnCommission(m)) && m.status === '已开始调试' && <Button size="small" type="primary" style={{ marginTop: 8 }} onClick={() => void finishCommission(m.id).then(() => void load(projectNo))}>调试完成</Button>}
                     </Card>
                   ))}
                 </>

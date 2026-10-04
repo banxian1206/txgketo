@@ -195,7 +195,8 @@ export default function PaymentChangeCard({
             render: (_: unknown, r: PayChangeRow) => (
               <Space size="small">
                 {r.status === '待商务总监审' && mineTodo.includes(r.id) && (
-                  <a onClick={() => { decideForm.resetFields(); setDecideFor(r) }}>审批</a>
+                  /* ★ F14：AppModal(destroyOnHidden) 每次打开都是新实例，开前 reset 只会产生未连接警告 */
+                  <a onClick={() => setDecideFor(r)}>审批</a>
                 )}
                 {r.status === '待商务总监审' && canEdit && (
                   <Popconfirm

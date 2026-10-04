@@ -2,6 +2,7 @@ import type { FormInstance } from 'antd'
 // components/design/DrawingsCard.tsx —— 由 EquipmentDesign 拆出（重构 1.6 · 只拆不改）
 import { AppstoreOutlined, BlockOutlined, FolderOpenOutlined } from '@ant-design/icons'
 import {
+  Alert,
   Button,
   Card,
   Empty,
@@ -33,7 +34,6 @@ export default function DrawingsCard({
   doNewDrawingVersion,
   doRename,
   loading,
-  matForm,
   message,
   openVersions,
   profile,
@@ -46,14 +46,12 @@ export default function DrawingsCard({
   setMatOpen,
   setSelected,
   setSubmitOpen,
-  submitForm,
   load
 }: {
   addForm: FormInstance;
   doNewDrawingVersion: (...args: any[]) => any;
   doRename: (...args: any[]) => any;
   loading: boolean;
-  matForm: FormInstance;
   message: any;
   openVersions: (...args: any[]) => any;
   profile: User | null;
@@ -66,7 +64,6 @@ export default function DrawingsCard({
   setMatOpen: (...args: any[]) => any;
   setSelected: (...args: any[]) => any;
   setSubmitOpen: (...args: any[]) => any;
-  submitForm: FormInstance;
   load: (...args: any[]) => any;
 }) {
   return (
@@ -79,6 +76,7 @@ export default function DrawingsCard({
             <Button
               size="small"
               type="primary"
+              title="新增一条组件/零件（新行是草稿，要提交评审发布后才计入采购/排产）"
               onClick={() => {
                 addForm.resetFields()
                 void searchItems()
@@ -95,10 +93,10 @@ export default function DrawingsCard({
             </Button>
             <Button
               size="small"
+              title="给自制件挂原材料（新行是草稿，要提交评审发布后才计入采购）"
               onClick={() => {
-                matForm.resetFields()
                 void searchItems()
-                setMatOpen(true)
+                setMatOpen(true) // ★ F14：该弹窗 destroyOnHidden，开前 reset 会触发 useForm 未连接警告
               }}
             >
               挂原材料
@@ -106,6 +104,17 @@ export default function DrawingsCard({
           </Space>
         }
       >
+        {/* ★ N3（2026-10-04 走查核实）：本批已发布冻结后，这两个按钮**没被禁**（新增的是草稿行，
+            不发布就不进需求）—— 但界面上没说清“为什么点了没反应/改了没下文”，补一句实话 */}
+        {rows.length > 0 && rows.every((r) => r.status === '已发布') && (
+          <Alert
+            type="info"
+            showIcon
+            className="alert-mb"
+            message="这台设备的图纸已全部发布（冻结）"
+            description="从这里新增的条目/材料是【草稿】，要再走一次「提交评审 → 发布」才计入采购和排产；要改已发布的图/BOM 行，请右键行上的「改版申请（ECN）」，不要直接覆盖。"
+          />
+        )}
         <Table<TreeNode>
           rowKey="drawing_no"
           size="small"
@@ -235,8 +244,7 @@ export default function DrawingsCard({
                     <a
                       onClick={() => {
                         setSelected(r)
-                        submitForm.resetFields()
-                        setSubmitOpen(true)
+                        setSubmitOpen(true) // ★ F14：submit 弹窗 destroyOnHidden，开前 reset 会触发 useForm 未连接警告
                       }}
                     >
                       上传图纸

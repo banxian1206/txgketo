@@ -177,7 +177,7 @@ export default function AcceptancePage() {
           />
         </Col>
         <Col span={5} style={{ textAlign: 'right' }}>
-          <Button type="primary" disabled={!canEdit} onClick={() => { form.resetFields(); setApplyOpen(true) }}>
+          <Button type="primary" disabled={!canEdit} onClick={() => setApplyOpen(true)}>
             申请客户验收
           </Button>
         </Col>
@@ -203,7 +203,7 @@ export default function AcceptancePage() {
             render: (_: unknown, r: AcceptanceRow) => (
               <Space size={6}>
                 <CodeNo>{r.project_no}</CodeNo>
-                <Typography.Text type="secondary" style={{ fontSize: 12 }}>{r.project_name ?? ''}</Typography.Text>
+                <Typography.Text type="secondary" className="hint-inline">{r.project_name ?? ''}</Typography.Text>
               </Space>
             ),
           },
@@ -229,7 +229,7 @@ export default function AcceptancePage() {
             width: 220,
             render: (_: unknown, r: AcceptanceRow) => (
               <Space size={4} wrap>
-                {canEdit && <a onClick={() => { form.resetFields(); setConfirmTarget(r) }}>客户确认</a>}
+                {canEdit && <a onClick={() => setConfirmTarget(r)}>客户确认</a>}
                 {canEdit && <a onClick={() => { setDocTarget(r); setFiles([]); setDocType('检验报告') }}>资料包</a>}
               </Space>
             ),
@@ -280,7 +280,7 @@ export default function AcceptancePage() {
             </Radio.Group>
           </Form.Item>
           <Form.Item name="signed_by" label="客户签字人" rules={[{ required: true, message: '验收通过必须记录客户签字人' }]}><Input placeholder="如 客户 张工" /></Form.Item>
-          <Form.Item name="accepted_at" label="验收日期"><DatePicker style={{ width: '100%' }} defaultValue={dayjs()} /></Form.Item>
+          <Form.Item name="accepted_at" label="验收日期" initialValue={dayjs()}><DatePicker style={{ width: '100%' }} /></Form.Item>
           <Form.Item name="remark" label="备注"><Input.TextArea rows={2} /></Form.Item>
           <Typography.Text type="secondary" style={{ fontSize: 12 }}>
             通过后：质保期 = 验收日 + 合同质保月数，项目阶段自动进入「质保」。

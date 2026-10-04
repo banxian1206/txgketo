@@ -164,7 +164,7 @@ export default function AppLayout() {
             <Typography.Text>{name}</Typography.Text>
             <Tooltip title="站内消息">
               <Badge count={unread} size="small">
-                <Button size="small" icon={<BellOutlined />} onClick={() => setNotifOpen(true)} />
+                <Button size="small" aria-label="站内消息" title="站内消息" icon={<BellOutlined />} onClick={() => setNotifOpen(true)} />
               </Badge>
             </Tooltip>
             <Link to="/m" style={{ fontSize: 13 }}>

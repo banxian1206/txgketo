@@ -31,6 +31,19 @@ def _can_site(current: User = Depends(get_current_user)) -> User:
     return current
 
 
+def _can_act_on_commission(current: User, row: SiteCommission) -> bool:
+    """★ N1（2026-10-04 走查核实）：调试进度要能由**被派的人自己**记。
+
+    修前：申请调试填了「派谁去」，但被派的技师（如 assy1，无 site:edit）在手机上按钮数为 0、
+    直接调接口 403 —— 派了活等于没派，只能现场负责人代填（容易漏）。
+    口径：现场/项目经理（原有门禁）或 被派人本人（dispatch_to 里写了 TA 的姓名/账号）。
+    """
+    if has_permission(current, "site:edit") or has_permission(current, "project:edit"):
+        return True
+    d = (row.dispatch_to or "").strip()
+    return bool(d) and (current.name in d or current.username in d)
+
+
 # --------------------------------------------------------------------------
 # 照片（含录视频）
 # --------------------------------------------------------------------------
@@ -290,11 +303,13 @@ def commission_arrive(
     cid: int,
     request: Request,
     session: Session = Depends(get_session),
-    current: User = Depends(require_permission("site:edit")),
+    current: User = Depends(get_current_user),
 ):
     row = session.get(SiteCommission, cid)
     if row is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "申请不存在")
+    if not _can_act_on_commission(current, row):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "只有现场/项目经理或本单被派的调试工程师本人能登记到场")
     site_svc.commission_arrive(session, row)
     audit.log(
         session, user=current, action="site_commission_arrive", object_type="site_commission",
@@ -309,11 +324,13 @@ def commission_finish(
     cid: int,
     request: Request,
     session: Session = Depends(get_session),
-    current: User = Depends(require_permission("site:edit")),
+    current: User = Depends(get_current_user),
 ):
     row = session.get(SiteCommission, cid)
     if row is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "申请不存在")
+    if not _can_act_on_commission(current, row):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "只有现场/项目经理或本单被派的调试工程师本人能标记调试完成")
     site_svc.commission_finish(session, row)
     audit.log(
         session, user=current, action="site_commission_finish", object_type="site_commission",
@@ -328,11 +345,13 @@ def commission_start(
     cid: int,
     request: Request,
     session: Session = Depends(get_session),
-    current: User = Depends(require_permission("site:edit")),
+    current: User = Depends(get_current_user),
 ):
     row = session.get(SiteCommission, cid)
     if row is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "申请不存在")
+    if not _can_act_on_commission(current, row):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "只有现场/项目经理或本单被派的调试工程师本人能开始调试")
     site_svc.commission_start(session, row)
     audit.log(
         session, user=current, action="site_commission_start", object_type="site_commission",

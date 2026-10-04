@@ -179,7 +179,9 @@ export function EquipmentEditor({ projectNo, onChanged }: Omit<Props, 'users'>) 
   }, [load])
 
   const openAdd = (same?: string) => {
-    form.resetFields()
+    // ★ F14（2026-10-04）：不在**打开前**调 resetFields —— destroyOnHidden 下弹窗未挂载，
+    //   对未连接的实例动手就是 console 警告（“useForm is not connected…”）；
+    //   destroyOnHidden + preserve={false} 每次打开都是干净新实例，本来就不需要 reset。
     setSameAs(same)
     setOpen(true)
   }
@@ -411,7 +413,7 @@ export function MilestoneEditor({ projectNo, users, onChanged }: Props) {
             size="small"
             type="primary"
             onClick={() => {
-              addForm.resetFields()
+              // ★ F14：同上 —— destroyOnHidden 的新实例不需要开前 reset
               setAddOpen(true)
             }}
           >

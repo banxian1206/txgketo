@@ -76,6 +76,12 @@ async function smokeByRole(ctx, groups, waitMs) {
   const bad = await smokeByRole(c, M_ROLE_ROUTES, 400);
   const n = M_ROLE_ROUTES.reduce((a, [, rs]) => a + rs.length, 0);
   check('SMOKE-mobile', bad.length === 0, bad.length ? bad.join(' | ').slice(0, 400) : `${n} 移动页零异常（${M_ROLE_ROUTES.length} 角色）`);
+  // ★ F12（2026-10-04 走查核实）：打错地址/过期书签不能被静默踢回工作台 —— 要明说「页面不存在」且保留原 URL
+  await c.page.goto(BASE + '/nope-xyz-404', { waitUntil: 'networkidle' }).catch(() => {});
+  await c.page.waitForTimeout(800);
+  const t404 = await body(c.page);
+  check('F12-真404页', /页面不存在/.test(t404) && c.page.url().includes('nope-xyz-404'),
+    `含「页面不存在」=${/页面不存在/.test(t404)} · URL 保留=${c.page.url().includes('nope-xyz-404')}`);
   await c.browser.close();
 }
 

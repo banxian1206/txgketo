@@ -1,5 +1,6 @@
 import { useMfgBoard } from '../../hooks/useMfgBoard'
 import { App, Button, Card, Empty, Form, Input, Modal, Radio, Select, Space, Tabs, Tag, Typography } from 'antd'
+import { useNavigate } from 'react-router-dom'
 import dayjs from 'dayjs'
 import {useState} from 'react'
 
@@ -28,6 +29,7 @@ type Kind = 'dispatch' | 'accept' | 'transfer' | 'os-send' | 'os-accept'
 /** 车间手机端（S5）：领料员/系统专员批量操作 —— 下发（拍照）→ 验收（拍照）→ 转运（拍照）。 */
 export default function ProductionM() {
   const { message } = App.useApp()
+  const nav = useNavigate()
   const canEdit = hasPerm('mfg:edit')
   const [tab, setTab] = useState('wait')
   const [action, setAction] = useState<{ kind: Kind; order?: ProdOrderRow; os?: OutsourceRow } | null>(null)
@@ -36,7 +38,8 @@ export default function ProductionM() {
   const [form] = Form.useForm()
 
   // 重构 2.3：看板数据走共享 hook（与另一端同源）
-  const { wb, loading, reload: load } = useMfgBoard()
+  // ★ F17：hook 内部已按 mfg:view 短路（不发请求不吃 403），这里把“为什么是空的”说清楚
+  const { wb, loading, reload: load, allowed } = useMfgBoard()
 
   const open = (kind: Kind, order?: ProdOrderRow, os?: OutsourceRow) => {
     setPhotos([])
@@ -127,6 +130,23 @@ export default function ProductionM() {
   )
 
   const c = wb?.counts
+
+  if (!allowed) {
+    return (
+      <Empty
+        description={
+          <Space direction="vertical">
+            <Typography.Text>你没有车间数据的查看权限（mfg:view）</Typography.Text>
+            <Typography.Text type="secondary" className="hint-inline">
+              制造任务是车间/装配的活。如果你是从别的页面点进来的，回首页选自己的工作台即可。
+            </Typography.Text>
+          </Space>
+        }
+      >
+        <Button onClick={() => nav('/m')}>回手机首页</Button>
+      </Empty>
+    )
+  }
 
   return (
     <>

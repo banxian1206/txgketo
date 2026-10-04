@@ -62,7 +62,8 @@ export default function VehicleModal({
           } finally {
             setSaving(false)
           }
-        })
+        }).catch(() => { /* ★ F3（2026-10-04）：validateFields 的 reject 值是 errorInfo 不是 Error，
+            不接住就是未处理拒绝（console 报错）；提示由 antd 行内校验自己给，这里只需不关弹窗 */ })
       }}
     >
       <Typography.Paragraph>

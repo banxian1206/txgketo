@@ -350,7 +350,7 @@ export default function MergeOrderModal({
                 min={0}
                 value={v ?? undefined}
                 placeholder="可不填"
-                addonBefore="¥"
+                prefix="¥" // ★ F14：antd 5.29 起 addonBefore 废弃（换 prefix），消除 console 警告
                 onChange={(x) => setLine(l.request_id, { unit_price: x == null ? null : Number(x) })}
               />
             ),

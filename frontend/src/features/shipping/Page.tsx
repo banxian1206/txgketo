@@ -354,9 +354,20 @@ export default function Shipping() {
               ]}
             />
             <Space style={{ marginTop: 10 }}>
-              <Button type="primary" disabled={!canEdit || selectedEquips.length === 0} onClick={() => setInstructOpen(true)}>
+              {/* ★ F15（2026-10-04 走查核实）：禁用按钮必须说清为什么 —— 对齐采购池「合并下单」的 title 做法 */}
+              <Button
+                type="primary"
+                disabled={!canEdit || selectedEquips.length === 0}
+                title={!canEdit ? '没有权限：发货指令由项目经理/发运下达' : selectedEquips.length === 0 ? '先在下面勾选“装配完成”的设备（未装配完成的勾不上）' : undefined}
+                onClick={() => setInstructOpen(true)}
+              >
                 下达发货指令（{selectedEquips.length} 台）
               </Button>
+              {canEdit && selectedEquips.length === 0 && (
+                <Typography.Text type="secondary" className="hint-inline">
+                  （先在表里勾选设备；只有「可发」状态能勾 —— 还没装配完的设备要等装配完成）
+                </Typography.Text>
+              )}
               <Typography.Text type="secondary" style={{ fontSize: 12 }}>
                 一次指令 = 一个发运批次，可分批发；散件发运，逐项勾「已发」+ 拍照。
               </Typography.Text>
@@ -537,7 +548,7 @@ export default function Shipping() {
                 setLoadTarget(null)
                 await load(projectNo)
               } catch (e) { message.error(errMsg(e)) }
-            }),
+            }).catch(() => { /* ★ F3：校验没过时 reject 的是 errorInfo，接住防未处理拒绝 */ }),
           )
         }}
         confirmLoading={saving}

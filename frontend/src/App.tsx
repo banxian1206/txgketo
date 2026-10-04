@@ -9,6 +9,7 @@ import WorkbenchShell from './components/domain/WorkbenchShell'
 import { ADMIN_TABS, BASE_TABS, redirectRoutes } from './configs/domain'
 import MobileLayout from './layouts/MobileLayout'
 import Login from './features/auth/Page'
+import NotFound from './features/NotFound'
 const AcceptM = lazy(() => import('./features/acceptance/MobilePage'))
 const HomeM = lazy(() => import('./features/home/MobilePage'))
 const IssuesM = lazy(() => import('./features/warehouse/IssuesPage'))
@@ -155,7 +156,9 @@ export default function App() {
         </Route>
         {redirectRoutes()}
       </Route>
-      <Route path="*" element={<Navigate to="/" replace />} />
+      {/* ★ F12（2026-10-04 走查核实）：未知路由不再静默踢回工作台 —— 给出真 404（旧路径由上面
+          redirectRoutes() 的兼容层一跳到位，不经过这里） */}
+      <Route path="*" element={<NotFound />} />
     </Routes>
     </Suspense>
   )

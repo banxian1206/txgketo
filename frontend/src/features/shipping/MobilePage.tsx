@@ -190,6 +190,17 @@ export default function ShippingM() {
               </Checkbox>
             </div>
           ))}
+          {/* ★ F15：手机端没有 hover，禁用理由只能写成看得见的字 */}
+          {canShip && selected.length === 0 && (
+            <div className="hint-note">
+              先在上面勾选设备；只有「装配完成」的能勾（没装配完的发不了）。
+            </div>
+          )}
+          {!canShip && (
+            <div className="hint-note">
+              发货指令由项目经理/发运下达，你这边只能看。
+            </div>
+          )}
           <Button type="primary" block style={{ marginTop: 10 }} disabled={!canShip || selected.length === 0} onClick={() => setInstructOpen(true)}>
             下达发货指令（{selected.length} 台）
           </Button>
@@ -252,7 +263,14 @@ export default function ShippingM() {
         open={!!tickTarget}
         title={`发运清单 · ${tickTarget?.shipment_no ?? ''}`}
         onCancel={() => setTickTarget(null)}
-        footer={<Button onClick={() => setTickTarget(null)}>完成</Button>}
+        footer={(
+          /* ★ F16（2026-10-04）：“完成”只是关闭——真保存是勾 checkbox 那刻即时提交；文案说实话，未拍照的勾提醒补完再关 */
+          <Button onClick={() => {
+            const noPhoto = (tickTarget?.items ?? []).filter((i) => i.shipped && !(i.photos && i.photos.length))
+            if (noPhoto.length) message.warning(`有 ${noPhoto.length} 项已勾“已发”但没拍照 —— 照片是现场清点的依据，补完再关`)
+            setTickTarget(null)
+          }}>关闭（勾选已实时保存）</Button>
+        )}
         width={560}
         destroyOnHidden
       >

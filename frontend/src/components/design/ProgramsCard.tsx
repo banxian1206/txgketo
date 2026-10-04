@@ -1,4 +1,3 @@
-import type { FormInstance } from 'antd'
 // components/design/ProgramsCard.tsx —— 由 EquipmentDesign 拆出（重构 1.6 · 只拆不改）
 import {
   Button,
@@ -27,8 +26,6 @@ export default function ProgramsCard({
   doNewProgramVersion,
   openProgramVersions,
   profile,
-  progForm,
-  progUploadForm,
   programs,
   removeProgram,
   setChangeTarget,
@@ -39,8 +36,6 @@ export default function ProgramsCard({
   doNewProgramVersion: (...args: any[]) => any;
   openProgramVersions: (...args: any[]) => any;
   profile: User | null;
-  progForm: FormInstance;
-  progUploadForm: FormInstance;
   programs: ProgramItem[];
   removeProgram: any;
   setChangeTarget: (...args: any[]) => any;
@@ -58,7 +53,7 @@ export default function ProgramsCard({
           <Button
             size="small"
             onClick={() => {
-              progForm.resetFields()
+              // ★ F14：destroyOnHidden 弹窗未挂载时 resetFields 会报 useForm 未连接警告；新实例本就干净
               setProgCreateOpen(true)
             }}
           >
@@ -102,8 +97,7 @@ export default function ProgramsCard({
                     <a
                       onClick={() => {
                         setProgUploadTarget(p)
-                        progUploadForm.resetFields()
-                        setProgUploadOpen(true)
+                        setProgUploadOpen(true) // ★ F14：同上，destroyOnHidden 不需要开前 reset
                       }}
                     >
                       上传程序
