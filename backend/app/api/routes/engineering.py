@@ -143,7 +143,13 @@ def get_design_tree(
         select(Drawing).where(Drawing.project_no == project_no, Drawing.equip_no == equip_no)
     ).all()
     names = _names(session)
-    bom_rows = session.scalars(select(BomItem).where(BomItem.project_no == project_no)).all()
+    # ★ 走查 2026-10-04：BOM 行必须按**本设备**收口。原来只按 `project_no` 取整个项目的 BOM，
+    #   同型第二台（01B）出现后，01A/01B 的设计面会互相看到对方的标准件/材料（计数翻倍、列表重复）。
+    #   用本设备图纸集合过滤（并保留 `parent_ref == 设备号` 的历史写法兜底）。
+    equip_refs = {d.drawing_no for d in drawings} | {equip_no}
+    bom_rows = session.scalars(
+        select(BomItem).where(BomItem.project_no == project_no, BomItem.parent_ref.in_(equip_refs))
+    ).all()
     items = {i.item_no: i for i in session.scalars(select(Item)).all()}
 
     # 按图号排序即是树的顺序（层次码天然有序）
@@ -866,8 +872,9 @@ def design_overview(
         for d in ds:
             if d.parent_drawing_no:
                 children[d.parent_drawing_no] = children.get(d.parent_drawing_no, 0) + 1
-        refs = {b.parent_ref for b in bom_rows if b.bom_source == BOM_DESIGN}
-        mats = {b.parent_ref for b in bom_rows if b.bom_source == BOM_MATERIAL}
+        # ★ 走查 2026-10-04：同 get_design_tree —— BOM 行按本设备图纸收口，别串到别的设备
+        refs = {b.parent_ref for b in bom_rows if b.bom_source == BOM_DESIGN and b.parent_ref in in_tree}
+        mats = {b.parent_ref for b in bom_rows if b.bom_source == BOM_MATERIAL and b.parent_ref in in_tree}
         # ★ P1-8：同 design 详情页的口径（全站唯一口径函数）—— 叶子只看“有没有子图”，
         #   总装图不算零件；不能因为挂了标准件就把自制件踢出“待配材料”的检查。
         _comps, part_nos = split_components_parts(

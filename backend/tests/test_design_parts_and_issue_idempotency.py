@@ -73,3 +73,18 @@ def test_generate_issue_reuses_open_sheet():
 def test_frontend_shows_reuse_instead_of_fake_success():
     s = _read(ROOT / "frontend" / "src" / "features" / "warehouse" / "Page.tsx")
     assert "if (r.reused)" in s, "复用时不能再提示“已生成领料单”（会让人以为建了第二张）"
+
+
+# ── 走查 2026-10-04：设计面 BOM 行必须按【设备】收口 ─────────────────────
+def test_design_tree_bom_rows_are_scoped_to_equipment():
+    """`get_design_tree` 取 BOM 行只按 project_no → 同型第二台（01B）出现后，
+    01A/01B 的设计面互相看到对方的标准件/材料（计数翻倍、列表重复，误导设计/采购）。
+    修法：`BomItem.parent_ref.in_(本设备图纸集合)`。
+    """
+    s = _read(BE / "api" / "routes" / "engineering.py")
+    j = s.index("def get_design_tree")
+    body = s[j : s.index("\nclass DrawingIn", j)]
+    assert "BomItem.parent_ref.in_(" in body, "设计面取 BOM 行必须按本设备图纸收口"
+    assert "select(BomItem).where(BomItem.project_no == project_no)).all()" not in body, (
+        "又回到只按 project_no 取整个项目的 BOM 行（同型设备会互相串项）"
+    )
