@@ -20,11 +20,18 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   errMsg,
   mergeOrder,
+  priceReference,
   recommendSuppliers,
+  type PriceReference,
   type PurchasePoolGroup,
 } from '../api/client'
 import { SelectSupplier } from './fields'
+import { Muted } from './ui/Primitives'
 import { T } from '../theme/tokens'
+
+// ★ F10（客户口径 2026-10-04）：本次单价高于「历史最高」的多少倍时，提交前红字确认一次。
+//   只是提醒，不拦人（价格合理性由采购判断）；不设这个阈值的价格对比是给审批看的。
+const PRICE_WARN_X = 3
 
 interface MergeLine {
   request_id: number
@@ -91,10 +98,11 @@ export default function MergeOrderModal({
   onCancel: () => void
   onDone: () => void
 }) {
-  const { message } = App.useApp()
+  const { message, modal } = App.useApp()
   const [form] = Form.useForm()
   const deliverTo = Form.useWatch('deliver_to', form)
   const [lines, setLines] = useState<MergeLine[]>([])
+  const [priceRefs, setPriceRefs] = useState<Record<string, PriceReference>>({})
   const [recos, setRecos] = useState<RecoRow[]>([])
   const [recoNote, setRecoNote] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
@@ -117,9 +125,25 @@ export default function MergeOrderModal({
     })
     setRecos([])
     setRecoNote(null)
+    setPriceRefs({})
     // 按选中的物料分别取推荐，再按供应商归并
     const uniq = [...new Map(groups.map((g) => [g.item_no, g])).values()]
     const notes: string[] = []
+    // ★ F10：先取历史价格参考 —— 有历史价就【预填】到单价，并显示「上次/均价」灰字
+    const refs = await Promise.all(uniq.map((g) => priceReference(g.item_no).catch(() => null)))
+    const refMap: Record<string, PriceReference> = {}
+    refs.forEach((ref, i) => {
+      if (ref) refMap[uniq[i].item_no] = ref
+    })
+    setPriceRefs(refMap)
+    setLines((prev) =>
+      prev.map((l) => {
+        if (l.unit_price) return l // 只填空白，别覆盖用户已填的
+        const st = refMap[l.item_no]?.stats
+        const p = st?.last_price ?? st?.avg_price
+        return p ? { ...l, unit_price: p } : l
+      }),
+    )
     try {
       const results = await Promise.all(
         uniq.map((g) =>
@@ -220,6 +244,38 @@ export default function MergeOrderModal({
       message.warning('至少留一条需求')
       return
     }
+    // ★ F10：没有单价不能下采购单（客户口径 2026-10-04）
+    if (unpriced > 0) {
+      message.error(`还有 ${unpriced} 条没填单价 —— 没有单价不能下采购单`)
+      return
+    }
+    // ★ F10：单价高于历史最高 N 倍 → 提交前红字确认（可继续，但必须眼过）
+    const offenders = lines.filter((l) => {
+      const max = priceRefs[l.item_no]?.stats?.max_price
+      return max != null && max > 0 && (l.unit_price ?? 0) > max * PRICE_WARN_X
+    })
+    if (offenders.length) {
+      const go = await new Promise<boolean>((resolve) => {
+        modal.confirm({
+          title: `有 ${offenders.length} 条单价高于历史最高 ${PRICE_WARN_X} 倍`,
+          okText: '确认没问题，继续下单',
+          cancelText: '回去核对',
+          content: (
+            <div>
+              {offenders.map((l) => (
+                <Muted key={l.request_id}>
+                  {l.display_name}（{l.item_no}）：本次 ¥{l.unit_price} vs 历史最高 ¥
+                  {priceRefs[l.item_no]?.stats?.max_price}
+                </Muted>
+              ))}
+            </div>
+          ),
+          onOk: () => resolve(true),
+          onCancel: () => resolve(false),
+        })
+      })
+      if (!go) return
+    }
     setSaving(true)
     try {
       const res = await mergeOrder({
@@ -236,7 +292,7 @@ export default function MergeOrderModal({
         lines: lines.map((l) => ({
           request_id: l.request_id,
           qty: l.qty,
-          unit_price: l.unit_price ?? undefined,
+          unit_price: l.unit_price as number, // 上面已拦下未填的，这里必有值
           tax_incl: v.tax_incl,
         })),
       })
@@ -261,7 +317,8 @@ export default function MergeOrderModal({
       onOk={() => void submit()}
       confirmLoading={saving}
       okText="确认合并下单"
-      okButtonProps={{ disabled: lines.length === 0 }}
+      // ★ F10：有未填单价的行就禁用（理由在下方红字写清楚，不让用户瞎猜，参 F15）
+      okButtonProps={{ disabled: lines.length === 0 || unpriced > 0 }}
       forceRender
       styles={{ body: { maxHeight: 'calc(100vh - 230px)', overflowY: 'auto', paddingRight: 8 } }}
     >
@@ -342,18 +399,32 @@ export default function MergeOrderModal({
           {
             title: '单价',
             dataIndex: 'unit_price',
-            width: 120,
-            render: (v: number | null | undefined, l) => (
-              <InputNumber
-                size="small"
-                style={{ width: '100%' }}
-                min={0}
-                value={v ?? undefined}
-                placeholder="可不填"
-                prefix="¥" // ★ F14：antd 5.29 起 addonBefore 废弃（换 prefix），消除 console 警告
-                onChange={(x) => setLine(l.request_id, { unit_price: x == null ? null : Number(x) })}
-              />
-            ),
+            width: 165,
+            render: (v: number | null | undefined, l) => {
+              const st = priceRefs[l.item_no]?.stats
+              return (
+                <>
+                  <InputNumber
+                    size="small"
+                    style={{ width: '100%' }}
+                    min={0.001}
+                    status={!v ? 'error' : undefined}
+                    value={v ?? undefined}
+                    placeholder="必填"
+                    prefix="¥" // ★ F14：antd 5.29 起 addonBefore 废弃（换 prefix），消除 console 警告
+                    onChange={(x) => setLine(l.request_id, { unit_price: x == null ? null : Number(x) })}
+                  />
+                  {st && st.deal_count > 0 && (
+                    <div>
+                      <Muted>
+                        上次 {st.last_price != null ? `¥${st.last_price}` : '—'} · 均价{' '}
+                        {st.avg_price != null ? `¥${st.avg_price}` : '—'}（{st.deal_count} 次）
+                      </Muted>
+                    </div>
+                  )}
+                </>
+              )
+            },
           },
           {
             title: '小计',
@@ -383,8 +454,8 @@ export default function MergeOrderModal({
         <Typography.Text>
           下单合计：<b>¥{totalAmount.toLocaleString()}</b>
           {unpriced > 0 && (
-            <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-              　（{unpriced} 条未填单价，只下单不记价）
+            <Typography.Text type="danger" style={{ fontSize: 12 }}>
+              　（{unpriced} 条没填单价 —— 没有单价不能下采购单）
             </Typography.Text>
           )}
         </Typography.Text>

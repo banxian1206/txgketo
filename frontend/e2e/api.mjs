@@ -95,7 +95,7 @@ const wh1 = await apiLogin('wh1', 'txgk@123');
       body: JSON.stringify({ supplier_id: sup.id, ordered_at: new Date().toISOString().slice(0, 10),
         expected_date: new Date(Date.now() + 86400000 * 7).toISOString().slice(0, 10),
         deliver_to: '公司仓库',
-        lines: [{ request_id: mr.id, tax_incl: true }] }),
+        lines: [{ request_id: mr.id, tax_incl: true, unit_price: 1 }] }),
     })).json();
     // 推到已批准 → 需求才转「在途」、仓库才看得到这条待验收
     let st = po.status;
@@ -157,7 +157,8 @@ const wh1 = await apiLogin('wh1', 'txgk@123');
         expected_date: new Date(Date.now() + 86400000 * 7).toISOString().slice(0, 10),
         deliver_to: '直发客户现场', deliver_address: 'E2E 探针地址',
         // ★ tax_incl 重构后必填（08 §3.2 / 客户口径#10），不传会 422 而撞不到本探针要测的门禁
-        lines: [{ request_id: mr.id, tax_incl: true }] }),
+        // ★ F10 起 unit_price 也必填（没有单价不能下采购单）
+        lines: [{ request_id: mr.id, tax_incl: true, unit_price: 1 }] }),
     })).json();
     // ★ 08 §4.2：直发【现场待验收】到货单在审批通过后才建 —— 必须先把单推到已批准再查
     let st = po.status;
@@ -239,14 +240,14 @@ const wh1 = await apiLogin('wh1', 'txgk@123');
     const noDate = await fetch(`${API}/api/v1/purchase/merge-order`, {
       method: 'POST', headers: h,
       body: JSON.stringify({ supplier_id: sup.id, ordered_at: ordered, deliver_to: '公司仓库',
-        lines: [{ request_id: mr.id, tax_incl: true }] }),
+        lines: [{ request_id: mr.id, tax_incl: true, unit_price: 1 }] }),
     });
     const d1 = await noDate.json().catch(() => ({}));
     const withDate = await fetch(`${API}/api/v1/purchase/merge-order`, {
       method: 'POST', headers: h,
       body: JSON.stringify({ supplier_id: sup.id, ordered_at: ordered,
         expected_date: new Date(Date.now() + 86400000 * 7).toISOString().slice(0, 10),
-        deliver_to: '公司仓库', lines: [{ request_id: mr.id, tax_incl: true }] }),
+        deliver_to: '公司仓库', lines: [{ request_id: mr.id, tax_incl: true, unit_price: 1 }] }),
     });
     check('O3A-预计到货必填',
       noDate.status === 400 && /预计到货/.test(String(d1.detail)) && withDate.status < 300,
@@ -459,6 +460,23 @@ const wh1 = await apiLogin('wh1', 'txgk@123');
         commissions[0].dispatch_to === '李工',
       `两次提交→${c1.code}/${c2.code} · reused=${c2.j?.reused} · 记录数=${Array.isArray(commissions) ? commissions.length : '?'} · 派=${commissions?.[0]?.dispatch_to}`);
   }
+}
+
+// ── F10：没有单价不能下采购单（客户口径 2026-10-04）──
+//     schema 必填 → 缺单价在进路由前就被 422 拦下（不依赖库里有需求，稳定可复现）。
+{
+  const buyer = await apiLogin('buyer1', 'txgk@123');
+  const r = await fetch(`${API}/api/v1/purchase/merge-order`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${buyer}` },
+    body: JSON.stringify({
+      supplier_id: 1, ordered_at: '2026-10-04', deliver_to: '公司仓库',
+      lines: [{ request_id: 1, tax_incl: true }],
+    }),
+  });
+  const d = await r.json().catch(() => ({}));
+  const blamesPrice = JSON.stringify(d).includes('unit_price');
+  check('F10-缺单价被拦', r.status === 422 && blamesPrice,
+    `→${r.status}${blamesPrice ? '（指名 unit_price）' : ' · ' + JSON.stringify(d).slice(0, 70)}`);
 }
 
 const fails = summary('API 回归');

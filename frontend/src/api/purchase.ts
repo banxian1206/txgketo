@@ -304,7 +304,8 @@ export async function generateEquipmentPurchase(
 export interface MergeOrderLineIn {
   request_id: number
   qty?: number
-  unit_price?: number
+  /** ★ F10：单价必填 —— 没有单价不能下采购单（后端 schema 也必填且 > 0） */
+  unit_price: number
   tax_incl: boolean
 }
 

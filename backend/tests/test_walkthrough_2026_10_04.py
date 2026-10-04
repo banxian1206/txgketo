@@ -8,12 +8,16 @@
   N2  重复「开始装配」新建第二条整机装配记录，把已装配设备打回「装配中」→
       发运台判"未装配完成"→ **能发的货发不出去**（且系统没有删除装配记录的口）
   F11 PM 台「验收与质保」没有项目筛选，签字类动作（法律性数据）跨项目混排
+  F9  现场勘测/申请调试重复提交 → 堆记录 + 重复通知
+  F10 合并下单不预填历史价、错价走到总监才提示；且单价留空也能下单（客户拍板：不放行）
 
 风格与本目录其它护栏一致：按代码结构断言（钉住"修法"，不是钉文件名）。
 """
 from __future__ import annotations
 
 from pathlib import Path
+
+import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
 FE = ROOT / "frontend" / "src"
@@ -198,3 +202,63 @@ def test_site_error_is_globally_handled():
     src = _src(ROOT / "backend" / "app" / "main.py")
     assert "from app.services.site import SiteError" in src
     assert "@app.exception_handler(SiteError)" in src
+
+
+# ══ F10：没有单价不能下采购单（客户口径 2026-10-04）═══════════════════
+def test_order_schemas_require_unit_price():
+    """合并下单 / 单条下单两个入参的单价都必填且必须 > 0（修前可留空 = 免费下单）。"""
+    from datetime import date
+
+    from pydantic import ValidationError
+
+    from app.api.routes.initiation import MergeLineIn, OrderIn
+
+    with pytest.raises(ValidationError):
+        MergeLineIn(request_id=1, tax_incl=True)
+    with pytest.raises(ValidationError):
+        MergeLineIn(request_id=1, unit_price=0, tax_incl=True)
+    assert MergeLineIn(request_id=1, unit_price=9.9, tax_incl=True).unit_price == 9.9
+    with pytest.raises(ValidationError):
+        OrderIn(tax_incl=True, ordered_at=date.today())
+
+
+def test_create_order_rejects_missing_price_before_touching_db():
+    """服务层底线：任何入口漏校验也拦得住；且在任何 DB 访问之前就抛（session=None 即可验证）。"""
+    from datetime import date
+
+    from app.services.purchase_order import PurchaseOrderError, create_order
+
+    with pytest.raises(PurchaseOrderError):
+        create_order(
+            None,
+            supplier_id=1,
+            supplier_name="x",
+            order_date=date.today(),
+            expect_date=None,
+            deliver_to="公司仓库",
+            deliver_address=None,
+            lines=[{"request_id": 1, "qty": 1}],
+            actor_id=1,
+        )
+
+
+def test_order_ui_prefills_history_and_requires_price():
+    """F10 前端：有历史价预填 + 灰字「上次/均价」+ 偏离历史最高 N 倍提交前确认 + 单价必填拦截。"""
+    merge = _src(FE / "components" / "MergeOrderModal.tsx")
+    assert "priceReference" in merge, "合并下单要取历史价（F10 预填）"
+    assert "上次" in merge and "均价" in merge, "要显示「上次 / 均价」灰字"
+    assert "PRICE_WARN_X" in merge and "modal.confirm" in merge, "偏离历史最高 N 倍要在提交前确认"
+    assert "没有单价不能下采购单" in merge, "单价必填的拦截提示"
+    assert "unpriced > 0" in merge, "未填单价要拦下来（不再「只下单不记价」）"
+
+    single = _src(FE / "components" / "PurchaseActions.tsx")
+    assert "priceReference" in single, "单条下单也要取历史价（F10 预填）"
+    assert "PRICE_WARN_X" in single and "modal.confirm" in single, "偏离历史最高 N 倍要在提交前确认"
+    assert "必须填单价" in single, "单价必填的前端校验"
+    assert "stats.last_price" in single, "预填用上次成交价"
+
+
+def test_order_audit_no_longer_falls_back_to_dash_price():
+    """单价已必填，审计摘要不该再兜「¥—」（那是“没单价也能下单”时代的旧文案）。"""
+    src = _src(ROOT / "backend" / "app" / "api" / "routes" / "initiation.py")
+    assert "body.unit_price or '—'" not in src

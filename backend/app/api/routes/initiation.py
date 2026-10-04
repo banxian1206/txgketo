@@ -960,7 +960,8 @@ class OrderIn(BaseModel):
     deliver_to: str = Field(default="公司仓库", description="公司仓库 / 直发客户现场")
     deliver_address: str | None = Field(default=None, description="送货地址（直发现场必填）")
     po_no: str | None = Field(default=None, description="采购单号")
-    unit_price: float | None = Field(default=None, gt=0, description="单价")
+    # ★ F10（客户口径 2026-10-04）：没有单价不能下采购单 —— 必填且必须 > 0
+    unit_price: float = Field(..., gt=0, description="单价（必填 —— 没有单价不能下采购单）")
     tax_incl: bool = Field(..., description="这个价含税 / 不含税（采购员必选）")
     ordered_at: date = Field(..., description="下单日期")
     expected_date: date | None = Field(default=None, description="预计到货日期")
@@ -1040,7 +1041,7 @@ def order(
         object_ref=f"{project_no}/{row.item_no}",
         summary=f"采购下单 {item.display_name if item else row.item_no}："
         f"供应商 {po.supplier_name or '—'} · 单号 {po.po_no}（{po.status}）· "
-        f"数量 {qty:g} · 单价 ¥{body.unit_price or '—'} · "
+        f"数量 {qty:g} · 单价 ¥{body.unit_price:g} · "
         f"下单 {body.ordered_at} · 预计到货 {row.expected_date or '—'}",
         ip=client_ip(request),
     )
@@ -2144,7 +2145,8 @@ def generate_equipment_purchase(
 class MergeLineIn(BaseModel):
     request_id: int
     qty: float | None = Field(default=None, gt=0, description="不填就用需求数量")
-    unit_price: float | None = Field(default=None, description="不填就只下单不记价")
+    # ★ F10（客户口径 2026-10-04）：没有单价不能下采购单 —— 必填且必须 > 0
+    unit_price: float = Field(..., gt=0, description="单价（必填 —— 没有单价不能下采购单）")
     tax_incl: bool = Field(..., description="这个价含税 / 不含税（采购员必选）")
 
 

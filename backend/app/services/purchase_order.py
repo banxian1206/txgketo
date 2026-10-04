@@ -283,10 +283,20 @@ def create_order(
 ) -> PurchaseOrder:
     """建一张采购单（单头 + 多行）并同步各需求的下单状态。
 
-    `lines` 每项：{request_id, qty, unit_price?, tax_incl?, tax_rate?, expect_date?, unit?}
+    `lines` 每项：{request_id, qty, unit_price, tax_incl?, tax_rate?, expect_date?, unit?}
+
+    ★ F10（客户口径 2026-10-04）：**每行必须有正数单价** ——"没有单价怎么可以下采购单"。
+      这里是不依赖路由的最终底线（新入口忘了校验也拦得住）；校验在任何 DB 访问之前。
     """
     if not lines:
         raise PurchaseOrderError("至少要有一行")
+    for ln in lines:
+        price = ln.get("unit_price")
+        if price is None or float(price) <= 0:
+            raise PurchaseOrderError(
+                "每条采购行都必须填单价（须大于 0）—— 没有单价不能下采购单；"
+                "暂时不确定成交价也请先按参考价填写，成交后仍可走改价。"
+            )
     po = PurchaseOrder(
         po_no=po_no or next_number(session, "PURCHASE_ORDER"),
         supplier_id=supplier_id,

@@ -16,6 +16,9 @@ import {
 import { T } from '../theme/tokens'
 import AppModal from './AppModal'
 
+// ★ F10（客户口径 2026-10-04）：本次单价高于「历史最高」的多少倍时，提交前红字确认一次（只提醒不拦人）
+const PRICE_WARN_X = 3
+
 /**
  * 采购的下单动作（只做下单；到货/验收/入库由仓库推，见采购单详情）。
  * 采购员看到的不是「完成」，而是「现在能不能下单」。
@@ -29,7 +32,7 @@ export default function PurchaseActions({
   onDone: () => void
   size?: 'small' | 'middle'
 }) {
-  const { message } = App.useApp()
+  const { message, modal } = App.useApp()
   const [orderOpen, setOrderOpen] = useState(false)
   const [orderInitial, setOrderInitial] = useState<Record<string, unknown>>({})
   const [saving, setSaving] = useState(false)
@@ -42,6 +45,26 @@ export default function PurchaseActions({
   const submitOrder = async () => {
     let v
     try { v = await orderForm.validateFields() } catch { return }
+    // ★ F10：没有单价不能下采购单（客户口径 2026-10-04）
+    if (v.unit_price == null || v.unit_price <= 0) {
+      message.error('必须填单价 —— 没有单价不能下采购单')
+      return
+    }
+    // ★ F10：单价高于历史最高 N 倍 → 提交前红字确认（可继续，但必须眼过）
+    const max = priceRef?.stats?.max_price
+    if (max != null && max > 0 && v.unit_price > max * PRICE_WARN_X) {
+      const go = await new Promise<boolean>((resolve) => {
+        modal.confirm({
+          title: `单价高于历史最高 ${PRICE_WARN_X} 倍`,
+          okText: '确认没问题，继续下单',
+          cancelText: '回去核对',
+          content: `本次 ¥${v.unit_price} · 历史最高 ¥${max}（${row.item_no}）`,
+          onOk: () => resolve(true),
+          onCancel: () => resolve(false),
+        })
+      })
+      if (!go) return
+    }
     setSaving(true)
     try {
       await orderPurchase(row.project_no, row.id, {
@@ -66,14 +89,16 @@ export default function PurchaseActions({
   }
 
   const openOrder = async () => {
+    let ref: PriceReference | null = null
     try {
-      const [sups, ref, rec] = await Promise.all([
+      const [sups, r, rec] = await Promise.all([
         listSuppliers(),
         priceReference(row.item_no).catch(() => null),
         recommendSuppliers(row.item_no, row.need_date ?? undefined).catch(() => null),
       ])
       setSuppliers(sups)
-      setPriceRef(ref)
+      ref = r
+      setPriceRef(r)
       setRecos(rec)
     } catch {
       setSuppliers([])
@@ -83,7 +108,8 @@ export default function PurchaseActions({
     setOrderInitial({
       supplier_name: row.supplier_name ?? undefined,
       po_no: row.po_no ?? undefined,
-      unit_price: row.unit_price ?? undefined,
+      // ★ F10：有历史价就预填（上次成交优先，其次均价），省得手填错价或空着
+      unit_price: row.unit_price ?? ref?.stats.last_price ?? ref?.stats.avg_price ?? undefined,
       qty: row.qty ?? 1,
       ordered_at: dayjs(),
       expected_date: row.lead_days ? dayjs().add(row.lead_days, 'day') : undefined,
@@ -246,8 +272,18 @@ export default function PurchaseActions({
             />
           )}
           <Space style={{ display: 'flex' }} size="middle">
-            <Form.Item name="unit_price" label="单价（元）" style={{ minWidth: 150 }}>
-              <InputNumber style={{ width: '100%' }} min={0} />
+            <Form.Item
+              name="unit_price"
+              label="单价（元）"
+              style={{ minWidth: 170 }}
+              rules={[{ required: true, message: '必须填单价 —— 没有单价不能下采购单' }]}
+              extra={
+                priceRef && priceRef.stats.deal_count > 0
+                  ? `上次 ¥${priceRef.stats.last_price ?? '—'} · 均价 ¥${priceRef.stats.avg_price ?? '—'}（${priceRef.stats.deal_count} 次）`
+                  : undefined
+              }
+            >
+              <InputNumber style={{ width: '100%' }} min={0.001} placeholder="必填" />
             </Form.Item>
             <Form.Item name="qty" label="数量" style={{ minWidth: 130 }} rules={[{ required: true }]}>
               <InputNumber style={{ width: '100%' }} min={0.001} />

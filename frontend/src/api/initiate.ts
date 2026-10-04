@@ -203,7 +203,8 @@ export async function orderPurchase(
     supplier_id?: number
     supplier_name?: string
     po_no?: string
-    unit_price?: number
+    /** ★ F10：单价必填 —— 没有单价不能下采购单 */
+    unit_price: number
     qty?: number
     ordered_at: string
     expected_date?: string
