@@ -127,6 +127,8 @@ export interface ProjectDetail {
   contacts: ProjectContact[]
   attachments: Attachment[]
   payment_terms: PaymentTerm[]
+  /** ★ 设备台数（与权限无关的计数）—— 头卡用它，别拿齐套条数顶替（2026-10-04） */
+  equipment_count?: number
   /** 合同金额（无 `project:amount` 权限时后端回 null） */
   amount?: number | null
   sales_name?: string | null

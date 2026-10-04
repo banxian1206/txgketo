@@ -80,3 +80,17 @@ def test_service_forms_use_pickers():
     assert 'name="project_no" label="项目"' in mob and "<Select" in mob, "手机端报修项目要下拉"
     pc = _read(FE / "features" / "service" / "Page.tsx")
     assert "<ItemSelect />" in pc, "备件建账的物料要能搜"
+
+
+# ── F4（2026-10-04 走查报告核实）：设备台数不许拿齐套条数顶替 ──────────────
+def test_project_detail_returns_permission_free_equipment_count():
+    """详情要单独给设备台数：齐套数据按 mfg:view 收口，拿它当台数会让销售看到「设备 0」。
+
+    走查报告 F4 的现象（详情头卡「设备 0」而实际 2 台）在**无 mfg:view 的角色**上成立，
+    根因是 `nums.equipments = kitting.length` + 齐套请求按权限被跳过（P2-6 之后更明显）。
+    """
+    be = _read(ROOT / "backend" / "app" / "api" / "routes" / "project.py")
+    assert '"equipment_count": int(equip_count or 0)' in be, "详情接口要返回与权限无关的设备台数"
+    fe = _read(ROOT / "frontend" / "src" / "features" / "project" / "DetailPage.tsx")
+    assert "equipments: detail?.equipment_count ?? 0" in fe, "头卡要用设备台数"
+    assert "equipments: kitting.length" not in fe, "不许再拿齐套条数顶替（销售/商务会看到 0）"

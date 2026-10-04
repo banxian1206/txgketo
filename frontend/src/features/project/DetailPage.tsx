@@ -379,7 +379,8 @@ export default function ProjectDetailPage() {
         stageOrder={STAGE_ORDER}
         next={nextAction}
         nums={{
-          equipments: kitting.length,
+          // ★ 设备台数用后端计数（齐套数据按 mfg:view 收口，拿它当台数会让销售/商务看到「设备 0」）
+          equipments: detail?.equipment_count ?? 0,
           kittingRate: kitting.length ? kitting.reduce((a, k) => a + (k.kitting_rate ?? 0), 0) / kitting.length : null,
           outstanding: hasAmount
             ? (detail?.payment_terms ?? []).reduce((a: number, x: any) => a + Math.max(0, (x.amount ?? 0) - (x.received_amount ?? 0)), 0)

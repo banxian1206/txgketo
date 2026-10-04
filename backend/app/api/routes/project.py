@@ -22,7 +22,7 @@ from app.core.config import settings
 from app.core.db import get_session
 from app.models.initiation import ProjectMember
 from app.models.platform import User
-from app.models.project import Attachment, Contact, Customer, PaymentTerm, Project
+from app.models.project import Attachment, Contact, Customer, Equipment, PaymentTerm, Project
 from app.services import audit, payment as payment_svc, project_stage
 from app.services.reviewers import dept_code_of
 from app.services.numbering import ObjectType, next_number, peek_number, year_scope_key
@@ -483,8 +483,16 @@ def get_project_detail(
         u = session.get(User, uid)
         return u.name if u else None
 
+    # ★ 设备台数单独给一个**与权限无关**的计数（2026-10-04 修）：
+    #   「合同与商务」那个头卡原来用齐套概览的条数顶替设备台数 ——
+    #   而齐套数据按 `mfg:view` 收口（P2-6），于是销售/商务打开详情看到「设备 0」（明明有 2 台）。
+    #   设备台数不是敏感信息（设备清单本身在立项页就可见），直接数。
+    equip_count = session.scalar(
+        select(func.count()).select_from(Equipment).where(Equipment.project_no == project_no)
+    )
     result = {
         "project": _out(project, customer.name if customer else None).model_dump(),
+        "equipment_count": int(equip_count or 0),
         "contacts": [
             {
                 "id": c.id,
