@@ -1,5 +1,6 @@
 import { CameraOutlined, FileTextOutlined } from '@ant-design/icons'
 import {
+  Alert,
   App,
   Button,
   Card,
@@ -68,7 +69,10 @@ export default function AcceptM() {
     try {
       const d = await mobileMaterial(Number(requestId))
       setData(d)
-      setQty(Math.max(0.001, d.qty - d.qty_received))
+      // ★ 走查 2026-10-04 P3：剩余为 0 时**不再**用 0.001 兜底预填（会提交出费解的 400）；
+      //   留 null + 显示「已全部到货」+ 提交置灰。
+      const remaining = Number(d.qty ?? 0) - Number(d.qty_received ?? 0)
+      setQty(remaining > 1e-9 ? remaining : null)
       // ★ N12：拆单时默认选唯一一行；多行让仓库自己选
       setPoLineId(d.lines && d.lines.length === 1 ? d.lines[0].po_line_id : null)
     } catch (e) {
@@ -102,8 +106,17 @@ export default function AcceptM() {
 
   const doInspect = async () => {
     if (!data) return
+    const remaining = Number(data.qty ?? 0) - Number(data.qty_received ?? 0)
+    if (remaining <= 1e-9) {
+      message.warning('这个需求已经全部到货了（没有可验收的数量）—— 如有多送，请走采购的换货/退货')
+      return
+    }
     if (qty === null || Number.isNaN(qty) || qty <= 0) {
       message.warning('请填「本次到货数量」—— 这是入库和结算的依据，不能空着')
+      return
+    }
+    if (qty > remaining + 1e-9) {
+      message.warning(`本次到货不能超过未到数量 ${remaining} ${data.unit ?? ''}`)
       return
     }
     setSaving(true)
@@ -163,6 +176,8 @@ export default function AcceptM() {
   if (!data) return <Empty description="找不到这条采购需求" />
 
   const pendingStorage = data.receipts.filter((g) => g.status === '待入库')
+  const remaining = Number(data.qty ?? 0) - Number(data.qty_received ?? 0)
+  const fullyReceived = remaining <= 1e-9
 
   return (
     <>
@@ -247,8 +262,28 @@ export default function AcceptM() {
           )}
           <Space>
             <span>本次到货数量</span>
-            <InputNumber min={0.001} max={data ? Math.max(0.001, data.qty - data.qty_received) : undefined} value={qty ?? undefined} onChange={(v) => setQty(v === null || v === undefined ? null : Number(v))} style={{ width: 120 }} />
+            <InputNumber
+              min={0.001}
+              max={fullyReceived ? undefined : remaining}
+              disabled={fullyReceived}
+              value={qty ?? undefined}
+              onChange={(v) => setQty(v === null || v === undefined ? null : Number(v))}
+              style={{ width: 120 }}
+            />
+            {!fullyReceived && (
+              <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                未到 {remaining} {data.unit ?? ''}
+              </Typography.Text>
+            )}
           </Space>
+          {fullyReceived && (
+            <Alert
+              type="info"
+              showIcon
+              message="这个需求已经全部到货，没有可验收的数量"
+              description="订购与已到数量相等。如有多送的货，请走采购的「换货 / 退货」。"
+            />
+          )}
           <Radio.Group value={result} onChange={(e) => setResult(e.target.value)}>
             <Radio.Button value="合格">合格</Radio.Button>
             <Radio.Button value="不合格">不合格</Radio.Button>
@@ -273,7 +308,7 @@ export default function AcceptM() {
           />
           {/* ★ 吸底主操作条（规范 §5.2）：站在货架边单手作业，主按钮不该在屏幕外要往上够 */}
           <div className="m-actionbar">
-            <Button type="primary" block loading={saving} disabled={!canStore} onClick={() => void doInspect()}>
+            <Button type="primary" block loading={saving} disabled={!canStore || fullyReceived} onClick={() => void doInspect()}>
               提交验收{photos.length ? `（含 ${photos.length} 张照片）` : ''}
             </Button>
           </div>

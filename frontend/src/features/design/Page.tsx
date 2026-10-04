@@ -352,6 +352,10 @@ export default function EquipmentDesign({ projectNo: p0, equipNo: e0, embedded }
       : []),
     ...rows
       .filter((r) => r.level < 4)
+      // ★ 走查 2026-10-04 P3：总装图已在上面单独列了一项，而 `rows`（design tree）里**也含总装图**
+      //   → 会生成两个同 value 的选项 → React「Encountered two children with the same key」告警
+      //   （选项可能被吞/重复）。这里把总装图从 rows 分支里排掉，它只保留第一项那个「挂在总装下」的入口。
+      .filter((r) => !(root?.exists && r.drawing_no === root.drawing_no))
       .map((r) => ({
         value: r.drawing_no,
         label: `${'　'.repeat(r.level)}└ ${r.drawing_no} ${r.title}`,

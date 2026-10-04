@@ -119,3 +119,29 @@ def test_partial_issue_can_continue_picking():
         assert ok, (
             f"{rel}：「部分领料」没有配「继续备料」(pick) 入口 —— 补货后无法再备，单据会永久卡在部分领料"
         )
+
+
+# ── P3（走查 2026-10-04）：设计面「挂在哪个下面」不许把总装图列两遍 ──────────
+def test_design_parent_options_dont_duplicate_root():
+    """`parentOptions` 先手动列了总装图，又把 `rows`（design tree，**含总装图**）整体 map 一遍
+    → 两个同 value 选项 → React「Encountered two children with the same key」（实测 key =
+    总装图号，构建结构时告警刷屏）。修法：rows 分支排除 `root.drawing_no`。
+    """
+    s = _flatten(FE / "features" / "design" / "Page.tsx")
+    seg = s[s.index("const parentOptions"):]
+    seg = seg[: seg.index("const submitPurchase")]
+    assert "r.drawing_no === root.drawing_no" in seg or "r.drawing_no === root?.drawing_no" in seg, (
+        "parentOptions 必须把总装图从 rows 分支里排掉，否则总装图被列两遍 → duplicate key 告警"
+    )
+
+
+# ── P3（走查 2026-10-04）：验收「本次到货数量」不许用 0.001 兜底 ─────────────
+def test_mobile_accept_no_tiny_qty_floor():
+    """剩余为 0 时，修前 `setQty(Math.max(0.001, qty - received))` 预填 0.001 并放行，
+    提交得到费解的「本批到货 0.001 超过未到数量 0」。现在：剩余为 0 → 留 null + 明说
+    「已全部到货」+ 提交按钮置灰。
+    """
+    s = _flatten(FE / "features" / "acceptance" / "MobilePage.tsx")
+    assert "Math.max(0.001" not in s, "剩余为 0 时不许用 0.001 兜底预填"
+    assert "已经全部到货" in s, "全部到货要有明确文案"
+    assert "fullyReceived" in s, "提交按钮要能按「已全部到货」置灰"

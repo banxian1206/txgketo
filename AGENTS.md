@@ -150,9 +150,11 @@ deploy/          docker-compose.dev.yml
 
 > 更新于：**端到端走查 + P2 修复（2026-10-04 · 晚）**：从干净库用真实浏览器走完 S0→S11（PC 1440×900 + 手机 390×844），
 > 近期 10-04 那批修复**逐条核实 17/17 通过**；报告 `docs/99-端到端走查报告-2026-10-04-近期改动核实.md`。
-> 走查发现并修掉一条真缺陷：★ **「部分领料」补货后无法再备料**（后端 `/pick` 支持，PC/手机都只在「待备料」给按钮 →
-> 单据卡死）—— 双端补「继续备料」入口 + pytest 静态钉子 `test_ui_p2_fixes.py::test_partial_issue_can_continue_picking`（注入反例能红）。
-> 另登记 2 条待办（P3）：验收数量 0.001 下限、设计结构构建时的 duplicate-key 告警。基线 `pytest 230 · static 41`。
+> 走查发现并修掉 3 条（P2×1 / P3×2，**三处护栏均注入反例自证能红**）：
+> ① ★ **「部分领料」补货后无法再备料**（后端 `/pick` 支持，PC/手机都只在「待备料」给按钮 → 单据卡死）—— 双端补「继续备料」入口；钉子 `test_ui_p2_fixes.py::test_partial_issue_can_continue_picking`；
+> ② **验收「本次到货数量」的 0.001 兜底**（剩余为 0 时预填 0.001 → 费解的 400）—— 改为留 `null` + 明说「已全部到货」+ 提交置灰；钉子 `test_mobile_accept_no_tiny_qty_floor`；
+> ③ **设计面父级下拉把总装图列两遍**（`parentOptions` 既手列总装图、又把含总装图的 `rows` 整体 map → React duplicate-key 告警刷屏）—— `rows` 分支排除 `root.drawing_no`；钉子 `test_design_parent_options_dont_duplicate_root`。
+> 基线 `pytest 232 · e2e:static 41 · tsc/build 绿`。
 >
 > 更新于：**走查报告核实 + 四条修复（2026-10-04）**：对 `docs/99-浏览器端到端走查报告-2026-10-02.md` 的 17 条
 > 逐条独立复现/纠偏（**核实报告：`docs/99-走查报告核实-2026-10-04.md`**，含 F4/F7/F12/F14 根因修正与 F6 未复现登记），
