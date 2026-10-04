@@ -104,13 +104,14 @@ def save_survey(
     session: Session = Depends(get_session),
     current: User = Depends(_can_site),
 ):
-    row = site_svc.save_survey(session, project_no=body.project_no, actor_id=current.id, body=body.model_dump())
+    row, reused = site_svc.save_survey(session, project_no=body.project_no, actor_id=current.id, body=body.model_dump())
     audit.log(
         session, user=current, action="site_survey", object_type="project", object_ref=body.project_no,
-        summary=f"现场勘测：{body.project_no} 约定入场 {body.enter_date or '待定'}", ip=client_ip(request),
+        summary=f"现场勘测{'（更新已有）' if reused else ''}：{body.project_no} 约定入场 {body.enter_date or '待定'}",
+        ip=client_ip(request),
     )
     session.commit()
-    return site_svc.survey_dict(row)
+    return {**site_svc.survey_dict(row), "reused": reused}
 
 
 @router.get("/survey")
@@ -274,16 +275,17 @@ def request_commission(
     session: Session = Depends(get_session),
     current: User = Depends(_can_site),
 ):
-    row = site_svc.request_commission(
+    row, reused = site_svc.request_commission(
         session, project_no=body.project_no, actor_id=current.id,
         dispatch_to=body.dispatch_to, plan_date=body.plan_date, remark=body.remark,
     )
     audit.log(
         session, user=current, action="site_commission", object_type="project", object_ref=body.project_no,
-        summary=f"申请调试：{body.project_no}（派 {body.dispatch_to or '待定'}）", ip=client_ip(request),
+        summary=f"申请调试{'（复用已有未完成）' if reused else ''}：{body.project_no}（派 {body.dispatch_to or '待定'}）",
+        ip=client_ip(request),
     )
     session.commit()
-    return site_svc.commission_dict(row)
+    return {**site_svc.commission_dict(row), "reused": reused}
 
 
 @router.get("/commission")

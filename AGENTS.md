@@ -170,7 +170,13 @@ deploy/          docker-compose.dev.yml
 > N1（★ **被派的调试工程师本人能记自己的进度**：`arrive/start/finish` 门禁从 `site:edit` 改为
 > 现场/PM **或 dispatch_to 里写了 TA 的姓名/账号**（`_can_act_on_commission`，双端同口径），修前 assy1 按钮数=0、接口 403 = 派了活没法干）·
 > N3（图纸全部发布后卡头加一句实话：“从这里新增的条目/材料是【草稿】，要再走评审发布才计入采购/排产；改已发布的走改版（ECN）”）。
-> 护栏基线：**`pytest 221` · `e2e:static 41` · `e2e:api 21` · `e2e:ui 73`** —— 全绿（新护栏均注入反例自证能红）。
+> **同日第三波 · F9 补齐**（报告里最后一条真缺陷）：现场「勘测 / 申请调试」重复提交不再堆记录 ——
+> `services/site.save_survey` 改为**一项目一条勘测（原地更新，`reused` 回传）**、`request_commission` 对
+> **未完成（已申请/已到现场/已开始调试）的调试申请复用并更新派工**（不再新建、不重复通知）；
+> 两接口都回 `reused`，手机端如实提示「已有…已更新（没有重复建单）」；护栏 `test_walkthrough_2026_10_04.py`（+4）
+> 与 `e2e:api` 的 `F9-勘测幂等`/`F9-申请调试幂等`（连提两次 → 记录数=1、`reused=true`）。
+> 至此 10-04 核实报告的真问题全部收口（F6 未复现；F10 待客户拍“缺价是否允许提交”；F13 属体验项）。
+> 护栏基线：**`pytest 225` · `e2e:static 41` · `e2e:api 23` · `e2e:ui 73`** —— 全绿（新护栏均注入反例自证能红）。
 >
 > 更新于：**UI 真实场景测试修复轮（2026-09-30）**：全程只用浏览器点 UI 走完 S0→S11 后，把报告里的
 > **P0×1 / P1×8 / P2×10 全部修掉**（测试报告与逐条修复记录：`docs/99-E2E测试报告-2026-09-30-UI真实场景.md`）。
@@ -323,6 +329,10 @@ deploy/          docker-compose.dev.yml
   ⚠ 新增接口报错一律经 `errMsg`，不许直接 `e.message` / 直返 `data.detail`。
 - ★ **签字类列表必须能按项目收口**（F11，2026-10-04）：验收台/PM 台 `?project=` 筛选进 URL，
   后端 `GET /acceptance/workbench?project_no=` 计数/列表/质保提醒同步过滤；未筛时黄字警示 + 项目号等宽强标识。
+- ★ **现场勘测 / 申请调试幂等**（F9，2026-10-04 走查核实）：一个项目**只保留一条勘测**（重提 = 原地更新，
+  仅首次或「约定入场时间」变了才通知）；**一张未完成的调试申请**（已申请/已到现场/已开始调试）重复提交
+  **复用并更新派工**、不新建、不重复通知；推进到「调试完成」后才允许再开下一张。
+  修前实测连点 3~5 次就堆 3~5 条 + 重复消息（`site_survey`/`site_commission`）。两接口回 `reused` 供 UI 说实话。
 
 ### 8.2 已完成（可用的功能）
 
@@ -610,8 +620,8 @@ POST /api/v1/warehouse/inbound                    其他入库（退料回库/�
 ### 8.6 当前环境
 
 - 后端 :8208 · 前端 :5207 · PG 35432（`docker compose -f deploy/docker-compose.dev.yml up -d`，compose 顶层写死了 `name: txgketo`）
-- 测试：`.venv/bin/python -m pytest -q` → **221 passed**；e2e 基线 `.venv/bin/python -m scripts.e2e_baseline`（★ 跑前复位业务数据；只清业务表，账户/组织/编号规则不动）→ **问题 0 / 中断 0 / 通过 149**；
-  隔离探针 `scripts/probe_bom_math.py` → **8/8**、`scripts/probe_n24_n25.py` → **20/20**；前端 `e2e:static 41` / **`e2e:api 21+0skip`** / **`e2e:ui 73+0skip`**（两套都自建靶，可复位后单跑）
+- 测试：`.venv/bin/python -m pytest -q` → **225 passed**；e2e 基线 `.venv/bin/python -m scripts.e2e_baseline`（★ 跑前复位业务数据；只清业务表，账户/组织/编号规则不动）→ **问题 0 / 中断 0 / 通过 149**；
+  隔离探针 `scripts/probe_bom_math.py` → **8/8**、`scripts/probe_n24_n25.py` → **20/20**；前端 `e2e:static 41` / **`e2e:api 23+0skip`** / **`e2e:ui 73+0skip`**（两套都自建靶，可复位后单跑）
   ★ **UI 真实场景走查（2026-09-30）**：只用浏览器点 UI 走完 S0→S11 + 双端，报告（含逐条修复记录与 commit）在
   `docs/99-E2E测试报告-2026-09-30-UI真实场景.md`；驱动脚本在 `/tmp/txgk-ui-e2e/`（**未入库**）。
   ⚠️ 那轮把主数据清了（`e2e:clean` 会连物料档/供应商/库位一起清），**重新跑 `e2e:ui` 前最好跑一次

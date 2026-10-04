@@ -23,6 +23,7 @@ from app.models.site import (
     COMMISSION_DONE,
     COMMISSION_ONSITE,
     COMMISSION_STARTED,
+    COMMISSION_WAIT,
     ISSUE_CLOSED,
     SITE_RECEIPT_DAMAGED,
     SITE_RECEIPT_OK,
@@ -40,6 +41,11 @@ SITE_RECEIPT_DONE = "现场已验收"
 
 class SiteError(Exception):
     """现场业务规则错误。"""
+
+
+# ★ F9（2026-10-04 走查核实）：调试申请「未完成」的三种状态。
+#   已有任一条时，再点「申请调试」不新建第二条（原地更新 + 复用），避免重复单/重复通知。
+COMMISSION_OPEN = (COMMISSION_WAIT, COMMISSION_ONSITE, COMMISSION_STARTED)
 
 
 def _now() -> datetime:
@@ -63,23 +69,33 @@ def team_ids(session: Session, project_no: str) -> set[int]:
 
 def save_survey(
     session: Session, *, project_no: str, actor_id: int, body: dict
-) -> SiteSurvey:
-    row = SiteSurvey(
-        project_no=project_no,
-        surveyed_by=actor_id,
-        surveyed_at=_now(),
-        contact=body.get("contact"),
-        floor_load=body.get("floor_load"),
-        passage=body.get("passage"),
-        power=body.get("power"),
-        air=body.get("air"),
-        network=body.get("network"),
-        enter_date=body.get("enter_date"),
-        photos=body.get("photos") or [],
-        remark=body.get("remark"),
-    )
-    session.add(row)
-    if body.get("enter_date"):
+) -> tuple[SiteSurvey, bool]:
+    """现场勘测（S8）。★ F9（2026-10-04 走查核实）：**一个项目只保留一条勘测**。
+
+    修前每点一次「现场勘测」就 insert 一条、并发一条通知（实测 4 条 + 4 条重复通知）。
+    现在：已有勘测 → **原地更新**（重勘测 = 覆盖同一张事实卡），返回 `(row, reused=True)`；
+    仅首次、或「约定入场时间」发生变化时才再发通知（重复点提交不再刷屏）。
+    """
+    row = session.scalars(
+        select(SiteSurvey).where(SiteSurvey.project_no == project_no).order_by(SiteSurvey.id.desc())
+    ).first()
+    reused = row is not None
+    old_enter = row.enter_date if row is not None else None
+    if row is None:
+        row = SiteSurvey(project_no=project_no)
+        session.add(row)
+    row.surveyed_by = actor_id
+    row.surveyed_at = _now()
+    row.contact = body.get("contact")
+    row.floor_load = body.get("floor_load")
+    row.passage = body.get("passage")
+    row.power = body.get("power")
+    row.air = body.get("air")
+    row.network = body.get("network")
+    row.enter_date = body.get("enter_date")
+    row.photos = body.get("photos") or []
+    row.remark = body.get("remark")
+    if body.get("enter_date") and (not reused or body.get("enter_date") != old_enter):
         notify.notify(
             session,
             team_ids(session, project_no),
@@ -91,7 +107,7 @@ def save_survey(
             actor_id=actor_id,
         )
     session.flush()
-    return row
+    return row, reused
 
 
 # --------------------------------------------------------------------------
@@ -203,14 +219,34 @@ def close_issue(session: Session, row: SiteIssue) -> SiteIssue:
 
 def request_commission(
     session: Session, *, project_no: str, actor_id: int, dispatch_to: str | None, plan_date: date | None, remark: str | None
-) -> SiteCommission:
+) -> tuple[SiteCommission, bool]:
+    """申请调试（S8）。★ F9（2026-10-04 走查核实）：**一个项目只允许一张「未完成」的调试申请**。
+
+    修前重复点提交就多一条（实测 5 条）+ 每次都通知（连着 4 条重复消息）。
+    现在：已有未完成（已申请/已到现场/已开始调试）→ **原地更新并复用**（不新建、不重复通知），
+    返回 `(row, reused=True)`；推进到「调试完成」后才允许再开下一张（一次调试一批）。
+    """
+    open_row = session.scalars(
+        select(SiteCommission)
+        .where(SiteCommission.project_no == project_no, SiteCommission.status.in_(COMMISSION_OPEN))
+        .order_by(SiteCommission.id.desc())
+    ).first()
+    if open_row is not None:
+        if dispatch_to:
+            open_row.dispatch_to = dispatch_to
+        if plan_date:
+            open_row.plan_date = plan_date
+        if remark is not None:
+            open_row.remark = remark
+        session.flush()
+        return open_row, True
     row = SiteCommission(
         project_no=project_no,
         request_by=actor_id,
         request_at=_now(),
         dispatch_to=dispatch_to,
         plan_date=plan_date,
-        status="已申请",
+        status=COMMISSION_WAIT,
         remark=remark,
     )
     session.add(row)
@@ -237,7 +273,7 @@ def request_commission(
         biz_id=row.id,
         actor_id=actor_id,
     )
-    return row
+    return row, False
 
 
 def commission_arrive(session: Session, row: SiteCommission) -> SiteCommission:

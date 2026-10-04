@@ -4,6 +4,8 @@ import { api } from './http'
 export interface SiteSurveyRow {
   id: number
   project_no: string
+  /** ★ F9：true = 后端复用了已有勘测并原地更新（不是新建） */
+  reused?: boolean
   surveyed_at?: string | null
   contact?: string | null
   floor_load?: string | null
@@ -49,6 +51,8 @@ export interface SiteIssueRow {
 export interface SiteCommissionRow {
   id: number
   project_no: string
+  /** ★ F9：true = 已有未完成的调试申请，本次是原地更新（不是新建第二条） */
+  reused?: boolean
   request_at?: string | null
   dispatch_to?: string | null
   plan_date?: string | null

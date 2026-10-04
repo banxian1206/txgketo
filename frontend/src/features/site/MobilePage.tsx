@@ -104,13 +104,16 @@ export default function SiteM() {
     let v
     try { v = await form.validateFields() } catch { return }
     setSaving(true)
+    // ★ F9（2026-10-04 走查核实）：重复提交不再堆记录 —— 后端复用已有并原地更新，这里如实告诉用户
+    let okMsg = '已提交'
     try {
       if (modal.kind === 'survey') {
-        await saveSiteSurvey({
+        const res = await saveSiteSurvey({
           project_no: projectNo,
           contact: v.contact, floor_load: v.floor_load, passage: v.passage, power: v.power, air: v.air, network: v.network,
           enter_date: v.enter_date?.format('YYYY-MM-DD'), photos, remark: v.remark,
         })
+        if (res.reused) okMsg = '这个项目已有勘测记录，已更新（没有重复建单）'
       } else if (modal.kind === 'daily') {
         if (photos.length + videos.length === 0) { message.warning('汇报要带照片或视频'); setSaving(false); return }
         await addSiteDaily({
@@ -121,7 +124,8 @@ export default function SiteM() {
       } else if (modal.kind === 'issue') {
         await addSiteIssue({ project_no: projectNo, equip_no: v.equip_no, drawing_no: v.drawing_no, title: v.title, desc: v.desc, photos })
       } else if (modal.kind === 'commission') {
-        await requestCommission({ project_no: projectNo, dispatch_to: v.dispatch_to, plan_date: v.plan_date?.format('YYYY-MM-DD'), remark: v.remark })
+        const res = await requestCommission({ project_no: projectNo, dispatch_to: v.dispatch_to, plan_date: v.plan_date?.format('YYYY-MM-DD'), remark: v.remark })
+        if (res.reused) okMsg = '已有未完成的调试申请，已更新（没有重复建单）'
       } else if (modal.kind === 'incoming' && modal.target) {
         if (!photos.length) { message.warning('到货清点要拍照'); setSaving(false); return }
         await acceptSiteIncoming(modal.target.receipt_id, {
@@ -136,7 +140,7 @@ export default function SiteM() {
           result: v.result, signed_by: v.signed_by, accepted_at: v.accepted_at?.format('YYYY-MM-DD'), remark: v.remark,
         })
       }
-      message.success('已提交')
+      message.success(okMsg)
       setModal(null)
       await load(projectNo)
     } catch (e) {

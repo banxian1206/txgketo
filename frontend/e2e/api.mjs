@@ -419,6 +419,48 @@ const wh1 = await apiLogin('wh1', 'txgk@123');
       `质保金 ${terms.find((t) => t.node_name === '质保金')?.percent}%`);
 }
 
+// ── F9：现场勘测 / 申请调试 重复提交不得堆记录（2026-10-04 走查核实）──
+//    修前实测：连点 3 次 → 3 条勘测 + 3 条调试申请（通知也跟着重复）。现在必须幂等。
+{
+  const H = (t) => ({ 'Content-Type': 'application/json', Authorization: `Bearer ${t}` });
+  const post = async (url, body2, token) => {
+    const r = await fetch(`${API}/api/v1${url}`, { method: 'POST', headers: H(token), body: JSON.stringify(body2 ?? {}) });
+    let j = null; try { j = await r.json(); } catch { /* noop */ }
+    return { code: r.status, j };
+  };
+  const sales = await apiLogin('sales1', 'txgk@123');
+  const site = await apiLogin('site1', 'txgk@123');
+  const me = (await (await apiGet('/auth/me', sales)).json()) ?? {};
+  const created = await post('/projects', {
+    project_name: `E2E护栏-F9重复提交-${Date.now() % 100000}`, project_desc: 'F9 幂等自建靶',
+    customer_name: 'E2E客户', contacts: [{ name: '张工', phone: '13800000000' }],
+    sales_id: me.id,
+    deadline: new Date(Date.now() + 90 * 864e5).toISOString().slice(0, 10),
+    site_address: 'E2E 探针地址',
+  }, sales);
+  const pno = created.j?.project_no;
+  if (!pno) {
+    check('F9-勘测幂等', false, '自建靶失败：新建商机失败');
+    check('F9-申请调试幂等', false, '自建靶失败：新建商机失败');
+  } else {
+    const s1 = await post('/site/survey', { project_no: pno, enter_date: '2026-11-01', contact: '李现场' }, site);
+    const s2 = await post('/site/survey', { project_no: pno, enter_date: '2026-11-02', contact: '李现场' }, site);
+    const surveys = await (await apiGet(`/site/survey?project_no=${pno}`, site)).json();
+    check('F9-勘测幂等',
+      s1.code < 300 && s2.code < 300 && s2.j?.reused === true && Array.isArray(surveys) && surveys.length === 1 &&
+        surveys[0].enter_date === '2026-11-02',
+      `两次提交→${s1.code}/${s2.code} · reused=${s2.j?.reused} · 记录数=${Array.isArray(surveys) ? surveys.length : '?'} · 约定入场=${surveys?.[0]?.enter_date}`);
+
+    const c1 = await post('/site/commission', { project_no: pno, dispatch_to: '王工', plan_date: '2026-11-03' }, site);
+    const c2 = await post('/site/commission', { project_no: pno, dispatch_to: '李工', plan_date: '2026-11-04' }, site);
+    const commissions = await (await apiGet(`/site/commission?project_no=${pno}`, site)).json();
+    check('F9-申请调试幂等',
+      c1.code < 300 && c2.code < 300 && c2.j?.reused === true && Array.isArray(commissions) && commissions.length === 1 &&
+        commissions[0].dispatch_to === '李工',
+      `两次提交→${c1.code}/${c2.code} · reused=${c2.j?.reused} · 记录数=${Array.isArray(commissions) ? commissions.length : '?'} · 派=${commissions?.[0]?.dispatch_to}`);
+  }
+}
+
 const fails = summary('API 回归');
 // ★ 本套件会留测试数据（自建靶建的商机/批次等）—— 跑完想回到干净态：
 console.log('   （本套件会留测试数据；复位：npm run e2e:clean）')

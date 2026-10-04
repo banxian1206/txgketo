@@ -118,3 +118,83 @@ def test_commission_dispatched_engineer_can_act():
     assert _can_act_on_commission(assy1, row("assy1"))                  # 账号也算
     assert not _can_act_on_commission(other, row("调试组 王装配"))       # 路人仍然不行
     assert not _can_act_on_commission(assy1, row(None))                 # 没派人 → 只有现场/PM 能推进
+
+
+# ══ F9：现场勘测 / 申请调试不得重复堆积（幂等）════════════════════════
+class _FakeResult:
+    def __init__(self, row):
+        self._row = row
+
+    def first(self):
+        return self._row
+
+    def all(self):
+        # team_ids() 会走 scalars(...).all()；测试里没有项目成员 → 空集即可（通知已被 mock）
+        return []
+
+
+class _FakeSession:
+    """只够 save_survey / request_commission 用：忽略 select，回一个预设行。"""
+
+    def __init__(self, existing=None):
+        self.existing = existing
+        self.added: list = []
+        self.flushed = 0
+
+    def scalars(self, _stmt):
+        return _FakeResult(self.existing)
+
+    def add(self, obj):
+        self.added.append(obj)
+
+    def flush(self):
+        self.flushed += 1
+
+
+def test_save_survey_is_idempotent_upsert():
+    """F9 修前：每 POST 一次就 insert 一条（实测 4 条）。现在：一个项目只一条，重提=原地更新。"""
+    from app.services import site as svc
+
+    s1 = _FakeSession(None)
+    row, reused = svc.save_survey(s1, project_no="P1", actor_id=1, body={"enter_date": None})
+    assert reused is False and len(s1.added) == 1, "首次应新建一条"
+
+    s2 = _FakeSession(row)
+    row2, reused2 = svc.save_survey(s2, project_no="P1", actor_id=2, body={"enter_date": None, "contact": "李现场"})
+    assert reused2 is True and row2 is row and not s2.added, "再次应复用同一行、不新增"
+    assert row.contact == "李现场", "重勘测要覆盖到同一张事实卡上"
+
+
+def test_request_commission_reuses_open_request():
+    """F9 修前：重复点「申请调试」堆 5 条 + 重复通知。现在：有未完成的就复用、不重复通知。"""
+    from unittest.mock import patch
+
+    from app.models.site import COMMISSION_WAIT
+    from app.services import site as svc
+
+    with patch.object(svc.notify, "notify_role"), patch.object(svc.notify, "notify"):
+        s1 = _FakeSession(None)
+        row, reused = svc.request_commission(
+            s1, project_no="P1", actor_id=1, dispatch_to="王工", plan_date=None, remark=None
+        )
+        assert reused is False and len(s1.added) == 1 and row.status == COMMISSION_WAIT
+
+        s2 = _FakeSession(row)
+        row2, reused2 = svc.request_commission(
+            s2, project_no="P1", actor_id=2, dispatch_to="李工", plan_date=None, remark=None
+        )
+        assert reused2 is True and row2 is row and not s2.added, "有未完成的 → 复用，不再建第二条"
+        assert row.dispatch_to == "李工", "复用时可更新派谁去（不静默丢弃改派）"
+
+
+def test_site_routes_expose_reused_flag():
+    """后端要把 reused 回传给前端，UI 才能如实说“已更新”而不是“又建了一条”（F9）。"""
+    src = _src(ROOT / "backend" / "app" / "api" / "routes" / "site.py")
+    assert src.count('"reused": reused') == 2, "survey / commission 两个接口都要暴露 reused"
+
+
+def test_site_error_is_globally_handled():
+    """域错误类必须注册进 main.py 的 400 处理器（别再靠 route 手工 try）。"""
+    src = _src(ROOT / "backend" / "app" / "main.py")
+    assert "from app.services.site import SiteError" in src
+    assert "@app.exception_handler(SiteError)" in src
