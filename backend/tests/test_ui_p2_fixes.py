@@ -94,3 +94,28 @@ def test_project_detail_returns_permission_free_equipment_count():
     fe = _read(ROOT / "frontend" / "src" / "features" / "project" / "DetailPage.tsx")
     assert "equipments: detail?.equipment_count ?? 0" in fe, "头卡要用设备台数"
     assert "equipments: kitting.length" not in fe, "不许再拿齐套条数顶替（销售/商务会看到 0）"
+
+
+# ── N24-UI（走查 2026-10-04 P2）：部分领料必须还能「继续备料」──────────────
+def test_partial_issue_can_continue_picking():
+    """领料单备不满 → 状态「部分领料」；补货后必须能从界面**再备差额**。
+
+    后端 `POST /warehouse/issues/{id}/pick` 本来就允许「待备料 / 部分领料」两态
+    （见 routes/warehouse.py「补货后可再 pick 补差额」，probe_n24_n25 已覆盖）。
+    但走查实测：PC `warehouse/Page.tsx` 与手机 `warehouse/IssuesPage.tsx` 都只在
+    「待备料」渲染「备料」按钮 —— 部分领料只剩「车间领走」→ 单据永久卡死、车间拿不到料，
+    与 AGENTS §8.1 N24「补货后可在部分领料状态再备」的承诺矛盾。
+    """
+    import re
+
+    for rel in ("features/warehouse/Page.tsx", "features/warehouse/IssuesPage.tsx"):
+        # 先去掉注释再判：注释里也会写「部分领料」，否则护栏会被自己的注释蒙混过关（已实测漏报）
+        raw = _read(FE / rel)
+        raw = re.sub(r"/\*.*?\*/", " ", raw, flags=re.S)
+        raw = re.sub(r"//[^\n]*", " ", raw)
+        s = re.sub(r"\s+", " ", raw)
+        # 每一处「部分领料」条件里，附近必须出现 pick 动作（而不是只有 hand-over）
+        ok = any(re.search(r"'pick'", s[i : i + 240]) for i in [m.start() for m in re.finditer("部分领料", s)])
+        assert ok, (
+            f"{rel}：「部分领料」没有配「继续备料」(pick) 入口 —— 补货后无法再备，单据会永久卡在部分领料"
+        )

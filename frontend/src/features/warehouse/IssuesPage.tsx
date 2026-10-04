@@ -60,8 +60,9 @@ export default function IssuesM() {
     }
     setBusyId(id)
     try {
-      await api.post(`/warehouse/issues/${id}/pick`, {})
-      message.success('已备料')
+      const res = await api.post<{ ok: boolean; status: string }>(`/warehouse/issues/${id}/pick`, {})
+      // ★ 走查 2026-10-04 P2：部分领料再备后如实说清（还有缺料 → 补货后可在本页继续备）
+      message.success(res.data.status === '部分领料' ? '已备料（仍有缺料，补货后可在本页继续备）' : '已备料')
       await load()
     } catch (e) {
       message.error(errMsg(e))
@@ -117,9 +118,9 @@ export default function IssuesM() {
             ))}
           </div>
           <Space style={{ marginTop: 8 }}>
-            {r.status === '待备料' && (
-              <Button size="small" type="primary" loading={busyId === r.id} onClick={() => void act(r.id, 'pick')}>
-                备料完成
+            {(r.status === '待备料' || r.status === '部分领料') && (
+              <Button size="small" type={r.status === '部分领料' ? 'default' : 'primary'} loading={busyId === r.id} onClick={() => void act(r.id, 'pick')}>
+                {r.status === '部分领料' ? '继续备料' : '备料完成'}
               </Button>
             )}
             {(r.status === '已备料' || r.status === '部分领料') && (

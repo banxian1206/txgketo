@@ -212,8 +212,9 @@ export default function Warehouse() {
       return
     }
     try {
-      await api.post(`/warehouse/issues/${id}/pick`, {})
-      message.success('备料完成')
+      const res = await api.post<{ ok: boolean; status: string }>(`/warehouse/issues/${id}/pick`, {})
+      // ★ 走查 2026-10-04 P2：部分领料再备后如实说清（还有缺料 → 补货后可在本页继续备）
+      message.success(res.data.status === '部分领料' ? '已备料（仍有缺料，补货后可在本页继续备）' : '备料完成')
       await load()
     } catch (e) {
       message.error(errMsg(e))
@@ -480,7 +481,9 @@ export default function Warehouse() {
                       title: '操作', key: 'a', width: 150,
                       render: (_: unknown, r: IssueRow) => (
                         <Space>
-                          {r.status === '待备料' && <Button size="small" type="primary" disabled={!canStore} onClick={() => void issueAction(r.id, 'pick')}>备料完成</Button>}
+                          {/* ★ 走查 2026-10-04 P2：部分领料也必须能**继续备料**（后端 /pick 支持；补货后补差额）——
+                              修前只在「待备料」给按钮，部分领料只剩「车间领走」→ 单据永久卡死、车间拿不到料 */}
+                          {(r.status === '待备料' || r.status === '部分领料') && <Button size="small" type={r.status === '部分领料' ? 'default' : 'primary'} disabled={!canStore} onClick={() => void issueAction(r.id, 'pick')}>{r.status === '部分领料' ? '继续备料' : '备料完成'}</Button>}
                           {(r.status === '已备料' || r.status === '部分领料') && <Button size="small" type="primary" disabled={!canStore} onClick={() => void issueAction(r.id, 'hand-over')}>车间领走</Button>}
                         </Space>
                       ),
