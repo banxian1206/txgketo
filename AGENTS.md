@@ -148,6 +148,13 @@ deploy/          docker-compose.dev.yml
 
 ## 8. 当前进度（交接记录）
 
+> 更新于：**路由/导航上下文补一轮（2026-10-04 · 晚3）**：用户实测「商务台 → 新建商机 → 取消 → 落到 /projects」。
+> 根因：上一跳已带 `?from=`，但页面**没消费**（写死 `nav('/projects')`）。已按「来源优先」修 5 处：
+> `CreatePage`（取消×2 + 成功进新商机详情，都带来源）· `InitiatePage`（立项成功）· `InitiationEditors`（立项页「设计」）·
+> `EquipmentsCard`（项目详情→车间台）· `DrawingsModals`（设计面→采购台）。
+> 护栏：静态 `NAV-跨域跳转带来源` **扩面**到 `features/project` + `components/` 并兼盯 `nav('/workbench…')`/裸 `navigate(`（注入反例能红）；
+> `e2e:ui` 新增行为断言 `NAV-取消回来源台`。契约补充见 `docs/11 §7`。基线 `pytest 233 · e2e:static 41`。
+>
 > 更新于：**S0→S11 全功能走查 · 设计面 BOM 串项修复（2026-10-04 · 晚2）**：真实浏览器（PC 1440×900 + 手机 390×844）从干净库
 > 跑完整条主线，并补测 **ECN 改版 / 退货重采 / Excel 历史采购导入 / 付款计划变更 / 同型再来一台 / 部分领料继续备 / 其他入库 / OCR** 等。
 > 发现并修掉一条真缺陷：★ **设计面标准件/材料 BOM 没按设备收口** —— `get_design_tree` 只按 `project_no` 取 BOM 行，

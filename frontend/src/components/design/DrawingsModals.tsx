@@ -26,6 +26,7 @@ import {
   type StdItem,
   type VersionRow,
 } from '../../api/client'
+import { useGoFrom } from '../../hooks/useFrom'
 import type { TreeNode } from './shared'
 
 export default function DrawingsModals({
@@ -39,7 +40,6 @@ addForm,
   matForm,
   matOpen,
   message,
-  nav,
   parentOptions,
   purchaseForm,
   purchaseOpen,
@@ -93,6 +93,8 @@ addForm: FormInstance;
   versions: VersionRow[];
   purchaseResult: GeneratePurchaseResult | null;
 }) {
+  // ★ 来源优先：本组件里往采购台的跳转要带来源（nav 仍由 props 传入，此处只用 go）
+  const go = useGoFrom()
   return (
     <>
       <Modal
@@ -104,7 +106,8 @@ addForm: FormInstance;
           setPurchaseResult(null)
         }}
         onOk={() => {
-          if (purchaseResult) nav('/purchase')
+          // ★ 来源优先：设计面 → 采购台也带来源
+          if (purchaseResult) go('/purchase')
           else void submitPurchase()
         }}
         okText={purchaseResult ? '去采购工作台' : '生成进池'}

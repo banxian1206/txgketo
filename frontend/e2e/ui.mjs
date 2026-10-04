@@ -365,6 +365,28 @@ try {
     }
   }
 
+  // ── 走查 2026-10-04：从工作台进「新建商机」再取消，必须回【来源工作台】（不是项目列表）──
+  //   用户实测：商务台 → 新建商机 → 取消 → 落到 /projects（丢来源）。本断言钉死这个动线。
+  {
+    const nc = await newCtx()
+    try {
+      await login(nc.page, 'sales1', 'txgk@123')
+      await nc.page.goto(BASE + '/workbench/sales', { waitUntil: 'networkidle' })
+      await nc.page.waitForTimeout(1200)
+      await nc.page.locator('button').filter({ hasText: '新建商机' }).first().click()
+      await nc.page.waitForTimeout(1400)
+      const newUrl = nc.page.url()
+      await nc.page.locator('button').filter({ hasText: /^取\s*消$/ }).first().click()
+      await nc.page.waitForTimeout(1200)
+      const cancelUrl = nc.page.url()
+      check('NAV-取消回来源台',
+        newUrl.includes('/projects/new') && newUrl.includes('from=') && cancelUrl.includes('/workbench/sales'),
+        `新建 → ${newUrl.replace(BASE, '')} · 取消 → ${cancelUrl.replace(BASE, '')}`)
+    } finally {
+      await nc.browser.close()
+    }
+  }
+
   // ── B1 三角色开台（拍板④）：发运/现场/售后各见自己的台 + 台Tab直达交付域 ──
   {
     const roles = [['delivery1', '发运工作台'], ['site1', '现场工作台'], ['service1', '售后工作台']]

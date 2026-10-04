@@ -11,6 +11,7 @@ import type { UploadFile } from 'antd/es/upload/interface'
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
+import { useBack, useGoFrom } from '../../hooks/useFrom'
 import ProjectFormFields, {
   type ProjectFormValues,
 } from '../../components/ProjectFormFields'
@@ -32,6 +33,9 @@ import {
 export default function ProjectCreate() {
   const { message } = App.useApp()
   const nav = useNavigate()
+  const go = useGoFrom()
+  // ★ 来源优先：从某个工作台点进来（?from=）时，「取消」回那个台；没有来源才退回项目列表 / 新建商机成功后进【新商机详情】（来源继续透传给详情的返回口）
+  const back = useBack('/projects', '← 返回列表')
   const [form] = Form.useForm<ProjectFormValues>()
   const [users, setUsers] = useState<{ id: number; name: string }[]>([])
   const [projects, setProjects] = useState<Project[]>([])
@@ -101,7 +105,8 @@ export default function ProjectCreate() {
       message.success(
         `商机已建立，编号 ${created.project_no}${uploaded ? ` · 已挂 ${uploaded} 份资料` : ''}`,
       )
-      nav('/projects')
+      // ★ Q1=A：建完直接进新商机详情（下一步就是成交登记）；go() 会把来源（来源工作台）继续带给详情页
+      go(`/projects/${created.project_no}`)
     } catch (e) {
       message.error(errMsg(e))
     } finally {
@@ -125,7 +130,7 @@ export default function ProjectCreate() {
         }
         extra={
           <Space>
-            <Button onClick={() => nav('/projects')}>取消</Button>
+            <Button onClick={() => nav(back.to)}>取消</Button>
             <Button type="primary" loading={saving} onClick={() => void submit()}>
               建立商机
             </Button>
@@ -160,7 +165,7 @@ export default function ProjectCreate() {
 
           {/* 滚到底也不用滚回顶部才敢提交 */}
           <div className="form-actions">
-            <Button onClick={() => nav('/projects')}>取消</Button>
+            <Button onClick={() => nav(back.to)}>取消</Button>
             <Button type="primary" loading={saving} onClick={() => void submit()}>
               建立商机
             </Button>

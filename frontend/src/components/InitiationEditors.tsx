@@ -16,7 +16,8 @@ import {
 } from 'antd'
 import dayjs from 'dayjs'
 import { useCallback, useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+
+import { useGoFrom } from '../hooks/useFrom'
 
 import AppModal from './AppModal'
 
@@ -159,7 +160,8 @@ export function TeamEditor({ projectNo, users, onChanged }: Props) {
 /** ② 设备清单：设备号由系统自动发（01A，同型第二台 01B） */
 export function EquipmentEditor({ projectNo, onChanged }: Omit<Props, 'users'>) {
   const { message } = App.useApp()
-  const navigate = useNavigate()
+  // ★ 来源优先：立项页「设计」跳设备设计面时带上来源（台→项目→立项→设计面，返回口仍能回最初的台）
+  const go = useGoFrom()
   const [rows, setRows] = useState<EquipmentItem[]>([])
   const [open, setOpen] = useState(false)
   const [sameAs, setSameAs] = useState<string | undefined>()
@@ -243,7 +245,7 @@ export function EquipmentEditor({ projectNo, onChanged }: Omit<Props, 'users'>) 
                 <Typography.Text editable={{ onChange: (nv) => void editField(r, 'equip_name', nv) }}>
                   {v}
                 </Typography.Text>
-                <a onClick={() => navigate(`/projects/${projectNo}/design/${r.equip_no}`)}>设计</a>
+                <a onClick={() => go(`/projects/${projectNo}/design/${r.equip_no}`)}>设计</a>
               </Space>
             ),
           },

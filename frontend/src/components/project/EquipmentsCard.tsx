@@ -7,11 +7,10 @@ import {
   Table,
   Typography,
 } from 'antd'
-import {useNavigate} from 'react-router-dom'
-
 import {
   type KittingOverviewRow,
 } from '../../api/client'
+import { useGoFrom } from '../../hooks/useFrom'
 import { T } from '../../theme/tokens'
 
 export default function EquipmentsCard({
@@ -19,7 +18,8 @@ export default function EquipmentsCard({
 }: {
   kitting: KittingOverviewRow[];
 }) {
-  const nav = useNavigate()
+  // ★ 来源优先：项目详情 → 车间台（装配）也带来源
+  const go = useGoFrom()
   return (
     <>
               <Card
@@ -27,7 +27,7 @@ export default function EquipmentsCard({
                 size="small"
                 title="齐套率（装配 · 只展示，不设门槛）"
                 style={{ marginBottom: 16 }}
-                extra={<a onClick={() => nav('/workbench/shop/assembly')}>装配 / 厂内调试</a>}
+                extra={<a onClick={() => go('/workbench/shop/assembly')}>装配 / 厂内调试</a>}
               >
                 <Table<KittingOverviewRow>
                   rowKey="equip_no"

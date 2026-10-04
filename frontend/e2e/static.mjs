@@ -434,9 +434,17 @@ const FEATS = path.join(SRC, 'features');
 {
   // ★ docs/11：台/业务域里点进项目必须带来源（go() → ?from=），否则侧栏被抢、台条消失、返回口骗人。
   //   静态盯，不看数据 —— 加新链接时忘了带 from，当场红。
+  // ★ 走查 2026-10-04：目录扩到 features/project 与 components/（原来漏了 → CreatePage 的裸 nav('/projects') 没人拦），
+  //   同时盯 `nav('/workbench…')` 与裸 `navigate(`；目标行出现 `go(` 即算合规。
   const DOMAINS = ['features/workbench', 'features/purchase', 'features/warehouse', 'features/task',
     'features/site', 'features/assembly', 'features/manufacturing', 'features/service',
-    'features/shipping', 'features/acceptance', 'features/review', 'features/change', 'features/design']
+    'features/shipping', 'features/acceptance', 'features/review', 'features/change', 'features/design',
+    'features/project', 'components']
+  // 例外必须写清为什么
+  const EXEMPT = {
+    'src/features/home/MePage.tsx': '手机端「回到电脑版」是主动切到 PC，非跨域下钻（R4-01 另有护栏）',
+    'src/features/workbench/Page.tsx': '工作台内「系统管理(/admin/users)」入口是域内链接，无来源可言',
+  }
   const bad = []
   for (const d of DOMAINS) {
     const abs = path.join(SRC, d)
@@ -446,16 +454,22 @@ const FEATS = path.join(SRC, 'features');
         const p2 = path.join(dir, f)
         if (fs.statSync(p2).isDirectory()) { walk(p2); continue }
         if (!/\.tsx$/.test(f)) continue
-        p2 && fs.readFileSync(p2, 'utf8').split('\n').forEach((l, i) => {
-          if (/nav\([`'"]\/projects/.test(l) && !/\bgo\(/.test(l)) bad.push(`${p2.replace(SRC, 'src')}:${i + 1}`)
+        const rel = p2.replace(SRC, 'src')
+        if (rel in EXEMPT) continue
+        fs.readFileSync(p2, 'utf8').split('\n').forEach((l, i) => {
+          const code = l.trim()
+          if (code.startsWith('//') || code.startsWith('*')) return // 注释不算
+          if (/(?:^|[^.\w])(nav|navigate)\([`'"]\/(projects|workbench|purchase|warehouse|library|admin|delivery)/.test(l) && !/\bgo\(/.test(l)) {
+            bad.push(`${rel}:${i + 1}`)
+          }
         })
       }
     }
     walk(abs)
   }
   check('NAV-跨域跳转带来源', bad.length === 0,
-    bad.length ? `台/业务域里出现裸 nav('/projects…')（应改用 useGoFrom 的 go() 带 ?from=）: ${bad.slice(0, 6).join(', ')}`
-      : '台/业务域 → 项目的跳转全部走 go()（来源随链路透传）')
+    bad.length ? `台/业务域/组件里出现裸 nav('/…')（应改用 useGoFrom 的 go() 带 ?from=）: ${bad.slice(0, 6).join(', ')}`
+      : '台/业务域/组件 → 跨域跳转全部走 go()（来源随链路透传）')
 }
 
 /* ══════════ VIS-视觉底座棘轮（docs/12 §6 · P0）══════════

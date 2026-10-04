@@ -40,7 +40,7 @@ import {
   type ProjectDetail,
   type PurchaseRequestItem,
 } from '../../api/client'
-import { useBack } from '../../hooks/useFrom'
+import { useBack, useGoFrom } from '../../hooks/useFrom'
 
 /**
  * 立项（00 卷 §3 S1）：项目组全体会议要定的三件事
@@ -52,6 +52,7 @@ import { useBack } from '../../hooks/useFrom'
 export default function ProjectInitiate() {
   const { projectNo = '' } = useParams()
   const nav = useNavigate()
+  const go = useGoFrom()
   // ★ docs/11：从台里点进来的，返回口要回**那个台**（并回到原来那个页签）；没有来源时行为完全不变
   const back = useBack(`/projects/${projectNo}`, '← 返回项目')
   const { message } = App.useApp()
@@ -131,7 +132,8 @@ export default function ProjectInitiate() {
       message.success(
         `立项完成：设备 ${r.equipment_count} 台 · 节点 ${r.milestone_count} 个 · 团队 ${r.member_count} 人 · 任务 ${r.task_count} 条已分派`,
       )
-      nav(`/projects/${projectNo}`)
+      // ★ 来源优先：立项完成后的详情页也要继续带来源（否则它的返回口会回默认项目列表）
+      go(`/projects/${projectNo}`)
     } catch (e) {
       message.error(errMsg(e))
     } finally {
