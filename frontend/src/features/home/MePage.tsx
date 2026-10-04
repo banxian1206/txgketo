@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom'
 
 import { useAuth } from '../../contexts/AuthContext'
 
-/** 我的：账号信息 + 常用入口 + 回电脑版 */
+/** 我的：账号信息 + 回电脑版 + 退出登录 */
 export default function MeM() {
   const nav = useNavigate()
   // 重构 1.3：用户信息/登出走 AuthContext（原散读 localStorage + 自己 fetchMe 刷缓存）
@@ -14,16 +14,11 @@ export default function MeM() {
     void refreshMe()
   }, [refreshMe])
 
-  // ★ 重整 P3：手机端同一份「管理入口」判断，来源也是后端能力位（原来是 position === '总监' 的第二份拷贝）
-  const canManageUsers = hasPerm('admin:users')
-
-  const links = [
-    // R4-01（客户口径 A）：手机端隐藏 PC-only 入口 —— 任务/评审/改版无移动页，
-    //   点了会跳进 /workbench/* 桌面壳（手机出现侧栏 + 宽表横滚）。移页列入后续迭代。
-    { label: '采购工作台', to: '/purchase' },
-    { label: '商机 / 项目', to: '/projects' },
-    ...(canManageUsers ? [{ label: '用户与权限', to: '/admin/users' }] : []),
-  ]
+  // ★ 重整 P3 + R4-01（客户口径 A）+ F2（2026-10-04 走查核实）：手机端不放 PC-only 入口。
+  //   修前这里有「采购工作台(/purchase)」「商机/项目(/projects)」「用户与权限(/admin/users)」三张链接，
+  //   全是桌面壳 —— 手机点进去长出侧栏 + 宽表横滚，回不来（原报告 F2 实测 wh1 就是这样卡住的）。
+  //   注释当年写着"隐藏"但链接没删，本轮全部下线；采购/商机/审批的移动页属后续迭代（03 卷）。
+  //   静态护栏：e2e:static 的 R4-01-移动不链PC台 禁止本文件/移动首页出现 to:|nav('/purchase'|'/admin/users'|…) 反例。
 
   return (
     <>
@@ -34,16 +29,6 @@ export default function MeM() {
             {profile?.username ?? ''} {profile?.profession ?? ''} {profile?.position ?? ''}
           </Typography.Text>
         </div>
-      </Card>
-
-      <Card size="small" style={{ marginBottom: 12 }}>
-        <Space direction="vertical" style={{ width: '100%' }}>
-          {links.map((l) => (
-            <Button key={l.to} block onClick={() => nav(l.to)}>
-              {l.label}
-            </Button>
-          ))}
-        </Space>
       </Card>
 
       <Space direction="vertical" style={{ width: '100%' }}>
@@ -61,4 +46,3 @@ export default function MeM() {
     </>
   )
 }
-import { hasPerm } from '../../api/user'

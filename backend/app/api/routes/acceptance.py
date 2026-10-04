@@ -182,10 +182,19 @@ def confirm(
 
 @router.get("/workbench")
 def workbench(
+    project_no: str | None = Query(default=None),
     session: Session = Depends(get_session),
     _: User = Depends(get_current_user),
 ):
-    rows = session.scalars(select(Acceptance).order_by(Acceptance.id.desc()).limit(200)).all()
+    # ★ F11（2026-10-04 走查核实）：签字类动作是法律性数据，列表必须能按项目收口
+    #   （修前跨项目混排，PM 台点错行的风险是真的）。
+    stmt = select(Acceptance).order_by(Acceptance.id.desc())
+    if project_no:
+        stmt = stmt.where(Acceptance.project_no == project_no)
+    rows = session.scalars(stmt.limit(200)).all()
+    watch = acc_svc.warranty_watch(session)
+    if project_no:
+        watch = [w for w in watch if w.get("project_no") == project_no]
     return {
         "counts": {
             "pending": len([a for a in rows if a.status == "待验收"]),
@@ -193,5 +202,6 @@ def workbench(
             "rejected": len([a for a in rows if a.status == "未通过"]),
         },
         "acceptances": [acc_svc.acceptance_dict(session, a) for a in rows],
-        "warranty_watch": acc_svc.warranty_watch(session),
+        "warranty_watch": watch,
+        "project_no": project_no,
     }

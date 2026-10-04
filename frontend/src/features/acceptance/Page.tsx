@@ -34,7 +34,9 @@ import {
   type AcceptanceWorkbench,
 } from '../../api/client'
 import { SelectProject } from '../../components/fields'
+import { CodeNo } from '../../components/ui/Primitives'
 import { acceptanceDocUrl } from '../../api/client'
+import { useUrlState } from '../../hooks/useUrlState'
 import { readSession } from '../../contexts/session'
 import { ACCEPTANCE_STATUS as ACC_COLOR } from '../../theme/status'
 import { T } from '../../theme/tokens'
@@ -56,14 +58,17 @@ export default function AcceptancePage() {
   const [files, setFiles] = useState<File[]>([])
   const [saving, setSaving] = useState(false)
   const [form] = Form.useForm()
+  // ★ F11（2026-10-04 走查核实）：签字类动作 = 法律性数据，列表必须能按项目收口（筛选进 URL，刷新/返航不丢）
+  const [q, setQ] = useUrlState({ project: undefined })
+  const filterNo = q.project || ''
 
   const load = useCallback(async () => {
     try {
-      setWb(await acceptanceWorkbench())
+      setWb(await acceptanceWorkbench(filterNo || undefined))
     } catch (e) {
       message.error(errMsg(e))
     }
-  }, [message])
+  }, [message, filterNo])
 
   useEffect(() => {
     void load()
@@ -161,12 +166,27 @@ export default function AcceptancePage() {
         <Col span={4}><Statistic title="待验收" value={c?.pending ?? 0} valueStyle={{ color: c?.pending ? T.goldText : undefined }} /></Col>
         <Col span={4}><Statistic title="已通过" value={c?.passed ?? 0} /></Col>
         <Col span={4}><Statistic title="未通过" value={c?.rejected ?? 0} /></Col>
-        <Col span={12} style={{ textAlign: 'right' }}>
+        {/* ★ F11：项目筛选（签字不能跨项目误操作） */}
+        <Col span={7}>
+          <SelectProject
+            allowClear
+            className="w-full"
+            placeholder="按项目筛选（默认全部项目）"
+            value={filterNo || undefined}
+            onChange={(v: string | undefined) => setQ({ project: v || undefined })}
+          />
+        </Col>
+        <Col span={5} style={{ textAlign: 'right' }}>
           <Button type="primary" disabled={!canEdit} onClick={() => { form.resetFields(); setApplyOpen(true) }}>
             申请客户验收
           </Button>
         </Col>
       </Row>
+      {!filterNo && (
+        <Typography.Paragraph type="warning" style={{ fontSize: 12, marginTop: -6 }}>
+          当前是全部项目混排 —— 签字前请逐行核对项目号，或选上方筛选收到一个项目。
+        </Typography.Paragraph>
+      )}
 
       <Table<AcceptanceRow>
         rowKey="id"
@@ -178,8 +198,14 @@ export default function AcceptancePage() {
           {
             title: '项目',
             key: 'p',
-            width: 180,
-            render: (_: unknown, r: AcceptanceRow) => `${r.project_no} ${r.project_name ?? ''}`,
+            width: 200,
+            // ★ F11：项目号等宽强标识 —— 签字是对这个项目的法律动作，不能看错行
+            render: (_: unknown, r: AcceptanceRow) => (
+              <Space size={6}>
+                <CodeNo>{r.project_no}</CodeNo>
+                <Typography.Text type="secondary" style={{ fontSize: 12 }}>{r.project_name ?? ''}</Typography.Text>
+              </Space>
+            ),
           },
           { title: '申请时间', dataIndex: 'applied_at', width: 150, render: (v: string | null) => v?.slice(0, 16).replace('T', ' ') ?? '—' },
           { title: '状态', dataIndex: 'status', width: 90, render: (v: string) => <Tag color={ACC_COLOR[v] ?? 'default'}>{v}</Tag> },

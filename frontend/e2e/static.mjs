@@ -169,9 +169,11 @@ check('SUBMIT-无裸validate', bareValidate.length === 0,
     `补勾允许已装车=${/SHIP_LOADED/.test(gateLine(mk))} 发运后锁死=${!/SHIP_TRANSIT/.test(gateLine(mk))}`);
 }
 
-// R4-01（客户口径 A）：移动端不得链到 PC-only 工作台路由（任务/评审/改版无移动页）
+// R4-01（客户口径 A）+ F2（2026-10-04 走查核实）：移动端不得链到 PC-only 工作台路由。
+// 修前 MePage 就挂着「采购工作台(/purchase)」「用户与权限(/admin/users)」——手机点进去长出侧栏。
+// ★ 豁免：/projects 在 MePage 是「回到电脑版」逃生口（有意为之），不在禁列。
 {
-  const PC_ONLY = ['/my-tasks', '/reviews', '/changes', '/mine/tasks', '/mine/reviews', '/mine/changes'];
+  const PC_ONLY = ['/my-tasks', '/reviews', '/changes', '/mine/tasks', '/mine/reviews', '/mine/changes', '/purchase', '/admin/users'];
   const bad = [];
   for (const rel of ['features/home/MePage.tsx', 'features/home/MobilePage.tsx']) {
     const p = path.join(SRC, rel);

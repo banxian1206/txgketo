@@ -39,6 +39,10 @@ export default function AssemblyM() {
 
   // 重构 2.3：看板数据走共享 hook（与另一端同源）
   const { overview, records, reload: load } = useAsmBoard(projectNo)
+  // ★ N2（2026-10-04）：整机装配已完成的设备不再给「开始装配」入口（组件预装不算数）
+  const wholeState: Record<string, string> = {}
+  for (const r of records) if (r.sub_assembly === '整机装配' && !(r.equip_no in wholeState)) wholeState[r.equip_no] = r.status
+  const WHOLE_DONE = ['已装配', '调试中', '调试完成']
 
   useEffect(() => {
     listProjects()
@@ -125,9 +129,13 @@ export default function AssemblyM() {
             </div>
             <Space style={{ marginTop: 8 }}>
               {canEdit && (
-                <Button size="small" type="primary" onClick={() => { setPhotos([]); setStartInitial({ sub_assembly: '整机装配' }); setStartTarget(o) }}>
-                  开始装配
-                </Button>
+                WHOLE_DONE.includes(wholeState[o.equip_no] ?? '') ? (
+                  <Tag color="success">{wholeState[o.equip_no]}</Tag>
+                ) : (
+                  <Button size="small" type="primary" onClick={() => { setPhotos([]); setStartInitial({ sub_assembly: '整机装配' }); setStartTarget(o) }}>
+                    {wholeState[o.equip_no] === '装配中' ? '继续装配' : '开始装配'}
+                  </Button>
+                )
               )}
             </Space>
             {detail?.equip_no === o.equip_no && (

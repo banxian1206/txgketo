@@ -18,7 +18,7 @@ import {
   Tag,
   Typography,
 } from 'antd'
-import {useEffect, useState} from 'react'
+import {useEffect, useMemo, useState} from 'react'
 import {
   debugAssembly,
   errMsg,
@@ -65,6 +65,14 @@ export default function Assembly() {
   const [form] = Form.useForm()
   // 重构 2.3：看板数据走共享 hook（与另一端同源）
   const { overview, records, loading, reload: load } = useAsmBoard(projectNo)
+  // ★ N2（2026-10-04）：每台设备的**整机装配**最新状态（组件预装不算数）——
+  //   已装配完成的设备不再给「开始装配」入口（点了也只会吃 400）
+  const wholeState = useMemo(() => {
+    const m: Record<string, string> = {}
+    for (const r of records) if (r.sub_assembly === '整机装配' && !(r.equip_no in m)) m[r.equip_no] = r.status // 列表按 id 倒序，第一条即最新
+    return m
+  }, [records])
+  const WHOLE_DONE = ['已装配', '调试中', '调试完成']
   // ★ G5：项目漏斗（未买/在途/已入库/已领料/已做成成品）+ 跨项目汇总
   const [funnel, setFunnel] = useState<KittingFunnel | null>(null)
   const [crossRows, setCrossRows] = useState<ProjectFunnelRow[]>([])
@@ -251,9 +259,13 @@ export default function Assembly() {
                   <Space size={4}>
                     <a onClick={() => void openDetail(o.equip_no)}>明细</a>
                     {canEdit && (
-                      <a onClick={() => { setPhotos([]); setStartInitial({ sub_assembly: '整机装配' }); setStartTarget({ equip_no: o.equip_no, rate: o.kitting_rate }) }}>
-                        开始装配
-                      </a>
+                      WHOLE_DONE.includes(wholeState[o.equip_no] ?? '') ? (
+                        <Tag color="success">{wholeState[o.equip_no]}</Tag>
+                      ) : (
+                        <a onClick={() => { setPhotos([]); setStartInitial({ sub_assembly: '整机装配' }); setStartTarget({ equip_no: o.equip_no, rate: o.kitting_rate }) }}>
+                          {wholeState[o.equip_no] === '装配中' ? '继续装配（复用）' : '开始装配'}
+                        </a>
+                      )
                     )}
                   </Space>
                 }

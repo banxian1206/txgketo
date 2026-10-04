@@ -17,7 +17,15 @@ from datetime import UTC, datetime
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.models.assembly import ASSY_DEBUG_DONE, ASSY_DEBUGGING, ASSY_DONE, AssemblyRecord, KittingSnapshot
+from app.models.assembly import (
+    ASSY_DEBUG_DONE,
+    ASSY_DEBUGGING,
+    ASSY_DONE,
+    ASSY_ING,
+    ASSY_WHOLE,
+    AssemblyRecord,
+    KittingSnapshot,
+)
 from app.models.engineering import BOM_MATERIAL, BOM_ROW_FROZEN, BomItem, Drawing
 from app.models.initiation import GoodsReceipt, PurchaseRequest
 from app.models.library import Item
@@ -232,10 +240,15 @@ def _bucket(line: dict) -> str:
 
 
 def _assembled_equips(session: Session, project_no: str) -> set[str]:
-    """已装配完成的设备（它们的件就“已做成成品/组装体”）。"""
+    """已装配完成的设备（它们的件就“已做成成品/组装体”）。
+
+    ★ N2（2026-10-04 走查核实）：只认**整机装配**记录 —— 组件预装是部件级动作，
+    它的完成/进行中都不得改写整机状态。
+    """
     rows = session.scalars(
         select(AssemblyRecord).where(
             AssemblyRecord.project_no == project_no,
+            AssemblyRecord.sub_assembly == ASSY_WHOLE,
             AssemblyRecord.status.in_((ASSY_DONE, ASSY_DEBUGGING, ASSY_DEBUG_DONE)),
         )
     ).all()
@@ -347,6 +360,10 @@ def snapshot(session: Session, project_no: str, equip_no: str, actor_id: int | N
     return row
 
 
+class AssemblyError(Exception):
+    """装配域业务规则错误 → 400（main.py 已注册全局处理器）。"""
+
+
 def start_assembly(
     session: Session,
     *,
@@ -356,8 +373,36 @@ def start_assembly(
     actor_id: int,
     photos: list | None = None,
     remark: str | None = None,
-) -> AssemblyRecord:
-    """开始装配（整机 / 组件预装）。**不校验齐套率** —— 到了多少都行，快照留档。"""
+) -> tuple[AssemblyRecord, bool]:
+    """开始装配（整机 / 组件预装）。**不校验齐套率** —— 到了多少都行，快照留档。
+
+    ★ F8/N2（2026-10-04 走查核实）：「整机装配」一台设备只有一条有效记录：
+      · 已有未结（装配中）→ **复用**，不重复建（同 P1-7 领料单幂等套路）；
+      · 已装配/调试中/调试完成 → **硬拦**（修前再点一次「开始装配」会把设备打回装配中
+        → 发运台判“未装配完成”→ 能发的货发不出去，且系统没有删除装配记录的口）。
+      组件预装是部件级动作，允许多次开工，不影响整机状态。
+    返回 (记录, 是否复用)。
+    """
+    kind = sub_assembly or ASSY_WHOLE
+    if kind == ASSY_WHOLE:
+        rows = session.scalars(
+            select(AssemblyRecord)
+            .where(
+                AssemblyRecord.project_no == project_no,
+                AssemblyRecord.equip_no == equip_no,
+                AssemblyRecord.sub_assembly == ASSY_WHOLE,
+            )
+            .order_by(AssemblyRecord.id)
+        ).all()
+        for r in rows:
+            if r.status == ASSY_ING:
+                return r, True
+        done = [r for r in rows if r.status in (ASSY_DONE, ASSY_DEBUGGING, ASSY_DEBUG_DONE)]
+        if done:
+            raise AssemblyError(
+                f"设备 {equip_no} 已于 {done[-1].assembled_at:%Y-%m-%d} 装配完成（{done[-1].status}）。\n"
+                "重复「开始装配」会把设备打回装配中、发运会被卡住 —— 如需返工请走售后/改版，不要在这里重开。"
+            )
     snap = snapshot(session, project_no, equip_no, actor_id)
     row = AssemblyRecord(
         project_no=project_no,
@@ -374,7 +419,7 @@ def start_assembly(
     )
     session.add(row)
     session.flush()
-    return row
+    return row, False
 
 
 def finish_assembly(

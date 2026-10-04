@@ -36,6 +36,7 @@ from app.core.config import settings
 from app.core.errors import ForbiddenOperation
 from app.services.acceptance import AcceptanceError
 from app.services.change_flow import ChangeFlowError
+from app.services.kitting import AssemblyError
 from app.services.manufacturing import ManufacturingError
 from app.services.numbering import NumberingError
 from app.services.project_stage import StageError
@@ -61,6 +62,7 @@ async def _forbidden_operation(request: Request, exc: ForbiddenOperation):
 
 @app.exception_handler(SiteError)
 @app.exception_handler(AcceptanceError)
+@app.exception_handler(AssemblyError)
 @app.exception_handler(PaymentChangeError)
 @app.exception_handler(PurchaseOrderError)
 @app.exception_handler(ChangeFlowError)
@@ -73,7 +75,7 @@ async def _forbidden_operation(request: Request, exc: ForbiddenOperation):
 async def _domain_error(request: Request, exc: Exception):
     """业务规则错误 → 400（前端能直接展示 `detail`）。
 
-    ★ 全量覆盖 10 个域错误类（2026-09-28 G1）：逐个 route 去 try/except 已经漏过三次
+    ★ 全量覆盖域错误类（2026-09-28 G1，2026-10-04 补 AssemblyError）：逐个 route 去 try/except 已经漏过三次
     （N2 merge_order / N25 confirm / G3 add_issue），**不再靠人工记得捕**。
     """
     return JSONResponse(status_code=400, content={"detail": str(exc)})

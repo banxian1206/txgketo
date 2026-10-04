@@ -12,7 +12,7 @@ from datetime import UTC, date, datetime
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.models.assembly import ASSY_DEBUG_DONE, ASSY_DEBUGGING, ASSY_DONE, AssemblyRecord
+from app.models.assembly import ASSY_DEBUG_DONE, ASSY_DEBUGGING, ASSY_DONE, ASSY_WHOLE, AssemblyRecord
 from app.models.library import Item
 from app.models.project import Equipment, Project
 from app.services import project_stage
@@ -72,11 +72,12 @@ def to_ship(session: Session, project_no: str) -> list[dict]:
         .where(Shipment.project_no == project_no, Shipment.status.in_(SHIP_OPEN))
     ).all()
     shipped = {e for e, _ in open_ship_lines}
-    # 每台设备最新装配状态
+    # 每台设备最新装配状态 —— ★ N2（2026-10-04）：只认**整机装配**记录。
+    # 修前所有记录按 id 轮流覆盖 → 一条后补的「组件预装（装配中）」会把已装配设备打回不可发。
     assy: dict[str, str] = {}
     for r in session.scalars(
         select(AssemblyRecord)
-        .where(AssemblyRecord.project_no == project_no)
+        .where(AssemblyRecord.project_no == project_no, AssemblyRecord.sub_assembly == ASSY_WHOLE)
         .order_by(AssemblyRecord.id)
     ).all():
         assy[r.equip_no] = r.status
@@ -265,12 +266,16 @@ def generate_items(
 
 
 def _assembled_record(session: Session, project_no: str, equip_no: str) -> AssemblyRecord | None:
-    """★ §2.1：这台设备是否已装配完成（已完成 → 清单折成组装体 + 未装清单）。"""
+    """★ §2.1：这台设备是否已装配完成（已完成 → 清单折成组装体 + 未装清单）。
+
+    ★ N2：只认整机装配记录（组件预装的完成不算整机完成）。
+    """
     return session.scalar(
         select(AssemblyRecord)
         .where(
             AssemblyRecord.project_no == project_no,
             AssemblyRecord.equip_no == equip_no,
+            AssemblyRecord.sub_assembly == ASSY_WHOLE,
             AssemblyRecord.status.in_((ASSY_DONE, ASSY_DEBUGGING, ASSY_DEBUG_DONE)),
         )
         .order_by(AssemblyRecord.id.desc())

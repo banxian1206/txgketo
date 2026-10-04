@@ -295,6 +295,13 @@ const wh1 = await apiLogin('wh1', 'txgk@123');
     check('R5-01-已装车可补勾', false, '同上');
     check('R5-02-锁死报400非500', false, '同上');
   } else {
+    // ★ N2（2026-10-04 走查核实）：重开「开始装配」必须 400，且待发设备**不得变不可发**
+    const again = await postAs('/assembly/records', { project_no: target.pno, equip_no: target.equip, sub_assembly: '整机装配' }, shop1);
+    const ts3r = (await (await apiGet(`/shipping/to-ship?project_no=${target.pno}`, pm)).json()) ?? [];
+    const row3 = (Array.isArray(ts3r) ? ts3r : []).find(r => r.equip_no === target.equip);
+    check('N2-重开装配被拦且仍可发',
+      again.code === 400 && row3?.ready === true,
+      `重开→${again.code}「${String(again.j?.detail ?? '').replace(/\n/g, ' ').slice(0, 30)}」 · 待发状态 ready=${row3?.ready}`);
     const ins = await post('/shipping/instructions', { project_no: target.pno, equip_nos: [target.equip], plan_ship_date: new Date(Date.now() + 7 * 864e5).toISOString().slice(0, 10) });
     const sid = ins.j?.id;
     await post(`/shipping/${sid}/items/generate`, {});

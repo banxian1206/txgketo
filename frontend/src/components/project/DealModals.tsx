@@ -155,8 +155,11 @@ export default function DealModals({
               {
                 validator: async (_, value) => {
                   if (!value || value.length === 0) throw new Error('至少登记 1 个付款节点')
-                  const first = value[0] ?? {}
-                  if (!first.node_name) throw new Error('第 1 个付款节点的节点名必填')
+                  // ★ F1：每一行的节点名都必填（后端 node_name: str 必填，空行必然 422）
+                  const blank = (value as { node_name?: string }[]).findIndex(
+                    (t) => !((t?.node_name ?? '').trim()),
+                  )
+                  if (blank >= 0) throw new Error(`第 ${blank + 1} 个付款节点没填节点名（或先删掉这行）`)
                   // ★ 比例合计必须 100%（与后端同一口径，两边都拦）
                   const ps = (value as { percent?: number | null }[])
                     .map((t) => t?.percent)
@@ -177,7 +180,7 @@ export default function DealModals({
                       <Form.Item
                         name={[field.name, 'node_name']}
                         style={{ marginBottom: 0 }}
-                        rules={field.name === 0 ? [{ required: true, message: '填节点名' }] : undefined}
+                        rules={[{ required: true, message: '填节点名' }]}
                       >
                         <Input placeholder="节点名，如 预付款" />
                       </Form.Item>

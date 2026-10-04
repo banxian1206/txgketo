@@ -96,7 +96,7 @@ def start_assembly(
     """开始装配（整机 / 组件预装）：**不看齐套率**，开工时把当时齐套率快照留档。"""
     if body.sub_assembly not in ASSY_KINDS:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "装配形态只能是 整机装配 / 组件预装")
-    rec = kt.start_assembly(
+    rec, reused = kt.start_assembly(
         session,
         project_no=body.project_no,
         equip_no=body.equip_no,
@@ -118,7 +118,7 @@ def start_assembly(
         ip=client_ip(request),
     )
     session.commit()
-    return kt.record_dict(rec)
+    return {**kt.record_dict(rec), "reused": reused}
 
 
 @router.get("/records")

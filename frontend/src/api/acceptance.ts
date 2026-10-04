@@ -45,8 +45,10 @@ export interface AcceptanceWorkbench {
   warranty_watch: WarrantyWatchRow[]
 }
 
-export async function acceptanceWorkbench() {
-  const { data } = await api.get<AcceptanceWorkbench>('/acceptance/workbench')
+export async function acceptanceWorkbench(projectNo?: string) {
+  const { data } = await api.get<AcceptanceWorkbench>('/acceptance/workbench', {
+    params: projectNo ? { project_no: projectNo } : {},
+  })
   return data
 }
 

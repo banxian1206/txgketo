@@ -490,6 +490,14 @@ try {
   // AppModal 已预填 4 个付款节点（R2-02 修复后）——不再多点「添加付款节点」
   await page.getByRole('button', { name: /确\s*认\s*成\s*交/ }).click();
   await page.waitForTimeout(2000);
+  // ★ F1 基线：成交登记提交后（无论成败）页面不得白屏 ——
+  //   修前 422 的 detail 对象数组被直接丢进 React 渲染 → body.innerText 长度归零整站白屏
+  {
+    const tDeal = await body(page);
+    const reactCrash = errs.filter((x) => /Objects are not valid as a React child/.test(x));
+    check('F1-提交后页面非空白', tDeal.trim().length > 50 && reactCrash.length === 0,
+      reactCrash.length ? reactCrash[0].slice(0, 120) : `body ${tDeal.trim().length} 字`);
+  }
 
   // —— 立项 + 建设备 ——
   await page.getByRole('button', { name: /^立\s*项$/ }).first().click();
@@ -1008,16 +1016,38 @@ try {
     // 装配开始（PC）
     // ★ 装配是车间/装配的活（mfg:edit）—— 工程总监本来就看不到「开始装配」，
     //   用他断言等于把"看不到"当"没入口"（休眠）。换真能干这活的角色。
+    // ★ N2/F8（2026-10-04）：已装配完成的设备**不再给「开始装配」入口**（改显状态 Tag）——
+    //   所以逐个项目找：看到「已装配/调试中/调试完成」Tag 而无按钮 = 新护栏在位（也算过）；
+    //   找到「开始装配」就点开验预填（原来的断言目标）。
     await login(page, 'assy1', 'txgk@123');
     await page.goto(BASE + '/assembly', { waitUntil: 'networkidle' }); await page.waitForTimeout(1400);
-    const sel = page.locator('.ant-select').first();
-    if (await sel.count()) { await sel.click(); await page.waitForTimeout(400); const opt = page.locator('.ant-select-item-option').first(); if (await opt.count()) { await opt.click(); await page.waitForTimeout(1200); } }
-    const asm = page.locator('a,button').filter({ hasText: '开始装配' }).first();
-    if (await asm.count()) {
-      await asm.click(); await page.waitForTimeout(700);
-      const checked = await page.locator('.ant-modal-content .ant-radio-button-wrapper-checked').innerText().catch(() => '');
-      check('PREFILL-装配开始', /整机装配/.test(checked), checked ? `装配形态=${checked.trim()}` : '未预选整机装配');
-    } else check('PREFILL-装配开始', false, '装配角色也看不到「开始装配」入口（是 bug，不是跳过）');
+    let asmHandled = false;
+    const sel = page.locator('.ant-select');
+    const selCount = await sel.count();
+    if (selCount) {
+      await sel.first().click(); await page.waitForTimeout(400);
+      const opts = page.locator('.ant-select-item-option');
+      const nOpts = Math.min(await opts.count(), 5);
+      for (let i = 0; i < nOpts && !asmHandled; i++) {
+        await opts.nth(i).click(); await page.waitForTimeout(1200);
+        const doneTag = await page.locator('.ant-card-body .ant-tag').filter({ hasText: /已装配|调试中|调试完成/ }).count();
+        const asm = page.locator('a,button').filter({ hasText: '开始装配' }).first();
+        if (await asm.count()) {
+          await asm.click(); await page.waitForTimeout(700);
+          const checked = await page.locator('.ant-modal-content .ant-radio-button-wrapper-checked').innerText().catch(() => '');
+          check('PREFILL-装配开始', /整机装配/.test(checked), checked ? `装配形态=${checked.trim()}` : '未预选整机装配');
+          asmHandled = true;
+          await page.keyboard.press('Escape'); await page.waitForTimeout(400);
+        } else if (doneTag > 0) {
+          check('PREFILL-装配开始', true, `已装配设备不再给「开始装配」入口，状态 Tag 在位（N2/F8 新行为）`);
+          asmHandled = true;
+        }
+        if (asmHandled) break;
+        await sel.first().click(); await page.waitForTimeout(400);
+        if (i + 1 >= nOpts) { await page.keyboard.press('Escape'); break; }
+      }
+    }
+    if (!asmHandled) check('PREFILL-装配开始', false, '装配角色在所有项目都看不到「开始装配」入口也没有已装配 Tag（是 bug，不是跳过）');
     // 现场来货清点（PC）：默认结论「齐」必须预选（曾先设后开丢值，护栏也只认 destroyOnHidden 而漏扫）
     let projWithIncoming = null;
     const toks = await apiLogin('pm1', 'txgk@123');

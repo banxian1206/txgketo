@@ -148,6 +148,20 @@ deploy/          docker-compose.dev.yml
 
 ## 8. 当前进度（交接记录）
 
+> 更新于：**走查报告核实 + 四条修复（2026-10-04）**：对 `docs/99-浏览器端到端走查报告-2026-10-02.md` 的 17 条
+> 逐条独立复现/纠偏（**核实报告：`docs/99-走查报告核实-2026-10-04.md`**，含 F4/F7/F12/F14 根因修正与 F6 未复现登记），
+> 并按核实报告 §5 修掉前四条：
+> ① **F1 422 整站白屏**（`errMsg` 不再把 detail 对象数组原样上屏：字符串直通/数组拼人话/对象取 msg，
+>    并顺手修了 **F7**：axios 拦截器把 `responseType:'blob'` 的错误体回读成 JSON，后端人话上屏）；
+> ② **N2/F8 重开装配硬拦**（`kitting.start_assembly`：整机装配一台设备只一条有效记录 ——
+>    已有「装配中」复用（同 P1-7 套路）、已装配再开 → `AssemblyError` 400；**发运只认整机装配记录**，
+>    组件预装不得改写整机状态；前端双端卡片对已装配设备改显状态 Tag）；
+> ③ **F2 手机端 PC-only 入口下线**（MePage 的采购工作台/商机项目/用户与权限三张链接全删，
+>    静态护栏 R4-01 禁列加进 `/purchase`·`/admin/users`）；
+> ④ **F11 验收列表按项目收口**（`GET /acceptance/workbench?project_no=` 计数/列表/质保提醒同步过滤；
+>    前端筛选进 `?project=`、未筛时黄字警示 + 项目号等宽强标识 —— 签字是法律动作）。
+> 护栏基线：**`pytest 220` · `e2e:static 38` · `e2e:api 21` · `e2e:ui 72`** —— 全绿（新护栏均注入反例自证能红）。
+>
 > 更新于：**UI 真实场景测试修复轮（2026-09-30）**：全程只用浏览器点 UI 走完 S0→S11 后，把报告里的
 > **P0×1 / P1×8 / P2×10 全部修掉**（测试报告与逐条修复记录：`docs/99-E2E测试报告-2026-09-30-UI真实场景.md`）。
 > 最关键的四条：① **经理拆分派工看不到组员**（`/users` 降级视图把 profession/position 也抹了 → 05 卷 P2 派工链在 UI 上断掉）
@@ -290,6 +304,15 @@ deploy/          docker-compose.dev.yml
   采购单详情的行展开是「流转记录」（验收 + 处理 + 经办），行上显示「原订购 X · 换 Y · 退 Z」；
   采购工作台有独立的「退换记录」页签
 - 状态重算：`_recalc_request_status()`（由到货单反推，验收/入库/协商后调用；注意 `autoflush=False`，改完先 `session.flush()`）
+
+- ★ **整机装配一台设备只一条有效记录**（N2/F8，2026-10-04 走查核实）：已有「装配中」→ 复用（返回 `reused`）；
+  已装配/调试中/调试完成 → 再点「开始装配」 400（`AssemblyError`）—— 修前重开会新建第二条把设备打回「装配中」，
+  **能发的货发不出去且无删除记录口**；★ 发运/齐套读设备状态**只认 `sub_assembly=整机装配`**（组件预装不得改写整机）。
+- ★ **错误文案唯一出口 `errMsg()` 只会产出字符串**（F1，2026-10-04）：422 的 `detail` 是对象数组，
+  原样上屏 = "Objects are not valid as a React child" **整站白屏**；blob 错误体在拦截器里回读成 JSON（F7）。
+  ⚠ 新增接口报错一律经 `errMsg`，不许直接 `e.message` / 直返 `data.detail`。
+- ★ **签字类列表必须能按项目收口**（F11，2026-10-04）：验收台/PM 台 `?project=` 筛选进 URL，
+  后端 `GET /acceptance/workbench?project_no=` 计数/列表/质保提醒同步过滤；未筛时黄字警示 + 项目号等宽强标识。
 
 ### 8.2 已完成（可用的功能）
 
@@ -577,8 +600,8 @@ POST /api/v1/warehouse/inbound                    其他入库（退料回库/�
 ### 8.6 当前环境
 
 - 后端 :8208 · 前端 :5207 · PG 35432（`docker compose -f deploy/docker-compose.dev.yml up -d`，compose 顶层写死了 `name: txgketo`）
-- 测试：`.venv/bin/python -m pytest -q` → **212 passed**；e2e 基线 `.venv/bin/python -m scripts.e2e_baseline`（★ 跑前复位业务数据；只清业务表，账户/组织/编号规则不动）→ **问题 0 / 中断 0 / 通过 149**；
-  隔离探针 `scripts/probe_bom_math.py` → **8/8**、`scripts/probe_n24_n25.py` → **20/20**；前端 `e2e:static 38` / **`e2e:api 20+0skip`** / **`e2e:ui 71+0skip`**（两套都自建靶，可复位后单跑）
+- 测试：`.venv/bin/python -m pytest -q` → **220 passed**；e2e 基线 `.venv/bin/python -m scripts.e2e_baseline`（★ 跑前复位业务数据；只清业务表，账户/组织/编号规则不动）→ **问题 0 / 中断 0 / 通过 149**；
+  隔离探针 `scripts/probe_bom_math.py` → **8/8**、`scripts/probe_n24_n25.py` → **20/20**；前端 `e2e:static 38` / **`e2e:api 21+0skip`** / **`e2e:ui 72+0skip`**（两套都自建靶，可复位后单跑）
   ★ **UI 真实场景走查（2026-09-30）**：只用浏览器点 UI 走完 S0→S11 + 双端，报告（含逐条修复记录与 commit）在
   `docs/99-E2E测试报告-2026-09-30-UI真实场景.md`；驱动脚本在 `/tmp/txgk-ui-e2e/`（**未入库**）。
   ⚠️ 那轮把主数据清了（`e2e:clean` 会连物料档/供应商/库位一起清），**重新跑 `e2e:ui` 前最好跑一次
