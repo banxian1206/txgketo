@@ -24,8 +24,16 @@ const TYPE_LABEL: Record<string, string> = {
 }
 
 // 移动端（/m）里点击消息：把 PC 路由映射到移动页
+// ★ R4-01（走查 2026-10-04）：手机端没有对应页面的（任务/评审/改版/采购/项目详情…）
+//   **不许把人踹进 PC 壳**（会冒出桌面侧栏/宽表横滚），改为一句实话。
 const MOBILE_LINK: Record<string, string> = {
   '/warehouse': '/m/warehouse',
+  '/shipping': '/m/shipping',
+  '/service': '/m/service',
+  '/site': '/m/site',
+  '/manufacturing': '/m/production',
+  '/acceptance': '/m/site',
+  '/my-tasks': '/m',
 }
 
 interface Props {
@@ -70,7 +78,14 @@ export default function NotificationsDrawer({ open, onClose, onReadChange }: Pro
     onClose()
     if (n.link) {
       const onMobile = typeof window !== 'undefined' && window.location.pathname.startsWith('/m')
-      go(onMobile ? (MOBILE_LINK[n.link] ?? n.link) : n.link)
+      if (!onMobile || n.link.startsWith('/m')) {
+        go(n.link)
+      } else {
+        const mapped = MOBILE_LINK[n.link]
+        if (mapped) go(mapped)
+        // ★ 手机端没有这个页面（任务/评审/改版/采购/项目详情…）→ 不跳，说明白（下个迭代才做移动页）
+        else message.info('这条消息对应的功能在电脑端处理（手机端还没这个页面）')
+      }
     } else {
       void load()
     }

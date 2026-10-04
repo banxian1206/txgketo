@@ -666,5 +666,14 @@ function topItems(block) {
   check('TABLE-每表列数≤上限', bad.length === 0, bad.join('; ') || '采购/仓库/项目/标准库 的每张表列数都在上限内')
 }
 
+// 移动端消息深链：手机里点消息不能把人踹进 PC 壳（R4-01 / 走查 2026-10-04）
+{
+  const s = fs.readFileSync(path.join(SRC, 'components', 'NotificationsDrawer.tsx'), 'utf8')
+  const need = ['/m/warehouse', '/m/shipping', '/m/service', '/m/site', '/m/production']
+  const miss = need.filter((x) => !s.includes(x))
+  check('MOBILE-消息深链不落PC', miss.length === 0 && /电脑端处理/.test(s),
+    miss.length ? `移动映射缺: ${miss.join(', ')}` : '有移动映射 + PC-only 兜底（不会在手机里长出桌面壳）')
+}
+
 const fails = summary('静态回归');
 exitWith(fails);

@@ -153,7 +153,10 @@ deploy/          docker-compose.dev.yml
 > `CreatePage`（取消×2 + 成功进新商机详情，都带来源）· `InitiatePage`（立项成功）· `InitiationEditors`（立项页「设计」）·
 > `EquipmentsCard`（项目详情→车间台）· `DrawingsModals`（设计面→采购台）。
 > 护栏：静态 `NAV-跨域跳转带来源` **扩面**到 `features/project` + `components/` 并兼盯 `nav('/workbench…')`/裸 `navigate(`（注入反例能红）；
-> `e2e:ui` 新增行为断言 `NAV-取消回来源台`。契约补充见 `docs/11 §7`。基线 `pytest 233 · e2e:static 41`。
+> `e2e:ui` 新增行为断言 `NAV-取消回来源台`。契约补充见 `docs/11 §7`。
+> **移动端也扫了一轮（docs/11 §8）**：站内消息深链原来只映射 `/warehouse` → 手机里点其它消息会**冒出桌面壳**（实测 pm1 手机点「现场清点」落到 `/delivery/site`）；
+> 现改为「有移动页就映射、没有就不跳并提示电脑端处理」（§8）；护栏 `e2e:static::MOBILE-消息深链不落PC`（注入反例能红）。
+> 基线 `pytest 233 · e2e:static 42 · e2e:api 24 · e2e:ui 74 · e2e_baseline 0/0/149`。
 >
 > 更新于：**S0→S11 全功能走查 · 设计面 BOM 串项修复（2026-10-04 · 晚2）**：真实浏览器（PC 1440×900 + 手机 390×844）从干净库
 > 跑完整条主线，并补测 **ECN 改版 / 退货重采 / Excel 历史采购导入 / 付款计划变更 / 同型再来一台 / 部分领料继续备 / 其他入库 / OCR** 等。

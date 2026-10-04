@@ -56,7 +56,9 @@ def test_project_detail_gates_kitting_by_permission():
 # ── P2-7 站内消息跳转要带来源（两处入口） ───────────────────────────────
 def test_notification_links_carry_from():
     drawer = _read(FE / "components" / "NotificationsDrawer.tsx")
-    assert "useGoFrom" in drawer and "go(onMobile" in drawer
+    assert "useGoFrom" in drawer and "go(n.link)" in drawer, "消息跳转要带来源（PC）"
+    # 移动端：有移动页就映射，没有就不跳（R4-01，见 docs/11 §8）
+    assert "MOBILE_LINK" in drawer and "n.link.startsWith('/m')" in drawer and "电脑端处理" in drawer
     wb = _read(FE / "features" / "workbench" / "Page.tsx")
     assert "if (n.link) go(n.link)" in wb, "我的工作台消息区也要带来源"
 
