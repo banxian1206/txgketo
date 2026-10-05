@@ -1,25 +1,17 @@
-import { CheckCircleFilled } from '@ant-design/icons'
 import { useSvcBoard } from '../../hooks/useSvcBoard'
-import { App, Button, Card, Empty, Form, Input, InputNumber, Modal, Select, Space, Tag } from 'antd'
-import {useCallback, useEffect, useState} from 'react'
+import { App, Button, Form, Input, InputNumber, Modal, Select } from 'antd'
+import { useCallback, useEffect, useState } from 'react'
 
-import {
-  arriveServiceOrder,
-  createServiceOrder,
-  dispatchServiceOrder,
-  errMsg,
-  fixServiceOrder,
-  hasPerm,
-  servicePhotoUrl,
-  signServiceOrder,
-  uploadServicePhotos,
-  type ServiceOrderRow,
-} from '../../api/client'
+import { arriveServiceOrder, createServiceOrder, dispatchServiceOrder, errMsg, fixServiceOrder, hasPerm, servicePhotoUrl, signServiceOrder, uploadServicePhotos, type ServiceOrderRow } from '../../api/client'
 import MfgPhotoPicker from '../../components/MfgPhotoPicker'
+import { MCard, MChip, MEmpty, MHead, MStatus } from '../../components/ds/mobile'
 import { listEquipment } from '../../api/initiate'
 import { listProjects } from '../../api/project'
-import { SERVICE_ORDER_STATUS as SO_COLOR } from '../../theme/status'
-import { T } from '../../theme/tokens'
+
+/** 售后状态 → 作业卡 tone（与 PC 同一套语义） */
+const SO_TONE: Record<string, 'ok' | 'warn' | 'err' | 'run' | undefined> = {
+  待受理: 'err', 已派工: 'run', 已到场: 'warn', 待客户签字: 'warn', 已关闭: 'ok',
+}
 
 /** 售后手机端（S11）：报修 / 派工 / 到场 / 处理完成（拍照）。 */
 export default function ServiceM() {
@@ -78,45 +70,82 @@ export default function ServiceM() {
   }
 
   const orderCard = (o: ServiceOrderRow) => (
-    <Card key={o.id} size="small" style={{ marginBottom: 10 }}>
-      <Space>
-        <Tag color={SO_COLOR[o.status] ?? 'default'}>{o.status}</Tag>
-        <b>{o.so_no}</b>
-        {o.in_warranty != null && (o.in_warranty ? <Tag color="success">在保</Tag> : <Tag color="red">过保</Tag>)}
-      </Space>
-      <div style={{ fontSize: 13, marginTop: 4 }}>{o.fault ?? ''}</div>
-      <div style={{ fontSize: 12, color: T.textSecondary, marginTop: 2 }}>
-        {o.project_no}{o.equip_no ? ` · ${o.equip_no}` : ''} · {o.dispatched_to ?? '未派工'}
+    <MCard
+      key={o.id}
+      tone={SO_TONE[o.status]}
+      head={
+        <>
+          <span className="ds-code" style={{ fontSize: 12 }}>{o.so_no}</span>
+          <MStatus tone={SO_TONE[o.status]}>{o.status}</MStatus>
+          <span style={{ marginLeft: 'auto' }}>
+            {/* 在保/过保是售后第一眼要看的（决定要不要收费）—— 单独一个中性徽标 */}
+            <MChip tone={o.in_warranty ? 'ok' : 'warn'}>{o.in_warranty ? '在保' : '过保'}</MChip>
+          </span>
+        </>
+      }
+      title={o.fault ?? o.so_no}
+      lines={[
+        <>
+          {o.project_no}
+          {o.equip_no ? ` · ${o.equip_no}` : ''} · {o.dispatched_to ?? '未派工'}
+        </>,
+        ...(o.solution
+          ? [<span key="s" style={{ color: 'var(--ds-ok)' }}>{o.solution}</span>]
+          : []),
+      ]}
+    >
+      <div className="m-actions">
+        {canEdit && o.status === '待受理' && (
+          <Button block type="primary" onClick={() => open('dispatch', o)}>
+            派工（派谁去修）
+          </Button>
+        )}
+        {canEdit && o.status === '已派工' && (
+          <Button
+            block
+            onClick={() => void arriveServiceOrder(o.id).then(() => void load()).catch((e) => message.error(errMsg(e)))}
+          >
+            到场
+          </Button>
+        )}
+        {canEdit && o.status === '已到场' && (
+          <Button block type="primary" onClick={() => open('fix', o)}>
+            处理完成（拍照）
+          </Button>
+        )}
+        {canEdit && o.status === '待客户签字' && (
+          <Button block onClick={() => open('sign', o)}>
+            客户签字
+          </Button>
+        )}
       </div>
-      {o.solution && <div style={{ fontSize: 12, color: T.success, marginTop: 4 }}><CheckCircleFilled style={{ color: T.success }} /> {o.solution}</div>}
-      <Space wrap style={{ marginTop: 8 }}>
-        {canEdit && o.status === '待受理' && <Button size="small" type="primary" onClick={() => open('dispatch', o)}>派工</Button>}
-        {canEdit && o.status === '已派工' && <Button size="small" onClick={() => void arriveServiceOrder(o.id).then(() => void load()).catch((e) => message.error(errMsg(e)))}>到场</Button>}
-        {canEdit && o.status === '已到场' && <Button size="small" type="primary" onClick={() => open('fix', o)}>处理完成</Button>}
-        {canEdit && o.status === '待客户签字' && <Button size="small" onClick={() => open('sign', o)}>客户签字</Button>}
-      </Space>
-    </Card>
+    </MCard>
   )
 
   const c = wb?.counts
 
   return (
     <>
-      <Card size="small" style={{ marginBottom: 10 }}>
-        <Space split="|" wrap>
-          <span>待受理 {c?.wait ?? 0}</span>
-          <span>处理中 {c?.in_progress ?? 0}</span>
-          <span>待签字 {c?.to_sign ?? 0}</span>
-        </Space>
-      </Card>
+      <MHead
+        title="售后"
+        sub={
+          (wb?.orders.length ?? 0) > 0
+            ? `待受理 ${c?.wait ?? 0} · 处理中 ${c?.in_progress ?? 0} · 待签字 ${c?.to_sign ?? 0}`
+            : '没有在办的服务工单'
+        }
+      />
 
       {canEdit && (
-        <Button type="primary" block style={{ marginBottom: 10 }} onClick={() => open('create')}>
-          ＋ 报修（新建工单）
-        </Button>
+        <div className="m-actions" style={{ marginTop: 0, marginBottom: 12 }}>
+          <Button block type="primary" onClick={() => open('create')}>
+            ＋ 报修（新建工单）
+          </Button>
+        </div>
       )}
 
-      {(wb?.orders.length ?? 0) === 0 && <Empty description="还没有服务工单" />}
+      {(wb?.orders.length ?? 0) === 0 && (
+        <MEmpty text="还没有服务工单。客户报修时在这里建一张：项目 → 设备 → 故障描述，系统自动判定在保 / 过保。" />
+      )}
       {wb?.orders.map(orderCard)}
 
       <Modal

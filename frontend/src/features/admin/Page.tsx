@@ -1,54 +1,17 @@
+import WorkbenchTabs from '../../components/ds/WorkbenchTabs'
+import { Chip } from '../../components/ds'
 import { useUrlState } from '../../hooks/useUrlState'
-import {
-  App,
-  Button,
-  Card,
-  Form,
-  Input,
-  Modal,
-  Popconfirm,
-  Select,
-  Space,
-  Switch,
-  Table,
-  Tabs,
-  Tag,
-  Tree,
-  TreeSelect,
-  Typography,
-} from 'antd'
+import { App, Button, Card, Form, Input, Modal, Popconfirm, Select, Space, Switch, Table, Tree, TreeSelect, Typography, Tooltip } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import IntegrationPanel from './IntegrationPanel'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import { useAuth } from '../../contexts/AuthContext'
-import { USERS_TABS, filterTabs } from '../../configs/tabs'
+import { USERS_TABS, filterTabs, USERS_GROUPS } from '../../configs/tabs'
 import { useTab } from '../../hooks/useTab'
 import AppModal from '../../components/AppModal'
 
-import {
-  POSITIONS,
-  PROFESSIONS,
-  createOrg,
-  createUser,
-  errMsg,
-  generateDemoUsers,
-  getMyScope,
-  listOrgs,
-  listRoles,
-  listUsers,
-  handoverUser,
-  listAuditLogs,
-  setDemoUsersActive,
-  updateOrg,
-  updateUser,
-  type DemoUserRow,
-  type AuditLog,
-  type MyScope,
-  type OrgRow,
-  type RoleRow,
-  type UserRow,
-} from '../../api/client'
+import { POSITIONS, PROFESSIONS, createOrg, createUser, errMsg, generateDemoUsers, getMyScope, listOrgs, listRoles, listUsers, handoverUser, listAuditLogs, setDemoUsersActive, updateOrg, updateUser, type DemoUserRow, type AuditLog, type MyScope, type OrgRow, type RoleRow, type UserRow } from '../../api/client'
 
 /** 角色 → 可见工作台（06 卷 §5） */
 const ROLE_WORKBENCH: Record<string, string> = {
@@ -446,7 +409,7 @@ export default function Users() {
       width: 100,
       render: (v: string | null) =>
         v ? (
-          <Tag color={v === '总监' ? 'red' : v === '经理' ? 'blue' : 'default'}>{v}</Tag>
+          <Chip tone={v === '总监' ? 'err' : v === '经理' ? 'run' : undefined}>{v}</Chip>
         ) : (
           '—'
         ),
@@ -456,14 +419,14 @@ export default function Users() {
       dataIndex: 'roles',
       render: (codes: string[] | undefined) =>
         codes?.length
-          ? codes.map((c) => <Tag key={c}>{roles.find((r) => r.code === c)?.name ?? c}</Tag>)
+          ? codes.map((c) => <Chip key={c}>{roles.find((r) => r.code === c)?.name ?? c}</Chip>)
           : '—',
     },
     {
       title: '状态',
       dataIndex: 'is_active',
       width: 80,
-      render: (v: boolean) => (v ? <Tag color="success">启用</Tag> : <Tag>停用</Tag>),
+      render: (v: boolean) => (v ? <Chip tone="ok">启用</Chip> : <Chip>停用</Chip>),
     },
     {
       title: '操作',
@@ -508,15 +471,16 @@ export default function Users() {
       title: '状态',
       dataIndex: 'is_active',
       width: 80,
-      render: (v: boolean | undefined) => (v ? <Tag color="success">启用</Tag> : <Tag>停用</Tag>),
+      render: (v: boolean | undefined) => (v ? <Chip tone="ok">启用</Chip> : <Chip>停用</Chip>),
     },
   ]
 
   return (
     <Card title="用户与权限" loading={loading}>
-      <Tabs
-        activeKey={tab}
-        onChange={setTab}
+      <WorkbenchTabs
+        groups={USERS_GROUPS}
+        tab={tab}
+        onTab={setTab}
         items={[
           {
             key: 'users',
@@ -630,7 +594,7 @@ export default function Users() {
                             if (!org) return null
                             return (
                               <>
-                                <Tag>{org.code}</Tag>
+                                <Chip>{org.code}</Chip>
                                 <Popconfirm
                                   title={org.is_active ? '停用这个组织？（保留历史）' : '重新启用？'}
                                   onConfirm={() => void toggleOrg(org)}
@@ -662,12 +626,13 @@ export default function Users() {
             : []),
           {
             key: 'roles',
-            label: '角色说明',
+            label: (
+              <Tooltip title="角色固定：只给用户勾角色，不给个人单独配权限。">
+                <span>角色说明</span>
+              </Tooltip>
+            ),
             children: (
               <>
-                <Typography.Paragraph type="secondary" style={{ fontSize: 12 }}>
-                  角色固定：只给用户勾角色，不给个人单独配权限（06 卷 §4）。
-                </Typography.Paragraph>
                 <Table<RoleRow>
                   rowKey="code"
                   size="small"
@@ -875,7 +840,7 @@ export default function Users() {
             {
               title: '角色',
               dataIndex: 'roles',
-              render: (v: string[]) => v.map((x) => <Tag key={x}>{x}</Tag>),
+              render: (v: string[]) => v.map((x) => <Chip key={x}>{x}</Chip>),
             },
           ]}
         />

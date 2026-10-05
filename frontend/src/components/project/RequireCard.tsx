@@ -1,8 +1,6 @@
 // components/project/RequireCard.tsx —— 由 ProjectDetailPage 拆出（重构 1.6b · 只拆不改）
 import type { Project } from '../../api/client'
-import {
-  Card,
-} from 'antd'
+import { Card } from 'antd'
 
 import EditableField from '../EditableField'
 

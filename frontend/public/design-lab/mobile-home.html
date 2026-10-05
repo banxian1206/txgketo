@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>移动端主页 · 三种风格（A / B / C）</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#e9ebee;font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;
+  -webkit-font-smoothing:antialiased;font-variant-numeric:tabular-nums;padding:26px 0 80px}
+.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+
+/* ── 顶部（页外）── */
+.pick{max-width:960px;margin:0 auto 20px;padding:0 24px;display:flex;align-items:center;gap:14px}
+.pick h1{font-size:17px;font-weight:600;letter-spacing:-.2px}
+.pick p{font-size:12.5px;color:#6b7480;margin-top:3px}
+.switch{display:flex;gap:2px;background:#14161a;border-radius:999px;padding:4px;margin-left:auto}
+.switch button{border:0;background:transparent;color:#b9c0c9;font:500 12.5px/1 inherit;padding:7px 15px;border-radius:999px;cursor:pointer}
+.switch button.on{background:#fff;color:#14161a}
+.stage{display:flex;gap:26px;justify-content:center;align-items:flex-start;flex-wrap:wrap}
+.frame{width:390px;height:844px;border-radius:36px;overflow:hidden;position:relative;display:flex;flex-direction:column;
+  box-shadow:0 24px 50px -20px rgba(20,30,45,.38),0 0 0 1px rgba(0,0,0,.05)}
+.cap{position:absolute;bottom:-26px;left:0;right:0;text-align:center;font-size:11.5px;color:#8a929e}
+
+/* ══════════════ 主题 A · 纸面 ══════════════ */
+.tA{--bg:#f6f7f9;--sf:#fff;--sf2:#f7f8fa;--ln:#e7e9ee;--ln2:#d8dce3;
+  --ink:#14161a;--ink2:#59616e;--ink3:#8b93a1;--ink4:#b8bfc9;--acc:#1f5fd0;--accT:#eef4ff;
+  --ok:#0f9d63;--warn:#c4761a;--err:#d23b3b;--idle:#98a1ae;--r:14px}
+.tA .sb{background:var(--sf)}
+.tA .top{background:var(--sf);border-bottom:1px solid var(--ln)}
+/* ══════════════ 主题 B · 墨蓝 ══════════════ */
+.tB{--bg:#eef1f5;--sf:#fff;--sf2:#f7f9fb;--ln:#dde4ec;--ln2:#c8d3e0;
+  --ink:#0f1c2b;--ink2:#4a5a6e;--ink3:#7b8797;--ink4:#a5b0be;--acc:#2f6fed;--accT:#e9f0fe;
+  --ok:#0d8a5f;--warn:#b96a10;--err:#c92f2f;--idle:#9aa6b4;--r:10px}
+.tB .sb{background:#0c1a2b;color:#fff}
+.tB .top{background:#0c1a2b;border-bottom:1px solid #1e3350}
+.tB .top .lg{color:#fff}.tB .top .lg span{color:#7f96b3}
+/* ══════════════ 主题 C · 密排 ══════════════ */
+.tC{--bg:#fbfbfa;--sf:#fff;--sf2:#fbfbfa;--ln:#e6e8ea;--ln2:#d4d8dc;
+  --ink:#101315;--ink2:#4c555c;--ink3:#79838c;--ink4:#a4adb5;--acc:#0b62d6;--accT:#eaf2fd;
+  --ok:#0a7f52;--warn:#a8620b;--err:#c02626;--idle:#98a1a9;--r:0}
+.tC .sb{background:var(--sf)}
+.tC .top{background:var(--sf);border-bottom:1px solid var(--ln2)}
+
+/* ── 通用壳 ── */
+.frame{background:var(--bg);color:var(--ink)}
+.sb{height:44px;display:flex;align-items:flex-end;justify-content:space-between;padding:0 20px 6px;font-size:11.5px;font-weight:600}
+.sb .r{display:flex;gap:5px;color:var(--ink3)}
+.top{padding:9px 16px 12px;display:flex;align-items:center;gap:10px}
+.top .lg{font-size:14px;font-weight:600;letter-spacing:-.1px;display:flex;align-items:center;gap:7px}
+.top .lg i{width:20px;height:20px;border-radius:5px;display:grid;place-items:center;font:700 9px/1 ui-monospace,monospace;
+  background:linear-gradient(140deg,#2f6fed,#0f2b52);color:#fff;font-style:normal}
+.tB .top .lg i{background:linear-gradient(140deg,#3b7bf5,#0d2a52)}
+.top .lg span{font-size:11px;font-weight:400;color:var(--ink3)}
+.top .rt{margin-left:auto;display:flex;align-items:center;gap:12px;color:var(--ink2)}
+.top .rt .bd{position:relative}
+.top .rt .bd::after{content:"";position:absolute;top:-1px;right:-3px;width:7px;height:7px;border-radius:50%;
+  background:var(--err);border:1.5px solid #fff}
+.body{flex:1;overflow:hidden;padding:12px 14px 96px}
+.hi{padding:2px 4px 12px}
+.hi h2{font-size:18px;font-weight:600;letter-spacing:-.35px}
+.hi p{font-size:12px;color:var(--ink3);margin-top:4px}
+.sec{display:flex;align-items:center;gap:7px;padding:12px 4px 8px;font-size:11px;font-weight:700;letter-spacing:.6px;color:var(--ink3)}
+.sec .b{width:3px;height:11px;border-radius:2px;background:var(--err)}
+.sec.w .b{background:var(--warn)}
+.sec .c{font-family:ui-monospace,monospace;color:var(--ink4);font-weight:600}
+.sec .lg{margin-left:auto;color:var(--acc);font-weight:600;letter-spacing:0;font-size:11.5px}
+
+.card{background:var(--sf);border:1px solid var(--ln);border-radius:var(--r);padding:13px 14px 13px 15px;
+  margin-bottom:10px;position:relative;overflow:hidden}
+.card::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3.5px;background:var(--idle)}
+.card.e::before{background:var(--err)}.card.w::before{background:var(--warn)}
+.card.u::before{background:var(--acc)}.card.o::before{background:var(--ok)}
+.card .a{display:flex;align-items:center;gap:8px;margin-bottom:5px}
+.card .id{font:600 12px/1 ui-monospace,monospace;letter-spacing:-.2px}
+.card .t1{font-size:14.5px;font-weight:600;letter-spacing:-.25px;line-height:1.35;margin-bottom:4px}
+.card .mt{font-size:12.5px;color:var(--ink2);line-height:1.5}
+.card .mt b{color:var(--err)}
+.card .ft{display:flex;align-items:center;gap:7px;margin-top:10px;padding-top:9px;border-top:1px dashed var(--ln);
+  font-size:11.5px;color:var(--ink3)}
+.card .ft .go{margin-left:auto;color:var(--acc);font-weight:600;font-size:12.5px}
+.st{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:500;color:var(--ink2)}
+.st i{width:6px;height:6px;border-radius:50%;background:var(--idle)}
+.st.e i{background:var(--err)}.st.e{color:var(--err)}
+.st.w i{background:var(--warn)}.st.w{color:var(--warn)}
+.st.u i{background:var(--acc)}.st.u{color:var(--acc)}
+.st.o i{background:var(--ok)}.st.o{color:var(--ok)}
+.chip{height:20px;display:inline-flex;align-items:center;padding:0 7px;border-radius:6px;background:var(--sf2);
+  border:1px solid var(--ln);font-size:11px;color:var(--ink2);font-weight:500}
+.chip.e{background:#fdecec;border-color:#f3c9c9;color:#d23b3b}
+.chip.w{background:#fdf3e6;border-color:#f0dcb8;color:#c4761a}
+.tC .chip{border-radius:3px}
+.tC .card::before{width:2.5px}
+.pic{width:26px;height:26px;border-radius:7px;border:1px solid var(--ln);background:#eef1f5;display:grid;place-items:center;
+  font-size:9px;color:var(--ink4)}
+.note{font-size:11.5px;color:var(--ink3);padding:6px 4px 0;line-height:1.6}
+.dock{position:absolute;left:0;right:0;bottom:58px;padding:10px 14px;background:rgba(255,255,255,.93);
+  backdrop-filter:blur(10px);border-top:1px solid var(--ln);display:flex;gap:9px}
+.tB .dock{background:rgba(255,255,255,.95)}
+.dock .b{flex:1;height:48px;border-radius:12px;border:0;background:var(--acc);color:#fff;font:600 15px/1 inherit;
+  display:flex;align-items:center;justify-content:center;gap:7px}
+.dock .b small{font-weight:400;font-size:12px;opacity:.85}
+.dock .b.g{flex:none;width:48px;background:var(--sf2);border:1px solid var(--ln2);color:var(--ink2)}
+.tB .dock .b{border-radius:9px;background:#0c1a2b}
+.tC .dock .b{border-radius:6px}
+.tabbar{position:absolute;left:0;right:0;bottom:0;height:58px;background:rgba(255,255,255,.96);backdrop-filter:blur(10px);
+  border-top:1px solid var(--ln);display:flex;align-items:center}
+.tC .tabbar{background:#fff;border-top:1px solid var(--ln2)}
+.tabbar a{flex:1;text-align:center;color:var(--ink3);font-size:10.5px;text-decoration:none;padding-top:5px;font-weight:500}
+.tabbar a.on{color:var(--acc);font-weight:700}
+.tabbar a svg{width:21px;height:21px;stroke-width:1.7;display:block;margin:0 auto 2px}
+.tabbar a .bd{position:relative;display:block;width:21px;margin:0 auto}
+.tabbar a .bd::after{content:"";position:absolute;top:-3px;right:-5px;width:13px;height:13px;border-radius:50%;
+  background:var(--err);border:1.5px solid #fff}
+
+/* ── A 专属：顶部渐变概览卡 ── */
+.heroA{background:linear-gradient(140deg,#12315a,#1f5fd0);border-radius:16px;padding:15px;color:#fff;margin-bottom:4px;position:relative;overflow:hidden}
+.heroA::after{content:"";position:absolute;right:-38px;top:-38px;width:150px;height:150px;border-radius:50%;border:22px solid rgba(255,255,255,.06)}
+.heroA .k{font-size:11.5px;opacity:.75;margin-bottom:12px;position:relative}
+.heroA .row{display:flex;gap:8px;position:relative}
+.heroA .x{flex:1;background:rgba(255,255,255,.15);border-radius:11px;padding:9px 10px}
+.heroA .x .n{font:600 20px/1 ui-monospace,monospace;letter-spacing:-.5px}
+.heroA .x .l{font-size:11px;opacity:.82;margin-top:3px}
+.heroA .x.dim{opacity:.42}
+/* ── B 专属：三段指标条 ── */
+.mb{display:flex;background:var(--sf);border:1px solid var(--ln);border-radius:var(--r);margin-bottom:4px;overflow:hidden}
+.mb .x{flex:1;padding:10px 12px 8px;border-right:1px solid var(--ln);position:relative}
+.mb .x:last-child{border-right:0}
+.mb .x .l{font-size:10px;letter-spacing:.7px;font-weight:600;color:var(--ink3);margin-bottom:5px}
+.mb .x .n{font:600 19px/1 ui-monospace,monospace;letter-spacing:-.6px}
+.mb .x.dim .n{color:var(--ink4)}
+.mb .x::after{content:"";position:absolute;left:12px;right:12px;bottom:0;height:2px;background:var(--err)}
+.mb .x.w::after{background:var(--warn)} .mb .x.dim::after{background:transparent}
+/* ── C 专属：无卡片，发丝列表 ── */
+.tC .card{border-radius:0;border:0;border-bottom:1px solid var(--ln);padding:12px 4px 12px 12px;margin-bottom:0;background:transparent}
+.tC .card:last-child{border-bottom:0}
+.tC .heroC{background:var(--sf);border:1px solid var(--ln);padding:12px 14px;display:flex;align-items:baseline;gap:14px;margin-bottom:2px}
+.tC .heroC .x{display:flex;flex-direction:column;gap:3px}
+.tC .heroC .x .n{font:700 22px/1 ui-monospace,monospace;letter-spacing:-1px}
+.tC .heroC .x .l{font-size:10px;letter-spacing:.7px;color:var(--ink4);font-weight:600}
+.tC .heroC .x.e .n{color:var(--err)} .tC .heroC .x.dim .n{color:var(--ink4)}
+.tC .sec{padding:14px 4px 2px;font-size:10px;letter-spacing:1.1px;color:var(--ink4)}
+.tC .sec .b{display:none}
+.tC .sec .c{color:var(--ink4)}
+.tC .card .id{font-size:12px;color:var(--ink2)}
+.tC .card .t1{font-weight:600}
+</style>
+</head>
+<body>
+<div class="pick">
+  <div>
+    <h1>移动端主页 —— 三种风格，同一份内容</h1>
+    <p>点右上角切换 A / B / C，三个方向共用同一套 token（只换壳、不换词）。这是仓库/车间/现场打开手机看到的<b>第一屏</b>。</p>
+  </div>
+  <div class="switch"><button class="on" data-t="tA">A 纸面</button><button data-t="tB">B 墨蓝</button><button data-t="tC">C 密排</button></div>
+</div>
+
+<div class="stage">
+  <div class="frame tA" id="fr">
+    <div class="sb"><span>9:41</span><span class="r">●●● 5G ▮▮▮</span></div>
+    <div class="top">
+      <div class="lg"><i>TX</i>深圳仓 <span>· 仓管组员</span></div>
+      <div class="rt">
+        <span class="bd">🔔</span>
+      </div>
+    </div>
+    <div class="body">
+      <div class="hi"><h2>早上好，仓管组员</h2><p>10 月 4 日 周六 · 3 件事正卡着别人</p></div>
+      <div class="heroA"><div class="k">今天先干这三件</div>
+        <div class="row"><div class="x"><div class="n">7</div><div class="l">待验收</div></div>
+          <div class="x"><div class="n">6</div><div class="l">待入库</div></div>
+          <div class="x dim"><div class="n">0</div><div class="l">待叫车</div></div></div></div>
+      <div class="sec"><span class="b"></span>阻塞下游<span class="c">3</span><span class="lg">全部</span></div>
+      <div class="card e">
+        <div class="a"><span class="id">GR26017</span><span class="st e"><i></i>待验收 · 车间等料</span></div>
+        <div class="t1">板材 Q235 2.0mm · 1220x2440</div>
+        <div class="mt">订 5 张 · 已到 <b>0</b> · 甲钢材 · 需要 09-25（<b>超期 9 天</b>）</div>
+        <div class="ft"><span class="mono" style="font-size:11.5px">TX26001 / 01A</span><span class="chip">PO26034</span><span class="go">去验收 →</span></div>
+      </div>
+      <div class="card e">
+        <div class="a"><span class="id">MI26003</span><span class="st e"><i></i>部分领料 · 可继续备料</span></div>
+        <div class="t1">缺 2 行 · 导轨 HGR20 已补货</div>
+        <div class="mt">已备 6 / 应领 8 · 车间等料开工 · 领料人 装配组员</div>
+        <div class="ft"><span class="mono" style="font-size:11.5px">TX26001 / 01A</span><span class="chip w">库位 A-03-12</span><span class="go">继续备料 →</span></div>
+      </div>
+      <div class="sec w"><span class="b"></span>今天到期<span class="c">2</span></div>
+      <div class="card u">
+        <div class="a"><span class="id">GR26021</span><span class="st u"><i></i>待入库</span></div>
+        <div class="t1">轴承 NSK 6204DDU ×5</div>
+        <div class="mt">验收合格 10-04 13:56 · 库位必填</div>
+        <div class="ft"><span class="pic">已拍</span><span class="chip">合格</span><span class="go">定库位入库 →</span></div>
+      </div>
+      <div class="note">其余 8 项今天没到期，已折叠。<br>为 0 的类别不显示 —— 屏幕上不摆空格子。</div>
+    </div>
+    <div class="dock"><button class="b">开始收货 <small>· 7 项</small></button><button class="b g">📷</button></div>
+    <div class="tabbar">
+      <a class="on" href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 11l9-7 9 7v9a1 1 0 01-1 1h-5v-6H9v6H4a1 1 0 01-1-1z"/></svg>今日</a>
+      <a href="#"><span class="bd"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 7l9-4 9 4-9 4z"/><path d="M3 7v10l9 4 9-4V7"/></svg></span>仓库</a>
+      <a href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M9 10v10"/></svg>领料</a>
+      <a href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-7 8-7s8 3 8 7"/></svg>我的</a>
+    </div>
+    <div class="cap" id="cap">A 纸面 · 渐变概览卡 · 白卡 + 3.5px 左色条</div>
+  </div>
+
+  <!-- 第二屏：同一内容的 B / C 变体（切换时显示） -->
+  <div class="frame tB" id="fr2" style="display:none">
+    <div class="sb"><span>9:41</span><span class="r">●●● 5G ▮▮</span></div>
+    <div class="top"><div class="lg"><i>TX</i>深圳仓 <span>· 仓管组员</span></div><div class="rt"><span class="bd">🔔</span></div></div>
+    <div class="body">
+      <div class="mb"><div class="x"><div class="l">阻塞下游</div><div class="n">3</div></div>
+        <div class="x w"><div class="l">今天到期</div><div class="n">2</div></div>
+        <div class="x dim"><div class="l">待叫车</div><div class="n">0</div></div></div>
+      <div class="sec"><span class="b"></span>阻塞下游<span class="c">3</span><span class="lg">全部</span></div>
+      <div class="card e"><div class="a"><span class="id">GR26017</span><span class="st e"><i></i>待验收 · 车间等料</span></div>
+        <div class="t1">板材 Q235 2.0mm · 1220x2440</div>
+        <div class="mt">订 5 张 · 已到 <b>0</b> · 甲钢材 · 需要 09-25（<b>超期 9 天</b>）</div>
+        <div class="ft"><span class="chip">PO26034</span><span class="chip">TX26001 / 01A</span><span class="go">去验收 →</span></div></div>
+      <div class="card e"><div class="a"><span class="id">MI26003</span><span class="st e"><i></i>部分领料 · 可继续备料</span></div>
+        <div class="t1">缺 2 行 · 导轨 HGR20 已补货</div>
+        <div class="mt">已备 6 / 应领 8 · 车间等料开工 · 领料人 装配组员</div>
+        <div class="ft"><span class="chip w">库位 A-03-12</span><span class="go">继续备料 →</span></div></div>
+      <div class="sec w"><span class="b"></span>今天到期<span class="c">2</span></div>
+      <div class="card u"><div class="a"><span class="id">GR26021</span><span class="st u"><i></i>待入库</span></div>
+        <div class="t1">轴承 NSK 6204DDU ×5</div>
+        <div class="mt">验收合格 10-04 13:56 · 库位必填</div>
+        <div class="ft"><span class="pic">已拍</span><span class="chip">合格</span><span class="go">定库位入库 →</span></div></div>
+      <div class="note">其余 8 项今天没到期，已折叠。</div>
+    </div>
+    <div class="dock"><button class="b">开始收货 <small>· 7 项</small></button><button class="b g">📷</button></div>
+    <div class="tabbar">
+      <a class="on" href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 11l9-7 9 7v9a1 1 0 01-1 1h-5v-6H9v6H4a1 1 0 01-1-1z"/></svg>今日</a>
+      <a href="#"><span class="bd"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 7l9-4 9 4-9 4z"/><path d="M3 7v10l9 4 9-4V7"/></svg></span>仓库</a>
+      <a href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M9 10v10"/></svg>领料</a>
+      <a href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-7 8-7s8 3 8 7"/></svg>我的</a>
+    </div>
+    <div class="cap">B 墨蓝 · 深色顶栏 · 指标条带色标 · 方块点</div>
+  </div>
+
+  <div class="frame tC" id="fr3" style="display:none">
+    <div class="sb" style="color:var(--ink)"><span>9:41</span><span class="r">●●● 5G ▮▮▮</span></div>
+    <div class="top"><div class="lg"><i>TX</i>深圳仓 <span>· 仓管组员</span></div><div class="rt"><span class="bd">🔔</span></div></div>
+    <div class="body">
+      <div class="heroC"><div class="x e"><div class="n">3</div><div class="l">阻塞下游</div></div>
+        <div class="x"><div class="n">2</div><div class="l">今天到期</div></div>
+        <div class="x dim"><div class="n">0</div><div class="l">待叫车</div></div></div>
+      <div class="sec"><span class="b"></span>阻塞下游 · 3</div>
+      <div class="card e"><div class="a"><span class="id">GR26017</span><span class="st e"><i></i>待验收 · 车间等料</span></div>
+        <div class="t1">板材 Q235 2.0mm · 1220x2440</div>
+        <div class="mt">订 5 张 · 已到 <b>0</b> · 甲钢材 · 需要 09-25（<b>超期 9 天</b>）</div>
+        <div class="ft"><span class="chip">PO26034</span><span class="go">去验收 →</span></div></div>
+      <div class="card e"><div class="a"><span class="id">MI26003</span><span class="st e"><i></i>部分领料 · 可继续备料</span></div>
+        <div class="t1">缺 2 行 · 导轨 HGR20 已补货</div>
+        <div class="mt">已备 6 / 应领 8 · 车间等料开工</div>
+        <div class="ft"><span class="chip w">A-03-12</span><span class="go">继续备料 →</span></div></div>
+      <div class="sec"><span class="b"></span>今天到期 · 2</div>
+      <div class="card u"><div class="a"><span class="id">GR26021</span><span class="st u"><i></i>待入库</span></div>
+        <div class="t1">轴承 NSK 6204DDU ×5</div>
+        <div class="mt">验收合格 10-04 13:56 · 库位必填</div>
+        <div class="ft"><span class="chip">合格</span><span class="go">定库位入库 →</span></div></div>
+      <div class="note">其余 8 项今天没到期，已折叠。</div>
+    </div>
+    <div class="dock"><button class="b">开始收货 <small>· 7 项</small></button><button class="b g">📷</button></div>
+    <div class="tabbar">
+      <a class="on" href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 11l9-7 9 7v9a1 1 0 01-1 1h-5v-6H9v6H4a1 1 0 01-1-1z"/></svg>今日</a>
+      <a href="#"><span class="bd"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 7l9-4 9 4-9 4z"/><path d="M3 7v10l9 4 9-4V7"/></svg></span>仓库</a>
+      <a href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M9 10v10"/></svg>领料</a>
+      <a href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-7 8-7s8 3 8 7"/></svg>我的</a>
+    </div>
+    <div class="cap">C 密排 · 无卡片（发丝分隔）· 大号等宽数字</div>
+  </div>
+</div>
+
+<script>
+document.querySelectorAll('.switch button').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('.switch button').forEach(x=>x.classList.toggle('on',x===b));
+  const t=b.dataset.t;
+  document.getElementById('fr').style.display = t==='tA'?'flex':'none';
+  document.getElementById('fr2').style.display = t==='tB'?'flex':'none';
+  document.getElementById('fr3').style.display = t==='tC'?'flex':'none';
+});
+</script>
+</body>
+</html>

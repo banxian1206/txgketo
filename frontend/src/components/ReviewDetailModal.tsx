@@ -1,16 +1,9 @@
-import { Alert, App, Button, Descriptions, Divider, Drawer, Input, Popconfirm, Space, Tag, Timeline, Typography } from 'antd'
+import { Alert, App, Button, Descriptions, Divider, Drawer, Input, Popconfirm, Space, Timeline, Typography } from 'antd'
+import { Status, Chip } from '../components/ds'
 import { useCallback, useEffect, useState } from 'react'
 
-import {
-  errMsg,
-  getReviewTicket,
-  me,
-  reviewTicket,
-  withdrawTicket,
-  type ReviewTicketDetail,
-  type User,
-} from '../api/client'
-import { REVIEW_STATUS as STATUS_COLOR } from '../theme/status'
+import { errMsg, getReviewTicket, me, reviewTicket, withdrawTicket, type ReviewTicketDetail, type User } from '../api/client'
+import { REVIEW_STATUS as STATUS_COLOR, toneOf } from '../theme/status'
 
 interface Props {
   ticketId: number | null
@@ -96,7 +89,7 @@ export default function ReviewDetailModal({ ticketId, open, onClose, onChanged }
         detail ? (
           <Space>
             <span>评审单 {detail.ticket_no}</span>
-            <Tag color={STATUS_COLOR[detail.status] ?? 'default'}>{detail.status}</Tag>
+            <Status tone={toneOf(STATUS_COLOR[detail.status])}>{detail.status}</Status>
           </Space>
         ) : (
           '评审单'
@@ -166,7 +159,7 @@ export default function ReviewDetailModal({ ticketId, open, onClose, onChanged }
                       color: 'blue',
                       children: (
                         <span>
-                          <Tag>{i.item_label}</Tag>
+                          <Chip>{i.item_label}</Chip>
                           {/* ★ BOM 行不要只甩一个数据库 id（P2-4）：审核人要看得见是什么料、多少 */}
                           {i.item_detail ?? i.item_ref}
                           {i.version ? ` ${i.version}` : ''}
@@ -196,7 +189,7 @@ export default function ReviewDetailModal({ ticketId, open, onClose, onChanged }
                             color: 'green',
                             children: (
                               <span>
-                                发布冻结 <Tag color="success">{rel.release_no}</Tag>
+                                发布冻结 <Chip tone="ok">{rel.release_no}</Chip>
                                 {rel.released_by_name ? ` · ${rel.released_by_name}` : ''}
                                 <Typography.Text type="secondary" style={{ marginLeft: 8, fontSize: 12 }}>
                                   {rel.released_at?.slice(5, 16).replace('T', ' ')}

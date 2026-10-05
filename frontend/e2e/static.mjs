@@ -32,6 +32,197 @@ function grepAll(pattern) {
 }
 
 
+// SHELL-台骨架四件套（docs/15 · 2026-10-05）：**九个台必须长同一个样**
+//   为什么要有它：这轮返工的根因就是"9 个工作台是 9 个不同时候手写的页面" ——
+//   结论指标条 0~6 个不等（5 个台完全没有）、流程条 4 种形态、体内 3 种语言。
+//   所以把「台骨架」钉成结构契约：① 每个台页必须用 <WorkbenchPage>（台头→结论条→流程条→体）
+//   ② 用 <WorkbenchPage> 的页**不许**再直接用旧的 <WorkbenchTabs>（两套框架并行 = 又开始漂）
+//   ③ 注册表必须给每个台声明 defaultTab（默认页签是行为契约，不是实现细节）
+//   ④ 声明 kind:'queue' 的页签，页面里必须真的有队列行（否则声明与实现脱节）
+{
+  const PAGES = {
+    sales: 'features/workbench/SalesWorkbench.tsx',
+    pm: 'features/workbench/PmWorkbench.tsx',
+    eng: 'features/workbench/EngWorkbench.tsx',
+    purchase: 'features/purchase/Page.tsx',
+    warehouse: 'features/warehouse/Page.tsx',
+    shop: 'features/manufacturing/Page.tsx',
+    shipping: 'features/shipping/Page.tsx',
+    site: 'features/site/Page.tsx',
+    service: 'features/service/Page.tsx',
+  }
+  const boards = fs.readFileSync(path.join(SRC, 'configs/boards.ts'), 'utf8')
+  const bad = []
+  for (const [key, rel] of Object.entries(PAGES)) {
+    const f = path.join(SRC, rel)
+    if (!fs.existsSync(f)) { bad.push(`${rel} 不存在`); continue }
+    const src = fs.readFileSync(f, 'utf8')
+    if (!/<WorkbenchPage/.test(src)) bad.push(`${rel} 没用 <WorkbenchPage>（台骨架未统一）`)
+    if (/<WorkbenchTabs/.test(src)) bad.push(`${rel} 还在用旧的 <WorkbenchTabs>（两套框架并行）`)
+    if (/locale=\{\{\s*emptyText:\s*<Empty description/.test(src)) {
+      bad.push(`${rel} 还有 antd 默认空态（应换成 ds <Empty text=… action=…>，说人话 + 下一步）`)
+    }
+    // 声明 queue 的页签 → 页面里必须有队列行
+    const re = new RegExp(`key: '${key}'[\\s\\S]{0,4000}?defaultTab|defaultTab`)
+    if (!re.test(boards)) bad.push(`BOARDS.${key} 没声明 defaultTab`)
+    const seg = boards.split(`key: '${key}'`)[1]?.split('export const')[0] ?? ''
+    // ⚠ 注意：有的台是映射式声明（`kind: (...) ? 'queue' : 'ledger'`），所以不能只匹配 `kind: 'queue'`
+    //    —— 只匹配字面量会把 8 个台整个漏掉（注入反例①发现，已修）
+    if (/'queue'/.test(seg) && !/<QueueBoard|<QueueRow/.test(src)) {
+      bad.push(`${rel} 有 kind:'queue' 的页签，但页面里没有队列行`)
+    }
+  }
+  // 注册表内部一致性：defaultTab 必须是自己的页签之一；每个页签必须声明 kind
+  const defs = [...boards.matchAll(/export const (\w+)_BOARD: BoardDef = \{([\s\S]*?)\n\}/g)]
+  for (const [, name, body] of defs) {
+    const dt = body.match(/defaultTab:\s*'([^']+)'/)
+    const keys = [...body.matchAll(/\{\s*key:\s*'([^']+)'/g)].map((m) => m[1])
+    if (!dt) bad.push(`${name}_BOARD 没声明 defaultTab`)
+    else if (keys.length && !keys.includes(dt[1]) && !/tabs: [A-Z_]+_TABS/.test(body)) {
+      bad.push(`${name}_BOARD.defaultTab='${dt[1]}' 不在自己的页签里`)
+    }
+  }
+  check('SHELL-台骨架四件套', bad.length === 0,
+    bad.length ? bad.slice(0, 4).join(' | ') : '9 个台：台头→结论条→流程条→体，同一条壳；队列页签真有队列行')
+}
+
+// SHELL-台页签分组≤4（R3-B · 2026-10-04）：分组是给"先扫一遍"的人减负，
+// 组数超过 4 就又变回一排横着摆的老问题；同时组的 keys 必须**恰好覆盖**该台注册表的键
+// （漏一个 = 那个页签在 UI 上消失；多一个 = 拼错 key，点了空白）。
+{
+  const src = fs.readFileSync(path.join(SRC, 'configs/tabs.ts'), 'utf8')
+  const tabDefs = [...src.matchAll(/export const (\w+)_TABS: TabDef\[\] = \[([\s\S]*?)\n\]/g)]
+    .map((m) => ({ name: m[1], keys: [...m[2].matchAll(/\bkey:\s*'([^']+)'/g)].map((x) => x[1]) }))
+  const groups = new Map(
+    [...src.matchAll(/export const (\w+)_GROUPS: TabGroup\[\] = \[([\s\S]*?)\n\]/g)]
+      .map((m) => [m[1], { keys: [...m[2].matchAll(/keys:\s*\[([^\]]*)\]/g)].map((x) => [...x[1].matchAll(/'([^']+)'/g)].map((y) => y[1])), groupsN: (m[2].match(/\bkey:\s*'/g) || []).length }])
+  )
+  const bad = []
+  for (const t of tabDefs) {
+    const g = groups.get(t.name)
+    if (!g) { bad.push(`${t.name} 没有配 *_GROUPS`); continue }
+    if (g.groupsN > 4) bad.push(`${t.name} 分组 ${g.groupsN} 个 > 4`)
+    const flat = g.keys.flat()
+    const miss = t.keys.filter((k) => !flat.includes(k))
+    const extra = flat.filter((k) => !t.keys.includes(k))
+    if (miss.length) bad.push(`${t.name} 分组漏了键: ${miss.join(',')}`)
+    if (extra.length) bad.push(`${t.name} 分组有注册表里没有的键: ${extra.join(',')}`)
+  }
+  check('SHELL-台页签分组≤4', bad.length === 0 && tabDefs.length >= 10,
+    bad.length ? bad.join(' | ') : `${tabDefs.length} 个台：分组 ≤4 且键集合与注册表一一对应`)
+}
+
+// CMDK-命令栏必须真能搜（R2 收尾 · 2026-10-04）：
+//   「粘任意编号 → 直达」是本项目最该有的一处入口（铁律 1+2：编号即入口），
+//   所以它**不许是装饰**：必须走真接口、必须有热键、落点必须带来源（否则返回口会骗人）。
+{
+  const bad = []
+  const file = path.join(SRC, 'components/CommandPalette.tsx')
+  const layoutPath = path.join(SRC, 'layouts/AppLayout.tsx')
+  const layout = fs.existsSync(layoutPath) ? fs.readFileSync(layoutPath, 'utf8') : ''
+  if (!fs.existsSync(file)) bad.push('没有 CommandPalette.tsx')
+  else {
+    const src = fs.readFileSync(file, 'utf8')
+    // ★ 热键绑在 AppLayout（全局键盘监听），搜索行为在组件里 —— 两处合起来看，
+    //   否则护栏会因"条件写窄了"而误报（第一版就是这样）
+    const both = src + '\n' + layout
+    if (!/globalSearch\(/.test(src)) bad.push('没调用 /search（globalSearch）')
+    if (!/metaKey|ctrlKey/.test(both)) bad.push('没有 ⌘K / Ctrl+K 热键')
+    if (!/'k'/.test(both)) bad.push('热键没绑到 k')
+    if (!/useGoFrom/.test(src)) bad.push('落点没带来源（返回口会骗人）')
+    if (!/ArrowDown|ArrowUp/.test(src)) bad.push('没有键盘选择（↑↓）')
+    if (!/没有找到/.test(src)) bad.push('查不到时没说人话（不许静默）')
+  }
+  if (!/CommandPalette/.test(layout)) bad.push('AppLayout 没挂命令栏')
+  if (!/app-search/.test(layout)) bad.push('顶栏没有搜索触发框')
+  check('CMDK-命令栏真能搜', bad.length === 0,
+    bad.length ? bad.join(' | ') : '走真接口 + ⌘K 热键 + ↑↓/Enter + 带来源 + 查不到说人话')
+}
+
+// OBJ-入口：图号/物料号出现的地方必须能点进件档案（2026-10-05 用户实测"没有入口"）
+//   教训（AGENTS §8.5）："字段写进了模型和接口但忘了放前端入口 → 做完了但找不到"。
+//   所以把"哪些页面必须给入口"写死成清单 —— 少一处即红。
+{
+  const MUST = [
+    ['src/features/purchase/Page.tsx', '/items/', '采购池/采购单的物料码 → 件档案'],
+    ['src/features/warehouse/Page.tsx', '/items/', '待验收/待入库/库存的物料码 → 件档案'],
+    ['src/features/manufacturing/Page.tsx', '/items/', '排产单的图号 → 件档案'],
+    ['src/components/project/EquipmentsCard.tsx', '/equipment/', '项目详情的设备行 → 设备档案'],
+    ['src/components/project/DesignProgressCard.tsx', '/equipment/', '设计进度行 → 设备档案'],
+    ['src/components/design/DrawingsCard.tsx', '/items/', '设计面图纸树的图号 → 件档案'],
+    ['src/components/design/DesignHeaderCard.tsx', '/equipment/', '设计面头部 → 设备档案'],
+    ['src/components/CommandPalette.tsx', '/search\|globalSearch', '命令栏能搜到对象'],
+    ['src/App.tsx', '/dashboard', '驾驶舱路由'],
+  ]
+  const bad = MUST.filter(([rel, needle]) => {
+    const f = path.join(SRC, rel.replace(/^src\//, ''))
+    if (!fs.existsSync(f)) return true
+    return !new RegExp(needle).test(fs.readFileSync(f, 'utf8'))
+  }).map(([rel, , why]) => `${rel}（缺：${why}）`)
+  // 驾驶舱必须挂在"台清单"（WORKBENCHES 是台清单唯一事实源 → 侧栏/工作台/台条自动出现）
+  {
+    // SRC = frontend/src → 后端在 ../../backend/app/…
+    const wb = fs.readFileSync(path.resolve(SRC, '../../backend/app/api/routes/workbench.py'), 'utf8')
+    check('GM-驾驶舱登记为台', /经营驾驶舱/.test(wb) && /"gm"/.test(wb),
+      /经营驾驶舱/.test(wb) ? 'WORKBENCHES 里有「经营驾驶舱」（入口随角色可见）' : '台清单里没有驾驶舱 —— 用户找不到入口')
+  }
+  check('OBJ-对象入口齐备', bad.length === 0,
+    bad.length ? bad.slice(0, 3).join(' | ') : `${MUST.length} 个必给入口的地方都在（图号/物料号/设备行可点）`)
+}
+
+// OBJ-分区来自注册表 + 进 URL（docs/14 · 2026-10-05）
+//   为什么要有：页面的"分区"如果各页自由发挥，就会退回「卡片一个个往下摆」；
+//   所以 ① 分区 key 必须在 configs/sections.ts 登记过、且**逐字对应**（漏一个=某块没地方放，
+//   多一个=拼错 key 点了空白）；② 分区状态必须进 ?tab=（刷新/收藏/通知深链都在）。
+{
+  const secSrc = fs.readFileSync(path.join(SRC, 'configs/sections.ts'), 'utf8')
+  const registry = new Map()
+  for (const m of secSrc.matchAll(/export const (\w+_SECTIONS):[^=]*= \[([\s\S]*?)\n\]/g)) {
+    registry.set(m[1], [...m[2].matchAll(/key:\s*'([^']+)'/g)].map((x) => x[1]))
+  }
+  const bad = []
+  const walk = (d) => {
+    for (const f of fs.readdirSync(d)) {
+      const p2 = path.join(d, f)
+      if (fs.statSync(p2).isDirectory()) { walk(p2); continue }
+      if (!/\.tsx$/.test(f)) continue
+      const src = fs.readFileSync(p2, 'utf8')
+      if (!/<SectionNav\b/.test(src)) continue
+      const rel = p2.replace(SRC, 'src')
+      if (!/useTab\(/.test(src)) bad.push(`${rel} 分区状态没进 URL（缺 useTab）`)
+      const imp = src.match(/import \{([^}]*)\} from '[^']*configs\/sections'/)
+      const constName = imp && [...imp[1].matchAll(/(\w+_SECTIONS)/g)].map((x) => x[1])[0]
+      if (!constName || !registry.has(constName)) { bad.push(`${rel} 没从注册表取分区（找不到 *_SECTIONS 导入）`); continue }
+      // ★ 只取 `sections={[ ... ]}` 块里的 key —— 第一版把整文件所有 key:'x' 都算进来，
+      //   于是生命周期轨道的 { key:'design' } 被误判成"注册表里没有的分区"（假红）。
+      // ★ 直接用注册表常量（`sections={CREATE_SECTIONS.map(...)}`）比手抄 key 更强 —— 豁免
+      const direct = new RegExp(`sections=\\{${constName}\\b`).test(src)
+      if (direct) continue
+      const at = src.indexOf('sections={[')
+      let use = []
+      if (at >= 0) {
+        const from = at + 'sections={['.length
+        let depth = 1, i = from
+        while (i < src.length && depth > 0) {
+          if (src[i] === '[') depth++
+          if (src[i] === ']') depth--
+          i++
+        }
+        const block = src.slice(from, i)
+        use = [...block.matchAll(/key:\s*'([^']+)'/g)].map((x) => x[1])
+      }
+      const want = registry.get(constName)
+      const miss = want.filter((k) => !use.includes(k))
+      const extra = use.filter((k) => !want.includes(k))
+      if (miss.length) bad.push(`${rel} 页面漏了注册表里的分区: ${miss.join(',')}`)
+      if (extra.length) bad.push(`${rel} 页面用了注册表里没有的 key: ${extra.join(',')}`)
+    }
+  }
+  walk(path.join(SRC, 'features'))
+  check('OBJ-分区来自注册表且进URL', bad.length === 0,
+    bad.length ? bad.slice(0, 3).join(' | ') : '分区 key 与 configs/sections.ts 逐字对应，且状态进 ?tab=')
+}
+
 // P-12：原生 prompt 全站禁止（交互规范反模式清单）
 const prompts = grepAll(/window\.prompt/);
 check('P-12', prompts.length === 0, prompts.length ? `残留: ${prompts.join(', ')}` : 'window.prompt = 0');
@@ -361,8 +552,16 @@ const FEATS = path.join(SRC, 'features');
       const p2 = path.join(d, f)
       if (fs.statSync(p2).isDirectory()) { walk(p2); continue }
       if (!/\.tsx$/.test(f)) continue
-      const n = (fs.readFileSync(p2, 'utf8').match(/<Tabs\b/g) || []).length
-      if (n > 1) bad.push(`${p2.replace(SRC, 'src')} 有 ${n} 条页签条`)
+      // ★ 2026-10-04：R3-B 之后台页签改走 <WorkbenchTabs（组页签 + Segmented）——
+      //   护栏必须一起认它，否则这些页面直接「不在扫描范围」= 护栏睡死（比没护栏更危险）。
+      // ★ 2026-10-05（docs/14）：又多了 <SectionNav（页内分区条）—— 同样必须认。
+      //   规矩：一屏最多 **1 条台页签 + 1 条分区条**；同类两条即红（退回 docs/12 批过的「三层标题」）。
+      const src1 = fs.readFileSync(p2, 'utf8')
+      const nTabs = (src1.match(/<Tabs\b|<WorkbenchTabs\b/g) || []).length
+      const nSec = (src1.match(/<SectionNav\b/g) || []).length
+      if (nTabs > 1) bad.push(`${p2.replace(SRC, 'src')} 有 ${nTabs} 条页签条（同类最多 1）`)
+      if (nSec > 1) bad.push(`${p2.replace(SRC, 'src')} 有 ${nSec} 条分区条（同类最多 1）`)
+      if (nTabs + nSec > 2) bad.push(`${p2.replace(SRC, 'src')} 横条合计 ${nTabs + nSec} 条（最多 1 页签 + 1 分区）`)
     }
   }
   walk(FEATS)
@@ -386,7 +585,8 @@ const FEATS = path.join(SRC, 'features');
       if (!/\.tsx$/.test(f)) continue
       const rel = p2.replace(SRC + '/', '')
       const src = fs.readFileSync(p2, 'utf8')
-      if (!/<Tabs\b/.test(src)) continue
+      // ★ 同上：台页签已改成 <WorkbenchTabs，也必须继续受注册表/权限/URL 三条约束
+      if (!/<Tabs\b|<WorkbenchTabs\b/.test(src)) continue
       if (EXEMPT[rel]) continue
       const byRegistry = /configs\/tabs/.test(src)
       const filtered = /filterTabs\(|visKeys/.test(src)
@@ -488,12 +688,20 @@ const FEATS = path.join(SRC, 'features');
     src.replace(/fontSize:\s*(\d+)/g, (_, n) => { if (!SCALE.has(+n)) offScale.push(`${f.replace(SRC, 'src')}:${n}`); return _ })
     // 剥掉注释后再找「把内部文档口径写给用户看」的地方
     const code = src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
+    // ★ 2026-10-04 修假绿：旧正则 `/>[^<>]*卷\s*§/` 要求「卷 §」与前面的 `>` **同行**，
+    //   而 JSX 多行子节点（文本独占一行）根本不会命中 —— 实测两处真违规（`workbench/Page.tsx`
+    //   的「（06 卷 §11）」、`purchase/Page.tsx` 的「（00 卷 §3.1②）」）在屏幕上看得见，
+    //   护栏却报「零处引用」。现在改成：剥注释后**逐行直扫**（不管它是不是 JSX 文本）。
     code.split('\n').forEach((l, i) => {
-      const isJsxText = />[^<>]*卷\s*§/.test(l)
-      const isLabel = /(?:label|title|placeholder|description|message)\s*[:=][^\n]*卷\s*§/.test(l)
-      if (isJsxText || isLabel) docRef.push(`${f.replace(SRC, 'src')}:${i + 1}`)
+      // 去掉行尾 `// 注释`（要求 // 前有空白，避免误伤 https://）
+      const line = l.replace(/\s\/\/.*$/, '')
+      if (/卷\s*§/.test(line)) docRef.push(`${f.replace(SRC, 'src')}:${i + 1}`)
     })
-    if (/from '[^']*ui\/Primitives'/.test(src) && /CodeNo|NumCell/.test(src)) monoCols++
+    // 等宽编号有**两代**实现：旧的 ui/Primitives {CodeNo,NumCell}、新的 ds {Code,Num}
+    // ★ 2026-10-04：只认旧的那一代 → 换成 ds 之后这里会静默掉到 0，护栏就该自己换代
+    const oldMono = /from '[^']*ui\/Primitives'/.test(src) && /CodeNo|NumCell/.test(src)
+    const newMono = /from '[^']*components\/ds'/.test(src) && /\bCode\b|\bNum\b/.test(src)
+    if (oldMono || newMono) monoCols++
   }
   // ★ 棘轮基线（2026-09-29 实测）：改完一期就下调一次，绝不许往上抬
   const BASE_INLINE = 850  // 2026-09-30：+付款变更卡（紧凑行改 .form-dense / .w-full 两个类，而非逐元素 inline）
@@ -502,7 +710,7 @@ const FEATS = path.join(SRC, 'features');
   check('VIS-字号在刻度内', offScale.length === 0, offScale.length ? `不在 FS 刻度(12/13/14/16/20/24)里的字号: ${offScale.slice(0, 5).join(', ')}` : '全部字号来自 FS 刻度')
   check('VIS-用户文案不引内部文档', docRef.length <= BASE_DOCREF,
     docRef.length ? `JSX 文案里出现「卷 §」（内部口径该进 Tooltip/帮助，不该上屏）: ${docRef.slice(0, 5).join(', ')}` : '用户可见文案零处引用内部文档章节号')
-  check('VIS-等宽编号已启用', monoCols >= 1, `使用 CodeNo/NumCell 的文件数 = ${monoCols}`)
+  check('VIS-等宽编号已启用', monoCols >= 3, `使用等宽编号组件（ds.Code/Num 或 CodeNo/NumCell）的文件数 = ${monoCols}`)
 }
 
 /* ══════════ 台类页统一壳（docs/12 §2-B · P2）══════════
@@ -517,7 +725,8 @@ const FEATS = path.join(SRC, 'features');
       if (fs.statSync(p2).isDirectory()) { walk(p2); continue }
       if (!/Page\.tsx$/.test(f)) continue
       const src = fs.readFileSync(p2, 'utf8')
-      if (!/<Tabs\b/.test(src)) continue
+      // ★ 同上：台页签已改成 <WorkbenchTabs，也必须继续受注册表/权限/URL 三条约束
+      if (!/<Tabs\b|<WorkbenchTabs\b/.test(src)) continue
       const outer = (src.match(/^\s{0,6}<Card title=/gm) || []).length + (src.match(/^\s{0,6}title=\{$/gm) || []).length
       if (outer > 1) bad.push(`${p2.replace(SRC, 'src')} 外层标题 ${outer} 个`)
     }

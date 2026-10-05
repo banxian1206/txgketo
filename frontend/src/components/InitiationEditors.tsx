@@ -1,52 +1,14 @@
-import {
-  App,
-  Button,
-  DatePicker,
-  Empty,
-  Form,
-  Input,
-  InputNumber,
-  Modal,
-  Popconfirm,
-  Select,
-  Space,
-  Table,
-  Tag,
-  Typography,
-} from 'antd'
+import { App, Button, DatePicker, Empty, Form, Input, InputNumber, Modal, Popconfirm, Select, Space, Table, Typography } from 'antd'
 import dayjs from 'dayjs'
 import { useCallback, useEffect, useState } from 'react'
+import { Chip } from '../components/ds'
 
 import { useGoFrom } from '../hooks/useFrom'
 
 import AppModal from './AppModal'
 
-import {
-  addEquipment,
-  addMilestone,
-  clearMilestones,
-  errMsg,
-  listEquipment,
-  listMembers,
-  removeMember,
-  listMilestones,
-  listPurchaseRequests,
-  removeEquipment,
-  removeMilestone,
-  removePurchaseRequest,
-  saveMember,
-  updateEquipment,
-  updateMilestone,
-  addPurchaseRequest,
-  updatePurchaseRequest,
-  listStdItems,
-  type EquipmentItem,
-  type StdItem,
-  type MilestoneItem,
-  type ProjectMember,
-  type PurchaseRequestItem,
-} from '../api/client'
-import { LONGLEAD_STATUS as STATUS_COLOR } from '../theme/status'
+import { addEquipment, addMilestone, clearMilestones, errMsg, listEquipment, listMembers, removeMember, listMilestones, listPurchaseRequests, removeEquipment, removeMilestone, removePurchaseRequest, saveMember, updateEquipment, updateMilestone, addPurchaseRequest, updatePurchaseRequest, listStdItems, type EquipmentItem, type StdItem, type MilestoneItem, type ProjectMember, type PurchaseRequestItem } from '../api/client'
+import { LONGLEAD_STATUS as STATUS_COLOR, toneOf } from '../theme/status'
 
 const PROJECT_ROLES = [
   '项目经理',
@@ -281,7 +243,7 @@ export function EquipmentEditor({ projectNo, onChanged }: Omit<Props, 'users'>) 
             dataIndex: 'bom_complete',
             width: 100,
             render: (v: boolean) =>
-              v ? <Tag color="green">完整</Tag> : <Tag>待设计</Tag>,
+              v ? <Chip tone="ok">完整</Chip> : <Chip>待设计</Chip>,
           },
           {
             title: '操作',
@@ -494,7 +456,7 @@ export function MilestoneEditor({ projectNo, users, onChanged }: Props) {
               value={v}
               options={MILESTONE_STATUS.map((s) => ({
                 value: s,
-                label: <Tag color={STATUS_COLOR[s]}>{s}</Tag>,
+                label: <Chip tone={toneOf(STATUS_COLOR[s])}>{s}</Chip>,
               }))}
               onChange={(nv) => void patch(r.id, { status: nv })}
             />
@@ -673,7 +635,7 @@ export function LongLeadEditor({ projectNo, onChanged }: Omit<Props, 'users'>) {
             render: (v: string | null, r) => (
               <Space size={4}>
                 <span>{v ?? '—'}</span>
-                {v && r.need_date && v > r.need_date && <Tag color="red">晚于需求</Tag>}
+                {v && r.need_date && v > r.need_date && <Chip tone="err">晚于需求</Chip>}
               </Space>
             ),
           },
@@ -682,7 +644,7 @@ export function LongLeadEditor({ projectNo, onChanged }: Omit<Props, 'users'>) {
             title: '状态',
             dataIndex: 'status',
             width: 100,
-            render: (v: string) => <Tag color={STATUS_COLOR[v]}>{v}</Tag>,
+            render: (v: string) => <Chip tone={toneOf(STATUS_COLOR[v])}>{v}</Chip>,
           },
           {
             title: '',

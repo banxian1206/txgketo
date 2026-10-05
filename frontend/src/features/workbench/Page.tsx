@@ -1,38 +1,46 @@
-
-import { App, Button, Card, Col, List, Row, Space, Statistic, Table, Tag, Typography } from 'antd'
-import { lazy, useCallback, useEffect, useState } from 'react'
+import { App, Button, Table } from 'antd'
+import { lazy, useCallback, useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 
 import NotificationsDrawer from '../../components/NotificationsDrawer'
-import {
-  errMsg,
-  listNotifications,
-  markAllNotificationsRead,
-  markNotificationRead,
-  workbenchMe,
-  type NotificationRow,
-  type WorkbenchMe,
-} from '../../api/client'
+import { Chip, Code, Empty, Metrics, Muted, NA, PageHead, Panel, QueueGroup, QueueRow, Status, type MetricItem, type Tone } from '../../components/ds'
+import { errMsg, listNotifications, markAllNotificationsRead, markNotificationRead, workbenchMe, type NotificationRow, type WorkbenchMe } from '../../api/client'
 import { hasPerm } from '../../api/user'
-import { WB_TYPE as TYPE_COLOR } from '../../theme/status'
-import { PROJECT_STAGE as STAGE_COLOR } from '../../theme/status'
-import { T } from '../../theme/tokens'
+import { PROJECT_STAGE as STAGE_COLOR, toneOf } from '../../theme/status'
 import { useGoFrom } from '../../hooks/useFrom'
 // A2（v2 拍板②）：三业务页组件复用挂入我的台（lazy import 与 App 同 chunk）
 const MyTasks = lazy(() => import('../task/Page'))
 const Reviews = lazy(() => import('../review/Page'))
 const Changes = lazy(() => import('../change/Page'))
 
-interface TodoCard {
+interface TodoRow {
   label: string
   count: number
   to: string
   hint?: string
+  /** 归属分组（只用于分区显示，不参与权限判断） */
+  group: 'mine' | 'purchase' | 'warehouse' | 'sales'
   /** 角色码标注（A3）：缺省 = 人人可见 */
   roles?: string[]
+  /** 有值时的强调色（超期 = err） */
+  tone?: Tone
 }
 
-/** 我的工作台（06 卷 §8）：一屏看完「我该干的事」+ 我能进的工作台 */
+const GROUP_LABEL: Record<TodoRow['group'], string> = {
+  mine: '我的工作',
+  purchase: '采购',
+  warehouse: '仓库',
+  sales: '商务',
+}
+
+/** 我的工作台 → 收件箱（06 卷 §8；方案 A「纸面」2026-10-04 重做）
+ *
+ * 改版要点（docs/13 §3.2）：
+ *   ① 数字卡墙 → **一行指标条**：只显示非 0 的，点一下就到那个队列（0 的项不占首屏）
+ *   ② 待办 → **分区队列**（我的工作 / 采购 / 仓库 / 商务），一条 = 一个动作
+ *   ③ 长说明与内部口径**一律不上屏**（旧版页脚那句「06 卷 §11」已删）
+ *   ④ 0 的项仍在列表里（你有这项权限、当前 0），只是弱化 —— 不藏事实，也不抢注意力
+ */
 export default function Workbench() {
   const { message } = App.useApp()
   const nav = useNavigate()
@@ -69,146 +77,194 @@ export default function Workbench() {
   }
 
   const c = data?.counts
-  // A3（v2 拍板）：KPI 按角色裁剪 —— 卡带 roles 标注（对齐后端 WORKBENCHES 思路），ADMIN 角色兜底；
-  // 人人卡（我的任务/我提的改版）不标注。仓库三卡改指 PC 仓库台（A6 桌面跳移动修正提前完成）。
-  const todos: TodoCard[] = [
-    { label: '我的任务', count: c?.my_tasks ?? 0, to: '/workbench/tasks',
+  // A3（v2 拍板）：KPI 按角色裁剪 —— 行带 roles 标注（对齐后端 WORKBENCHES 思路），ADMIN 角色兜底；
+  // 人人行（我的任务/我提的改版）不标注。
+  const todos: TodoRow[] = [
+    { label: '我的任务', count: c?.my_tasks ?? 0, to: '/workbench/tasks', group: 'mine',
       // ★ 到期扫描（§8.3）：超期了就红字点出来，别等他自己翻
-      hint: c?.overdue_tasks ? `⚠ 超期 ${c.overdue_tasks}` : undefined },
-    { label: '待我审核', count: c?.to_review ?? 0, to: '/workbench/reviews?tab=todo', hint: '评审单', roles: ['DESIGN_AUDIT', 'ADMIN'] },
-    { label: '待我裁决', count: c?.to_decide ?? 0, to: '/workbench/changes?tab=pending', roles: ['DESIGN_AUDIT', 'ADMIN'] },
-    { label: '待我改版', count: c?.to_change ?? 0, to: '/workbench/changes?tab=pending', hint: '改版任务', roles: ['DESIGN', 'DESIGN_AUDIT', 'CRAFT', 'ADMIN'] },
-    { label: '我提的改版', count: c?.my_changes ?? 0, to: '/workbench/changes?tab=mine' },
-    { label: '待采购', count: c?.to_purchase ?? 0, to: '/purchase?tab=pool', hint: '采购池', roles: ['PURCHASE', 'PURCHASE_LEAD', 'ADMIN'] },
-    { label: '待验收', count: c?.to_inspect ?? 0, to: '/warehouse?tab=incoming', roles: ['WAREHOUSE', 'ADMIN'] },
-    { label: '待入库', count: c?.to_store ?? 0, to: '/warehouse?tab=storage', roles: ['WAREHOUSE', 'ADMIN'] },
-    { label: '待领料', count: c?.issues ?? 0, to: '/warehouse?tab=issues', roles: ['WAREHOUSE', 'ADMIN'] },
-    { label: '我的商机', count: c?.my_leads ?? 0, to: '/projects', hint: '线索 / 待立项', roles: ['SALES', 'SCHEME', 'ADMIN'] },
+      hint: c?.overdue_tasks ? `其中 ${c.overdue_tasks} 项已超期` : undefined,
+      tone: c?.overdue_tasks ? 'err' : undefined },
+    { label: '待我审核', count: c?.to_review ?? 0, to: '/workbench/reviews?tab=todo', group: 'mine', hint: '评审单', roles: ['DESIGN_AUDIT', 'ADMIN'] },
+    { label: '待我裁决', count: c?.to_decide ?? 0, to: '/workbench/changes?tab=pending', group: 'mine', hint: '改版申请', roles: ['DESIGN_AUDIT', 'ADMIN'] },
+    { label: '待我改版', count: c?.to_change ?? 0, to: '/workbench/changes?tab=pending', group: 'mine', hint: '改版任务', roles: ['DESIGN', 'DESIGN_AUDIT', 'CRAFT', 'ADMIN'] },
+    { label: '我提的改版', count: c?.my_changes ?? 0, to: '/workbench/changes?tab=mine', group: 'mine' },
+    { label: '待采购', count: c?.to_purchase ?? 0, to: '/purchase?tab=pool', group: 'purchase', hint: '采购池', roles: ['PURCHASE', 'PURCHASE_LEAD', 'ADMIN'] },
+    { label: '待验收', count: c?.to_inspect ?? 0, to: '/warehouse?tab=incoming', group: 'warehouse', roles: ['WAREHOUSE', 'ADMIN'] },
+    { label: '待入库', count: c?.to_store ?? 0, to: '/warehouse?tab=storage', group: 'warehouse', roles: ['WAREHOUSE', 'ADMIN'] },
+    { label: '待领料', count: c?.issues ?? 0, to: '/warehouse?tab=issues', group: 'warehouse', roles: ['WAREHOUSE', 'ADMIN'] },
+    { label: '我的商机', count: c?.my_leads ?? 0, to: '/projects', group: 'sales', hint: '线索 / 待立项', roles: ['SALES', 'SCHEME', 'ADMIN'] },
   ]
-  // 裁剪：角色码交集 + ADMIN 兜底（无 roles = 人人卡）
+  // 裁剪：角色码交集 + ADMIN 兜底（无 roles = 人人行）
   const myRoles = data?.user.roles ?? []
   const isAdminRole = myRoles.includes('ADMIN')
   const visibleTodos = todos.filter((t) => !t.roles || isAdminRole || t.roles.some((r) => myRoles.includes(r)))
-  // 管理入口卡（canManageUsers 对齐：ADMIN 角色或总监岗）——纯入口无数字，不发明数据
   const canManageUsers = hasPerm('admin:users')
 
+  // 指标条：只放**非 0** 的（0 不占首屏）+ 未读收尾
+  const metrics = useMemo<MetricItem[]>(() => {
+    const live = visibleTodos.filter((t) => t.count > 0)
+    const errCount = visibleTodos.filter((t) => t.tone === 'err').length
+    const items: MetricItem[] = live.slice(0, 5).map((t, i) => ({
+      key: t.label,
+      label: t.label,
+      value: t.count,
+      unit: '项',
+      note: t.hint ?? (t.group === 'mine' ? undefined : GROUP_LABEL[t.group]),
+      tone: t.tone ?? (i === 0 && errCount ? 'err' : undefined),
+      to: t.to,
+    }))
+    const unread = c?.unread ?? 0
+    if (unread > 0) items.push({ key: 'unread', label: '未读消息', value: unread, unit: '条', tone: 'run', onClick: () => setNotifOpen(true) })
+    if (!items.length) items.push({ key: 'clear', label: '今天', value: '无待办', note: '有新任务会出现在这里' })
+    return items
+  }, [visibleTodos, c?.unread])
 
+  // 待办分区（0 的项也列出，但弱化）
+  const groups = (['mine', 'purchase', 'warehouse', 'sales'] as const)
+    .map((g) => ({ g, rows: visibleTodos.filter((t) => t.group === g) }))
+    .filter((x) => x.rows.length > 0)
 
-  // ★ 重整 P1（docs/10 §8.4）：**台内不再放页签条**。
-  //   待办卡本身就是入口，点它直达「对应台 + 对应页签」（?tab=），
-  //   原来是「台条 → 台内条 → 页内条 → 状态条」四条叠在一屏（§1.3 实测 4 层）。
-  //   /workbench/tasks|reviews|changes 三个子路由**保留**（通知 link / 书签 / ROUTE_REDIRECTS 不破），
-  //   只是从"页签"改成"整页渲染"。
+  // 分区计数（第一分区不重复显示数字 —— 首屏指标条已经给过）
+  const totalOpen = visibleTodos.reduce((a, t) => a + t.count, 0)
+
+  // ★ 重整 P1（docs/10 §8.4）：**台内不再放页签条**，待办行本身就是入口，
+  //   点它直达「对应台 + 对应页签」（?tab=）。三个子路由**保留**（通知 link / 书签 / ROUTE_REDIRECTS 不破）。
   const seg = loc.pathname.replace(/^\/workbench\/?/, '')
   if (seg === 'tasks') return <MyTasks />
   if (seg === 'reviews') return <Reviews />
   if (seg === 'changes') return <Changes />
 
   return (
-    <>
-      <Card size="small" style={{ marginBottom: 12 }}>
-        <Space wrap>
-          <Typography.Text strong style={{ fontSize: 16 }}>
-            {data?.user.name ?? '…'}
-          </Typography.Text>
-          <Tag>{data?.user.department?.name ?? '未分部门'}</Tag>
-          {data?.user.position && <Tag color="blue">{data.user.position}</Tag>}
-          {data?.user.title && <Tag>{data.user.title}</Tag>}
-          <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-            {data?.user.roles.join(' / ')}
-          </Typography.Text>
-        </Space>
-      </Card>
+    <div className="ds-page">
+      <PageHead
+        title={`${data?.user.name ?? '…'}，你好`}
+        sub={
+          <>
+            {data?.user.department?.name ?? '未分部门'}
+            {data?.user.position ? ` · ${data.user.position}` : ''}
+            {' · '}
+            {totalOpen > 0 ? `今天有 ${totalOpen} 项待处理` : '今天没有待处理的事'}
+          </>
+        }
+        actions={
+          <>
+            <Button size="small" disabled={!c?.unread} onClick={() => void markAllNotificationsRead().then(load)}>
+              全部已读
+            </Button>
+            <Button size="small" type="primary" onClick={() => setNotifOpen(true)}>
+              消息中心{c?.unread ? ` (${c.unread})` : ''}
+            </Button>
+          </>
+        }
+      />
 
-      <Row gutter={[12, 12]}>
-        {visibleTodos.map((t) => (
-          <Col xs={12} sm={8} md={6} lg={4} xl={4} key={t.label}>
-            <Card size="small" hoverable onClick={() => nav(t.to)} style={{ textAlign: 'center' }}>
-              <Statistic
+      <Metrics items={metrics} />
+
+      <Panel
+        title="待办"
+        sub="一行 = 一件事，点一下直接过去"
+        help="按角色下发：你看得到的都是你有权限处理的。数量为 0 的项仍列在这里（你有这项职责，当前没有待办）。"
+        extra={
+          <Chip tone={totalOpen ? 'acc' : undefined}>
+            共 {totalOpen} 项
+          </Chip>
+        }
+      >
+        {groups.map(({ g, rows }) => (
+          <div key={g}>
+            <QueueGroup
+              label={GROUP_LABEL[g]}
+              tone={rows.some((r) => r.tone === 'err') ? 'err' : g === 'mine' ? 'run' : undefined}
+            />
+            {rows.map((t) => (
+              <QueueRow
+                key={t.label}
                 title={t.label}
-                value={t.count}
-                valueStyle={{ fontSize: 20, color: t.count ? T.brand : T.textDisabled }}
+                meta={t.hint ?? (t.count ? undefined : '当前没有待办')}
+                muted={t.count === 0}
+                cells={[
+                  { text: t.count ? `${t.count} 项` : NA, tone: t.count ? t.tone : undefined },
+                ]}
+                actions={
+                  <Button size="small" disabled={!t.count} onClick={() => go(t.to)}>
+                    去处理
+                  </Button>
+                }
+                onClick={() => go(t.to)}
               />
-              {t.hint && (
-                <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-                  {t.hint}
-                </Typography.Text>
-              )}
-            </Card>
-          </Col>
+            ))}
+          </div>
         ))}
         {canManageUsers && (
-          <Col xs={12} sm={8} md={6} lg={4} xl={4}>
-            <Card size="small" hoverable onClick={() => nav('/admin/users')} style={{ textAlign: 'center' }}>
-              <Statistic title="系统管理" value="入口" valueStyle={{ fontSize: 20, color: T.brand }} />
-              <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-                用户与权限 · 操作日志 · 演示数据
-              </Typography.Text>
-            </Card>
-          </Col>
+          <div>
+            <QueueGroup label="系统管理" />
+            <QueueRow
+              title="用户与权限"
+              meta="组织架构 · 角色与岗位 · 操作日志 · 演示数据"
+              onClick={() => nav('/admin/users')}
+              actions={<Button size="small">进入</Button>}
+            />
+          </div>
         )}
-      </Row>
+        {!groups.length && !canManageUsers && <Empty text="这个账号还没有被分配任何工作台，请联系管理员。" />}
+      </Panel>
 
-
-      <Card
-        size="small"
-        title={`最新消息（未读 ${data?.counts.unread ?? 0}）`}
-        style={{ marginTop: 12 }}
+      <Panel
+        title={`最新消息${c?.unread ? `（未读 ${c.unread}）` : ''}`}
+        sub="只显示最近 5 条"
+        help="系统通知与业务消息；点一条就直接跳到对应页面。"
         extra={
-          <Space>
-            <Button size="small" disabled={!data?.counts.unread} onClick={() => void markAllNotificationsRead().then(load)}>
+          <>
+            <Button size="small" disabled={!c?.unread} onClick={() => void markAllNotificationsRead().then(load)}>
               全部已读
             </Button>
             <Button size="small" onClick={() => setNotifOpen(true)}>
               查看全部
             </Button>
-          </Space>
+          </>
         }
       >
-        <List
-          size="small"
-          dataSource={messages}
-          locale={{ emptyText: '没有消息' }}
-          renderItem={(n) => (
-            <List.Item style={{ cursor: 'pointer', padding: '6px 0' }} onClick={() => void openMessage(n)}>
-              <Space size={6} wrap>
-                <Tag color={TYPE_COLOR[n.type] ?? 'default'}>{n.type}</Tag>
-                <span style={{ fontWeight: n.is_read ? 400 : 600 }}>{n.title}</span>
-                <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-                  {n.created_at ? n.created_at.slice(5, 16).replace('T', ' ') : ''}
-                </Typography.Text>
-              </Space>
-            </List.Item>
-          )}
-        />
-      </Card>
+        {messages.length ? (
+          messages.map((n) => (
+            <QueueRow
+              key={n.id}
+              lead={<Chip>{n.type}</Chip>}
+              title={<span style={{ fontWeight: n.is_read ? 400 : 600 }}>{n.title}</span>}
+              cells={[
+                { text: <Muted>{n.created_at ? n.created_at.slice(5, 16).replace('T', ' ') : ''}</Muted> },
+              ]}
+              onClick={() => void openMessage(n)}
+            />
+          ))
+        ) : (
+          <Empty text="没有消息。任务派工、评审、改版、到货都会在这里通知你。" />
+        )}
+      </Panel>
 
-      <NotificationsDrawer open={notifOpen} onClose={() => setNotifOpen(false)} onReadChange={() => void load()} />
-
-      <Card size="small" title="我参与的项目" style={{ marginTop: 12 }}>
+      <Panel title="我参与的项目" sub="我是项目经理 / 销售负责人 / 项目团队成员">
         <Table
           rowKey="project_no"
           size="small"
           pagination={false}
           dataSource={data?.my_projects ?? []}
-          locale={{ emptyText: '还没有参与的项目' }}
+          locale={{
+            emptyText: <Empty text="还没有参与的项目。项目立项后你会在团队里看到它。" />,
+          }}
           onRow={(r) => ({ onClick: () => go(`/projects/${r.project_no}`), style: { cursor: 'pointer' } })}
           columns={[
-            { title: '项目号', dataIndex: 'project_no', width: 110 },
+            { title: '项目号', dataIndex: 'project_no', width: 120, render: (v: string) => <Code>{v}</Code> },
             { title: '项目名称', dataIndex: 'project_name' },
             {
               title: '阶段',
               dataIndex: 'stage',
-              width: 110,
-              render: (v: string) => <Tag color={STAGE_COLOR[v] ?? 'default'}>{v}</Tag>,
+              width: 120,
+              render: (v: string) => <Status tone={toneOf(STAGE_COLOR[v])}>{v}</Status>,
             },
           ]}
         />
-      </Card>
+      </Panel>
 
-      <Typography.Paragraph type="secondary" style={{ fontSize: 12, marginTop: 12 }}>
-        每个节点一个工作台，按角色显示；「我的工作台」把所有待办收在一屏。工作台的详细内容随后续步骤补齐（06 卷 §11）。
-      </Typography.Paragraph>
-    </>
+      <NotificationsDrawer open={notifOpen} onClose={() => setNotifOpen(false)} onReadChange={() => void load()} />
+    </div>
   )
 }

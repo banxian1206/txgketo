@@ -1,11 +1,13 @@
-import { App, Button, Card, Table, Tabs, Tag, Typography } from 'antd'
+import { App, Button, Card, Table, Typography } from 'antd'
+import { Status } from '../../components/ds'
 import type { ColumnsType } from 'antd/es/table'
 import { useCallback, useEffect, useState } from 'react'
 
+import WorkbenchTabs from '../../components/ds/WorkbenchTabs'
 import ChangeDetailModal from '../../components/ChangeDetailModal'
 import { errMsg, listChangeRequests, type ChangeRequestRow } from '../../api/client'
-import { CHANGE_STATUS as STATUS_COLOR } from '../../theme/status'
-import { CHANGE_TABS, filterTabs } from '../../configs/tabs'
+import { CHANGE_STATUS as STATUS_COLOR, toneOf } from '../../theme/status'
+import { CHANGE_TABS, filterTabs, CHANGE_GROUPS } from '../../configs/tabs'
 import { useTab } from '../../hooks/useTab'
 
 /** 改版（ECN）工作台（05 卷 §7、§9）：提申请 → 总监裁决 → 下发 → 修订 → 重审发布 */
@@ -72,7 +74,7 @@ export default function Changes() {
       title: '状态',
       dataIndex: 'status',
       width: 90,
-      render: (v: string) => <Tag color={STATUS_COLOR[v] ?? 'default'}>{v}</Tag>,
+      render: (v: string) => <Status tone={toneOf(STATUS_COLOR[v])}>{v}</Status>,
     },
     {
       title: '改版任务',
@@ -90,9 +92,10 @@ export default function Changes() {
 
   return (
     <Card title="改版申请（ECN）" extra={<Button onClick={() => void load()}>刷新</Button>}>
-      <Tabs
-        activeKey={scope}
-        onChange={setTab}
+      <WorkbenchTabs
+        groups={CHANGE_GROUPS}
+        tab={scope}
+        onTab={setTab}
         items={[
           { key: 'pending', label: '待我裁决（总监）' },
           { key: 'todo', label: '待我改版' },

@@ -9,6 +9,8 @@
 
 from __future__ import annotations
 
+from datetime import date
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -30,7 +32,7 @@ from app.models.service import ServiceOrder
 from app.models.shipment import Shipment
 from app.models.site import SiteCommission, SiteIssue
 from app.models.task import Task
-from app.models.warehouse import MaterialIssue
+from app.models.warehouse import MaterialIssue, MaterialIssueLine
 from app.services.notify import unread_count
 
 router = APIRouter(prefix="/m", tags=["移动端"])
@@ -150,6 +152,111 @@ def mobile_home(session: Session = Depends(get_session), current: User = Depends
         to_review = 0
         to_decide = 0
 
+    # ── 今日任务流（R4 · 2026-10-04）────────────────────────────────────────────
+    # ★ 为什么加这一段：手机首页原来是 14 个数字格（其中一大半是 0），用户得自己判断
+    #   "今天先干哪件"。给一条**行级**任务流（带编号/名称/去向），首页只放前几条。
+    #   每条带 `tab`（属于哪个移动台）→ 前端按**该用户可见的台**过滤，不越权展示。
+    tasks: list[dict] = []
+
+    def _add(kind: str, tab: str, to: str, code: str | None, title: str, sub: str,
+             tone: str | None = None, extra: int = 0) -> None:
+        if len(tasks) >= 8:
+            return
+        tasks.append({
+            "kind": kind, "tab": tab, "to": to, "code": code,
+            "title": title, "sub": sub, "tone": tone, "more": extra,
+        })
+
+    # ① 待验收（最紧：货到了不进库，车间就等料）—— 超期排最前
+    rows = session.execute(
+        select(PurchaseRequest)
+        .where(
+            PurchaseRequest.status.in_(TO_INSPECT),
+            PurchaseRequest.deliver_to.in_(("公司仓库", None)),
+        )
+        .order_by(PurchaseRequest.need_date.asc().nulls_last(), PurchaseRequest.id)
+        .limit(3)
+    ).scalars().all()
+    for r in rows:
+        item = session.get(Item, r.item_no)
+        overdue = bool(r.need_date and r.need_date < date.today())
+        _add("待验收", "/m/warehouse", "/m/warehouse", r.po_no,
+             (item.display_name if item else r.item_no),
+             f"{r.project_no or '辅料'} {r.equip_no or ''} · 需要 {r.need_date or '—'}".strip(),
+             "err" if overdue else None, extra=to_inspect)
+
+    # ② 待入库（验收合格了，定个库位就完事）
+    for g in session.execute(
+        select(GoodsReceipt)
+        .where(GoodsReceipt.status == "待入库", GoodsReceipt.deliver_to == "公司仓库")
+        .order_by(GoodsReceipt.id)
+        .limit(2)
+    ).scalars().all():
+        item = session.get(Item, g.item_no)
+        _add("待入库", "/m/warehouse", "/m/warehouse", g.receipt_no,
+             (item.display_name if item else g.item_no) or "—",
+             f"{g.project_no or '辅料'} · 验收 {g.receipt_date or '—'} · 库位必填",
+             extra=to_store)
+
+    # ③ 待领料（车间在等；缺料的行要在卡片上说清楚）
+    for mi in session.execute(
+        select(MaterialIssue)
+        .where(MaterialIssue.status.in_(("待备料", "已备料", "部分领料")))
+        .order_by(MaterialIssue.id)
+        .limit(2)
+    ).scalars().all():
+        n_lines = _count(
+            session, select(func.count()).select_from(MaterialIssueLine).where(MaterialIssueLine.issue_id == mi.id)
+        )
+        n_short = _count(
+            session,
+            select(func.count())
+            .select_from(MaterialIssueLine)
+            .where(MaterialIssueLine.issue_id == mi.id, MaterialIssueLine.shortage.is_(True)),
+        )
+        _add("领料", "/m/issues", "/m/issues", mi.issue_no,
+             f"{mi.project_no} {mi.equip_no or ''}".strip(),
+             f"{n_lines} 种物料" + (f" · 缺 {n_short} 种" if n_short else ""),
+             "warn" if n_short else None, extra=issues)
+
+    # ④ 制造 / 装配 / 发运 / 现场 / 售后：各自取最早一条，够首页提示"还有别的活"
+    for o in session.execute(
+        select(ProdOrder).where(ProdOrder.status == PROD_WAIT).order_by(ProdOrder.id).limit(1)
+    ).scalars().all():
+        _add("待下发", "/m/production", "/m/production", o.order_no, o.item_name or o.item_no,
+             f"{o.project_no} {o.equip_no or ''} · 交原材料 + 图纸（拍照）".strip(), extra=to_dispatch)
+    for o in session.execute(
+        select(ProdOrder).where(ProdOrder.status.in_((PROD_DISPATCHED, PROD_RUNNING))).order_by(ProdOrder.id).limit(1)
+    ).scalars().all():
+        _add("待验收零件", "/m/production", "/m/production", o.order_no, o.item_name or o.item_no,
+             f"计划 {o.plan_end or '—'} · 合格后转运装配区", extra=to_accept)
+    for a in session.execute(
+        select(AssemblyRecord).where(AssemblyRecord.status == "装配中").order_by(AssemblyRecord.id).limit(1)
+    ).scalars().all():
+        _add("装配中", "/m/assembly", "/m/assembly", None, f"{a.project_no} {a.equip_no}",
+             f"开工时齐套率 {round((a.kitting_rate or 0) * 100)}%", extra=assembling)
+    for sh in session.execute(
+        select(Shipment).where(Shipment.status.in_(("已指令", "打包中", "已装车"))).order_by(Shipment.id).limit(1)
+    ).scalars().all():
+        _add("发运待办", "/m/shipping", "/m/shipping", sh.shipment_no, sh.project_no or '',
+             f"发货日 {sh.plan_ship_date or '—'} · 状态 {sh.status}", extra=shipments_open)
+    for si in session.execute(
+        select(SiteIssue).where(SiteIssue.status == "待处理").order_by(SiteIssue.id).limit(1)
+    ).scalars().all():
+        _add("现场问题", "/m/site", "/m/site", si.project_no, si.title,
+             f"{si.project_no} {si.equip_no or ''}".strip(), tone="err", extra=site_open_issues)
+    for c in session.execute(
+        select(SiteCommission).where(SiteCommission.status == "已申请").order_by(SiteCommission.id).limit(1)
+    ).scalars().all():
+        _add("待派调试", "/m/site", "/m/site", c.project_no, c.project_no,
+             f"派给 {c.dispatch_to or '—'} · 计划 {c.plan_date or '—'}", extra=site_to_dispatch)
+    for so in session.execute(
+        select(ServiceOrder).where(ServiceOrder.status != "已关闭").order_by(ServiceOrder.id).limit(1)
+    ).scalars().all():
+        _add("售后工单", "/m/service", "/m/service", so.so_no, so.fault or so.so_no,
+             f"{so.project_no} {so.equip_no or ''} · {'在保' if so.in_warranty else '过保'}".strip(),
+             "err" if so.status == "待受理" else None, extra=service_open)
+
     return {
         "user": {
             "id": current.id,
@@ -158,6 +265,7 @@ def mobile_home(session: Session = Depends(get_session), current: User = Depends
             "position": current.position,
         },
         "unread": unread,
+        "tasks": tasks,
         "counts": {
             "to_inspect": to_inspect,
             "to_store": to_store,

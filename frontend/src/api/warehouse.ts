@@ -92,6 +92,8 @@ export async function storeReceipt(receiptId: number, body: { location?: string;
 
 export interface MobileHome {
   user: { id: number; name: string; profession?: string | null; position?: string | null }
+  /** ★ 未读数在后端是**顶层**字段（不在 counts 里）—— 别照直觉往 counts 里加 */
+  unread?: number
   counts: {
     to_inspect: number
     to_store: number
@@ -111,6 +113,21 @@ export interface MobileHome {
     acceptance_pending: number
     service_open: number
   }
+  /**
+   * 今日任务流（R4 · 2026-10-04）：手机首页只放前几条，**行级**数据（带编号/名称/去向）。
+   * `tab` = 这条属于哪个移动台 —— 前端按**该用户可见的台**过滤后再显示（不越权展示）。
+   */
+  tasks?: {
+    kind: string
+    tab: string
+    to: string
+    code?: string | null
+    title: string
+    sub?: string | null
+    tone?: 'err' | 'warn' | null
+    /** 同类还有多少条（"还有 N 条 →"） */
+    more?: number
+  }[]
 }
 
 export async function mobileHome() {

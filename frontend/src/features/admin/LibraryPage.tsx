@@ -1,33 +1,8 @@
 import { useUrlState } from '../../hooks/useUrlState'
-import {
-  App,
-  Button,
-  Card,
-  Col,
-  Empty,
-  Form,
-  Input,
-  InputNumber,
-  Row,
-  Select,
-  Space,
-  Table,
-  Typography,
-} from 'antd'
+import { App, Button, Card, Col, Empty, Form, Input, InputNumber, Row, Select, Space, Table, Typography } from 'antd'
 import { useCallback, useEffect, useState } from 'react'
 
-import {
-  createStdItem,
-  errMsg,
-  getStdItem,
-  listLibraryCategories,
-  listStdItems,
-  updateStdItem,
-  type SpecFieldDef,
-  type StdCategoryInfo,
-  type StdClassInfo,
-  type StdItem,
-} from '../../api/client'
+import { createStdItem, errMsg, getStdItem, listLibraryCategories, listStdItems, updateStdItem, type SpecFieldDef, type StdCategoryInfo, type StdClassInfo, type StdItem } from '../../api/client'
 import AppModal from '../../components/AppModal'
 import { T } from '../../theme/tokens'
 

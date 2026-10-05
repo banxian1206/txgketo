@@ -1,18 +1,10 @@
-import { Alert, App, Button, DatePicker, Form, Input, InputNumber, Select, Space, Tag, Typography } from 'antd'
+import { Alert, App, Button, DatePicker, Form, Input, InputNumber, Select, Space, Typography } from 'antd'
+import { toneOf } from '../theme/status'
+import { Chip } from '../components/ds'
 import dayjs from 'dayjs'
 import { useState } from 'react'
 
-import {
-  errMsg,
-  listSuppliers,
-  priceReference,
-  recommendSuppliers,
-  orderPurchase,
-  type PriceReference,
-  type RecommendResult,
-  type PurchaseRequestItem,
-  type SupplierRow,
-} from '../api/client'
+import { errMsg, listSuppliers, priceReference, recommendSuppliers, orderPurchase, type PriceReference, type RecommendResult, type PurchaseRequestItem, type SupplierRow } from '../api/client'
 import { T } from '../theme/tokens'
 import AppModal from './AppModal'
 
@@ -210,11 +202,11 @@ export default function PurchaseActions({
                         })
                       }}
                     >
-                      <Tag color={r.late ? 'red' : 'blue'}>{r.score} 分</Tag>
+                      <Chip tone={toneOf(r.late ? 'red' : 'blue')}>{r.score} 分</Chip>
                       <b>{r.name}</b>
                       {r.price_hint ? `　参考价 ¥${r.price_hint.toLocaleString()}` : ''}
                       {r.lead_days ? `　交期 ${r.lead_days} 天` : ''}
-                      {r.reasons.includes('首选供应商') && <Tag color="gold">首选</Tag>}
+                      {r.reasons.includes('首选供应商') && <Chip tone="warn">首选</Chip>}
                       <div style={{ color: T.textSecondary }}>{r.reasons.join('　·　')}</div>
                     </div>
                   ))}
@@ -255,14 +247,14 @@ export default function PurchaseActions({
                       在报价的供应商（从低到高，点一下填入单价）：
                       <div style={{ marginTop: 4 }}>
                         {priceRef.quotes.map((q) => (
-                          <Tag
+                          <Chip
                             key={q.id}
                             style={{ cursor: 'pointer', marginBottom: 4 }}
                             onClick={() => orderForm.setFieldsValue({ unit_price: q.price })}
                           >
                             {q.supplier_name} ¥{q.price.toLocaleString()}
                             {q.lead_days ? ` / ${q.lead_days}天` : ''}
-                          </Tag>
+                          </Chip>
                         ))}
                       </div>
                     </div>

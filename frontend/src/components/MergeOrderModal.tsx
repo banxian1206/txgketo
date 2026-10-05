@@ -1,3 +1,5 @@
+import { Chip } from '../components/ds'
+import { toneOf } from '../theme/status'
 import {
   Alert,
   App,
@@ -11,20 +13,12 @@ import {
   Select,
   Space,
   Table,
-  Tag,
   Typography,
 } from 'antd'
 import dayjs from 'dayjs'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
-import {
-  errMsg,
-  mergeOrder,
-  priceReference,
-  recommendSuppliers,
-  type PriceReference,
-  type PurchasePoolGroup,
-} from '../api/client'
+import { errMsg, mergeOrder, priceReference, recommendSuppliers, type PriceReference, type PurchasePoolGroup } from '../api/client'
 import { SelectSupplier } from './fields'
 import { Muted } from './ui/Primitives'
 import { T } from '../theme/tokens'
@@ -373,7 +367,7 @@ export default function MergeOrderModal({
               <>
                 <Space size={4}>
                   <span>{v ?? '—'}</span>
-                  {v && v < today && <Tag color="red">赶不上</Tag>}
+                  {v && v < today && <Chip tone="err">赶不上</Chip>}
                 </Space>
                 {l.lead_days ? (
                   <div style={{ fontSize: 12, color: T.textSecondary }}>周期 {l.lead_days} 天</div>
@@ -476,7 +470,7 @@ export default function MergeOrderModal({
                 title: '匹配',
                 dataIndex: 'score',
                 width: 76,
-                render: (v: number) => <Tag color="blue">{v} 分</Tag>,
+                render: (v: number) => <Chip tone="run">{v} 分</Chip>,
               },
               {
                 title: '供应商',
@@ -485,7 +479,7 @@ export default function MergeOrderModal({
                 render: (v: string, r) => (
                   <Space size={4}>
                     <b>{v}</b>
-                    {r.late && <Tag color="red">赶不上</Tag>}
+                    {r.late && <Chip tone="err">赶不上</Chip>}
                   </Space>
                 ),
               },
@@ -497,16 +491,16 @@ export default function MergeOrderModal({
                     {Object.entries(r.prices)
                       .filter(([, p]) => p)
                       .map(([item, p]) => (
-                        <Tag key={item}>
+                        <Chip key={item}>
                           {shortName(item)} ¥{p?.toLocaleString()}
-                        </Tag>
+                        </Chip>
                       ))}
                     {Object.entries(r.leads)
                       .filter(([, d]) => d)
                       .map(([item, d]) => (
-                        <Tag key={item} color={undefined}>
+                        <Chip key={item} tone={toneOf(undefined)}>
                           {shortName(item)} 交期 {d} 天
-                        </Tag>
+                        </Chip>
                       ))}
                   </>
                 ),

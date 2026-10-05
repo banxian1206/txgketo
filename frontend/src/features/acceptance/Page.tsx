@@ -1,45 +1,16 @@
-import {
-  App,
-  Button,
-  Card,
-  Col,
-  DatePicker,
-  Empty,
-  Form,
-  Input,
-  Modal,
-  Radio,
-  Row,
-  Select,
-  Space,
-  Statistic,
-  Table,
-  Tag,
-  Typography,
-  Upload,
-} from 'antd'
+import { App, Button, DatePicker, Empty, Form, Input, Modal, Radio, Select, Space, Table, Typography, Upload } from 'antd'
 import { UploadOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import { useCallback, useEffect, useState } from 'react'
 
-import {
-  acceptanceWorkbench,
-  applyAcceptance,
-  confirmAcceptance,
-  errMsg,
-  hasPerm,
-  signAcceptanceDoc,
-  uploadAcceptanceDocs,
-  type AcceptanceRow,
-  type AcceptanceWorkbench,
-} from '../../api/client'
+import { acceptanceWorkbench, applyAcceptance, confirmAcceptance, errMsg, hasPerm, signAcceptanceDoc, uploadAcceptanceDocs, type AcceptanceRow, type AcceptanceWorkbench } from '../../api/client'
 import { SelectProject } from '../../components/fields'
 import { CodeNo } from '../../components/ui/Primitives'
 import { acceptanceDocUrl } from '../../api/client'
 import { useUrlState } from '../../hooks/useUrlState'
 import { readSession } from '../../contexts/session'
-import { ACCEPTANCE_STATUS as ACC_COLOR } from '../../theme/status'
-import { T } from '../../theme/tokens'
+import { Chip, PageHead, Panel, Status } from '../../components/ds'
+import { ACCEPTANCE_STATUS as ACC_COLOR, toneOf } from '../../theme/status'
 
 const DOC_TYPES = ['技术协议', '图纸清单', '检验报告', '调试记录', '操作手册', '备件清单', '培训记录', '验收单', '其他']
 
@@ -154,38 +125,32 @@ export default function AcceptancePage() {
   const c = wb?.counts
 
   return (
-    <Card
-      title="验收与质保（S10）"
-      extra={
-        <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-          调试完成 → 申请客户验收 → 上传资料包 → 客户签字确认 → ★ 自动进入质保期
-        </Typography.Text>
-      }
-    >
-      <Row gutter={12} style={{ marginBottom: 12 }}>
-        <Col span={4}><Statistic title="待验收" value={c?.pending ?? 0} valueStyle={{ color: c?.pending ? T.goldText : undefined }} /></Col>
-        <Col span={4}><Statistic title="已通过" value={c?.passed ?? 0} /></Col>
-        <Col span={4}><Statistic title="未通过" value={c?.rejected ?? 0} /></Col>
-        {/* ★ F11：项目筛选（签字不能跨项目误操作） */}
-        <Col span={7}>
-          <SelectProject
-            allowClear
-            className="w-full"
-            placeholder="按项目筛选（默认全部项目）"
-            value={filterNo || undefined}
-            onChange={(v: string | undefined) => setQ({ project: v || undefined })}
-          />
-        </Col>
-        <Col span={5} style={{ textAlign: 'right' }}>
-          <Button type="primary" disabled={!canEdit} onClick={() => setApplyOpen(true)}>
+    <div className="ds-page">
+      <PageHead
+        title="验收与质保"
+        sub={`待验收 ${c?.pending ?? 0} · 已通过 ${c?.passed ?? 0}${c?.rejected ? ` · 未通过 ${c.rejected}` : ''}${filterNo ? ` · 已筛选项目 ${filterNo}` : ''}`}
+        help="调试完成 → 申请客户验收 → 上传资料包 → 客户签字确认 → 自动进入质保期（质保起算日 = 验收确认日）。签字是法律动作，务必先按项目筛选。"
+        actions={
+          <Button size="small" type="primary" disabled={!canEdit} onClick={() => setApplyOpen(true)}>
             申请客户验收
           </Button>
-        </Col>
-      </Row>
+        }
+      />
+      <Panel>
+      <div className="ds-toolbar">
+        {/* ★ F11：项目筛选（签字不能跨项目误操作）—— 未筛时黄字警示在下方 */}
+        <SelectProject
+          allowClear
+          className="w-full"
+          placeholder="按项目筛选（默认全部项目）"
+          value={filterNo || undefined}
+          onChange={(v: string | undefined) => setQ({ project: v || undefined })}
+        />
+      </div>
       {!filterNo && (
-        <Typography.Paragraph type="warning" style={{ fontSize: 12, marginTop: -6 }}>
-          当前是全部项目混排 —— 签字前请逐行核对项目号，或选上方筛选收到一个项目。
-        </Typography.Paragraph>
+        <div style={{ padding: '8px 16px 0' }}>
+          <Chip tone="warn">当前是全部项目混排 —— 签字前请逐行核对项目号，或选上方筛选收到一个项目</Chip>
+        </div>
       )}
 
       <Table<AcceptanceRow>
@@ -208,7 +173,7 @@ export default function AcceptancePage() {
             ),
           },
           { title: '申请时间', dataIndex: 'applied_at', width: 150, render: (v: string | null) => v?.slice(0, 16).replace('T', ' ') ?? '—' },
-          { title: '状态', dataIndex: 'status', width: 90, render: (v: string) => <Tag color={ACC_COLOR[v] ?? 'default'}>{v}</Tag> },
+          { title: '状态', dataIndex: 'status', width: 90, render: (v: string) => <Status tone={toneOf(ACC_COLOR[v])}>{v}</Status> },
           {
             title: '资料包',
             key: 'docs',
@@ -311,11 +276,12 @@ export default function AcceptancePage() {
               dataIndex: 'is_signed',
               width: 90,
               render: (v: boolean, r) =>
-                v ? <Tag color="success">已签</Tag> : canEdit ? <a onClick={() => void signAcceptanceDoc(r.id).then(() => void load())}>标记已签</a> : <Tag>未签</Tag>,
+                v ? <Chip tone="ok">已签</Chip> : canEdit ? <a onClick={() => void signAcceptanceDoc(r.id).then(() => void load())}>标记已签</a> : <Chip>未签</Chip>,
             },
           ]}
         />
       </Modal>
-    </Card>
+      </Panel>
+    </div>
   )
 }

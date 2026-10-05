@@ -1,28 +1,20 @@
 import { useMfgBoard } from '../../hooks/useMfgBoard'
-import { App, Button, Card, Empty, Form, Input, Modal, Radio, Select, Space, Tabs, Tag, Typography } from 'antd'
+import { App, Button, Form, Input, Modal, Radio, Select } from 'antd'
 import { useNavigate } from 'react-router-dom'
 import dayjs from 'dayjs'
-import {useState} from 'react'
+import { useState } from 'react'
 
-import {
-  acceptOutsource,
-  acceptProdOrder,
-  dispatchProdOrder,
-  errMsg,
-  hasPerm,
-  returnOutsource,
-  sendOutsource,
-  startProdOrder,
-  transferProdOrder,
-  type OutsourceRow,
-  type ProdOrderRow,
-} from '../../api/client'
+import { acceptOutsource, acceptProdOrder, dispatchProdOrder, errMsg, hasPerm, returnOutsource, sendOutsource, startProdOrder, transferProdOrder, type OutsourceRow, type ProdOrderRow } from '../../api/client'
 import MfgPhotoPicker from '../../components/MfgPhotoPicker'
-import { PROD_STATUS as STATUS_COLOR } from '../../theme/status'
-import { OUTSOURCE_STATUS as OS_COLOR } from '../../theme/status'
-import { T } from '../../theme/tokens'
+import { MCard, MChip, MEmpty, MHead, MStatus } from '../../components/ds/mobile'
 
 const TEAMS = ['下料', '机加', '焊接', '钣金', '喷涂']
+
+/** 状态色（theme/status 的预设名）→ 作业卡的语义 tone（与 PC 的 toneOf 同一套语义） */
+const STATUS_TONE: Record<string, 'ok' | 'warn' | 'err' | 'run' | undefined> = {
+  success: 'ok', processing: 'run', error: 'err', gold: 'warn', default: undefined,
+}
+const OS_TONE = STATUS_TONE
 
 type Kind = 'dispatch' | 'accept' | 'transfer' | 'os-send' | 'os-accept'
 
@@ -39,7 +31,7 @@ export default function ProductionM() {
 
   // 重构 2.3：看板数据走共享 hook（与另一端同源）
   // ★ F17：hook 内部已按 mfg:view 短路（不发请求不吃 403），这里把“为什么是空的”说清楚
-  const { wb, loading, reload: load, allowed } = useMfgBoard()
+  const { wb, reload: load, allowed } = useMfgBoard()
 
   const open = (kind: Kind, order?: ProdOrderRow, os?: OutsourceRow) => {
     setPhotos([])
@@ -89,88 +81,156 @@ export default function ProductionM() {
   }
 
   const orderCard = (o: ProdOrderRow, kind: 'wait' | 'running' | 'transfer' | 'rework') => (
-    <Card key={o.id} size="small" style={{ marginBottom: 10 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-        <Typography.Text strong>{o.item_no}</Typography.Text>
-        <Tag color={STATUS_COLOR[o.status] ?? 'default'}>{o.status}</Tag>
+    <MCard
+      key={o.id}
+      tone={o.overdue ? 'err' : STATUS_TONE[o.status]}
+      head={
+        <>
+          <span className="ds-code" style={{ fontSize: 12 }}>{o.order_no ?? o.item_no}</span>
+          <MStatus tone={o.overdue ? 'err' : STATUS_TONE[o.status]}>{o.status}</MStatus>
+          {o.overdue && (
+            <span style={{ marginLeft: 'auto' }}>
+              <MChip tone="err">超期</MChip>
+            </span>
+          )}
+        </>
+      }
+      title={o.item_name ?? o.item_no}
+      lines={[
+        <>
+          {o.item_no} · {o.qty} {o.unit}
+        </>,
+        <>
+          {o.project_no} · {o.equip_no ?? ''} · 计划 {o.plan_end ?? '—'}
+        </>,
+      ]}
+    >
+      <div className="m-actions">
+        {canEdit && kind === 'wait' && (
+          <Button block type="primary" onClick={() => open('dispatch', o)}>
+            下发原材料 + 图纸（拍照）
+          </Button>
+        )}
+        {canEdit && kind === 'running' && o.status === '已派工' && (
+          <Button block onClick={() => void startProdOrder(o.id).then(() => void load())}>
+            开工
+          </Button>
+        )}
+        {canEdit && kind === 'running' && (
+          <Button block type="primary" onClick={() => open('accept', o)}>
+            到期验收（拍照）
+          </Button>
+        )}
+        {canEdit && kind === 'transfer' && (
+          <Button block type="primary" onClick={() => open('transfer', o)}>
+            转运装配区（拍照）
+          </Button>
+        )}
+        {canEdit && kind === 'rework' && (
+          <Button block danger onClick={() => open('dispatch', o)}>
+            重新下发
+          </Button>
+        )}
       </div>
-      <div style={{ fontSize: 13, color: T.textStrong, marginTop: 4 }}>
-        {o.item_name ?? ''} · {o.qty} {o.unit}
-      </div>
-      <div style={{ fontSize: 12, color: T.textSecondary, marginTop: 2 }}>
-        {o.project_no} · {o.equip_no ?? ''} · 计划 {o.plan_end ?? '—'} {o.overdue ? '（超期）' : ''}
-      </div>
-      <Space wrap style={{ marginTop: 10 }}>
-        {canEdit && kind === 'wait' && <Button size="small" type="primary" onClick={() => open('dispatch', o)}>下发原材料+图纸</Button>}
-        {canEdit && kind === 'running' && o.status === '已派工' && <Button size="small" onClick={() => void startProdOrder(o.id).then(() => void load())}>开工</Button>}
-        {canEdit && kind === 'running' && <Button size="small" type="primary" onClick={() => open('accept', o)}>到期验收</Button>}
-        {canEdit && kind === 'transfer' && <Button size="small" type="primary" onClick={() => open('transfer', o)}>转运装配区</Button>}
-        {canEdit && kind === 'rework' && <Button size="small" danger onClick={() => open('dispatch', o)}>重新下发</Button>}
-      </Space>
-    </Card>
+    </MCard>
   )
 
   const osCard = (o: OutsourceRow) => (
-    <Card key={o.id} size="small" style={{ marginBottom: 10 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-        <Typography.Text strong>{o.item_no}</Typography.Text>
-        <Tag color={OS_COLOR[o.status] ?? 'default'}>{o.status}</Tag>
-      </div>
-      <div style={{ fontSize: 13, color: T.textStrong, marginTop: 4 }}>
-        {o.item_name ?? ''} · {o.qty} · {o.project_no} {o.equip_no ?? ''}
-      </div>
-      <Space wrap style={{ marginTop: 10 }}>
-        {canEdit && o.status === '待发出' && <Button size="small" type="primary" onClick={() => open('os-send', undefined, o)}>发出</Button>}
-        {canEdit && o.status === '外协中' && (
-          <Button size="small" onClick={() => void returnOutsource(o.id, {}).then(() => void load())}>登记回厂</Button>
+    <MCard
+      key={o.id}
+      tone={OS_TONE[o.status]}
+      head={
+        <>
+          <span className="ds-code" style={{ fontSize: 12 }}>{o.outsource_no ?? o.item_no}</span>
+          <MStatus tone={OS_TONE[o.status]}>{o.status}</MStatus>
+        </>
+      }
+      title={o.item_name ?? o.item_no}
+      lines={[
+        <>
+          {o.item_no} · {o.qty} · {o.project_no} {o.equip_no ?? ''}
+        </>,
+        o.due_date ? <>约定回厂 {o.due_date}</> : null,
+      ].filter(Boolean) as React.ReactNode[]}
+    >
+      <div className="m-actions">
+        {canEdit && o.status === '待发出' && (
+          <Button block type="primary" onClick={() => open('os-send', undefined, o)}>
+            外协发出（拍照）
+          </Button>
         )}
-        {canEdit && o.status === '回厂待检' && <Button size="small" type="primary" onClick={() => open('os-accept', undefined, o)}>验收</Button>}
-      </Space>
-    </Card>
+        {canEdit && o.status === '外协中' && (
+          <Button block onClick={() => void returnOutsource(o.id, {}).then(() => void load())}>
+            登记回厂
+          </Button>
+        )}
+        {canEdit && o.status === '回厂待检' && (
+          <Button block type="primary" onClick={() => open('os-accept', undefined, o)}>
+            回厂验收（拍照）
+          </Button>
+        )}
+      </div>
+    </MCard>
   )
 
   const c = wb?.counts
 
   if (!allowed) {
     return (
-      <Empty
-        description={
-          <Space direction="vertical">
-            <Typography.Text>你没有车间数据的查看权限（mfg:view）</Typography.Text>
-            <Typography.Text type="secondary" className="hint-inline">
-              制造任务是车间/装配的活。如果你是从别的页面点进来的，回首页选自己的工作台即可。
-            </Typography.Text>
-          </Space>
-        }
-      >
-        <Button onClick={() => nav('/m')}>回手机首页</Button>
-      </Empty>
+      <>
+        <MHead title="车间" sub="你没有车间数据的查看权限" />
+        <MEmpty text="制造任务是车间 / 装配的活。如果你是从别的页面点进来的，回首页选自己的工作台即可。" />
+        <div className="m-actions">
+          <Button block type="primary" onClick={() => nav('/m')}>
+            回手机首页
+          </Button>
+        </div>
+      </>
     )
   }
 
+  const SEGS = [
+    { key: 'wait', label: '待下发', n: wb?.wait.length ?? 0 },
+    { key: 'running', label: '在制', n: wb?.running.length ?? 0 },
+    { key: 'transfer', label: '待转运', n: wb?.to_transfer.length ?? 0 },
+    { key: 'rework', label: '返工', n: wb?.rework.length ?? 0 },
+    { key: 'os', label: '外协', n: wb?.outsource.length ?? 0 },
+  ] as const
+  const activeSeg = SEGS.find((x) => x.key === tab) ?? SEGS[0]
+
   return (
     <>
-      <Card size="small" style={{ marginBottom: 10 }}>
-        <Space split="|" wrap>
-          <span>待下发 {c?.wait ?? 0}</span>
-          <span>在制 {c?.running ?? 0}</span>
-          <span>待转运 {c?.to_transfer ?? 0}</span>
-          <span style={{ color: c?.rework ? T.error : undefined }}>返工 {c?.rework ?? 0}</span>
-          <span style={{ color: c?.overdue ? T.error : undefined }}>超期 {c?.overdue ?? 0}</span>
-        </Space>
-      </Card>
-
-      <Tabs
-        activeKey={tab}
-        onChange={setTab}
-        items={[
-          { key: 'wait', label: `待下发 ${wb?.wait.length ?? 0}`, children: <div>{loading ? null : (wb?.wait.length ?? 0) === 0 ? <Empty description="没有待下发" /> : wb?.wait.map((o) => orderCard(o, 'wait'))}</div> },
-          { key: 'running', label: `在制 ${wb?.running.length ?? 0}`, children: <div>{(wb?.running.length ?? 0) === 0 ? <Empty description="没有在制" /> : wb?.running.map((o) => orderCard(o, 'running'))}</div> },
-          { key: 'transfer', label: `待转运 ${wb?.to_transfer.length ?? 0}`, children: <div>{(wb?.to_transfer.length ?? 0) === 0 ? <Empty description="没有待转运" /> : wb?.to_transfer.map((o) => orderCard(o, 'transfer'))}</div> },
-          { key: 'rework', label: `返工 ${wb?.rework.length ?? 0}`, children: <div>{(wb?.rework.length ?? 0) === 0 ? <Empty description="没有返工" /> : wb?.rework.map((o) => orderCard(o, 'rework'))}</div> },
-          { key: 'os', label: `外协 ${wb?.outsource.length ?? 0}`, children: <div>{(wb?.outsource.length ?? 0) === 0 ? <Empty description="没有外协" /> : wb?.outsource.map(osCard)}</div> },
-        ]}
+      <MHead
+        title="车间"
+        sub={`待下发 ${c?.wait ?? 0} · 在制 ${c?.running ?? 0} · 待转运 ${c?.to_transfer ?? 0}${
+          c?.rework ? ` · 返工 ${c.rework}` : ''
+        }${c?.overdue ? ` · 超期 ${c.overdue}` : ''}`}
       />
+
+      {/* 视图切换：一排 Segmented（原来 5 条页签，手机上横着挤不下） */}
+      <div className="m-seg wrap">
+        {SEGS.map((x) => (
+          <button key={x.key} type="button" className={tab === x.key ? 'on' : ''} onClick={() => setTab(x.key)}>
+            {x.label}
+            {x.n > 0 && <span className="m-seg-n">{x.n}</span>}
+          </button>
+        ))}
+      </div>
+
+      {activeSeg.key === 'os'
+        ? (wb?.outsource.length ?? 0) === 0
+          ? <MEmpty text="没有外协任务。" />
+          : wb?.outsource.map(osCard)
+        : (() => {
+            const list =
+              activeSeg.key === 'wait' ? wb?.wait
+              : activeSeg.key === 'running' ? wb?.running
+              : activeSeg.key === 'transfer' ? wb?.to_transfer
+              : wb?.rework
+            return (list?.length ?? 0) === 0
+              ? <MEmpty text={`没有${activeSeg.label}的排产单。`} />
+              : list!.map((o) => orderCard(o, activeSeg.key as 'wait' | 'running' | 'transfer' | 'rework'))
+          })()}
 
       <Modal
         open={!!action}

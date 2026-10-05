@@ -1,16 +1,7 @@
 // components/project/InitiateCards.tsx —— 由 ProjectDetailPage 拆出（重构 1.6b · 只拆不改）
-import {
-  Card,
-  Space,
-  Typography,
-} from 'antd'
+import { Card, Space, Typography } from 'antd'
 
-import {
-  EquipmentEditor,
-  LongLeadEditor,
-  MilestoneEditor,
-  TeamEditor,
-} from '../InitiationEditors'
+import { EquipmentEditor, LongLeadEditor, MilestoneEditor, TeamEditor } from '../InitiationEditors'
 import { useGoFrom } from '../../hooks/useFrom'
 
 export default function InitiateCards({

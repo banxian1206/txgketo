@@ -1,5 +1,9 @@
 import { hasPerm } from '../../api/user'
 import ProjectSummaryBar from '../../components/project/ProjectSummaryBar'
+import SectionNav from '../../components/ds/SectionNav'
+import { Chip, Panel, QueueRow, Status } from '../../components/ds'
+import { PROJECT_SECTIONS, defaultSectionKey } from '../../configs/sections'
+import { useTab } from '../../hooks/useTab'
 import DeliveryLane from '../../components/project/DeliveryLane'
 import BasicCard from '../../components/project/BasicCard'
 import CustomerCard from '../../components/project/CustomerCard'
@@ -13,46 +17,18 @@ import InitiateCards from '../../components/project/InitiateCards'
 import AttsCard from '../../components/project/AttsCard'
 import LogsCard from '../../components/project/LogsCard'
 import DealModals from '../../components/project/DealModals'
-import {
-  App,
-  Collapse,
-  Empty,
-  Form,
-  Spin,
-  Typography,
-} from 'antd'
+import { App, Button, Empty, Form, Spin, Typography } from 'antd'
 import dayjs from 'dayjs'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
+
+import { useGoFrom } from '../../hooks/useFrom'
 
 import { listShipments } from '../../api/shipping'
 import { listAcceptances } from '../../api/acceptance'
 import { serviceWorkbench } from '../../api/service'
 import AttachmentPreviewModal, { type PreviewState } from '../../components/AttachmentPreviewModal'
-import {
-  closeProject,
-  createContact,
-  errMsg,
-  getDesignOverview,
-  getProjectDetail,
-  listAuditLogs,
-  listUsers,
-  previewAttachment,
-  registerDeal,
-  updateContact,
-  updateProject,
-  uploadAttachment,
-  type Attachment,
-  type AuditLog,
-  type ContactIn,
-  type ProjectContact,
-  type DesignOverviewRow,
-  type ProjectDetail as Detail,
-  type ProjectUpdate,
-  kittingOverview,
-  registerPayment,
-  type KittingOverviewRow,
-} from '../../api/client'
+import { closeProject, createContact, errMsg, getDesignOverview, getProjectDetail, listAuditLogs, listUsers, previewAttachment, registerDeal, updateContact, updateProject, uploadAttachment, type Attachment, type AuditLog, type ContactIn, type ProjectContact, type DesignOverviewRow, type ProjectDetail as Detail, type ProjectUpdate, kittingOverview, registerPayment, type KittingOverviewRow } from '../../api/client'
 
 const ATT_CATEGORIES = ['客户资料', '方案', '报价', '合同', '技术协议', '其他']
 const CLOSE_REASONS = ['价格', '交期', '技术不满足', '客户取消', '对手中标', '其他']
@@ -69,9 +45,11 @@ export default function ProjectDetailPage() {
   const { projectNo = '' } = useParams()
   const { message } = App.useApp()
   const nav = useNavigate()
+  const go = useGoFrom()
 
   // 注意：useState 必须在 early-return 之前（否则 loading 分支与渲染分支 hooks 数量不一致）
-  const [lanes, setLanes] = useState<string[]>(['contract'])
+  // ★ P3：分区进 URL（`?tab=`）；原 Collapse 的 lanes 状态退役
+  const [tab, setTab] = useTab(PROJECT_SECTIONS.map((x) => x.key), defaultSectionKey(PROJECT_SECTIONS))
   const [detail, setDetail] = useState<Detail | null>(null)
   const [logs, setLogs] = useState<AuditLog[]>([])
   const [users, setUsers] = useState<{ id: number; name: string }[]>([])
@@ -200,15 +178,6 @@ export default function ProjectDetailPage() {
 
   const p = detail?.project
   // 阶段决定默认展开哪一段（线索/成交待立项→合同；执行中→执行；交付及以后→交付与售后）
-  // ★ 放在 early-return 之前：hooks 每次渲染的顺序必须一致（踩过：放后面直接白屏）
-  const stageRef = useRef('')
-  useEffect(() => {
-    const st = p?.stage ?? ''
-    if (!st || stageRef.current === st) return
-    stageRef.current = st
-    setLanes(st === '线索' || st === '成交待立项' ? ['contract'] : st === '执行中' ? ['exec'] : ['delivery'])
-  }, [p?.stage])
-
   if (loading && !p) {
     return (
       <div style={{ textAlign: 'center', padding: 80 }}>
@@ -220,13 +189,8 @@ export default function ProjectDetailPage() {
 
   const stepIndex = STAGE_ORDER.indexOf(p.stage)
   const goNext = (to: string) => nav(to)
-  // ★ 受控泳道：「下一步」按钮要能真的把人带到该去的那一段（原来质保的按钮点了是自跳）
-  const focusLane = (id: string) => {
-    setLanes((cur) => (cur.includes(id) ? cur : [...cur, id]))
-    window.setTimeout(() => {
-      document.querySelector(`.lane-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-    }, 60)
-  }
+  // ★ 「下一步」把人带到该去的**分区**（原来是把泳道展开并滚动；分区切换是瞬时的）
+  const focusLane = (id: string) => setTab(id)
   const nextAction =
     p.stage === '线索'
       ? { label: '成交登记', run: () => openDeal() }
@@ -367,6 +331,47 @@ export default function ProjectDetailPage() {
   }
 
   // ---------------------------------------------------------------- 渲染
+  // ── 卡点清单（概览区）：从各处状态汇总成"现在需要有人动手"的几件事 ────────
+  //   为什么放概览：这些话原来散在 4 条泳道 + 各工作台里，用户得挨个点开找。
+  const blocked: { text: string; tone: 'err' | 'warn'; tab?: string; to?: string }[] = []
+  if (p.delivery_days_left != null && p.delivery_days_left < 0)
+    blocked.push({ text: `合同交期已过 ${-p.delivery_days_left} 天`, tone: 'err', tab: 'exec' })
+  if (p.opportunity_days_left != null && p.opportunity_days_left < 0)
+    blocked.push({ text: `商机截止已过 ${-p.opportunity_days_left} 天`, tone: 'warn', tab: 'contract' })
+  if (hasAmount) {
+    const unpaid = (detail?.payment_terms ?? []).reduce(
+      (a: number, x: any) => a + Math.max(0, (x.amount ?? 0) - (x.received_amount ?? 0)),
+      0,
+    )
+    if (unpaid > 0)
+      blocked.push({
+        text: `未收款 ¥${Math.round(unpaid).toLocaleString()}${p.stage === '质保' || p.stage === '已归档' ? '（质保期）' : ''}`,
+        tone: p.stage === '质保' || p.stage === '已归档' ? 'err' : 'warn',
+        tab: 'contract',
+      })
+  }
+  for (const k of kitting) {
+    if ((k.kitting_rate ?? 1) < 1)
+      blocked.push({
+        text: `${k.equip_no} ${k.equip_name} 齐套 ${Math.round((k.kitting_rate ?? 0) * 100)}%（缺 ${k.total - k.arrived} 种）`,
+        tone: 'warn',
+        to: `/equipment/${projectNo}/${k.equip_no}`,
+      })
+  }
+  const unpublished = design.reduce((a: number, d: any) => a + (d.unpublished ?? 0), 0)
+  if (unpublished > 0)
+    blocked.push({ text: `设计有 ${unpublished} 张图/条目未发布（未发布不进采购与排产）`, tone: 'warn', tab: 'exec' })
+  const shortShip = shipRows.filter((s: any) =>
+    (s.receipts ?? []).some((r: any) => ['缺件', '破损'].includes(r.result)),
+  )
+  if (shortShip.length)
+    blocked.push({ text: `现场清点有缺/损（${shortShip.length} 批）`, tone: 'err', tab: 'delivery' })
+  const openSvc = svcRows.filter((o: any) => !['已关闭', '已解决'].includes(o.status))
+  if (openSvc.length)
+    blocked.push({ text: `售后 ${openSvc.length} 单未关闭`, tone: 'err', tab: 'delivery' })
+  if (!accRows.some((a: any) => a.status === '已通过') && p.stage === '交付中')
+    blocked.push({ text: '客户验收尚未签字', tone: 'warn', tab: 'delivery' })
+
   return (
     <>
       <AttachmentPreviewModal state={preview} onClose={() => setPreview(null)} />
@@ -392,21 +397,64 @@ export default function ProjectDetailPage() {
         onClose={() => setCloseOpen(true)}
       />
 
-      {/* ============ 四条泳道 + 操作记录（原来 12 张卡平铺 9 屏 → 折叠成 4 组）============ */}
-      <Collapse
-        ghost
-        activeKey={lanes}
-        onChange={(k) => setLanes(Array.isArray(k) ? (k as string[]) : [k as string])}
-        items={[
+      {/* ============ 分区：概览（卡点）/ 合同与商务 / 范围与资料 / 执行进度 / 交付与售后 / 操作记录
+          原来这里是 4 条折叠泳道 —— 折叠与"往下滑"是同一枚硬币的两面（点开一条立刻 2–3 屏），
+          改成横向切 + 结论条常驻（上面那条 ProjectSummaryBar 不随分区变）。============ */}
+      <SectionNav
+        tab={tab}
+        onTab={setTab}
+        emptyText="这一区还没有内容。"
+        sections={[
           {
-            key: 'contract',
-            className: 'lane-contract',
-            label: <b>合同与商务</b>,
+            key: 'overview',
+            label: '概览',
+            badge: blocked.length,
+            children: (
+              <Panel
+                title="现在卡在这"
+                sub={blocked.length ? `${blocked.length} 件事需要有人动手` : '没有卡点'}
+                help="从各处状态自动汇总：交期 / 付款 / 齐套 / 设计发布 / 现场 / 售后。点「去处理」直达对应分区或工作台。"
+                bodyStyle={{ padding: blocked.length ? 0 : undefined }}
+              >
+                {blocked.length === 0 ? (
+                  <Status tone="ok">没有卡点 —— 交期、回款、齐套、设计发布、现场与售后都没有异常</Status>
+                ) : (
+                  blocked.map((b) => (
+                    <QueueRow
+                      key={b.text}
+                      lead={<Chip tone={b.tone}>{b.tone === 'err' ? '需处理' : '留意'}</Chip>}
+                      title={b.text}
+                      actions={
+                        <Button size="small" onClick={() => (b.tab ? setTab(b.tab) : go(b.to!))}>
+                          去处理
+                        </Button>
+                      }
+                    />
+                  ))
+                )}
+              </Panel>
+            ),
+          },
+          {
+            key: 'basic',
+            label: '基本信息',
+            children: <BasicCard SOURCES={SOURCES} detail={detail} save={save} users={users} DASH={DASH} p={p} />,
+          },
+          {
+            key: 'customer',
+            label: '客户与联系人',
+            children: <CustomerCard detail={detail} openContact={openContact} save={save} DASH={DASH} p={p} />,
+          },
+          {
+            key: 'time',
+            label: '时间与金额',
+            children: <TimeCard save={save} DASH={DASH} p={p} />,
+          },
+          {
+            key: 'deal',
+            label: '成交与付款',
             children: (
               <>
-                <BasicCard SOURCES={SOURCES} detail={detail} save={save} users={users} DASH={DASH} p={p} />
-                <CustomerCard detail={detail} openContact={openContact} save={save} DASH={DASH} p={p} />
-                <TimeCard save={save} DASH={DASH} p={p} />
                 <DealCard detail={detail} doReceive={doReceive} message={message} openDeal={openDeal} openReceive={openReceive} receiveForm={receiveForm} receiveTarget={receiveTarget} save={save} saving={saving} setReceiveTarget={setReceiveTarget} DASH={DASH} p={p} />
                 {/* ★ 成交后改付款计划的唯一入口（要商务总监审批，只改未收节点） */}
                 <PaymentChangeCard
@@ -420,12 +468,11 @@ export default function ProjectDetailPage() {
           },
           {
             key: 'scope',
-            className: 'lane-scope',
-            label: <b>范围与资料</b>,
+            label: '范围与资料',
             children: (
               <>
                 <RequireCard save={save} p={p} />
-                <EquipmentsCard kitting={kitting} />
+                <EquipmentsCard kitting={kitting} projectNo={projectNo} />
                 <AttsCard ATT_CATEGORIES={ATT_CATEGORIES} attCategory={attCategory} detail={detail} doPreview={doPreview} doUpload={doUpload} loading={loading} setAttCategory={setAttCategory} uploading={uploading} projectNo={projectNo} />
               </>
             ),
@@ -434,8 +481,7 @@ export default function ProjectDetailPage() {
             ? [
                 {
                   key: 'exec',
-                  className: 'lane-exec',
-                  label: <b>执行进度</b>,
+                  label: '执行进度',
                   children: (
                     <>
                       <DesignProgressCard design={design} projectNo={projectNo} />
@@ -447,14 +493,13 @@ export default function ProjectDetailPage() {
             : []),
           {
             key: 'delivery',
-            className: 'lane-delivery',
-            label: <b>交付与售后</b>,
+            label: '交付与售后',
             children: <DeliveryLane shipments={shipRows} acceptances={accRows} orders={svcRows} />,
           },
           {
             key: 'logs',
-            className: 'lane-logs',
-            label: <b>操作记录（{logs.length}）</b>,
+            label: '操作记录',
+            badge: logs.length,
             children: <LogsCard detail={detail} logs={logs} />,
           },
         ]}

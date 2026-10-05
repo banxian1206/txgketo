@@ -1,8 +1,8 @@
-import { App, Button, Card, Empty, Input, Modal, Space, Tag, Typography } from 'antd'
+import { App, Button, Input, Modal, Spin } from 'antd'
 import { useCallback, useEffect, useState } from 'react'
 
 import { api, errMsg } from '../../api/client'
-import { WH_ISSUE_STATUS as STATUS_COLOR } from '../../theme/status'
+import { MCard, MChip, MEmpty, MGroup, MHead, MStatus } from '../../components/ds/mobile'
 
 interface IssueLine {
   id: number
@@ -11,6 +11,7 @@ interface IssueLine {
   spec_text?: string | null
   unit?: string | null
   qty_required: number
+  qty_picked?: number
   qty_issued: number
   location_name?: string | null
   shortage: boolean
@@ -26,7 +27,12 @@ interface IssueRow {
   lines: IssueLine[]
 }
 
-/** 手机端领料：备料 → 车间领走（03 卷：清单 + 勾选） */
+/** 手机端领料（R4-b · 2026-10-04 重做）：备料 → 车间领走（03 卷：清单 + 勾选 + 拍照）
+ *
+ * 改动：`Typography` 堆叠 + 未用到的三量 → 作业卡；一张单 = 一张卡，卡里把**缺料行**直接标出来
+ * （原来"缺料"只是个 Tag，看不出缺多少、补货后能不能继续备）。
+ * 三量口径（N24）：已备 = `qty_picked`、已领 = `qty_issued`，缺料 = `shortage`。
+ */
 export default function IssuesM() {
   const { message } = App.useApp()
   const [rows, setRows] = useState<IssueRow[]>([])
@@ -92,45 +98,96 @@ export default function IssuesM() {
   }
 
   const open = rows.filter((r) => r.status === '待备料' || r.status === '已备料' || r.status === '部分领料')
+  const totalShort = open.reduce((a, r) => a + r.lines.filter((l) => l.shortage).length, 0)
 
   return (
     <>
-      <Typography.Title level={5} style={{ marginTop: 0 }}>
-        领料（备料 → 领走）
-      </Typography.Title>
-      {!open.length && !loading && <Empty description="没有待办领料单" />}
-      {open.map((r) => (
-        <Card key={r.id} size="small" style={{ marginBottom: 10 }}>
-          <Space>
-            <Typography.Text strong>{r.issue_no}</Typography.Text>
-            <Tag color={STATUS_COLOR[r.status] ?? 'default'}>{r.status}</Tag>
-            <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-              {r.project_no} {r.equip_no ?? ''}
-            </Typography.Text>
-          </Space>
-          <div style={{ marginTop: 8 }}>
-            {r.lines.map((ln) => (
-              <div key={ln.id} style={{ fontSize: 13, marginBottom: 2 }}>
-                {ln.display_name} × {ln.qty_required} {ln.unit ?? ''}
-                {ln.location_name ? `（${ln.location_name}）` : ''}
-                {ln.shortage ? <Tag color="red" style={{ marginLeft: 6 }}>缺料</Tag> : null}
+      <Spin spinning={loading}>
+        <MHead
+          title="领料"
+          sub={
+            open.length
+              ? `${open.length} 张单待处理${totalShort ? ` · ${totalShort} 行缺料` : ''}`
+              : '没有待办的领料单'
+          }
+        />
+
+        {!open.length && !loading && (
+          <MEmpty text="没有待办领料单。车间排产后会生成领料单，仓库备好料车间再领走。" />
+        )}
+
+        {open.map((r) => {
+          const short = r.lines.filter((l) => l.shortage)
+          const done = r.lines.filter((l) => !l.shortage).length
+          const tone = short.length ? 'warn' : r.status === '已备料' ? 'ok' : 'run'
+          return (
+            <MCard
+              key={r.id}
+              tone={tone}
+              head={
+                <>
+                  <span className="ds-code" style={{ fontSize: 12 }}>
+                    {r.issue_no}
+                  </span>
+                  <MStatus tone={tone}>{r.status}</MStatus>
+                </>
+              }
+              title={`${r.project_no} ${r.equip_no ?? ''}`.trim()}
+              lines={[
+                <>
+                  {r.lines.length} 种物料 · 已齐 {done} 行
+                  {short.length ? (
+                    <>
+                      {' '}
+                      · <b>缺 {short.length} 行</b>
+                    </>
+                  ) : null}
+                </>,
+              ]}
+            >
+              {/* 缺料行单独列清楚（哪一行缺、缺多少、从哪备）—— 手机上一眼要能看出"还差什么" */}
+              {!!short.length && (
+                <>
+                  <MGroup title="缺料行" sub="补货后可在本页继续备料" />
+                  {short.map((ln) => (
+                    <div className="m-row" key={ln.id}>
+                      <div className="m-row-tx">
+                        <div className="m-row-t">{ln.display_name}</div>
+                        <div className="m-row-s">
+                          应领 {ln.qty_required} {ln.unit ?? ''}
+                          {ln.qty_picked ? ` · 已备 ${ln.qty_picked}` : ''}
+                          {ln.location_name ? ` · ${ln.location_name}` : ''}
+                        </div>
+                      </div>
+                      <div className="m-row-r">
+                        <MChip tone="err">缺</MChip>
+                      </div>
+                    </div>
+                  ))}
+                </>
+              )}
+
+              <div className="m-actions">
+                {(r.status === '待备料' || r.status === '部分领料') && (
+                  <Button
+                    block
+                    type={r.status === '部分领料' ? 'default' : 'primary'}
+                    loading={busyId === r.id}
+                    onClick={() => void act(r.id, 'pick')}
+                  >
+                    {r.status === '部分领料' ? '继续备料' : '备料完成'}
+                  </Button>
+                )}
+                {(r.status === '已备料' || r.status === '部分领料') && (
+                  <Button block type="primary" loading={busyId === r.id} onClick={() => void act(r.id, 'hand-over')}>
+                    车间领走
+                  </Button>
+                )}
               </div>
-            ))}
-          </div>
-          <Space style={{ marginTop: 8 }}>
-            {(r.status === '待备料' || r.status === '部分领料') && (
-              <Button size="small" type={r.status === '部分领料' ? 'default' : 'primary'} loading={busyId === r.id} onClick={() => void act(r.id, 'pick')}>
-                {r.status === '部分领料' ? '继续备料' : '备料完成'}
-              </Button>
-            )}
-            {(r.status === '已备料' || r.status === '部分领料') && (
-              <Button size="small" type="primary" loading={busyId === r.id} onClick={() => void act(r.id, 'hand-over')}>
-                车间领走
-              </Button>
-            )}
-          </Space>
-        </Card>
-      ))}
+            </MCard>
+          )
+        })}
+      </Spin>
 
       <Modal
         title="车间领走"
@@ -139,8 +196,12 @@ export default function IssuesM() {
         onOk={() => void doHandOver()}
         confirmLoading={busyId !== null}
         okText="确认领走"
+        okButtonProps={{ disabled: !handOverTo.trim() }}
         destroyOnHidden
       >
+        <div style={{ fontSize: 12.5, color: 'var(--ds-ink3)', marginBottom: 8 }}>
+          领料人必填 —— 谁从仓库领走的，后面追溯就靠这一笔。
+        </div>
         <Input
           value={handOverTo}
           onChange={(e) => setHandOverTo(e.target.value)}

@@ -1,22 +1,17 @@
+import { Link } from 'react-router-dom'
 // components/project/EquipmentsCard.tsx —— 由 ProjectDetailPage 拆出（重构 1.6b · 只拆不改）
-import {
-  Card,
-  Empty,
-  Progress,
-  Space,
-  Table,
-  Typography,
-} from 'antd'
-import {
-  type KittingOverviewRow,
-} from '../../api/client'
+import { Card, Empty, Progress, Space, Table, Typography } from 'antd'
+import { type KittingOverviewRow } from '../../api/client'
 import { useGoFrom } from '../../hooks/useFrom'
 import { T } from '../../theme/tokens'
 
 export default function EquipmentsCard({
-  kitting
+  kitting,
+  projectNo,
 }: {
   kitting: KittingOverviewRow[];
+  /** ★ 入口（2026-10-05）：设备档案需要项目号才能定位 —— 由项目详情传进来 */
+  projectNo: string;
 }) {
   // ★ 来源优先：项目详情 → 车间台（装配）也带来源
   const go = useGoFrom()
@@ -40,10 +35,13 @@ export default function EquipmentsCard({
                       title: '设备',
                       key: 'eq',
                       width: 180,
+                      // ★ 入口（2026-10-05 用户实测"找不到设备档案"）：设备行就是它最自然的入口
                       render: (_: unknown, r: KittingOverviewRow) => (
                         <Space size={6}>
-                          <Typography.Text strong>{r.equip_no}</Typography.Text>
-                          <span>{r.equip_name}</span>
+                          <Link to={`/equipment/${projectNo}/${r.equip_no}`} title="看这台设备的一生（设计/齐套/制造/装配/发运/现场/售后）">
+                            <Typography.Text strong>{r.equip_no}</Typography.Text>
+                          </Link>
+                          <Link to={`/equipment/${projectNo}/${r.equip_no}`}>{r.equip_name}</Link>
                         </Space>
                       ),
                     },

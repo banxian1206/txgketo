@@ -1,18 +1,13 @@
-import {
-  Alert,
-  App,
-  Col,
-  Form,
-  Input,
-  Modal,
-  Row,
-} from 'antd'
+import { Alert, App, Form, Input, Modal } from 'antd'
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 
 import type { Dayjs } from 'dayjs'
 
 import DesignHeaderCard from '../../components/design/DesignHeaderCard'
+import SectionNav from '../../components/ds/SectionNav'
+import { DESIGN_SECTIONS, defaultSectionKey } from '../../configs/sections'
+import { useTab } from '../../hooks/useTab'
 import MySubmitsCard from '../../components/design/MySubmitsCard'
 import DrawingsCard from '../../components/design/DrawingsCard'
 import BomStdCard from '../../components/design/BomStdCard'
@@ -24,34 +19,7 @@ import ReviewDetailModal from '../../components/ReviewDetailModal'
 import SubmitReviewModal from '../../components/SubmitReviewModal'
 import ChangeRequestModal from '../../components/ChangeRequestModal'
 
-import {
-  addBom,
-  addDrawing,
-  createProgram,
-  deleteProgram,
-  errMsg,
-  generateEquipmentPurchase,
-  getDesignTree,
-  getMyDesignTasks,
-  listPrograms,
-  listProgramVersions,
-  listStdItems,
-  listVersions,
-  me,
-  newDrawingVersion,
-  newProgramVersion,
-  uploadProgramDraft,
-  updateDrawing,
-  type DesignRoot,
-  type DesignTree,
-  type GeneratePurchaseResult,
-  type MyDesignTask,
-  type ProgramItem,
-  type ProgramVersionRow,
-  type StdItem,
-  type User,
-  type VersionRow,
-} from '../../api/client'
+import { addBom, addDrawing, createProgram, deleteProgram, errMsg, generateEquipmentPurchase, getDesignTree, getMyDesignTasks, listPrograms, listProgramVersions, listStdItems, listVersions, me, newDrawingVersion, newProgramVersion, uploadProgramDraft, updateDrawing, type DesignRoot, type DesignTree, type GeneratePurchaseResult, type MyDesignTask, type ProgramItem, type ProgramVersionRow, type StdItem, type User, type VersionRow } from '../../api/client'
 
 interface TreeNode {
   drawing_no: string
@@ -85,6 +53,8 @@ export default function EquipmentDesign({ projectNo: p0, equipNo: e0, embedded }
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [selected, setSelected] = useState<TreeNode | null>(null)
+  // ★ P3：设计面分区进 URL（`?tab=`）
+  const [tab, setTab] = useTab(DESIGN_SECTIONS.map((x) => x.key), defaultSectionKey(DESIGN_SECTIONS))
 
   const [addOpen, setAddOpen] = useState(false)
   const [matOpen, setMatOpen] = useState(false)
@@ -422,20 +392,42 @@ export default function EquipmentDesign({ projectNo: p0, equipNo: e0, embedded }
       )}
 
       {/* 图纸树 */}
-      <DrawingsCard addForm={addForm} doNewDrawingVersion={doNewDrawingVersion} doRename={doRename} loading={loading} message={message} openVersions={openVersions} profile={profile} root={root} rows={rows} searchItems={searchItems} selected={selected} setAddOpen={setAddOpen} setChangeTarget={setChangeTarget} setMatOpen={setMatOpen} setSelected={setSelected} setSubmitOpen={setSubmitOpen} load={load} />
 
-      {/* 标准件 + 材料 */}
-      <Row gutter={16} style={{ marginTop: 16 }}>
-        <Col span={12}>
-      <BomStdCard data={data} message={message} setChangeTarget={setChangeTarget} load={load} />
-        </Col>
-        <Col span={12}>
-      <BomMaterialCard data={data} message={message} setChangeTarget={setChangeTarget} load={load} />
-        </Col>
-      </Row>
-
-      {/* PLC 程序版本（程序专业）：走评审单发布，不采购 */}
-      <ProgramsCard doNewProgramVersion={doNewProgramVersion} openProgramVersions={openProgramVersions} profile={profile} programs={programs} removeProgram={removeProgram} setChangeTarget={setChangeTarget} setProgCreateOpen={setProgCreateOpen} setProgUploadOpen={setProgUploadOpen} setProgUploadTarget={setProgUploadTarget} />
+      {/* ── 分区：图纸与 BOM / 标准件 / 原材料 / PLC 程序（docs/14 P3）──
+          原来 4 张卡纵向堆（1079px），现在横向切；设计面头部「设备档案」入口与结论保持常驻 */}
+      <SectionNav
+        tab={tab}
+        onTab={setTab}
+        emptyText="这一区还没有内容。"
+        sections={[
+          {
+            key: 'drawing',
+            label: '图纸与 BOM',
+            badge: rows.length,
+            children: (
+              <DrawingsCard addForm={addForm} doNewDrawingVersion={doNewDrawingVersion} doRename={doRename} loading={loading} message={message} openVersions={openVersions} profile={profile} root={root} rows={rows} searchItems={searchItems} selected={selected} setAddOpen={setAddOpen} setChangeTarget={setChangeTarget} setMatOpen={setMatOpen} setSelected={setSelected} setSubmitOpen={setSubmitOpen} load={load} />
+            ),
+          },
+          {
+            key: 'std',
+            label: '标准件',
+            badge: data?.counts.std_items,
+            children: <BomStdCard data={data} message={message} setChangeTarget={setChangeTarget} load={load} />,
+          },
+          {
+            key: 'material',
+            label: '原材料',
+            badge: data?.counts.materials,
+            children: <BomMaterialCard data={data} message={message} setChangeTarget={setChangeTarget} load={load} />,
+          },
+          {
+            key: 'program',
+            label: 'PLC 程序',
+            badge: programs.length,
+            children: <ProgramsCard doNewProgramVersion={doNewProgramVersion} openProgramVersions={openProgramVersions} profile={profile} programs={programs} removeProgram={removeProgram} setChangeTarget={setChangeTarget} setProgCreateOpen={setProgCreateOpen} setProgUploadOpen={setProgUploadOpen} setProgUploadTarget={setProgUploadTarget} />,
+          },
+        ]}
+      />
 
       {/* 新增组件/零件 */}
       {/* 生成采购需求（BOM → 净需求 → 进池） */}

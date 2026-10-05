@@ -1,24 +1,12 @@
+import { Link } from 'react-router-dom'
+import { Status, Chip } from '../../components/ds'
 // components/design/BomMaterialCard.tsx —— 由 EquipmentDesign 拆出（重构 1.6 · 只拆不改）
-import {
-  Card,
-  Empty,
-  Popconfirm,
-  Space,
-  Table,
-  Tag,
-  Tooltip,
-  Typography,
-} from 'antd'
+import { Card, Empty, Popconfirm, Space, Table, Tooltip, Typography } from 'antd'
 
 
 
-import {
-  errMsg,
-  removeBom,
-  type BomLine,
-  type DesignTree,
-} from '../../api/client'
-import { CHANGE_STATUS as CHANGE_STATUS_COLOR } from '../../theme/status'
+import { errMsg, removeBom, type BomLine, type DesignTree } from '../../api/client'
+import { CHANGE_STATUS as CHANGE_STATUS_COLOR, toneOf } from '../../theme/status'
 import { BOM_STATUS as BOM_STATUS_COLOR } from '../../theme/status'
 
 export default function BomMaterialCard({
@@ -50,7 +38,11 @@ data: DesignTree | null;
               dataSource={data?.material_bom ?? []}
               locale={{ emptyText: <Empty description="工艺部还没补材料" /> }}
               columns={[
-                { title: '零件', dataIndex: 'parent_ref', width: 210 },
+                {
+                  // ★ R2：零件图号可点 → 回那个件的档案（材料 BOM 是"给哪个零件用料"）
+                  title: '零件', dataIndex: 'parent_ref', width: 210,
+                  render: (v: string) => <Link to={`/items/${v}`} onClick={(e) => e.stopPropagation()}>{v}</Link>,
+                },
                 { title: '原材料', dataIndex: 'display_name' },
                 {
                   title: '用量',
@@ -62,7 +54,7 @@ data: DesignTree | null;
                   title: '状态',
                   dataIndex: 'status',
                   width: 80,
-                  render: (v: string) => <Tag color={BOM_STATUS_COLOR[v] ?? 'default'}>{v ?? '草稿'}</Tag>,
+                  render: (v: string) => <Status tone={toneOf(BOM_STATUS_COLOR[v])}>{v ?? '草稿'}</Status>,
                 },
                 {
                   title: '操作',
@@ -86,9 +78,9 @@ data: DesignTree | null;
                         )}
                         {r.change_request && (
                           <Tooltip title={`改版申请 ${r.change_request.cr_no}：${r.change_request.status}`}>
-                            <Tag color={CHANGE_STATUS_COLOR[r.change_request.status] ?? 'default'}>
+                            <Chip tone={toneOf(CHANGE_STATUS_COLOR[r.change_request.status])}>
                               {r.change_request.status}
-                            </Tag>
+                            </Chip>
                           </Tooltip>
                         )}
                       </Space>

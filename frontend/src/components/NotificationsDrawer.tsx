@@ -1,14 +1,9 @@
-import { App, Badge, Button, Drawer, Empty, List, Space, Tag, Typography } from 'antd'
+import { App, Badge, Button, Drawer, Empty, List, Space, Typography } from 'antd'
+import { Status } from '../components/ds'
 import { useCallback, useEffect, useState } from 'react'
 
-import {
-  errMsg,
-  listNotifications,
-  markAllNotificationsRead,
-  markNotificationRead,
-  type NotificationRow,
-} from '../api/client'
-import { NOTIF_TYPE as TYPE_COLOR } from '../theme/status'
+import { errMsg, listNotifications, markAllNotificationsRead, markNotificationRead, type NotificationRow } from '../api/client'
+import { NOTIF_TYPE as TYPE_COLOR, toneOf } from '../theme/status'
 import { useGoFrom } from '../hooks/useFrom'
 
 // 通知类型中文名（P-18：不再裸露英文 type）
@@ -137,7 +132,7 @@ export default function NotificationsDrawer({ open, onClose, onReadChange }: Pro
             <List.Item.Meta
               title={
                 <Space size={6}>
-                  <Tag color={TYPE_COLOR[n.type] ?? 'default'}>{TYPE_LABEL[n.type] ?? n.type}</Tag>
+                  <Status tone={toneOf(TYPE_COLOR[n.type])}>{TYPE_LABEL[n.type] ?? n.type}</Status>
                   <span style={{ fontWeight: n.is_read ? 400 : 600 }}>{n.title}</span>
                 </Space>
               }

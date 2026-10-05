@@ -1,24 +1,12 @@
+import { Link } from 'react-router-dom'
+import { Status, Chip } from '../../components/ds'
 // components/design/BomStdCard.tsx —— 由 EquipmentDesign 拆出（重构 1.6 · 只拆不改）
-import {
-  Card,
-  Empty,
-  Popconfirm,
-  Space,
-  Table,
-  Tag,
-  Tooltip,
-  Typography,
-} from 'antd'
+import { Card, Empty, Popconfirm, Space, Table, Tooltip, Typography } from 'antd'
 
 
 
-import {
-  errMsg,
-  removeBom,
-  type BomLine,
-  type DesignTree,
-} from '../../api/client'
-import { CHANGE_STATUS as CHANGE_STATUS_COLOR } from '../../theme/status'
+import { errMsg, removeBom, type BomLine, type DesignTree } from '../../api/client'
+import { CHANGE_STATUS as CHANGE_STATUS_COLOR, toneOf } from '../../theme/status'
 import { BOM_STATUS as BOM_STATUS_COLOR } from '../../theme/status'
 
 export default function BomStdCard({
@@ -42,16 +30,22 @@ data: DesignTree | null;
               dataSource={data?.std_bom ?? []}
               locale={{ emptyText: <Empty description="还没挂标准件" /> }}
               columns={[
-                { title: '挂在', dataIndex: 'parent_ref', width: 210 },
+                {
+                  // ★ R2：父级图号可点 → 回那个件的档案（BOM 行只存"挂在谁下面"，点父件才看得出全貌）
+                  title: '挂在', dataIndex: 'parent_ref', width: 210,
+                  render: (v: string) => <Link to={`/items/${v}`} onClick={(e) => e.stopPropagation()}>{v}</Link>,
+                },
                 {
                   title: '物料',
                   dataIndex: 'display_name',
                   render: (v: string, r: BomLine) => (
                     <Space direction="vertical" size={0}>
                       <span>{v}</span>
-                      <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-                        {r.child_item_no}
-                      </Typography.Text>
+                      <Link to={`/items/${r.child_item_no}`} onClick={(e) => e.stopPropagation()}>
+                        <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                          {r.child_item_no}
+                        </Typography.Text>
+                      </Link>
                     </Space>
                   ),
                 },
@@ -65,7 +59,7 @@ data: DesignTree | null;
                   title: '状态',
                   dataIndex: 'status',
                   width: 80,
-                  render: (v: string) => <Tag color={BOM_STATUS_COLOR[v] ?? 'default'}>{v ?? '草稿'}</Tag>,
+                  render: (v: string) => <Status tone={toneOf(BOM_STATUS_COLOR[v])}>{v ?? '草稿'}</Status>,
                 },
                 {
                   title: '操作',
@@ -89,9 +83,9 @@ data: DesignTree | null;
                         )}
                         {r.change_request && (
                           <Tooltip title={`改版申请 ${r.change_request.cr_no}：${r.change_request.status}`}>
-                            <Tag color={CHANGE_STATUS_COLOR[r.change_request.status] ?? 'default'}>
+                            <Chip tone={toneOf(CHANGE_STATUS_COLOR[r.change_request.status])}>
                               {r.change_request.status}
-                            </Tag>
+                            </Chip>
                           </Tooltip>
                         )}
                       </Space>

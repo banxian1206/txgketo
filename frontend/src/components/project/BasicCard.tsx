@@ -1,15 +1,10 @@
 import { hasPerm } from '../../api/user'
 // components/project/BasicCard.tsx —— 由 ProjectDetailPage 拆出（重构 1.6b · 只拆不改）
 import type { Project } from '../../api/client'
-import {
-  Card,
-  Typography,
-} from 'antd'
+import { Card, Typography } from 'antd'
 
 import EditableField from '../EditableField'
-import {
-  type ProjectDetail as Detail,
-} from '../../api/client'
+import { type ProjectDetail as Detail } from '../../api/client'
 
 export default function BasicCard({
   SOURCES,

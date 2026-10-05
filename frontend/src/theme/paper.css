@@ -1,0 +1,461 @@
+/* ══════════════════════════════════════════════════════════════════════════
+   方案 A「纸面 Paper」设计系统（2026-10-04 客户选定）
+   ──────────────────────────────────────────────────────────────────────────
+   定位：这是全站**唯一**的版面与密度来源。页面里不许再自由发挥字号/间距/圆角。
+   颜色：取值全部来自 theme/tokens.ts 的 PAPER / T，由 main.tsx 注入为 --ds-* 变量
+        （所以本文件不写死 hex，改色只改 tokens.ts 一处）。
+   规矩（与 docs/13 §4 对齐）：
+     · 圆角只准 12（容器）/ 8（控件）/ 6（小元素）/ 999（胶囊）
+     · 间距只准 4 / 8 / 12 / 16 / 24 / 32
+     · 字号只准 theme/tokens.ts 的 FS 六档
+     · 状态只有一种画法：圆点 + 文字（.ds-st）；只有「异常/当前」才允许色块（.ds-ch）
+     · 层级靠「描边 + 背景分层」拉开，不靠阴影堆叠（阴影全站只有一档）
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* ── 页面骨架 ─────────────────────────────────────────────────────────── */
+.ds-page { max-width: 1400px; width: 100%; }
+.ds-head { display: flex; align-items: flex-end; gap: 16px; margin-bottom: 20px; }
+.ds-head h1 { font-size: 20px; font-weight: 600; letter-spacing: -0.3px; color: var(--ds-ink); line-height: 1.3; margin: 0; }
+.ds-head .sub { font-size: 13px; color: var(--ds-ink3); margin-top: 4px; }
+.ds-head .act { margin-left: auto; display: flex; gap: 8px; align-items: center; flex: none; }
+.ds-crumb { font-size: 13px; color: var(--ds-ink3); margin-bottom: 6px; }
+.ds-crumb a { color: var(--ds-ink3); text-decoration: none; }
+.ds-crumb a:hover { color: var(--ds-acc); }
+.ds-crumb .cur { color: var(--ds-ink); }
+
+/* ── 面板：白纸 + 发丝线（A 的基本容器，替代「卡片套卡片」）────────────── */
+.ds-panel {
+  background: var(--ds-surface); border: 1px solid var(--ds-line);
+  border-radius: 12px; box-shadow: var(--ds-shadow); overflow: hidden;
+}
+.ds-panel + .ds-panel { margin-top: 16px; }
+.ds-panel-h { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--ds-line); }
+.ds-panel-h h3 { font-size: 16px; font-weight: 600; letter-spacing: -0.1px; color: var(--ds-ink); margin: 0; }
+.ds-panel-h .sub { font-size: 12px; color: var(--ds-ink3); }
+.ds-panel-h .act { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+.ds-panel-b { padding: 16px; }
+/* 面板内工具栏：筛选/动作一行，左侧可放说明，右侧放控件 */
+.ds-toolbar { display: flex; align-items: center; gap: 8px; padding: 12px 16px; border-bottom: 1px solid var(--ds-line); flex-wrap: wrap; }
+/* 独立小字（不依赖面板标题语境） */
+.ds-sub { font-size: 12px; color: var(--ds-ink3); }
+.ds-toolbar .sp { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+/* 帮助气泡锚点（长说明一律进 title，不上屏） */
+.ds-help {
+  width: 16px; height: 16px; border-radius: 999px; border: 1px solid var(--ds-line2);
+  color: var(--ds-ink3); font-size: 12px; line-height: 1; display: inline-grid; place-items: center;
+  cursor: help; flex: none; font-family: inherit; background: none; padding: 0;
+}
+.ds-help:hover { border-color: var(--ds-acc); color: var(--ds-acc); }
+
+/* ── 指标条（一行账目；替代「数字卡墙」）────────────────────────────── */
+.ds-metrics {
+  display: flex; background: var(--ds-surface); border: 1px solid var(--ds-line);
+  border-radius: 12px; box-shadow: var(--ds-shadow); margin-bottom: 16px; overflow: hidden;
+}
+/* 项少时不要拉满整行（1 项拉成 1400px 宽会显得空） */
+.ds-metrics.is-short { max-width: 660px; }
+.ds-metrics.is-short .ds-metric { min-width: 150px; }
+.ds-metric {
+  flex: 1; min-width: 0; padding: 14px 16px; border: 0; border-right: 1px solid var(--ds-line);
+  background: none; font: inherit; text-align: left; color: inherit;
+}
+.ds-metric:last-child { border-right: 0; }
+button.ds-metric { cursor: pointer; }
+button.ds-metric:hover { background: var(--ds-surface2); }
+.ds-metric .k { display: block; font-size: 12px; color: var(--ds-ink3); margin-bottom: 5px; }
+.ds-metric .v { display: block; font-family: var(--ds-mono); font-size: 24px; font-weight: 600; line-height: 1.1; letter-spacing: -0.5px; color: var(--ds-ink); }
+.ds-metric .v.is-text { font-family: inherit; font-size: 16px; letter-spacing: 0; }
+.ds-metric .v small { font-family: inherit; font-size: 12px; font-weight: 400; letter-spacing: 0; color: var(--ds-ink3); }
+.ds-metric .n { display: block; font-size: 12px; color: var(--ds-ink4); margin-top: 4px; }
+.ds-metric.is-err  .v { color: var(--ds-err); }
+.ds-metric.is-warn .v { color: var(--ds-warn); }
+.ds-metric.is-ok   .v { color: var(--ds-ok); }
+.ds-metric.is-zero .v { color: var(--ds-ink4); }
+
+/* ── 队列：分组标题 + 行（A 的工作列表基本形）──────────────────────── */
+.ds-q-group {
+  display: flex; align-items: center; gap: 8px; padding: 10px 16px 6px;
+  font-size: 12px; font-weight: 500; color: var(--ds-ink3);
+}
+.ds-q-group .bar { width: 3px; height: 11px; border-radius: 2px; background: var(--ds-line2); flex: none; }
+.ds-q-group.is-err  .bar { background: var(--ds-err); }
+.ds-q-group.is-warn .bar { background: var(--ds-warn); }
+.ds-q-group.is-run  .bar { background: var(--ds-acc); }
+.ds-q-group .c { font-family: var(--ds-mono); color: var(--ds-ink4); }
+.ds-q-group .act { margin-left: auto; }
+
+.ds-row {
+  display: flex; align-items: center; gap: 16px; width: 100%; text-align: left;
+  padding: 12px 16px; border: 0; border-top: 1px solid var(--ds-line); background: none; font: inherit; color: inherit;
+}
+.ds-row:first-of-type { border-top: 0; }
+.ds-row.is-clickable { cursor: pointer; }
+.ds-row.is-clickable:hover { background: var(--ds-surface2); }
+.ds-row.is-clickable:focus-visible { outline: 2px solid var(--ds-accentLine); outline-offset: -2px; }
+.ds-row .body { flex: 1; min-width: 0; }
+.ds-row .title { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.ds-row .title .nm { font-size: 14px; font-weight: 500; color: var(--ds-ink); }
+.ds-row .meta { font-size: 12px; color: var(--ds-ink3); margin-top: 3px; }
+.ds-row .cell { flex: none; width: 112px; font-size: 12px; color: var(--ds-ink2); }
+.ds-row .cell.is-err { color: var(--ds-err); font-weight: 500; }
+.ds-row .cell.is-warn { color: var(--ds-warn); font-weight: 500; }
+.ds-row .act { display: flex; gap: 6px; flex: none; }
+.ds-row.is-muted { opacity: 0.72; }
+
+/* ── 状态：圆点 + 文字（全站唯一状态画法）──────────────────────────── */
+.ds-st { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--ds-ink2); white-space: nowrap; }
+.ds-st::before { content: ""; width: 6px; height: 6px; border-radius: 999px; background: var(--ds-idle); flex: none; }
+.ds-st.is-ok   { color: var(--ds-ok); }   .ds-st.is-ok::before   { background: var(--ds-ok); }
+.ds-st.is-warn { color: var(--ds-warn); } .ds-st.is-warn::before { background: var(--ds-warn); }
+.ds-st.is-err  { color: var(--ds-err); }  .ds-st.is-err::before  { background: var(--ds-err); }
+.ds-st.is-run  { color: var(--ds-acc); }  .ds-st.is-run::before  { background: var(--ds-acc); }
+.ds-st.is-idle { color: var(--ds-ink3); }
+
+/* ── 徽标：中性为默认，只有「异常/当前」才上色 ─────────────────────── */
+.ds-ch {
+  display: inline-flex; align-items: center; height: 22px; padding: 0 8px; border-radius: 6px;
+  font-size: 12px; white-space: nowrap; border: 1px solid var(--ds-line2);
+  background: var(--ds-surface2); color: var(--ds-ink2);
+}
+.ds-ch.is-acc  { background: var(--ds-accentSoft); border-color: var(--ds-accentLine); color: var(--ds-acc); }
+.ds-ch.is-ok   { background: var(--ds-okSoft);     border-color: var(--ds-okLine);     color: var(--ds-ok); }
+.ds-ch.is-warn { background: var(--ds-warnSoft);   border-color: var(--ds-warnLine);   color: var(--ds-warn); }
+.ds-ch.is-err  { background: var(--ds-errSoft);    border-color: var(--ds-errLine);    color: var(--ds-err); }
+
+/* ── 编号 / 数字：等宽（图号=物料号是本系统最重要的排版决定）─────────── */
+.ds-code { font-family: var(--ds-mono); font-size: 13px; letter-spacing: -0.1px; }
+.ds-num  { font-family: var(--ds-mono); font-variant-numeric: tabular-nums; }
+
+/* ── 空态：必须给下一步动作，不给插图 ─────────────────────────────── */
+.ds-empty { padding: 32px 16px; text-align: center; color: var(--ds-ink3); font-size: 13px; }
+.ds-empty .act { margin-top: 12px; display: flex; justify-content: center; gap: 8px; }
+
+/* ── 生命周期轨道（项目/设备/单据共用）──────────────────────────────── */
+.ds-rail { display: flex; gap: 4px; padding: 16px; overflow-x: auto; }
+.ds-rail::-webkit-scrollbar { height: 6px; }
+.ds-seg { flex: 1; min-width: 106px; font: inherit; text-align: left; border: 1px solid var(--ds-line); border-radius: 8px; padding: 9px 10px; background: var(--ds-surface2); }
+.ds-seg .n { display: flex; align-items: center; gap: 5px; font-size: 12px; color: var(--ds-ink3); margin-bottom: 3px; }
+.ds-seg .n::before { content: ""; width: 6px; height: 6px; border-radius: 999px; background: var(--ds-idle); flex: none; }
+.ds-seg .v { font-size: 13px; font-weight: 500; color: var(--ds-ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ds-seg .d { font-family: var(--ds-mono); font-size: 12px; color: var(--ds-ink4); margin-top: 2px; }
+.ds-seg.is-done { background: var(--ds-surface); }
+.ds-seg.is-done .n::before { background: var(--ds-ok); }
+.ds-seg.is-done .v { color: var(--ds-ok); }
+.ds-seg.is-now { background: var(--ds-accentSoft); border-color: var(--ds-accentLine); }
+.ds-seg.is-now .n::before { background: var(--ds-acc); }
+.ds-seg.is-now .v { color: var(--ds-acc); }
+.ds-seg.is-block { background: var(--ds-errSoft); border-color: var(--ds-errLine); }
+.ds-seg.is-block .n::before { background: var(--ds-err); }
+.ds-seg.is-block .v { color: var(--ds-err); }
+
+/* ── 活动流 ───────────────────────────────────────────────────────── */
+.ds-tl { padding: 4px 16px 12px; }
+.ds-tl-i { display: grid; grid-template-columns: 14px 1fr; gap: 12px; padding-bottom: 16px; position: relative; }
+.ds-tl-i::before { content: ""; position: absolute; left: 6.5px; top: 14px; bottom: 0; width: 1px; background: var(--ds-line); }
+.ds-tl-i:last-child::before { display: none; }
+.ds-tl-i .pt { width: 7px; height: 7px; border-radius: 999px; background: var(--ds-line2); margin: 5px 0 0 3px; }
+.ds-tl-i.is-ok .pt { background: var(--ds-ok); }
+.ds-tl-i.is-err .pt { background: var(--ds-err); }
+.ds-tl-i.is-run .pt { background: var(--ds-acc); }
+.ds-tl-i .tx { font-size: 13px; color: var(--ds-ink); }
+.ds-tl-i .tx b { font-weight: 500; }
+.ds-tl-i .tm { font-family: var(--ds-mono); font-size: 12px; color: var(--ds-ink4); margin-top: 2px; }
+
+/* ── 键位 ─────────────────────────────────────────────────────────── */
+.ds-kbd { font-family: var(--ds-mono); font-size: 12px; border: 1px solid var(--ds-line2); border-bottom-width: 2px; border-radius: 6px; padding: 0 5px; color: var(--ds-ink3); background: var(--ds-surface); }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   antd 组件对齐 A（全局一次生效，页面里不用再逐个覆盖）
+   ══════════════════════════════════════════════════════════════════════════ */
+/* 表格：无斑马纹、发丝线、hover 才出底、表头弱化 */
+.ant-table-wrapper .ant-table { background: transparent; }
+.ant-table-wrapper .ant-table-thead > tr > th {
+  font-size: 12px; font-weight: 500; color: var(--ds-ink3); letter-spacing: 0.2px;
+  background: var(--ds-surface2); border-bottom: 1px solid var(--ds-line);
+}
+.ant-table-wrapper .ant-table-thead > tr > th::before { display: none; }
+.ant-table-wrapper .ant-table-tbody > tr > td { border-bottom: 1px solid var(--ds-line); }
+.ant-table-wrapper .ant-table-tbody > tr:last-child > td { border-bottom: 0; }
+.ant-table-wrapper .ant-table-tbody > tr.ant-table-row:hover > td { background: var(--ds-surface2); }
+.ant-table-wrapper .ant-table-container { border-start-start-radius: 12px; border-start-end-radius: 12px; }
+
+/* 弹窗 / 抽屉：统一圆角与内边距 */
+.ant-modal .ant-modal-content { border-radius: 12px; padding: 20px; }
+.ant-drawer .ant-drawer-body { padding: 16px; }
+
+/* 表单：密度对齐 A（默认 32 高控件已有 token，这里只压 label 与行距） */
+.ant-form-item .ant-form-item-label > label { font-size: 12px; color: var(--ds-ink3); }
+
+/* 描述列表：label 弱化 */
+.ant-descriptions .ant-descriptions-item-label { font-size: 12px; color: var(--ds-ink3); }
+
+/* 侧栏（A：浅色、分组标题、无右边框线由容器管） */
+.app-sider { border-right: 1px solid var(--ds-line); }
+.app-sider .ant-menu { background: transparent; border-inline-end: 0 !important; }
+.app-sider .ant-menu-item { font-size: 13px; }
+.app-sider .ant-menu-item-selected { font-weight: 500; }
+.app-sider .ant-layout-sider-children { display: flex; flex-direction: column; }
+
+/* 顶栏（A：白色、发丝线、无阴影） */
+.app-header { border-bottom: 1px solid var(--ds-line); display: flex; align-items: center; gap: 16px; }
+
+/* 可点轨道段（button 版）——去掉浏览器默认按钮外观 */
+button.ds-seg.is-link { cursor: pointer; }
+button.ds-seg.is-link:hover { border-color: var(--ds-accentLine); background: var(--ds-accentSoft); }
+
+/* ── 泳道 = A 面板（保留 antd Collapse 的 DOM：护栏要数 .ant-collapse-item-active）── */
+.ant-collapse-ghost > .ant-collapse-item {
+  background: var(--ds-surface); border: 1px solid var(--ds-line); border-radius: 12px;
+  margin-bottom: 12px; box-shadow: var(--ds-shadow); overflow: hidden;
+}
+.ant-collapse-ghost > .ant-collapse-item > .ant-collapse-header {
+  padding: 12px 16px; background: var(--ds-surface); font-size: 16px; align-items: center;
+}
+.ant-collapse-ghost > .ant-collapse-item-active > .ant-collapse-header { border-bottom: 1px solid var(--ds-line); }
+.ant-collapse-ghost .ant-collapse-content > .ant-collapse-content-box { padding: 16px; }
+/* 泳道内嵌的 Card 不再重复描边（层级：泳道 > 卡；卡只做分组，不做第二个框） */
+.ant-collapse-content .ant-card { border: 0; box-shadow: none; }
+.ant-collapse-content .ant-card > .ant-card-head { padding: 0 0 8px; min-height: 0; border-bottom: 1px solid var(--ds-line); }
+.ant-collapse-content .ant-card > .ant-card-body { padding: 12px 0 0; }
+.ant-collapse-content .ant-card + .ant-card { margin-top: 4px; }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   台类页统一壳（R3 · 2026-10-04）
+   ──────────────────────────────────────────────────────────────────────────
+   治的是 docs/12 §1.3 实测的三条病：**三层标题 / 双份计数 / 长说明上屏**。
+   做法：台 = `PageHead`（标题+一句现状+刷新） + 可选 `Metrics`（只放非 0） + `Panel`（装页签与内容）。
+   ⚠ 页签的 **key 不许改**（通知 link / ROUTE_REDIRECTS / ?tab= 深链都靠它）。
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* 页签条：A 的下划线风格（13px、灰、选中深色加粗、2px 主色下划线） */
+.ant-tabs-top > .ant-tabs-nav { margin-bottom: 0; }
+.ant-tabs-top > .ant-tabs-nav::before { border-bottom: 1px solid var(--ds-line); }
+.ant-tabs .ant-tabs-tab { padding: 11px 0; font-size: 13px; }
+.ant-tabs .ant-tabs-tab + .ant-tabs-tab { margin-left: 20px; }
+.ant-tabs .ant-tabs-tab .ant-tabs-tab-btn { color: var(--ds-ink3); }
+.ant-tabs .ant-tabs-tab:hover .ant-tabs-tab-btn { color: var(--ds-ink); }
+.ant-tabs .ant-tabs-tab-active .ant-tabs-tab-btn { color: var(--ds-ink); font-weight: 600; }
+.ant-tabs .ant-tabs-ink-bar { height: 2px; background: var(--ds-acc); }
+/* 页签内容区：统一内边距（原来是 0，表格贴着页签线） */
+.ds-panel > .ant-tabs > .ant-tabs-content-holder > .ant-tabs-content > .ant-tabs-tabpane { padding-top: 16px; }
+.ds-panel > .ant-tabs { padding: 0 16px 16px; }
+.ds-panel > .ant-tabs > .ant-tabs-nav { padding: 0; }
+/* 台内不再出现「卡里嵌卡」：页签内容里的 Card 去掉外框，只留分组标题 */
+.ds-panel .ant-tabs-tabpane .ant-card { border: 0; box-shadow: none; }
+.ds-panel .ant-tabs-tabpane .ant-card > .ant-card-head { padding: 0 0 8px; min-height: 0; border-bottom: 1px solid var(--ds-line); }
+.ds-panel .ant-tabs-tabpane .ant-card > .ant-card-body { padding: 12px 0 0; }
+/* 数字卡（Statistic）：台类页尽量别用；真要用时压到 A 的尺寸 */
+.ant-statistic .ant-statistic-title { font-size: 12px; color: var(--ds-ink3); }
+.ant-statistic .ant-statistic-content { font-family: var(--ds-mono); font-size: 20px; font-weight: 600; letter-spacing: -0.4px; }
+/* 台内提示条（Alert）：中性化，不再整屏蓝色说明 */
+.ant-alert { border-radius: 8px; }
+.ant-alert-info { background: var(--ds-surface2); border-color: var(--ds-line); }
+.ant-alert-info .ant-alert-message { color: var(--ds-ink2); font-size: 13px; }
+/* 分段控件（我组/我的 这类视图开关）：A 的中性底 */
+.ant-segmented { background: var(--ds-surface3); border-radius: 8px; }
+.ant-segmented .ant-segmented-item-selected { border-radius: 6px; }
+
+/* 台内二级视图切换（组内 Segmented）+ 内容区（页面用 WorkbenchTabs 时，内容在 Tabs 之外） */
+.ds-subtabs { padding-top: 12px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.ds-tabs-body { padding-top: 16px; }
+/* WorkbenchTabs 只把「组页签」交给 antd Tabs（内容自己渲染）→ 去掉它自带的内容区下边距 */
+.ds-subtabs + .ds-tabs-body { padding-top: 12px; }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   移动端「作业卡 Job」（R4 · 2026-10-04）
+   触控 ≥40px / 字号更大 / 一屏一件事 —— 但**颜色与语义与 PC 完全同源**
+   （--ds-* 变量、圆点+文字的状态画法、左侧色条）
+   ══════════════════════════════════════════════════════════════════════════ */
+.m-head { padding: 2px 2px 12px; }
+.m-head-t { font-size: 17px; font-weight: 600; letter-spacing: -0.3px; color: var(--ds-ink); line-height: 1.3; }
+.m-head-s { font-size: 12.5px; color: var(--ds-ink3); margin-top: 4px; }
+
+.m-group { display: flex; align-items: flex-end; gap: 8px; padding: 14px 2px 8px; }
+.m-group-l { min-width: 0; }
+.m-group-t { font-size: 13px; font-weight: 600; color: var(--ds-ink); }
+.m-group-s { font-size: 11.5px; color: var(--ds-ink3); margin-top: 2px; }
+.m-group-r { margin-left: auto; flex: none; }
+
+.m-card {
+  background: var(--ds-surface); border: 1px solid var(--ds-line); border-radius: 14px;
+  padding: 13px 14px 13px 16px; margin-bottom: 10px; position: relative; overflow: hidden;
+}
+.m-card::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3.5px; background: var(--ds-idle); }
+.m-card.is-err::before { background: var(--ds-err); }
+.m-card.is-warn::before { background: var(--ds-warn); }
+.m-card.is-ok::before { background: var(--ds-ok); }
+.m-card.is-run::before { background: var(--ds-acc); }
+.m-card.is-tap { cursor: pointer; }
+.m-card.is-tap:active { background: var(--ds-surface2); }
+.m-card-h { display: flex; align-items: center; gap: 8px; margin-bottom: 5px; font-size: 12px; color: var(--ds-ink2); }
+.m-card-t { font-size: 15px; font-weight: 600; letter-spacing: -0.2px; color: var(--ds-ink); line-height: 1.35; margin-bottom: 4px; }
+.m-card-l { font-size: 12.5px; color: var(--ds-ink2); line-height: 1.55; }
+.m-card-l b { color: var(--ds-err); font-weight: 600; }
+.m-photos { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+
+.m-row { display: flex; align-items: center; gap: 11px; padding: 11px 0; border-bottom: 1px solid var(--ds-line); min-height: 56px; }
+.m-row:last-child { border-bottom: 0; }
+.m-check {
+  width: 26px; height: 26px; border-radius: 8px; border: 1.5px solid var(--ds-line2); flex: none;
+  display: grid; place-items: center; background: var(--ds-surface); color: #fff; font-size: 14px;
+}
+.m-check.on { background: var(--ds-acc); border-color: var(--ds-acc); }
+.m-row-tx { flex: 1; min-width: 0; }
+.m-row-t { font-size: 14px; font-weight: 500; color: var(--ds-ink); line-height: 1.35; }
+.m-row-s { font-size: 11.5px; color: var(--ds-ink3); margin-top: 2px; }
+.m-row-r { flex: none; font-family: var(--ds-mono); font-size: 14px; font-weight: 600; color: var(--ds-ink2); }
+
+.m-st { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 500; color: var(--ds-ink2); }
+.m-st::before { content: ""; width: 6px; height: 6px; border-radius: 999px; background: var(--ds-idle); flex: none; }
+.m-st.is-err { color: var(--ds-err); } .m-st.is-err::before { background: var(--ds-err); }
+.m-st.is-warn { color: var(--ds-warn); } .m-st.is-warn::before { background: var(--ds-warn); }
+.m-st.is-ok { color: var(--ds-ok); } .m-st.is-ok::before { background: var(--ds-ok); }
+.m-st.is-run { color: var(--ds-acc); } .m-st.is-run::before { background: var(--ds-acc); }
+
+.m-chip {
+  display: inline-flex; align-items: center; height: 22px; padding: 0 8px; border-radius: 999px;
+  font-size: 11.5px; border: 1px solid var(--ds-line2); background: var(--ds-surface2); color: var(--ds-ink2);
+  font-family: var(--ds-mono);
+}
+.m-chip.is-err { background: var(--ds-errSoft); border-color: var(--ds-errLine); color: var(--ds-err); }
+.m-chip.is-warn { background: var(--ds-warnSoft); border-color: var(--ds-warnLine); color: var(--ds-warn); }
+.m-chip.is-ok { background: var(--ds-okSoft); border-color: var(--ds-okLine); color: var(--ds-ok); }
+.m-chip.is-run, .m-chip.is-acc { background: var(--ds-accentSoft); border-color: var(--ds-accentLine); color: var(--ds-acc); }
+
+.m-empty { padding: 30px 12px; text-align: center; color: var(--ds-ink3); font-size: 13px; line-height: 1.7; }
+.m-sec { font-size: 11.5px; font-weight: 600; letter-spacing: 0.5px; color: var(--ds-ink4); padding: 14px 2px 6px; }
+
+/* 移动端视图切换（Segmented 手写版，避免 antd Segmented 在窄屏把文字挤掉） */
+.m-seg { display: flex; gap: 6px; background: var(--ds-surface3); border-radius: 11px; padding: 3px; margin-bottom: 4px; }
+.m-seg button {
+  flex: 1; min-height: 40px; border: 0; border-radius: 9px; background: transparent;
+  font: inherit; font-size: 13px; font-weight: 500; color: var(--ds-ink2); cursor: pointer;
+  padding: 0 4px; white-space: nowrap;
+}
+.m-seg button.on { background: var(--ds-surface); color: var(--ds-ink); font-weight: 600; box-shadow: 0 1px 3px rgba(0,0,0,.07); }
+
+/* 卡片内动作区（移动端：一个主动作全宽，可多个则竖排） */
+.m-actions { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
+.m-actions .ant-btn { min-height: 44px; }
+
+/* 移动端 Segmented：可换行（车间 5 个视图在 390px 上排不下） */
+.m-seg.wrap { flex-wrap: wrap; }
+.m-seg.wrap button { flex: 1 1 30%; min-width: 88px; display: inline-flex; align-items: center; justify-content: center; gap: 4px; }
+.m-seg-n { font-family: var(--ds-mono); font-size: 11px; color: var(--ds-acc); font-weight: 600; }
+.m-seg button.on .m-seg-n { color: var(--ds-acc); }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   命令栏（⌘K）—— 「粘任意编号 → 直达」（R2 收尾）
+   规矩：不引依赖；视觉全用 A 的 token（描边 + 背景分层，不用重阴影）
+   ══════════════════════════════════════════════════════════════════════════ */
+.cmdk-mask {
+  position: fixed; inset: 0; z-index: 1000; background: rgba(20, 22, 26, 0.35);
+  display: flex; justify-content: center; align-items: flex-start; padding-top: 12vh;
+  backdrop-filter: blur(2px);
+}
+.cmdk {
+  width: min(680px, calc(100vw - 32px)); background: var(--ds-surface);
+  border: 1px solid var(--ds-line2); border-radius: 12px; box-shadow: 0 16px 48px -12px rgba(16, 24, 40, 0.3);
+  overflow: hidden; display: flex; flex-direction: column; max-height: 70vh;
+}
+.cmdk-in { display: flex; align-items: center; gap: 8px; padding: 6px 12px 6px 4px; border-bottom: 1px solid var(--ds-line); }
+.cmdk-in .ant-input { font-size: 15px; }
+.cmdk-body { overflow-y: auto; }
+.cmdk-tip { padding: 14px 16px; font-size: 12.5px; color: var(--ds-ink3); line-height: 2; }
+.cmdk-row {
+  display: flex; align-items: center; gap: 12px; width: 100%; text-align: left;
+  padding: 10px 16px; border: 0; border-bottom: 1px solid var(--ds-line); background: none;
+  font: inherit; color: inherit; cursor: pointer;
+}
+.cmdk-row:last-child { border-bottom: 0; }
+.cmdk-row.on { background: var(--ds-accentSoft); }
+.cmdk-kind { flex: none; }
+.cmdk-tx { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.cmdk-t { font-size: 13.5px; color: var(--ds-ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cmdk-s { font-size: 12px; color: var(--ds-ink3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cmdk-go { flex: none; font-family: var(--ds-mono); font-size: 11.5px; color: var(--ds-acc); }
+.cmdk-foot {
+  display: flex; gap: 16px; padding: 8px 16px; border-top: 1px solid var(--ds-line);
+  background: var(--ds-surface2); font-size: 11.5px; color: var(--ds-ink4); font-family: var(--ds-mono);
+}
+/* 顶栏的搜索触发框 */
+.app-search {
+  display: flex; align-items: center; gap: 8px; width: 300px; height: 30px; padding: 0 10px;
+  border: 1px solid var(--ds-line2); border-radius: 8px; background: var(--ds-surface2);
+  color: var(--ds-ink3); font-size: 13px; cursor: pointer; font-family: inherit;
+}
+.app-search:hover { background: var(--ds-surface); border-color: var(--ds-accentLine); }
+.app-search .ds-kbd { margin-left: auto; }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   页面分区壳（docs/14 · P1）—— 一页多区、横向切，替代"卡片一个个往下摆"
+   形态：比台内页签更轻的一档；**不是下划线 Tab**（一屏只允许一条页签条）
+   ══════════════════════════════════════════════════════════════════════════ */
+.ds-sec-nav {
+  position: sticky; top: 8px; z-index: 6; display: flex; gap: 6px; align-items: center;
+  padding: 6px; margin-bottom: 16px; background: var(--ds-surface);
+  border: 1px solid var(--ds-line); border-radius: 12px; box-shadow: var(--ds-shadow);
+  overflow-x: auto; scrollbar-width: none;
+}
+.ds-sec-nav::-webkit-scrollbar { display: none; }
+.ds-sec {
+  flex: none; display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 12px;
+  border: 0; border-radius: 8px; background: transparent; font: inherit; font-size: 13px;
+  color: var(--ds-ink2); cursor: pointer; white-space: nowrap;
+}
+.ds-sec:hover { background: var(--ds-surface3); color: var(--ds-ink); }
+.ds-sec.on { background: var(--ds-accentSoft); color: var(--ds-acc); font-weight: 600; }
+.ds-sec-b {
+  font-family: var(--ds-mono); font-size: 11px; font-weight: 600; padding: 0 5px;
+  border-radius: 999px; background: var(--ds-surface3); color: var(--ds-ink3);
+}
+.ds-sec.on .ds-sec-b { background: var(--ds-surface); color: var(--ds-acc); }
+/* 分区体 = **一张纸**；里面的块（Panel / antd Card）变成纸上的**分节**（去卡化，docs/14 P5）
+   —— 为什么用一条作用域 CSS 而不是改 20 个文件：这些块来自不同组件（12 个 *Card.tsx、
+   工程台 10 张卡…），逐个改既慢又容易改错；而"去框"本来就是纯视觉的，作用域内统一即可。
+   效果：同一分区里不再是一摞白框，而是一张纸上的若干分节（发丝线分隔）。 */
+.ds-sec-body {
+  min-height: 120px; background: var(--ds-surface); border: 1px solid var(--ds-line);
+  border-radius: 12px; box-shadow: var(--ds-shadow); padding: 4px 16px;
+}
+/* 空分区这句人话不需要纸框 */
+.ds-sec-body:has(> .ds-sec-empty) { background: transparent; border: 0; box-shadow: none; padding: 0; }
+.ds-sec-body .ds-panel,
+.ds-sec-body .ant-card { border: 0; border-radius: 0; box-shadow: none; background: transparent; }
+.ds-sec-body .ds-panel + .ds-panel,
+.ds-sec-body .ant-card + .ant-card,
+.ds-sec-body .ds-panel + .ant-card,
+.ds-sec-body .ant-card + .ds-panel { border-top: 1px solid var(--ds-line); }
+.ds-sec-body .ds-panel-h,
+.ds-sec-body .ant-card > .ant-card-head {
+  padding: 12px 0 8px; border-bottom: 1px solid var(--ds-line); min-height: 0;
+}
+.ds-sec-body .ant-card > .ant-card-head .ant-card-head-title { padding: 0; font-size: 13.5px; }
+.ds-sec-body .ds-panel-b,
+.ds-sec-body .ant-card > .ant-card-body { padding: 12px 0 0; }
+/* 表格在分节里贴边更自然 */
+.ds-sec-body .ant-table-wrapper { margin-bottom: 4px; }
+.ds-sec-empty { padding: 28px 16px; text-align: center; color: var(--ds-ink3); font-size: 13px; }
+
+/* 同一张面板内的"分节"（去卡化：把 N 张卡合并成一张面板 + 小标题分隔线） */
+.ds-subhead {
+  display: flex; align-items: baseline; gap: 8px; padding: 12px 16px 8px;
+  border-top: 1px solid var(--ds-line);
+}
+.ds-subhead:first-child { border-top: 0; }
+.ds-subhead h4 { font-size: 13.5px; font-weight: 600; color: var(--ds-ink); margin: 0; }
+.ds-subhead .sub { font-size: 12px; color: var(--ds-ink3); }
+.ds-subhead .sp { margin-left: auto; display: flex; gap: 8px; align-items: center; }
+
+/* 驾驶舱：**同屏四块**（驾驶舱不分区 —— 它的价值就是一眼看全） */
+.ds-grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: start; }
+@media (max-width: 1100px) { .ds-grid2 { grid-template-columns: 1fr; } }
+
+/* ── 队列板（docs/15）：工具条位置固定（筛选在左、批量动作在右）+ 分页 + 组条 ── */
+.ds-q-bar { display: flex; align-items: center; gap: 10px; padding: 4px 0 10px; }
+.ds-q-bar .l { flex: 1 1 auto; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.ds-q-bar .r { flex: 0 0 auto; display: flex; align-items: center; gap: 8px; }
+.ds-q-page { display: flex; justify-content: flex-end; padding: 10px 2px 2px; }
+/* 两层的流程条：组那一行与项那一行贴在一起，不要两条大横条 */
+.ds-subtabs.ds-grp { padding-bottom: 0; }
+.ds-row-expand { padding: 10px 12px 14px; background: var(--ds-bg2); border-top: 1px solid var(--ds-line); }

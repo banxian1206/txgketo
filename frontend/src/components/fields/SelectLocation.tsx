@@ -1,4 +1,5 @@
-import { App, Button, List, Modal, Select, Space, Tag, Tooltip, Typography, type SelectProps } from 'antd'
+import { App, Button, List, Modal, Select, Space, Tooltip, Typography, type SelectProps } from 'antd'
+import { Chip } from '../../components/ds'
 import { CameraOutlined } from '@ant-design/icons'
 import { useEffect, useRef, useState } from 'react'
 
@@ -122,7 +123,7 @@ export default function SelectLocation({ valueMode = 'text', activeOnly = true, 
                 >
                   <Space>
                     <b>{c.code}</b>
-                    {known ? <Tag color="green">库里有这个库位</Tag> : <Tag color="orange">库里还没有</Tag>}
+                    {known ? <Chip tone="ok">库里有这个库位</Chip> : <Chip tone="warn">库里还没有</Chip>}
                   </Space>
                 </List.Item>
               )

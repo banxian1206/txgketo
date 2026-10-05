@@ -1,20 +1,8 @@
 // components/project/AttsCard.tsx —— 由 ProjectDetailPage 拆出（重构 1.6b · 只拆不改）
-import {
-  Button,
-  Card,
-  Empty,
-  Select,
-  Space,
-  Table,
-  Tag,
-  Upload,
-} from 'antd'
+import { Button, Card, Empty, Select, Space, Table, Upload } from 'antd'
+import { Chip } from '../../components/ds'
 
-import {
-  downloadAttachment,
-  type Attachment,
-  type ProjectDetail as Detail,
-} from '../../api/client'
+import { downloadAttachment, type Attachment, type ProjectDetail as Detail } from '../../api/client'
 
 export default function AttsCard({
   ATT_CATEGORIES,
@@ -79,7 +67,7 @@ export default function AttsCard({
                   title: '分类',
                   dataIndex: 'category',
                   width: 100,
-                  render: (v: string) => <Tag>{v}</Tag>,
+                  render: (v: string) => <Chip>{v}</Chip>,
                 },
                 { title: '文件名', dataIndex: 'filename' },
                 {

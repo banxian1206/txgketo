@@ -1,4 +1,5 @@
-import { App, Button, Card, Col, Input, Row, Space, Table, Tag, Typography } from 'antd'
+import { App, Button, Card, Col, Input, Row, Space, Table, Typography } from 'antd'
+import { Chip } from '../../components/ds'
 import type { ColumnsType } from 'antd/es/table'
 import { useEffect, useState } from 'react'
 
@@ -83,7 +84,7 @@ export default function NumberRules() {
       title: '取号范围',
       dataIndex: 'scope',
       width: 140,
-      render: (v: string) => <Tag>{v}</Tag>,
+      render: (v: string) => <Chip>{v}</Chip>,
     },
     { title: '说明', dataIndex: 'remark', width: 260 },
   ]
@@ -129,11 +130,11 @@ export default function NumberRules() {
                 <div style={{ marginTop: 4 }}>
                   层次码：
                   {(['l1', 'l2', 'l3', 'l4'] as const).map((k) => (
-                    <Tag key={k} color="blue">
+                    <Chip tone="run">
                       {String(parseRes.parsed?.[k] ?? '—')}
-                    </Tag>
+                    </Chip>
                   ))}
-                  <Tag color="purple">第 {parseRes.level} 级</Tag>
+                  <Chip tone="run">第 {parseRes.level} 级</Chip>
                 </div>
                 <div style={{ marginTop: 4 }}>
                   父级图号：<Typography.Text code>{parseRes.parent ?? '（无，总装图）'}</Typography.Text>
@@ -178,7 +179,7 @@ export default function NumberRules() {
                   图号：<Typography.Text code copyable>{composeRes.drawing_no}</Typography.Text>
                 </div>
                 <div style={{ marginTop: 4 }}>
-                  <Tag color="purple">第 {composeRes.level} 级</Tag>
+                  <Chip tone="run">第 {composeRes.level} 级</Chip>
                   父级：<Typography.Text code>{composeRes.parent ?? '（无，总装图）'}</Typography.Text>
                 </div>
               </div>

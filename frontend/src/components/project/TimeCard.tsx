@@ -1,11 +1,9 @@
 import { hasPerm } from '../../api/user'
+import { toneOf } from '../../theme/status'
+import { Chip } from '../../components/ds'
 // components/project/TimeCard.tsx —— 由 ProjectDetailPage 拆出（重构 1.6b · 只拆不改）
 import type { Project } from '../../api/client'
-import {
-  Card,
-  Tag,
-  Typography,
-} from 'antd'
+import { Card, Typography } from 'antd'
 
 import EditableField from '../EditableField'
 
@@ -43,13 +41,13 @@ export default function TimeCard({
                   {p.opportunity_days_left === null || p.opportunity_days_left === undefined ? (
                     DASH
                   ) : p.opportunity_days_left < 0 ? (
-                    <Tag color="red">已过期 {-p.opportunity_days_left} 天</Tag>
+                    <Chip tone="err">已过期 {-p.opportunity_days_left} 天</Chip>
                   ) : p.opportunity_days_left === 0 ? (
-                    <Tag color="red">今天到期</Tag>
+                    <Chip tone="err">今天到期</Chip>
                   ) : (
-                    <Tag color={p.opportunity_days_left <= 3 ? 'red' : 'blue'}>
+                    <Chip tone={toneOf(p.opportunity_days_left <= 3 ? 'red' : 'blue')}>
                       还剩 {p.opportunity_days_left} 天
-                    </Tag>
+                    </Chip>
                   )}
                 </span>
               </div>

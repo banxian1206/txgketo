@@ -22,3 +22,9 @@ export * from './shipping'
 export * from './site'
 export * from './acceptance'
 export * from './service'
+
+// 对象档案与全局检索（docs/13 §5）—— 保持在 client 的再导出里，页面从一处 import
+export * from './dossier'
+
+// 经营驾驶舱（00 卷 §2.1）
+export * from './dashboard'

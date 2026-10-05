@@ -1,19 +1,11 @@
 import { Muted } from '../ui/Primitives'
+import { Chip } from '../../components/ds'
 // components/project/CustomerCard.tsx —— 由 ProjectDetailPage 拆出（重构 1.6b · 只拆不改）
 import type { Project } from '../../api/client'
-import {
-  Button,
-  Card,
-  Empty,
-  Table,
-  Tag,
-} from 'antd'
+import { Button, Card, Empty, Table } from 'antd'
 
 import EditableField from '../EditableField'
-import {
-  type ProjectContact,
-  type ProjectDetail as Detail,
-} from '../../api/client'
+import { type ProjectContact, type ProjectDetail as Detail } from '../../api/client'
 
 export default function CustomerCard({
   detail,
@@ -57,7 +49,9 @@ export default function CustomerCard({
               rowKey="id"
               size="small"
               style={{ marginTop: 12 }}
-              pagination={false}
+              // ★ 泳道里**不许**把长表平铺开：实测某客户攒了 26 个联系人 → 这一张卡就 1195px，
+              //   单条泳道 2180px（等于把「9 屏平铺」搬回来了）。这里封顶 5 行 + 分页。
+              pagination={{ pageSize: 5, size: 'small', showSizeChanger: false, hideOnSinglePage: true }}
               dataSource={detail?.contacts ?? []}
               locale={{ emptyText: <Empty description="还没有登记联系人" /> }}
               columns={[
@@ -65,7 +59,7 @@ export default function CustomerCard({
                   title: '角色',
                   dataIndex: 'role_tag',
                   width: 110,
-                  render: (v: string) => (v ? <Tag color="blue">{v}</Tag> : DASH),
+                  render: (v: string) => (v ? <Chip tone="run">{v}</Chip> : DASH),
                 },
                 { title: '姓名', dataIndex: 'name', width: 110 },
                 { title: '电话', dataIndex: 'phone', width: 140 },

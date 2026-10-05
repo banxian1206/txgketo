@@ -4,15 +4,7 @@ import { useNavigate } from 'react-router-dom'
 
 import { errMsg } from '../../api/client'
 import { useAuth } from '../../contexts/AuthContext'
-import {
-  clearCredential,
-  clearManualLogout,
-  isManualLogout,
-  readCredential,
-  readRememberPref,
-  saveCredential,
-  saveRememberPref,
-} from '../../utils/credential'
+import { clearCredential, clearManualLogout, isManualLogout, readCredential, readRememberPref, saveCredential, saveRememberPref } from '../../utils/credential'
 
 /**
  * 登录页（2026-09-23 重做 · 简单有格调 + 记住密码）

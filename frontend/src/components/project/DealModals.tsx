@@ -1,23 +1,10 @@
 // components/project/DealModals.tsx —— 由 ProjectDetailPage 拆出（重构 1.6b · 只拆不改）
 import type { FormInstance } from 'antd'
-import {
-  Button,
-  Col,
-  DatePicker,
-  Divider,
-  Form,
-  Input,
-  InputNumber,
-  Row,
-  Select,
-  Typography,
-} from 'antd'
+import { Button, Col, DatePicker, Divider, Form, Input, InputNumber, Row, Select, Typography } from 'antd'
 
 import AppModal from '../AppModal'
 
-import {
-  type ProjectContact,
-} from '../../api/client'
+import { type ProjectContact } from '../../api/client'
 
 export default function DealModals({
   CLOSE_REASONS,

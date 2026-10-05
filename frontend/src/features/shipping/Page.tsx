@@ -1,55 +1,18 @@
 import { useUrlState } from '../../hooks/useUrlState'
 import { useShipBoard } from '../../hooks/useShipBoard'
-import {
-  App,
-  Button,
-  Card,
-  Checkbox,
-  Col,
-  Descriptions,
-  Drawer,
-  Empty,
-  DatePicker,
-  Form,
-  Input,
-  Modal,
-  Row,
-  Select,
-  Skeleton,
-  Space,
-  Statistic,
-  Table,
-  Tag,
-  Tooltip,
-  Typography,
-} from 'antd'
-import {useEffect, useState} from 'react'
+import { App, Button, Card, Checkbox, Descriptions, Drawer, DatePicker, Form, Input, Modal, Select, Skeleton, Space, Table, Tooltip, Typography } from 'antd'
+import { useEffect, useState } from 'react'
 
-import {
-  addManualShipItem,
-  arriveShipment,
-  createShipment,
-  departShipment,
-  errMsg,
-  generateShipItems,
-  hasPerm,
-  listProjects,
-  listShipments,
-  loadShipment,
-  markShipItems,
-  receiptShipment,
-  setItemPlacePhotos,
-  shipPhotoUrl,
-  uploadShipPhotos,
-  type ShipmentItemRow,
-  type ShipmentRow,
-  type ToShipRow,
-} from '../../api/client'
+import { addManualShipItem, arriveShipment, createShipment, departShipment, errMsg, generateShipItems, hasPerm, listProjects, listShipments, loadShipment, markShipItems, receiptShipment, setItemPlacePhotos, shipPhotoUrl, uploadShipPhotos, type ShipmentItemRow, type ShipmentRow, type ToShipRow } from '../../api/client'
 import AuthedImage from '../../components/AuthedImage'
 import VehicleModal from '../../components/VehicleModal'
 import { Muted } from '../../components/ui/Primitives'
 import MfgPhotoPicker from '../../components/MfgPhotoPicker'
-import { SHIP_STATUS as SHIP_COLOR } from '../../theme/status'
+import { Chip, Code, Empty as DsEmpty, Status } from '../../components/ds'
+import QueueBoard from '../../components/ds/QueueBoard'
+import WorkbenchPage from '../../components/domain/WorkbenchPage'
+import { SHIPPING_BOARD } from '../../configs/boards'
+import { SHIP_STATUS as SHIP_COLOR, toneOf } from '../../theme/status'
 import { T } from '../../theme/tokens'
 
 export default function Shipping() {
@@ -285,22 +248,75 @@ export default function Shipping() {
     }
   }
 
-  const counts = {
-    open: shipments.filter((s) => ['已指令', '发货中', '已装车', '在途', '已到货'].includes(s.status)).length,
-    transit: shipments.filter((s) => s.status === '在途').length,
-    signed: shipments.filter((s) => s.status === '已签收').length,
-  }
+
+  // ── 队列：车已叫回、该我装/该我发的批次（跨项目；叫车是采购的事，见 PURCHASE_BOARD）──
+  const todoRows = shipments
+    .filter((x) => ['已指令', '发货中', '已装车'].includes(x.status) && x.vehicle_status === '已叫车')
+    .sort((a, b) => String(a.plan_ship_date ?? '9999').localeCompare(String(b.plan_ship_date ?? '9999')))
+  const waitLoad = todoRows.filter((x) => x.status !== '已装车')
+  const waitDepart = todoRows.filter((x) => x.status === '已装车')
 
   return (
-    <Card
-      title="发运（S7）"
-      extra={
-        <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-          按设备结构生成发运清单 → 逐项勾「已发」+ 拍照 → 装车（拍照）→ 发运 → 现场按同一份清单清点（到/缺/损）
-        </Typography.Text>
-      }
-    >
-      <Space style={{ marginBottom: 12 }}>
+    <div className="ds-page">
+      {/* ★ docs/15 台骨架四件套：台头 → 结论条 → 流程条（注册表驱动）→ 体 */}
+      <WorkbenchPage
+        board={SHIPPING_BOARD}
+        sub={
+          todoRows.length
+            ? `${waitLoad.length} 个批次等装车 · ${waitDepart.length} 个已装车等发运`
+            : '现在没有等装车/等发运的批次'
+        }
+        help="必经顺序：按设备结构生成发运清单 → 逐项勾「已发」+ 拍照 → 装车（拍照）→ 发运 → 现场按同一份清单清点（到/缺/损）。★ 采购没叫车不能装车。"
+        actions={
+          <>
+            {!canEdit && <Chip>只读（需要 ship:edit 才能操作）</Chip>}
+            <Button size="small" onClick={() => void load(projectNo)}>
+              刷新
+            </Button>
+          </>
+        }
+        counts={{
+          todo: todoRows.length,
+          batches: shipments.filter((x) => !['已签收', '已取消'].includes(x.status)).length,
+        }}
+        metrics={[
+          { key: 'load', label: '等装车', value: waitLoad.length, unit: '批', tone: waitLoad.length ? 'warn' : undefined, dimZero: true, to: '?tab=todo' },
+          { key: 'depart', label: '等发运', value: waitDepart.length, unit: '批', tone: waitDepart.length ? 'warn' : undefined, dimZero: true, to: '?tab=todo' },
+          { key: 'transit', label: '在途', value: shipments.filter((x) => x.status === '在途').length, unit: '批', tone: shipments.filter((x) => x.status === '在途').length ? 'warn' : undefined, dimZero: true, to: '?tab=batches' },
+          { key: 'open', label: '未完成批次', value: shipments.filter((x) => !['已签收', '已取消'].includes(x.status)).length, unit: '批', dimZero: true, to: '?tab=batches' },
+          { key: 'signed', label: '已签收', value: shipments.filter((x) => x.status === '已签收').length, unit: '批', tone: 'ok', dimZero: true, to: '?tab=batches' },
+        ]}
+      >
+        {(t: string) =>
+          t === 'todo' ? (
+            <QueueBoard
+              search={<Muted>车由采购叫回来；你这边装车、发运。还没叫车的批次不在这里（去采购台的「待叫车」）。</Muted>}
+              emptyText="没有等装车/等发运的批次 —— 项目经理下达发货指令、采购叫车之后会出现在这里。"
+              items={todoRows.map((x) => ({
+                key: x.shipment_no,
+                group: x.status === '已装车' ? '已装车，等发运' : '已叫车，等装车',
+                groupCount: x.status === '已装车' ? waitDepart.length : waitLoad.length,
+                groupTone: x.status === '已装车' ? 'warn' : undefined,
+                lead: <Code>{x.shipment_no}</Code>,
+                title: `${x.project_no}`,
+                meta: `发货日 ${x.plan_ship_date ?? '未定'} · ${x.vehicle_count ?? 0} 车 · ${
+                  x.lines?.length ? `清单 ${x.lines.length} 项` : '清单还没生成'
+                }`,
+                cells: [{ text: <Status tone="run">{x.status}</Status> }],
+                action: x.status === '已装车' ? (
+                  <Button type="primary" size="small" disabled={!canEdit} onClick={() => setItemsShip(x)}>
+                    跟踪/发运
+                  </Button>
+                ) : (
+                  <Button type="primary" size="small" disabled={!canEdit} onClick={() => setLoadTarget(x)}>
+                    装车
+                  </Button>
+                ),
+              }))}
+            />
+          ) : (
+            <>
+      <div className="ds-toolbar">
         <Select
           showSearch
           optionFilterProp="label"
@@ -310,19 +326,13 @@ export default function Shipping() {
           onChange={(v: string | undefined) => { setProjectNo(v); setSelectedEquips([]); void load(v) }}
           options={projects.map((p) => ({ value: p.project_no, label: `${p.project_no} ${p.project_name}` }))}
         />
-        {!canEdit && <Tag>只读（需要 ship:edit 才能操作）</Tag>}
-      </Space>
+        {!canEdit && <Chip>只读（需要 ship:edit 才能操作）</Chip>}
+      </div>
 
-      {!projectNo && <Empty description="先选一个项目" />}
+      {!projectNo && <DsEmpty text="先在上面选一个项目 —— 待发设备、发运清单、批次都是按项目看的。" />}
 
       {projectNo && (
         <>
-          <Row gutter={12} style={{ marginBottom: 12 }}>
-            <Col span={6}><Statistic title="未完成批次" value={counts.open} /></Col>
-            <Col span={6}><Statistic title="在途" value={counts.transit} valueStyle={{ color: counts.transit ? T.goldText : undefined }} /></Col>
-            <Col span={6}><Statistic title="已签收" value={counts.signed} /></Col>
-          </Row>
-
           <Card size="small" title="待发设备（本次要发哪几台）" style={{ marginBottom: 12 }}>
             <Table<ToShipRow>
               rowKey="equip_no"
@@ -330,7 +340,7 @@ export default function Shipping() {
               loading={loading}
               dataSource={toShipRows}
               pagination={false}
-              locale={{ emptyText: <Empty description="没有可发的设备（设各未装配完成、或已在本轮未完成的批次里）" /> }}
+              locale={{ emptyText: <DsEmpty text="没有可发的设备（设各未装配完成、或已在本轮未完成的批次里）" /> }}
               rowSelection={{
                 selectedRowKeys: selectedEquips,
                 onChange: (keys) => setSelectedEquips(keys as string[]),
@@ -343,13 +353,13 @@ export default function Shipping() {
                 { title: '设备', key: 'eq', width: 220, render: (_: unknown, r: ToShipRow) => `${r.equip_no} ${r.equip_name}` },
                 {
                   title: '装配状态', dataIndex: 'assembly_status', width: 130,
-                  render: (v: string | null) => (v ? <Tag color={v === '调试完成' ? 'success' : 'processing'}>{v}</Tag> : <Tag>未装配</Tag>),
+                  render: (v: string | null) => (v ? <Chip tone={toneOf(v === '调试完成' ? 'success' : 'processing')}>{v}</Chip> : <Chip>未装配</Chip>),
                 },
                 { title: '齐套率', dataIndex: 'kitting_rate', width: 100, render: (v: number) => `${Math.round(v * 100)}%` },
                 {
                   title: '能否发', key: 'ready', width: 150,
                   render: (_: unknown, r: ToShipRow) =>
-                    r.in_open_shipment ? <Tag color="orange">已在发运批次</Tag> : r.ready ? <Tag color="success">可发</Tag> : <Tag>未装配完成</Tag>,
+                    r.in_open_shipment ? <Chip tone="warn">已在发运批次</Chip> : r.ready ? <Chip tone="ok">可发</Chip> : <Chip>未装配完成</Chip>,
                 },
               ]}
             />
@@ -381,11 +391,11 @@ export default function Shipping() {
             loading={loading}
             dataSource={shipments}
             pagination={{ pageSize: 10, showSizeChanger: false }}
-            locale={{ emptyText: <Empty description="还没有发货指令" /> }}
+            locale={{ emptyText: <DsEmpty text="还没有发货指令" /> }}
             columns={[
               { title: '发运单号', dataIndex: 'shipment_no', width: 110, render: (v: string, r: ShipmentRow) => <a onClick={() => setDetail(r)}>{v}</a> },
               { title: '本次设备', key: 'lines', render: (_: unknown, r: ShipmentRow) => r.lines.map((l) => l.equip_no).join('、') },
-              { title: '状态', dataIndex: 'status', width: 100, render: (v: string) => <Tag color={SHIP_COLOR[v] ?? 'default'}>{v}</Tag> },
+              { title: '状态', dataIndex: 'status', width: 100, render: (v: string) => <Status tone={toneOf(SHIP_COLOR[v])}>{v}</Status> },
               // ★ §2.2：PM 定的发货日 + 采购叫车结果（装货的人看“当天几车”）
               { title: '发货日', dataIndex: 'plan_ship_date', width: 110, render: (v?: string | null) => v ?? '—' },
               {
@@ -393,7 +403,7 @@ export default function Shipping() {
                 render: (_: unknown, r: ShipmentRow) =>
                   r.vehicle_status === '已叫车'
                     ? <span>已叫 {r.vehicle_count ?? '?'} 车{r.vehicle_note ? `· ${r.vehicle_note}` : ''}</span>
-                    : <Tag color="orange">待叫车</Tag>,
+                    : <Chip tone="warn">待叫车</Chip>,
               },
               { title: '车牌 / 司机', key: 'v', width: 160, render: (_: unknown, r: ShipmentRow) => `${r.plate_no ?? ''} ${r.driver ?? ''}` || '—' },
               {
@@ -457,7 +467,7 @@ export default function Shipping() {
             <Skeleton active paragraph={{ rows: 4 }} />
           ) : (
             <>
-              {(itemsShip?.items ?? []).length === 0 && <Empty description="清单为空" />}
+              {(itemsShip?.items ?? []).length === 0 && <DsEmpty text="清单为空" />}
               {(itemsShip?.items ?? []).map((it) => (
                 <div key={it.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 0', borderBottom: `1px solid ${T.border}` }}>
                   {/* ★ 没拍照就不能勾（P2-8）：
@@ -474,7 +484,7 @@ export default function Shipping() {
                         <Typography.Text type="secondary" style={{ fontSize: 12, marginLeft: 6 }}>
                           {it.name ?? ''} · {it.qty} {it.kind}
                         </Typography.Text>
-                        {it.shipped && <Tag color="success" style={{ marginLeft: 6 }}>已发</Tag>}
+                        {it.shipped && <Chip tone="ok" style={{ marginLeft: 6 }}>已发</Chip>}
                       </Checkbox>
                     </span>
                   </Tooltip>
@@ -502,7 +512,7 @@ export default function Shipping() {
       >
         <Typography.Paragraph>
           <Muted>
-            本次要发：{selectedEquips.join('、')}。指令下达后采购要去叫车、发运负者据此装车 —— 所以发货日必须定下来。
+            本次要发：{selectedEquips.join('、')}。指令下达后采购要去叫车、发运组据此装车 —— 所以发货日必须定下来。
           </Muted>
         </Typography.Paragraph>
         <Form form={instructForm} layout="vertical" preserve={false}>
@@ -643,7 +653,7 @@ export default function Shipping() {
           <>
             <Descriptions size="small" column={1} bordered>
               <Descriptions.Item label="项目">{detail.project_no}</Descriptions.Item>
-              <Descriptions.Item label="状态"><Tag color={SHIP_COLOR[detail.status] ?? 'default'}>{detail.status}</Tag></Descriptions.Item>
+              <Descriptions.Item label="状态"><Status tone={toneOf(SHIP_COLOR[detail.status])}>{detail.status}</Status></Descriptions.Item>
               <Descriptions.Item label="本次设备">{detail.lines.map((l) => l.equip_no).join('、')}</Descriptions.Item>
               <Descriptions.Item label="车辆">{detail.vehicle ?? '—'} {detail.plate_no ?? ''} {detail.driver ?? ''}</Descriptions.Item>
               <Descriptions.Item label="指令 / 发运 / 到货">
@@ -653,14 +663,14 @@ export default function Shipping() {
             </Descriptions>
 
             <Typography.Title level={5} style={{ marginTop: 16 }}>发运清单（{detail.items.length}）</Typography.Title>
-            {detail.items.length === 0 && <Empty description="清单为空" />}
+            {detail.items.length === 0 && <DsEmpty text="清单为空" />}
             {detail.items.map((p) => (
               <div key={p.id} style={{ padding: '5px 0', borderBottom: `1px solid ${T.border}` }}>
                 <Space>
-                  {p.shipped ? <Tag color="success">已发</Tag> : <Tag>未发</Tag>}
+                  {p.shipped ? <Chip tone="ok">已发</Chip> : <Chip>未发</Chip>}
                   <Typography.Text>{p.ref}</Typography.Text>
                   <Typography.Text type="secondary" style={{ fontSize: 12 }}>{p.name ?? ''} × {p.qty}</Typography.Text>
-                  {p.check_result && <Tag color={p.check_result === '到' ? 'success' : 'error'}>现场：{p.check_result}</Tag>}
+                  {p.check_result && <Status tone={p.check_result === '到' ? 'ok' : 'err'}>现场：{p.check_result}</Status>}
                   <a onClick={() => { setPlaceItem(p); setPlacePhotos([]) }}>摆放拍照</a>
                 </Space>
                 <Space wrap style={{ marginTop: 4 }}>
@@ -672,10 +682,10 @@ export default function Shipping() {
             ))}
 
             <Typography.Title level={5} style={{ marginTop: 16 }}>现场清点</Typography.Title>
-            {detail.receipts.length === 0 && <Empty description="还没到货清点" />}
+            {detail.receipts.length === 0 && <DsEmpty text="还没到货清点" />}
             {detail.receipts.map((r) => (
               <Card key={r.id} size="small" style={{ marginBottom: 8 }}>
-                <Tag color={r.result === '齐' ? 'success' : 'error'}>{r.result}</Tag>
+                <Status tone={r.result === '齐' ? 'ok' : 'err'}>{r.result}</Status>
                 {r.remark}
                 {r.shortage_detail.length > 0 && (
                   <div style={{ fontSize: 12, color: T.error, marginTop: 4 }}>
@@ -726,6 +736,10 @@ export default function Shipping() {
           label="摆放位置照片"
         />
       </Modal>
-    </Card>
+      </>
+          )
+        }
+      </WorkbenchPage>
+    </div>
   )
 }

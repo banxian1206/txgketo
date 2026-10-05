@@ -106,7 +106,13 @@ def test_only_assembled_equipment_can_enter_a_shipment():
     pc = _read(fe / "Page.tsx")
     assert "disabled: r.in_open_shipment || !r.ready" in pc, "PC 端未装配完成的设备不该能勾"
     mob = _read(fe / "MobilePage.tsx")
-    assert "disabled={t.in_open_shipment || !t.ready}" in mob, "手机端未装配完成的设备不该能勾"
+    # ★ 2026-10-04 迁移（断言语义不变，只跟着实现换代）：
+    #   手机端从 antd `Checkbox disabled=` 改成了作业卡的「勾选行」（`MCheckRow` + `onToggle`），
+    #   门禁因此写成 `onToggle` 里的提前 return。**门禁必须在**，写法允许两种之一。
+    assert (
+        "disabled={t.in_open_shipment || !t.ready}" in mob
+        or "if (t.in_open_shipment || !t.ready) return" in mob
+    ), "手机端未装配完成的设备不该能勾（勾选入口必须带 ready 门禁）"
 
 
 def test_both_ends_collect_plan_ship_date():

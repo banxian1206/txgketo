@@ -1,44 +1,29 @@
 import { CheckCircleFilled, MinusCircleOutlined, PlusOutlined, WarningOutlined } from '@ant-design/icons'
 import { useSiteBoard } from './hooks'
 import IncomingCheckFields from './components/IncomingCheckFields'
-import { App, Button, Card, DatePicker, Empty, Form, Input, InputNumber, Radio, Select, Space, Tabs, Tag, Typography } from 'antd'
+import { App, Button, DatePicker, Form, Input, InputNumber, Radio, Select, Space } from 'antd'
 import dayjs from 'dayjs'
-import {useEffect, useState} from 'react'
+import { useEffect, useState } from 'react'
 
 import { useAuth } from '../../contexts/AuthContext'
 
-import {
-  acceptSiteIncoming,
-  addSiteDaily,
-  addSiteIssue,
-  applyAcceptance,
-  commissionArrive,
-  commissionStart,
-  confirmAcceptance,
-  errMsg,
-  finishCommission,
-  hasPerm,
-  linkSiteIssue,
-  requestCommission,
-  saveSiteSurvey,
-  sitePhotoUrl,
-  uploadSitePhotos,
-  type AcceptanceRow,
-  type SiteCommissionRow,
-  type SiteDailyRow,
-  type SiteIncomingPending,
-  type SiteIssueRow,
-} from '../../api/client'
+import { acceptSiteIncoming, addSiteDaily, addSiteIssue, applyAcceptance, commissionArrive, commissionStart, confirmAcceptance, errMsg, finishCommission, hasPerm, linkSiteIssue, requestCommission, saveSiteSurvey, sitePhotoUrl, uploadSitePhotos, type AcceptanceRow, type SiteCommissionRow, type SiteDailyRow, type SiteIncomingPending, type SiteIssueRow } from '../../api/client'
+import { MCard, MChip, MEmpty, MHead, MStatus } from '../../components/ds/mobile'
 import MfgPhotoPicker from '../../components/MfgPhotoPicker'
 import AppModal from '../../components/AppModal'
 import { getDesignTree } from '../../api/design'
-import { SITE_ISSUE_STATUS as ISSUE_COLOR } from '../../theme/status'
-import { SITE_COMMISSION_STATUS as COMMISSION_COLOR } from '../../theme/status'
-import { T } from '../../theme/tokens'
 
 type Kind = 'survey' | 'daily' | 'issue' | 'commission' | 'incoming' | 'acc-apply' | 'acc-confirm'
 
 /** 现场手机端（S8）：现场以手机为唯一终端 —— 勘测 / 来货清点 / 每日汇报 / 问题 / 申请调试。 */
+/** 现场问题 / 调试申请状态 → 作业卡 tone（与 PC 同一套语义） */
+const ISSUE_TONE: Record<string, 'ok' | 'warn' | 'err' | 'run' | undefined> = {
+  待处理: 'err', 已转变更: 'run', 已闭环: 'ok',
+}
+const COMMISSION_TONE: Record<string, 'ok' | 'warn' | 'err' | 'run' | undefined> = {
+  已申请: 'warn', 已到现场: 'run', 已开始调试: 'run', 调试完成: 'ok',
+}
+
 export default function SiteM() {
   const { message } = App.useApp()
   // ★ N1（2026-10-04 走查核实）：被派的调试工程师本人也能记自己的进度（与后端 _can_act_on_commission 同口径）
@@ -54,6 +39,8 @@ export default function SiteM() {
   const [modal, setModal] = useState<{ kind: Kind; target?: SiteIncomingPending; issue?: SiteIssueRow; acc?: AcceptanceRow } | null>(null)
   const [modalInitial, setModalInitial] = useState<Record<string, unknown>>({})
   const [saving, setSaving] = useState(false)
+  // ★ R4-c：视图切换从 antd Tabs 改成 .m-seg —— 显式 state（6 个视图：清点/日报/问题/调试/验收/勘测）
+  const [view, setView] = useState<'incoming' | 'daily' | 'issues' | 'commission' | 'acceptance' | 'survey'>('incoming')
   const [form] = Form.useForm()
 
   // 重构 2.1：看板数据走共享 hook（与 PC 同源）
@@ -153,19 +140,34 @@ export default function SiteM() {
   const c = wb?.counts
 
   const dailyCard = (d: SiteDailyRow) => (
-    <Card key={d.id} size="small" style={{ marginBottom: 10 }}>
-      <Space>
-        <Tag color="processing">{d.stage}</Tag>
-        <Typography.Text>{d.report_date}</Typography.Text>
-        {d.equip_no && <Tag>{d.equip_no}</Tag>}
-        {d.people != null && <Typography.Text type="secondary" style={{ fontSize: 12 }}>现场 {d.people} 人</Typography.Text>}
-      </Space>
-      <div style={{ fontSize: 12, marginTop: 4 }}>
-        {d.done_items.map((x, i) => <div key={i}><CheckCircleFilled style={{ color: T.success }} /> {x}</div>)}
-        {d.problem && <div style={{ color: T.error }}><WarningOutlined style={{ color: 'inherit' }} /> {d.problem}</div>}
-      </div>
-      <div style={{ fontSize: 12, color: T.textSecondary, marginTop: 4 }}>照片 {d.photos.length} · 视频 {d.videos.length}</div>
-    </Card>
+    <MCard
+      key={d.id}
+      tone={d.problem ? 'err' : 'run'}
+      head={
+        <>
+          <MStatus tone="run">{d.stage}</MStatus>
+          <span style={{ marginLeft: 'auto' }}>
+            <MChip>{d.photos.length} 张 · {d.videos.length} 视频</MChip>
+          </span>
+        </>
+      }
+      title={d.report_date}
+      lines={[
+        ...(d.people != null ? [<>现场 {d.people} 人</>] : []),
+        ...d.done_items.map((x) => (
+          <span key={x} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+            <CheckCircleFilled style={{ color: 'var(--ds-ok)' }} /> {x}
+          </span>
+        )),
+        ...(d.problem
+          ? [
+              <span key="p" style={{ color: 'var(--ds-err)', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                <WarningOutlined /> {d.problem}
+              </span>,
+            ]
+          : []),
+      ]}
+    />
   )
 
   return (
@@ -175,142 +177,264 @@ export default function SiteM() {
         value={projectNo} onChange={(v: string | undefined) => pick(v)}
         options={projects.map((p) => ({ value: p.project_no, label: `${p.project_no} ${p.project_name}` }))}
       />
-      {projectNo && (
-        <Card size="small" style={{ marginBottom: 10 }}>
-          <Space split="|" wrap>
-            <span>已勘测 {c?.surveyed ?? 0}</span>
-            <span>今日汇报 {c?.daily_today ?? 0}</span>
-            <span style={{ color: c?.open_issues ? T.error : undefined }}>待处理问题 {c?.open_issues ?? 0}</span>
-            <span>待派调试 {c?.to_dispatch ?? 0}</span>
-          </Space>
-        </Card>
+      {!projectNo && (
+        <>
+          <MHead title="现场" sub="先选一个项目（现场日常用手机浏览器加主屏）" />
+          {projects.map((pj) => (
+            <MCard
+              key={pj.project_no}
+              head={<span className="ds-code" style={{ fontSize: 12 }}>{pj.project_no}</span>}
+              title={pj.project_name}
+              onClick={() => pick(pj.project_no)}
+            />
+          ))}
+        </>
       )}
 
       {projectNo && (
-        <Tabs
-          items={[
-            {
-              key: 'incoming',
-              label: `来货清点 ${incoming.pending.length}`,
-              children: (
-                <>
-                  {incoming.pending.length === 0 && <Empty description="没有待清点的直发件" />}
-                  {incoming.pending.map((p) => (
-                    <Card key={p.receipt_no} size="small" style={{ marginBottom: 10 }}>
-                      <div><b>{p.item_no}</b> × {p.qty} {p.unit ?? ''}</div>
-                      <div style={{ fontSize: 12, color: T.textSecondary }}>{p.receipt_no} · {p.receipt_date ?? ''} · 直发客户现场</div>
-                      {canEdit && <Button size="small" type="primary" style={{ marginTop: 8 }} onClick={() => open('incoming', p)}>清点验收</Button>}
-                    </Card>
-                  ))}
-                </>
-              ),
-            },
-            {
-              key: 'daily',
-              label: '每日汇报',
-              children: (
-                <>
-                  {canEdit && <Button type="primary" block style={{ marginBottom: 10 }} onClick={() => open('daily')}>＋ 今天汇报</Button>}
-                  {(wb?.dailies.length ?? 0) === 0 && <Empty description="还没有汇报" />}
-                  {wb?.dailies.map(dailyCard)}
-                </>
-              ),
-            },
-            {
-              key: 'issues',
-              label: `现场问题 ${wb?.issues.length ?? 0}`,
-              children: (
-                <>
-                  {canEdit && <Button danger block style={{ marginBottom: 10 }} onClick={() => open('issue')}>＋ 上报问题（走变更）</Button>}
-                  {(wb?.issues.length ?? 0) === 0 && <Empty description="没有问题" />}
-                  {wb?.issues.map((it) => (
-                    <Card key={it.id} size="small" style={{ marginBottom: 10 }}>
-                      <Space>
-                        <Tag color={ISSUE_COLOR[it.status] ?? 'default'}>{it.status}</Tag>
-                        <b>{it.title}</b>
-                      </Space>
-                      <div style={{ fontSize: 12, color: T.textStrong, marginTop: 4 }}>{it.desc}</div>
-                      {canEdit && it.status === '待处理' && (
-                        <Space style={{ marginTop: 8 }}>
-                          <Button size="small" onClick={() => void linkSiteIssue(it.id, { change_id: undefined }).then(() => void load(projectNo))}>转变更</Button>
-                          <Button size="small" onClick={() => void linkSiteIssue(it.id, { close: true }).then(() => void load(projectNo))}>闭环</Button>
-                        </Space>
-                      )}
-                    </Card>
-                  ))}
-                </>
-              ),
-            },
-            {
-              key: 'commission',
-              label: `申请调试 ${wb?.commissions.length ?? 0}`,
-              children: (
-                <>
-                  {canEdit && <Button type="primary" block style={{ marginBottom: 10 }} onClick={() => open('commission')}>＋ 申请调试（派人到现场）</Button>}
-                  {(wb?.commissions.length ?? 0) === 0 && <Empty description="还没申请调试" />}
-                  {wb?.commissions.map((m: SiteCommissionRow) => (
-                    <Card key={m.id} size="small" style={{ marginBottom: 10 }}>
-                      <Space>
-                        <Tag color={COMMISSION_COLOR[m.status] ?? 'default'}>{m.status}</Tag>
-                        <span>{m.plan_date ?? '待定'}</span>
-                        <span>{m.dispatch_to ?? '待派'}</span>
-                      </Space>
-                      {/* ★ N1（2026-10-04 走查核实）：被派的调试工程师本人也能记自己的进度 ——
-                          修前只有 site:edit 能点，派了活被派的人却看不到入口（后端同步放行） */}
-                      {(canEdit || canActOnCommission(m)) && m.status === '已申请' && <Button size="small" style={{ marginTop: 8 }} onClick={() => void commissionArrive(m.id).then(() => void load(projectNo))}>已到现场</Button>}
-                      {(canEdit || canActOnCommission(m)) && m.status === '已到现场' && <Button size="small" type="primary" style={{ marginTop: 8 }} onClick={() => void commissionStart(m.id).then(() => void load(projectNo))}>开始调试</Button>}
-                      {(canEdit || canActOnCommission(m)) && m.status === '已开始调试' && <Button size="small" type="primary" style={{ marginTop: 8 }} onClick={() => void finishCommission(m.id).then(() => void load(projectNo))}>调试完成</Button>}
-                    </Card>
-                  ))}
-                </>
-              ),
-            },
-            {
-              key: 'acceptance',
-              label: `客户验收 ${accs.length}`,
-              children: (
-                <>
-                  {canEdit && <Button type="primary" block style={{ marginBottom: 10 }} onClick={() => open('acc-apply')}>＋ 申请客户验收</Button>}
-                  {accs.length === 0 && <Empty description="还没验收单" />}
-                  {accs.map((a) => (
-                    <Card key={a.id} size="small" style={{ marginBottom: 10 }}>
-                      <Space>
-                        <Tag color={a.status === '已通过' ? 'success' : a.status === '未通过' ? 'error' : 'gold'}>{a.status}</Tag>
-                        <span>资料 {a.doc_count} 个（已签 {a.signed_count}）</span>
-                      </Space>
-                      {a.warranty_start && (
-                        <div style={{ fontSize: 12, color: T.textStrong, marginTop: 4 }}>质保 {a.warranty_start} ~ {a.warranty_end}</div>
-                      )}
-                      {a.signed_by && <div style={{ fontSize: 12, color: T.textStrong }}>客户签字：{a.signed_by}</div>}
-                      {canEdit && a.status === '待验收' && (
-                        <Button size="small" type="primary" style={{ marginTop: 8 }} onClick={() => open('acc-confirm', undefined, undefined, a)}>客户确认验收</Button>
-                      )}
-                    </Card>
-                  ))}
-                </>
-              ),
-            },
-            {
-              key: 'survey',
-              label: '勘测',
-              children: (
-                <>
-                  {canEdit && <Button type="primary" block style={{ marginBottom: 10 }} onClick={() => open('survey')}>＋ 现场勘测</Button>}
-                  {(wb?.surveys.length ?? 0) === 0 && <Empty description="还没勘测" />}
-                  {wb?.surveys.map((s) => (
-                    <Card key={s.id} size="small" style={{ marginBottom: 10 }} title={`约定入场 ${s.enter_date ?? '待定'}`}>
-                      <div style={{ fontSize: 12, color: T.textStrong }}>
-                        甲方：{s.contact ?? '—'} · 承重：{s.floor_load ?? '—'} · 通道：{s.passage ?? '—'}
-                        <br />电：{s.power ?? '—'} · 气：{s.air ?? '—'} · 网：{s.network ?? '—'}
-                      </div>
-                      {s.remark && <div style={{ fontSize: 12, marginTop: 4 }}>{s.remark}</div>}
-                    </Card>
-                  ))}
-                </>
-              ),
-            },
-          ]}
+        <MHead
+          title="现场"
+          sub={`待清点 ${incoming.pending.length} · 今日汇报 ${c?.daily_today ?? 0} · 问题 ${
+            c?.open_issues ?? 0
+          } · 待派调试 ${c?.to_dispatch ?? 0}`}
         />
+      )}
+
+      {projectNo && (
+        <div className="m-seg wrap">
+          {(
+            [
+              ['incoming', `来货清点${incoming.pending.length ? ` ${incoming.pending.length}` : ''}`],
+              ['daily', '每日汇报'],
+              ['issues', `现场问题${c?.open_issues ? ` ${c.open_issues}` : ''}`],
+              ['commission', `申请调试${c?.to_dispatch ? ` ${c.to_dispatch}` : ''}`],
+              ['acceptance', `客户验收${accs.length ? ` ${accs.length}` : ''}`],
+              ['survey', '勘测'],
+            ] as const
+          ).map(([k, label]) => (
+            <button key={k} type="button" className={view === k ? 'on' : ''} onClick={() => setView(k)}>
+              {label}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {projectNo && view === 'incoming' && (
+        <>
+          {incoming.pending.length === 0 && <MEmpty text="没有待清点的直发件。直发到现场的货会出现在这里。" />}
+          {incoming.pending.map((p) => (
+            <MCard
+              key={p.receipt_no}
+              tone="warn"
+              head={
+                <>
+                  <span className="ds-code" style={{ fontSize: 12 }}>{p.receipt_no}</span>
+                  <MStatus tone="warn">待清点</MStatus>
+                  <span style={{ marginLeft: 'auto' }}>
+                    <MChip>直发客户现场</MChip>
+                  </span>
+                </>
+              }
+              title={`${p.item_no} × ${p.qty} ${p.unit ?? ''}`}
+              lines={[<>到货 {p.receipt_date ?? '—'}</>]}
+            >
+              <div className="m-actions">
+                {canEdit && (
+                  <Button block type="primary" onClick={() => open('incoming', p)}>
+                    清点验收（逐项到 / 缺 / 损 + 拍照）
+                  </Button>
+                )}
+              </div>
+            </MCard>
+          ))}
+        </>
+      )}
+
+      {projectNo && view === 'daily' && (
+        <>
+          {canEdit && (
+            <div className="m-actions" style={{ marginTop: 0, marginBottom: 12 }}>
+              <Button block type="primary" onClick={() => open('daily')}>
+                ＋ 今天汇报（必带照片）
+              </Button>
+            </div>
+          )}
+          {(wb?.dailies.length ?? 0) === 0 && <MEmpty text="还没有汇报。每天收工前报一次：勾今天做完的 + 拍照。" />}
+          {wb?.dailies.map(dailyCard)}
+        </>
+      )}
+
+      {projectNo && view === 'issues' && (
+        <>
+          {canEdit && (
+            <div className="m-actions" style={{ marginTop: 0, marginBottom: 12 }}>
+              <Button block danger onClick={() => open('issue')}>
+                ＋ 上报问题（改动一律走变更）
+              </Button>
+            </div>
+          )}
+          {(wb?.issues.length ?? 0) === 0 && <MEmpty text="没有问题。现场遇到的改动需求都从这里上报，走变更审批。" />}
+          {wb?.issues.map((it) => (
+            <MCard
+              key={it.id}
+              tone={ISSUE_TONE[it.status]}
+              head={
+                <>
+                  <MStatus tone={ISSUE_TONE[it.status]}>{it.status}</MStatus>
+                  {it.drawing_no && <span className="ds-code" style={{ fontSize: 12 }}>{it.drawing_no}</span>}
+                </>
+              }
+              title={it.title}
+              lines={[<>{it.desc ?? ''}</>]}
+            >
+              {canEdit && it.status === '待处理' && (
+                <div className="m-actions">
+                  <Button
+                    block
+                    onClick={() => void linkSiteIssue(it.id, { change_id: undefined }).then(() => void load(projectNo))}
+                  >
+                    转变更（走 ECN 审批）
+                  </Button>
+                  <Button block onClick={() => void linkSiteIssue(it.id, { close: true }).then(() => void load(projectNo))}>
+                    直接闭环
+                  </Button>
+                </div>
+              )}
+            </MCard>
+          ))}
+        </>
+      )}
+
+      {projectNo && view === 'commission' && (
+        <>
+          {canEdit && (
+            <div className="m-actions" style={{ marginTop: 0, marginBottom: 12 }}>
+              <Button block type="primary" onClick={() => open('commission')}>
+                ＋ 申请调试（派人到现场）
+              </Button>
+            </div>
+          )}
+          {(wb?.commissions.length ?? 0) === 0 && <MEmpty text="还没申请调试。安装完成后在这里申请，必须写清派谁去。" />}
+          {wb?.commissions.map((m: SiteCommissionRow) => (
+            <MCard
+              key={m.id}
+              tone={COMMISSION_TONE[m.status]}
+              head={
+                <>
+                  <MStatus tone={COMMISSION_TONE[m.status]}>{m.status}</MStatus>
+                  <span style={{ marginLeft: 'auto' }}>
+                    <MChip>{m.dispatch_to ?? '待派'}</MChip>
+                  </span>
+                </>
+              }
+              title={`计划到场 ${m.plan_date ?? '待定'}`}
+            >
+              {/* ★ N1（2026-10-04 走查核实）：被派的调试工程师本人也能记自己的进度 ——
+                  修前只有 site:edit 能点，派了活被派的人却看不到入口（后端同步放行） */}
+              <div className="m-actions">
+                {(canEdit || canActOnCommission(m)) && m.status === '已申请' && (
+                  <Button block onClick={() => void commissionArrive(m.id).then(() => void load(projectNo))}>
+                    已到现场
+                  </Button>
+                )}
+                {(canEdit || canActOnCommission(m)) && m.status === '已到现场' && (
+                  <Button block type="primary" onClick={() => void commissionStart(m.id).then(() => void load(projectNo))}>
+                    开始调试
+                  </Button>
+                )}
+                {(canEdit || canActOnCommission(m)) && m.status === '已开始调试' && (
+                  <Button block type="primary" onClick={() => void finishCommission(m.id).then(() => void load(projectNo))}>
+                    调试完成（可申请验收）
+                  </Button>
+                )}
+              </div>
+            </MCard>
+          ))}
+        </>
+      )}
+
+      {projectNo && view === 'acceptance' && (
+        <>
+          {canEdit && (
+            <div className="m-actions" style={{ marginTop: 0, marginBottom: 12 }}>
+              <Button block type="primary" onClick={() => open('acc-apply')}>
+                ＋ 申请客户验收
+              </Button>
+            </div>
+          )}
+          {accs.length === 0 && <MEmpty text="还没验收单。调试完成后申请，客户签字即自动进入质保期。" />}
+          {accs.map((a) => (
+            <MCard
+              key={a.id}
+              tone={a.status === '已通过' ? 'ok' : a.status === '未通过' ? 'err' : 'warn'}
+              head={
+                <>
+                  <MStatus tone={a.status === '已通过' ? 'ok' : a.status === '未通过' ? 'err' : 'warn'}>
+                    {a.status}
+                  </MStatus>
+                  <span style={{ marginLeft: 'auto' }}>
+                    <MChip tone={a.signed_count >= a.doc_count && a.doc_count > 0 ? 'ok' : undefined}>
+                      资料 {a.signed_count}/{a.doc_count} 已签
+                    </MChip>
+                  </span>
+                </>
+              }
+              title="验收资料包"
+              lines={[
+                ...(a.warranty_start ? [<>质保 {a.warranty_start} ~ {a.warranty_end}</>] : []),
+                ...(a.signed_by ? [<>客户签字：{a.signed_by}</>] : []),
+              ]}
+            >
+              <div className="m-actions">
+                <Button block onClick={() => open('acc-confirm', undefined, undefined, a)} disabled={!canEdit}>
+                  看资料包 / 标记已签
+                </Button>
+                {canEdit && a.status === '待验收' && (
+                  <Button block type="primary" onClick={() => open('acc-confirm', undefined, undefined, a)}>
+                    客户确认验收（签字）
+                  </Button>
+                )}
+              </div>
+            </MCard>
+          ))}
+        </>
+      )}
+
+      {projectNo && view === 'survey' && (
+        <>
+          {canEdit && (
+            <div className="m-actions" style={{ marginTop: 0, marginBottom: 12 }}>
+              <Button block type="primary" onClick={() => open('survey')}>
+                ＋ 现场勘测（定入场时间）
+              </Button>
+            </div>
+          )}
+          {(wb?.surveys.length ?? 0) === 0 && <MEmpty text="还没勘测。入场前先勘测：承重 / 通道 / 电 / 气 / 网 + 约定入场时间。" />}
+          {wb?.surveys.map((s) => (
+            <MCard
+              key={s.id}
+              tone="ok"
+              head={
+                <>
+                  <MStatus tone="ok">已勘测</MStatus>
+                  <span style={{ marginLeft: 'auto' }}>
+                    <MChip tone="acc">约定入场 {s.enter_date ?? '待定'}</MChip>
+                  </span>
+                </>
+              }
+              title={s.contact ? `甲方 ${s.contact}` : '现场条件'}
+              lines={[
+                <>
+                  承重 {s.floor_load ?? '—'} · 通道 {s.passage ?? '—'}
+                </>,
+                <>
+                  电 {s.power ?? '—'} · 气 {s.air ?? '—'} · 网 {s.network ?? '—'}
+                </>,
+                ...(s.remark ? [<>{s.remark}</>] : []),
+              ]}
+            />
+          ))}
+        </>
       )}
 
       <AppModal
@@ -396,9 +520,7 @@ export default function SiteM() {
 
           {modal?.kind === 'commission' && (
             <>
-              <Typography.Paragraph type="secondary" style={{ fontSize: 12 }}>
-                一个动作：必须派人到现场（设备太多，远程调不了）。会同时通知装配/调试组和项目团队。
-              </Typography.Paragraph>
+              <div style={{ fontSize: 12.5, color: 'var(--ds-ink3)', marginBottom: 8 }}>一个动作：必须派人到现场（设备太多，远程调不了）。会同时通知装配/调试组和项目团队。</div>
               <Form.Item name="dispatch_to" label="派谁去（调试工程师）" rules={[{ required: true, message: '必须写明派谁去' }]}>
                 <Input placeholder="如 王工" />
               </Form.Item>
@@ -409,9 +531,7 @@ export default function SiteM() {
 
           {modal?.kind === 'acc-apply' && (
             <>
-              <Typography.Paragraph type="secondary" style={{ fontSize: 12 }}>
-                现场调试完成 → 申请客户验收。资料包在 PC「验收与质保」页上传（要传要签的东西很多）。
-              </Typography.Paragraph>
+              <div style={{ fontSize: 12.5, color: 'var(--ds-ink3)', marginBottom: 8 }}>现场调试完成 → 申请客户验收。资料包在 PC「验收与质保」页上传（要传要签的东西很多）。</div>
               <Form.Item name="remark" label="说明"><Input placeholder="现场调试完成，具备验收条件" /></Form.Item>
             </>
           )}
@@ -427,7 +547,7 @@ export default function SiteM() {
               <Form.Item name="signed_by" label="客户签字人"><Input placeholder="如 客户 张工" /></Form.Item>
               <Form.Item name="accepted_at" label="验收日期"><DatePicker style={{ width: '100%' }} /></Form.Item>
               <Form.Item name="remark" label="备注"><Input /></Form.Item>
-              <Typography.Text type="secondary" style={{ fontSize: 12 }}>通过后自动进入质保期，项目阶段推进到「质保」。</Typography.Text>
+              <div style={{ fontSize: 12.5, color: 'var(--ds-ink3)', marginTop: 4 }}>通过后自动进入质保期，项目阶段推进到「质保」。</div>
             </>
           )}
 

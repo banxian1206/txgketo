@@ -1,42 +1,9 @@
-import {
-  App,
-  Button,
-  Card,
-  DatePicker,
-  Checkbox,
-  Drawer,
-  Empty,
-  Form,
-  Input,
-  InputNumber,
-  Rate,
-  Select,
-  Space,
-  Table,
-  Tag,
-  Typography,
-} from 'antd'
+import { App, Button, Card, DatePicker, Checkbox, Drawer, Empty, Form, Input, InputNumber, Rate, Select, Space, Table, Typography } from 'antd'
 import dayjs from 'dayjs'
 import { useCallback, useEffect, useState } from 'react'
+import { Chip } from '../../components/ds'
 
-import {
-  addSupplierCatalog,
-  addSupplierQuote,
-  createSupplier,
-  errMsg,
-  listLibraryCategories,
-  listSupplierCatalog,
-  removeSupplierCatalog,
-  listSupplierQuotes,
-  listSuppliers,
-  listStdItems,
-  updateSupplier,
-  type CatalogRow,
-  type QuoteRow,
-  type StdCategoryInfo,
-  type StdItem,
-  type SupplierRow,
-} from '../../api/client'
+import { addSupplierCatalog, addSupplierQuote, createSupplier, errMsg, listLibraryCategories, listSupplierCatalog, removeSupplierCatalog, listSupplierQuotes, listSuppliers, listStdItems, updateSupplier, type CatalogRow, type QuoteRow, type StdCategoryInfo, type StdItem, type SupplierRow } from '../../api/client'
 import AppModal from '../../components/AppModal'
 import SupplierStatementModal from '../../components/SupplierStatementModal'
 
@@ -181,7 +148,7 @@ export default function Suppliers() {
               title: '主营',
               dataIndex: 'kind',
               width: 100,
-              render: (v: string) => (v ? <Tag>{v}</Tag> : '—'),
+              render: (v: string) => (v ? <Chip>{v}</Chip> : '—'),
             },
             { title: '联系人', dataIndex: 'contact_name', width: 100 },
             { title: '电话', dataIndex: 'phone', width: 130 },
@@ -349,12 +316,12 @@ export default function Suppliers() {
                 render: (_: unknown, r: CatalogRow) =>
                   r.item_no ? (
                     <Space size={4}>
-                      <Tag color="blue">型号</Tag>
+                      <Chip tone="run">型号</Chip>
                       {r.item_name ?? r.item_no}
                     </Space>
                   ) : (
                     <Space size={4}>
-                      <Tag>品类</Tag>
+                      <Chip>品类</Chip>
                       {r.std_class_name}
                     </Space>
                   ),
@@ -375,7 +342,7 @@ export default function Suppliers() {
                 title: '首选',
                 dataIndex: 'is_preferred',
                 width: 80,
-                render: (v: boolean) => (v ? <Tag color="gold">首选</Tag> : '—'),
+                render: (v: boolean) => (v ? <Chip tone="warn">首选</Chip> : '—'),
               },
               {
                 title: '',
@@ -480,7 +447,7 @@ export default function Suppliers() {
               title: '类型',
               dataIndex: 'price_type',
               width: 90,
-              render: (v: string) => (v === '成交' ? <Tag color="green">成交</Tag> : <Tag>报价</Tag>),
+              render: (v: string) => (v === '成交' ? <Chip tone="ok">成交</Chip> : <Chip>报价</Chip>),
             },
             { title: '日期', dataIndex: 'quote_date', width: 110 },
             { title: '来源', dataIndex: 'source', width: 130, render: (v: string | null) => v || '—' },

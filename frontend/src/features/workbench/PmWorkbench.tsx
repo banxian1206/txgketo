@@ -1,19 +1,28 @@
-import { App, Button, Card, Col, Progress, Row, Space, Spin, Table, Tabs, Tag, Typography } from 'antd'
+import { App, Button, Progress, Space, Spin, Table, Typography } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import { useCallback, useEffect, useState } from 'react'
+
 import { errMsg, pmBoard, workbenchMe, type PmBoard, type PmProjectRow, type WorkbenchMe } from '../../api/client'
-import { PM_TABS, filterTabs } from '../../configs/tabs'
-import { useTab } from '../../hooks/useTab'
 import AcceptancePage from '../acceptance/Page'
-import { PROJECT_STAGE as STAGE_COLOR } from '../../theme/status'
-import { T } from '../../theme/tokens'
+import { Chip, Panel, Status } from '../../components/ds'
+import WorkbenchPage from '../../components/domain/WorkbenchPage'
+import { PM_BOARD } from '../../configs/boards'
+import { PROJECT_STAGE as STAGE_COLOR, toneOf } from '../../theme/status'
 import { useGoFrom } from '../../hooks/useFrom'
-/** 项目经理台（06 卷 §3）：我项目的全链进度（设计 → 采购 → 到货/入库）+ 风险/待办 */
-function PmBoardPage() {
+
+/**
+ * 项目经理台（06 卷 §3）：我项目的全链进度（设计 → 采购 → 到货/入库）+ 风险/待办。
+ *
+ * ★ docs/15 台骨架：台头 → 结论条 → 流程条 → 体。
+ *   原来由本组件先画页签条、再看板页画标题 → **页签条跑到标题之上**（九个台里唯一一个）。
+ *   现在台头/结论条/流程条由 `WorkbenchPage` 一次渲染，看板只作为「体」。
+ *   只剩一个可见页签时（PM 默认只有「看板」）不画条 —— 与其它台一致。
+ */
+export default function PmWorkbench() {
   const { message } = App.useApp()
   // ★ docs/11：跳去别的域时带上 ?from= （来源台/来源页），回来还在原来那一层
   const go = useGoFrom()
-  const [me, setMe] = useState<WorkbenchMe | null>(null)
+  const [, setMe] = useState<WorkbenchMe | null>(null)
   const [data, setData] = useState<PmBoard | null>(null)
   const [loading, setLoading] = useState(true)
   const load = useCallback(async () => {
@@ -32,6 +41,7 @@ function PmBoardPage() {
     void load()
   }, [load])
   const s = data?.summary
+
   const columns: ColumnsType<PmProjectRow> = [
     {
       title: '项目',
@@ -47,15 +57,16 @@ function PmBoardPage() {
       title: '阶段',
       dataIndex: 'stage',
       width: 100,
-      render: (v: string) => <Tag color={STAGE_COLOR[v] ?? 'default'}>{v}</Tag>,
+      render: (v: string) => <Status tone={toneOf(STAGE_COLOR[v])}>{v}</Status>,
     },
     {
       title: '设计进度',
       key: 'design',
-      width: 160,
+      width: 190,
       render: (_: unknown, r: PmProjectRow) => (
-        <Space direction="vertical" size={0} style={{ width: 130 }}>
+        <Space size={8}>
           <Progress
+            style={{ width: 90 }}
             percent={r.design_total ? Math.round((r.design_done / r.design_total) * 100) : 0}
             size="small"
             status={r.design_total && r.design_done === r.design_total ? 'success' : 'active'}
@@ -72,9 +83,9 @@ function PmBoardPage() {
       width: 190,
       render: (_: unknown, r: PmProjectRow) => (
         <Space size={4} wrap>
-          <Tag color={r.purchase.to_purchase ? 'gold' : 'default'}>待采购 {r.purchase.to_purchase}</Tag>
-          <Tag color={r.purchase.in_transit ? 'processing' : 'default'}>在途 {r.purchase.in_transit}</Tag>
-          <Tag color={r.purchase.stored ? 'success' : 'default'}>已入库 {r.purchase.stored}</Tag>
+          <Chip tone={toneOf(r.purchase.to_purchase ? 'gold' : 'default')}>待采购 {r.purchase.to_purchase}</Chip>
+          <Chip tone={toneOf(r.purchase.in_transit ? 'processing' : 'default')}>在途 {r.purchase.in_transit}</Chip>
+          <Chip tone={toneOf(r.purchase.stored ? 'success' : 'default')}>已入库 {r.purchase.stored}</Chip>
         </Space>
       ),
     },
@@ -85,78 +96,61 @@ function PmBoardPage() {
         r.risks.length ? (
           <Space size={4} wrap>
             {r.risks.map((x) => (
-              <Tag key={x} color="red">
+              <Chip key={x} tone="err">
                 {x}
-              </Tag>
+              </Chip>
             ))}
           </Space>
         ) : (
-          <Tag color="success">正常</Tag>
+          <Chip tone="ok">正常</Chip>
         ),
     },
   ]
+
   return (
     <Spin spinning={loading}>
-      <Card size="small" style={{ marginBottom: 12 }}>
-        <Space wrap>
-          <Typography.Title level={5} style={{ margin: 0 }}>
-            项目经理台
-          </Typography.Title>
-          <Tag color="blue">{me?.user.position || '—'}</Tag>
-          <Button size="small" onClick={() => void load()}>
-            刷新
-          </Button>
-          <Button size="small" onClick={() => go('/projects')}>
-            商机 / 项目
-          </Button>
-        </Space>
-      </Card>
-      <Row gutter={[12, 12]} style={{ marginBottom: 12 }}>
-        {[
-          { label: '我负责的项目', value: s?.projects ?? 0, color: T.brand },
-          { label: '有风险项目', value: s?.at_risk ?? 0, color: T.error },
-          { label: '缺料（待采购）', value: s?.shortage ?? 0, color: T.orange },
-          { label: '在途采购', value: s?.in_transit ?? 0, color: T.cyan },
-          { label: '超期任务', value: s?.overdue_tasks ?? 0, color: T.error },
-        ].map((x) => (
-          <Col xs={12} sm={8} md={4} key={x.label}>
-            <Card size="small" style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: 12, color: T.textSecondary }}>{x.label}</div>
-              <div style={{ fontSize: 20, fontWeight: 600, color: x.value ? x.color : T.textDisabled }}>{x.value}</div>
-            </Card>
-          </Col>
-        ))}
-      </Row>
-      <Card size="small" title="我负责的项目（全链进度）">
-        <Table
-          rowKey="project_no"
-          size="small"
-          dataSource={data?.projects ?? []}
-          columns={columns}
-          pagination={{ pageSize: 15, showSizeChanger: false }}
-        />
-      </Card>
+      {/* ★ docs/15 台骨架四件套：台头 → 结论条 → 流程条（注册表驱动）→ 体 */}
+      <WorkbenchPage
+        board={PM_BOARD}
+        sub={`我负责 ${s?.projects ?? 0} 个项目 · 缺料 ${s?.shortage ?? 0} 项 · 在途采购 ${s?.in_transit ?? 0} 项`}
+        help="这里看全链进度与风险；具体动作去对应的工作台（设计 / 采购 / 仓库 / 车间 / 发运）。"
+        actions={
+          <>
+            {(s?.at_risk ?? 0) > 0 && <Chip tone="err">有风险 {s?.at_risk}</Chip>}
+            {(s?.overdue_tasks ?? 0) > 0 && <Chip tone="warn">超期任务 {s?.overdue_tasks}</Chip>}
+            <Button size="small" onClick={() => void load()}>
+              刷新
+            </Button>
+            <Button size="small" onClick={() => go('/projects')}>
+              商机 / 项目
+            </Button>
+          </>
+        }
+        counts={{ board: s?.projects ?? 0 }}
+        metrics={[
+          { key: 'r', label: '有风险项目', value: s?.at_risk ?? 0, unit: '个', tone: s?.at_risk ? 'err' : undefined, note: '交期 / 缺料 / 卡点', dimZero: true, to: '?tab=board' },
+          { key: 'ot', label: '超期任务', value: s?.overdue_tasks ?? 0, unit: '项', tone: s?.overdue_tasks ? 'err' : undefined, dimZero: true, to: '?tab=board' },
+          { key: 'sh', label: '缺料（待采购）', value: s?.shortage ?? 0, unit: '项', tone: s?.shortage ? 'warn' : undefined, dimZero: true, to: '?tab=board' },
+          { key: 'it', label: '在途采购', value: s?.in_transit ?? 0, unit: '项', dimZero: true, to: '?tab=board' },
+          { key: 'p', label: '我负责的项目', value: s?.projects ?? 0, unit: '个', dimZero: true, to: '?tab=board' },
+        ]}
+      >
+        {(t) =>
+          t === 'acceptance' ? (
+            <AcceptancePage />
+          ) : (
+            <Panel title="我负责的项目" sub="全链进度：设计 → 采购 → 制造 → 装配 → 发运 → 现场 → 验收">
+              <Table
+                rowKey="project_no"
+                size="small"
+                dataSource={data?.projects ?? []}
+                columns={columns}
+                pagination={{ pageSize: 15, showSizeChanger: false }}
+              />
+            </Panel>
+          )
+        }
+      </WorkbenchPage>
     </Spin>
-  )
-}
-/**
- * 项目经理台 = 台内页签（docs/10 §8.5 拍板 A 的默认归属）：
- *   看板 · 验收与质保（PM 有 acceptance:edit；质保到期/质保金本就是 PM 与商务关心的）
- * 只剩一个可见页签时不画条（避免多一层噪音）。
- */
-export default function PmWorkbench() {
-  const vis = filterTabs(PM_TABS)
-  const [tab, setTab] = useTab(vis.map((x) => x.key), 'board')
-  if (vis.length <= 1) return <PmBoardPage />
-  return (
-    <Tabs
-      activeKey={tab}
-      onChange={setTab}
-      items={vis.map((x) => ({
-        key: x.key,
-        label: x.label,
-        children: x.key === 'acceptance' ? <AcceptancePage /> : <PmBoardPage />,
-      }))}
-    />
   )
 }

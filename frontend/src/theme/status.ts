@@ -60,3 +60,26 @@ export const OCR_STATE: Record<string, string> = { unconfigured: 'default', unve
 
 // 配置状态的**人话**（与 OCR_STATE 成对，别在业务文件里各写一份）
 export const OCR_STATE_TEXT: Record<string, string> = { unconfigured: '未启用', unverified: '已配置（未验证）', verified: '已验证可用', failed: '上次测试失败' }
+
+/**
+ * ★ 状态色（antd 预设名）→ 方案 A「纸面」的语义 tone（圆点 / 文字色）。
+ *
+ * 为什么单列一张：A 的状态画法是「圆点 + 文字」而不是彩色药丸，于是每个页面都要把
+ * `status.ts` 里的预设色名翻译成 tone。如果让各页自己写 if/else，必然一周后就漂出
+ * 十套口径（docs/12 §1.1 的教训）。所以翻译只此一处。
+ *
+ * 用法：`<Status tone={toneOf(STAGE_COLOR[stage])}>{stage}</Status>`
+ */
+export type Tone = 'ok' | 'warn' | 'err' | 'run'
+
+const TONE_OF: Record<string, Tone> = {
+  success: 'ok', green: 'ok', lime: 'ok',
+  error: 'err', red: 'err', volcano: 'err', magenta: 'err',
+  warning: 'warn', gold: 'warn', orange: 'warn',
+  processing: 'run', blue: 'run', cyan: 'run', purple: 'run', geekblue: 'run',
+}
+
+/** 无 tone（default / 未知）→ 中性灰，调用方按需处理 */
+export function toneOf(color?: string): Tone | undefined {
+  return color ? TONE_OF[color] : undefined
+}

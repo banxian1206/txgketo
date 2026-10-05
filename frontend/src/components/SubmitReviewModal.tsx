@@ -1,14 +1,8 @@
-import { Alert, App, Checkbox, Empty, Input, Modal, Select, Space, Tag, Typography } from 'antd'
+import { Alert, App, Checkbox, Empty, Input, Modal, Select, Space, Typography } from 'antd'
+import { Chip } from '../components/ds'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
-import {
-  errMsg,
-  getReviewCandidates,
-  submitReview,
-  type MyDesignTask,
-  type ReviewCandidate,
-  type ReviewSelection,
-} from '../api/client'
+import { errMsg, getReviewCandidates, submitReview, type MyDesignTask, type ReviewCandidate, type ReviewSelection } from '../api/client'
 
 interface Props {
   task: MyDesignTask | null
@@ -143,9 +137,9 @@ export default function SubmitReviewModal({ task, open, onClose, onDone }: Props
                   onChange={(e) => toggle(`D:${d.drawing_no}`, e.target.checked)}
                 >
                   {d.drawing_no} {d.title}
-                  {d.drawing_no.endsWith('-00-00-00-00') && <Tag color="purple" style={{ marginLeft: 6 }}>总装图</Tag>}
-                  <Tag style={{ marginLeft: 6 }}>{d.version}</Tag>
-                  {d.filename ? <Tag color="green">已传文件</Tag> : <Tag color="orange">未传文件（请先上传）</Tag>}
+                  {d.drawing_no.endsWith('-00-00-00-00') && <Chip tone="run" style={{ marginLeft: 6 }}>总装图</Chip>}
+                  <Chip style={{ marginLeft: 6 }}>{d.version}</Chip>
+                  {d.filename ? <Chip tone="ok">已传文件</Chip> : <Chip tone="warn">未传文件（请先上传）</Chip>}
                 </Checkbox>
               </div>
             ))}
@@ -222,8 +216,8 @@ export default function SubmitReviewModal({ task, open, onClose, onDone }: Props
                   onChange={(e) => toggle(`P:${p.program_id}`, e.target.checked)}
                 >
                   {p.name}
-                  <Tag style={{ marginLeft: 6 }}>{p.version}</Tag>
-                  {p.filename ? <Tag color="green">已传文件</Tag> : <Tag color="orange">未传文件（请先上传）</Tag>}
+                  <Chip style={{ marginLeft: 6 }}>{p.version}</Chip>
+                  {p.filename ? <Chip tone="ok">已传文件</Chip> : <Chip tone="warn">未传文件（请先上传）</Chip>}
                 </Checkbox>
               </div>
             ))}

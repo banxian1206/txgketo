@@ -1,40 +1,16 @@
-import {
-  App,
-  Button,
-  Card,
-  Empty,
-  Modal,
-  Segmented,
-  Select,
-  Space,
-  Table,
-  Tabs,
-  Tag,
-  Tooltip,
-  Typography,
-} from 'antd'
+import { App, Button, Card, Empty, Modal, Segmented, Select, Space, Table, Tooltip, Typography } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import { useCallback, useEffect, useState } from 'react'
 import PurchaseActions from '../../components/PurchaseActions'
-import {
-  errMsg,
-  listMyTasks,
-  listPurchaseRequests,
-  listUsers,
-  me,
-  splitTask,
-  updateTask,
-  type PurchaseRequestItem,
-  type TaskItem,
-  type User,
-  type UserRow,
-} from '../../api/client'
+import { errMsg, listMyTasks, listPurchaseRequests, listUsers, me, splitTask, updateTask, type PurchaseRequestItem, type TaskItem, type User, type UserRow } from '../../api/client'
 import { hasPerm } from '../../api/user'
-import { TASK_STATUS as STATUS_COLOR } from '../../theme/status'
+import { TASK_STATUS as STATUS_COLOR, toneOf } from '../../theme/status'
 import { TASK_TYPE as TYPE_COLOR } from '../../theme/status'
-import { TASK_TABS } from '../../configs/tabs'
+import { TASK_TABS, TASK_GROUPS } from '../../configs/tabs'
 import { useTab } from '../../hooks/useTab'
+import WorkbenchTabs from '../../components/ds/WorkbenchTabs'
 import { useGoFrom } from '../../hooks/useFrom'
+import { Status, Chip } from '../../components/ds'
 /** 我的任务（工作台）：我的任务 / 我组任务（经理，05 卷 §2.2） */
 export default function MyTasks() {
   const { message } = App.useApp()
@@ -147,7 +123,7 @@ export default function MyTasks() {
       width: 96,
       render: (v: string, r) => (
         <Space size={4}>
-          <Tag color={TYPE_COLOR[v] ?? 'default'}>{v}</Tag>
+          <Status tone={toneOf(TYPE_COLOR[v])}>{v}</Status>
           {r.profession && r.profession !== '采购' && (
             <Typography.Text type="secondary" style={{ fontSize: 12 }}>
               {r.profession}
@@ -173,7 +149,7 @@ export default function MyTasks() {
       render: (v: string, r) => (
         <Space size={4}>
           {v}
-          {r.parent_task_id ? <Tag color="geekblue">子任务</Tag> : null}
+          {r.parent_task_id ? <Chip tone="run">子任务</Chip> : null}
         </Space>
       ),
     },
@@ -206,10 +182,10 @@ export default function MyTasks() {
       width: 130,
       render: (v: string, r) => (
         <Space size={4}>
-          <Tag color={STATUS_COLOR[v]}>{v}</Tag>
+          <Chip tone={toneOf(STATUS_COLOR[v])}>{v}</Chip>
           {r.blocked && (
             <Tooltip title={r.blocked_reason ?? '等待前置'}>
-              <Tag color="orange">等前置</Tag>
+              <Chip tone="warn">等前置</Chip>
             </Tooltip>
           )}
         </Space>
@@ -268,7 +244,14 @@ export default function MyTasks() {
   ]
   return (
     <Card
-      title="我的任务"
+      title={
+        <>
+          我的任务{' '}
+          <Tooltip title="任务在「立项」时生成：每台设备 × 专业 → 设计任务，直接派给各专业经理，经理再拆给组员；工艺挂在机械之后，机械首次发布即可开工。">
+            <span className="ds-help">?</span>
+          </Tooltip>
+        </>
+      }
       extra={
         <Space>
           {isLead && (
@@ -285,9 +268,10 @@ export default function MyTasks() {
         </Space>
       }
     >
-      <Tabs
-        activeKey={tab}
-        onChange={setTab}
+      <WorkbenchTabs
+        groups={TASK_GROUPS}
+        tab={tab}
+        onTab={setTab}
         items={[
           {
             key: '未完成',
@@ -308,10 +292,6 @@ export default function MyTasks() {
         locale={{ emptyText: <Empty description={scope === 'team' ? '本组没有任务' : '没有指派给你的任务'} /> }}
         columns={columns}
       />
-      <Typography.Paragraph type="secondary" style={{ fontSize: 12, marginTop: 12 }}>
-        任务在「立项」时生成：每台设备 × 专业 → 设计任务，直接派给各专业经理，经理再拆给组员；
-        工艺挂在机械之后，机械首次发布即可开工（05 卷 §0.1）。
-      </Typography.Paragraph>
       <Modal
         open={!!splitTarget}
         title={`拆分派工：${splitTarget?.title ?? ''}`}

@@ -1,15 +1,9 @@
-import { App, Button, Card, Empty, Input, Modal, Space, Table, Tag, Typography } from 'antd'
+import { App, Button, Card, Empty, Input, Modal, Space, Table, Typography } from 'antd'
+import { toneOf } from '../theme/status'
+import { Chip } from '../components/ds'
 import { useEffect, useState } from 'react'
 
-import {
-  approvePurchaseOrder,
-  errMsg,
-  priceReference,
-  purchaseOrderDetail,
-  type PriceReference,
-  type PurchaseOrderDetail,
-  type PurchaseOrderLine,
-} from '../api/client'
+import { approvePurchaseOrder, errMsg, priceReference, purchaseOrderDetail, type PriceReference, type PurchaseOrderDetail, type PurchaseOrderLine } from '../api/client'
 import { T } from '../theme/tokens'
 
 /**
@@ -146,9 +140,9 @@ export default function PoApproveModal({
                   return (
                     <Space direction="vertical" size={0}>
                       <span>
-                        ¥{l.unit_price} <Tag color={l.tax_incl ? 'blue' : 'orange'}>{l.tax_incl ? '含税' : '不含税'}</Tag>
+                        ¥{l.unit_price} <Chip tone={toneOf(l.tax_incl ? 'blue' : 'orange')}>{l.tax_incl ? '含税' : '不含税'}</Chip>
                       </span>
-                      {high && <Tag color="red">高于历史最高 ¥{seg?.max_price}</Tag>}
+                      {high && <Chip tone="err">高于历史最高 ¥{seg?.max_price}</Chip>}
                     </Space>
                   )
                 },

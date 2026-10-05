@@ -1,38 +1,19 @@
 import { useWarehouseBoard } from './hooks'
 import type { IncomingRow, IssueRow, MoveRow, StockRow, StorageRow } from './types'
-import {
-  App,
-  Alert,
-  Button,
-  Card,
-  DatePicker,
-  Empty,
-  Form,
-  Input,
-  InputNumber,
-  Modal,
-  Radio,
-  Select,
-  Space,
-  Table,
-  Tooltip,
-  Tabs,
-  Tag,
-  Typography,
-} from 'antd'
+import { App, Alert, Button, Card, DatePicker, Form, Input, InputNumber, Modal, Radio, Select, Space, Table, Typography } from 'antd'
 import dayjs from 'dayjs'
-import {useEffect, useRef, useState} from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import AuthedImage from '../../components/AuthedImage'
 import AppModal from '../../components/AppModal'
 import { SelectLocation } from '../../components/fields'
 import { useRequest } from '../../hooks/useRequest'
 import { useSubmit } from '../../hooks/useSubmit'
-import {api, createLocation, errMsg, generateEquipmentIssue, hasPerm, inspectPurchase, listEquipment, listLocations, listProjects, manualInbound, searchItems, storeReceipt, type ItemLite, type LocationRow} from '../../api/client'
-import { WH_ISSUE_STATUS as ISSUE_COLOR } from '../../theme/status'
-import { T } from '../../theme/tokens'
-import { WAREHOUSE_TABS, filterTabs } from '../../configs/tabs'
-import { useTab } from '../../hooks/useTab'
-import { useGoFrom } from '../../hooks/useFrom'
+import { api, createLocation, errMsg, generateEquipmentIssue, hasPerm, inspectPurchase, listEquipment, listLocations, listProjects, manualInbound, searchItems, storeReceipt, type ItemLite, type LocationRow } from '../../api/client'
+import { WH_ISSUE_STATUS as ISSUE_COLOR, toneOf } from '../../theme/status'
+import {Chip, Code, Empty as DsEmpty } from '../../components/ds'
+import QueueBoard from '../../components/ds/QueueBoard'
+import { WAREHOUSE_BOARD } from '../../configs/boards'
+import WorkbenchPage from '../../components/domain/WorkbenchPage'
 /**
  * 仓库只有两个动作：
  *   ① 验收（货到了就验，合格 / 不合格）→ 合格进「待入库」，不合格回采购「验收不合格」协商
@@ -40,8 +21,6 @@ import { useGoFrom } from '../../hooks/useFrom'
  */
 export default function Warehouse() {
   const { message } = App.useApp()
-  // ★ docs/11：跳去别的域时带上 ?from= （来源台/来源页），回来还在原来那一层
-  const go = useGoFrom()
   const canStore = hasPerm('warehouse:edit')
   // 生成领料单（按设备）
   const [genProject, setGenProject] = useState<string | undefined>()
@@ -60,9 +39,6 @@ export default function Warehouse() {
   const [locOpen, setLocOpen] = useState(false)
   const [locForm] = Form.useForm()
   const itemSearchTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  // ★ 重整 P0（docs/10 §3.2/§3.3）：页签条按**真实权限码**过滤，状态写进 URL（?tab=）
-  const visKeys = filterTabs(WAREHOUSE_TABS).map((x) => x.key)
-  const [tab, setTab] = useTab(visKeys, 'incoming')
   const [acceptOpen, setAcceptOpen] = useState(false)
   const [acceptTarget, setAcceptTarget] = useState<IncomingRow | null>(null)
   const [storeOpen, setStoreOpen] = useState(false)
@@ -72,7 +48,7 @@ export default function Warehouse() {
   const [storeForm] = Form.useForm()
   const acceptResult = Form.useWatch('result', acceptForm)
   // 重构 2.0：数据与刷新走共享 hook（与移动端同源，计数必然一致）
-  const { wb, stock, moves, issueCount, loading, reload: load } = useWarehouseBoard({ full: true })
+  const { wb, stock, moves, issueCount, reload: load } = useWarehouseBoard({ full: true })
   // 生成领料单用：项目列表
   useEffect(() => {
     listProjects()
@@ -235,344 +211,277 @@ export default function Warehouse() {
       message.error(errMsg(e))
     }
   }
-  return (
-    <Card
-      title={
-        <Space>
-          <span>仓库工作台</span>
-          <Typography.Text type="secondary" style={{ fontSize: 12, fontWeight: 400 }}>
-            {wb?.stock.out_of_stock ? <Tag color="red">缺货 {wb.stock.out_of_stock} 种</Tag> : <Typography.Text type="secondary" style={{ fontSize: 12, fontWeight: 400 }}>库存正常</Typography.Text>}
-          </Typography.Text>
-        </Space>
-      }
-      extra={<Button onClick={() => void load()}>刷新</Button>}
-    >
-      <Tabs
-        activeKey={tab}
-        onChange={setTab}
-        items={[
-          {
-            key: 'incoming',
-            label: (
-              <Tooltip title="分批送的货分批验收：合格 → 待入库；不合格 → 回采购「验收不合格」协商换货/退货">
-                <span>待验收 ({wb?.incoming.length ?? 0})</span>
-              </Tooltip>
-            ),
-            children: (
-                <Table<IncomingRow>
-                  rowKey="id" size="small" loading={loading}
-                  dataSource={wb?.incoming ?? []} pagination={false}
-                  scroll={{ x: 1200 }}
-                  locale={{ emptyText: <Empty description="没有在路上、等到公司仓库的货" /> }}
-                  columns={[
-                    { title: '采购单号', dataIndex: 'po_no', width: 125, fixed: 'left', render: (v: string | null) => v ?? '未编号' },
-                    {
-                      title: '物料', key: 'item', width: 230,
-                      render: (_: unknown, r) => (
-                        <>
-                          <b>{r.display_name}</b>
-                          <div style={{ fontSize: 12, color: T.textSecondary }}>{r.item_no}</div>
-                        </>
-                      ),
-                    },
-                    {
-                      title: '订购 / 已到', key: 'qty', width: 110,
-                      render: (_: unknown, r) => (
-                        <>
-                          <b>{r.qty} {r.unit ?? ''}</b>
-                          <div style={{ fontSize: 12, color: T.textSecondary }}>已到 {r.qty_received}</div>
-                        </>
-                      ),
-                    },
-                    { title: '供应商', dataIndex: 'supplier_name', width: 140, render: (v) => v ?? '—' },
-                    {
-                      title: '项目 / 设备', key: 'belong', width: 190,
-                      render: (_: unknown, r) => (
-                        <>
-                          {r.project_no ? (
-                            <a onClick={() => go(`/projects/${r.project_no}`)}>{r.project_no}</a>
-                          ) : (
-                            <Tag>{r.attribution ?? '辅料'}</Tag>
-                          )}
-                          <div style={{ fontSize: 12, color: T.textSecondary }}>
-                            {r.equip_no ? `${r.equip_no} ${r.equip_name ?? ''}` : (r.project_name ?? '')}
-                          </div>
-                        </>
-                      ),
-                    },
-                    {
-                      title: '预计到货', dataIndex: 'expected_date', width: 140,
-                      render: (v: string | null, r) => (
-                        <Space size={4}>
-                          <span>{v ?? '—'}</span>
-                          {r.overdue && <Tag color="red">赶不上需要日</Tag>}
-                        </Space>
-                      ),
-                    },
-                    {
-                      title: '操作', key: 'a', width: 100, fixed: 'right',
-                      render: (_: unknown, r) => (
-                        <Button type="primary" size="small" disabled={!canStore} onClick={() => openAccept(r)}>验收</Button>
-                      ),
-                    },
-                  ]}
-                />
-            ),
-          },
-          {
-            key: 'storage',
-            label: (
-              <Tooltip title="验收合格的货选库位入库；入库后库存与出入库流水同时更新">
-                <span>待入库 ({wb?.pending_storage.length ?? 0})</span>
-              </Tooltip>
-            ),
-            children: (
-                <Table<StorageRow>
-                  rowKey="id" size="small" loading={loading}
-                  dataSource={wb?.pending_storage ?? []} pagination={false}
-                  scroll={{ x: 1200 }}
-                  locale={{ emptyText: <Empty description="没有等待入库的货" /> }}
-                  columns={[
-                    {
-                      // ★ 列治理：到货单为主、采购单号为副（原来占两列）
-                      title: '到货单 / 采购单', dataIndex: 'receipt_no', width: 140, fixed: 'left',
-                      render: (v: string, r) => (
-                        <>
-                          <Typography.Text strong>{v}</Typography.Text>
-                          <div style={{ fontSize: 12, color: T.textSecondary }}>{r.po_no ?? '未编号'}</div>
-                        </>
-                      ),
-                    },
-                    {
-                      title: '物料', key: 'item', width: 230,
-                      render: (_: unknown, r) => (
-                        <>
-                          <b>{r.display_name}</b>
-                          <div style={{ fontSize: 12, color: T.textSecondary }}>
-                            {r.item_no ?? ''}{r.spec_text ? ` · ${r.spec_text}` : ''}
-                          </div>
-                        </>
-                      ),
-                    },
-                    { title: '数量', dataIndex: 'qty', width: 85, render: (v: number | null, r) => `${v ?? ''} ${r.unit ?? ''}` },
-                    {
-                      title: '项目 / 设备', key: 'belong', width: 190,
-                      render: (_: unknown, r) => (
-                        <>
-                          {r.project_no ? (
-                            <a onClick={() => go(`/projects/${r.project_no}`)}>{r.project_no}</a>
-                          ) : (
-                            <Tag>{r.attribution ?? '辅料'}</Tag>
-                          )}
-                          <div style={{ fontSize: 12, color: T.textSecondary }}>
-                            {r.equip_no ? `${r.equip_no} ${r.equip_name ?? ''}` : (r.project_name ?? '')}
-                          </div>
-                        </>
-                      ),
-                    },
-                    { title: '验收日期', dataIndex: 'receipt_date', width: 105 },
-                    {
-                      title: '验收照片', key: 'photos', width: 140,
-                      render: (_: unknown, r) =>
-                        r.photos?.length ? (
-                          <Space wrap size={4}>
-                            {r.photos.map((p, i) => (
-                              <AuthedImage key={i} path={p.url} size={40} />
-                            ))}
-                          </Space>
-                        ) : (
-                          '—'
-                        ),
-                    },
-                    {
-                      title: '操作', key: 'a', width: 100, fixed: 'right',
-                      render: (_: unknown, r) => (
-                        <Button type="primary" size="small" disabled={!canStore} onClick={() => openStore(r)}>入库</Button>
-                      ),
-                    },
-                  ]}
-                />
-            ),
-          },
-          {
-            key: 'issues',
-            label: (
-              <Tooltip title="按设备展开 BOM 生成领料单 → 仓库备料 → 车间领走；缺料会标出来，不再静默跳过">
-                <span>待领料 ({wb?.pending_issues.length ?? 0})</span>
-              </Tooltip>
-            ),
-            children: (
-              <>
-                <Card size="small" title="生成领料单（按设备）" style={{ marginBottom: 12 }}>
-                  <Space wrap>
-                    <Select
-                      showSearch
-                      optionFilterProp="label"
-                      style={{ width: 260 }}
-                      placeholder="项目"
-                      value={genProject}
-                      onChange={(v: string | undefined) => void onGenProject(v)}
-                      options={genProjects.map((p) => ({
-                        value: p.project_no,
-                        label: `${p.project_no} ${p.project_name}`,
-                      }))}
-                    />
-                    <Select
-                      showSearch
-                      optionFilterProp="label"
-                      style={{ width: 220 }}
-                      placeholder="设备"
-                      value={genEquip}
-                      onChange={setGenEquip}
-                      options={genEquips.map((e) => ({
-                        value: e.equip_no,
-                        label: `${e.equip_no} ${e.equip_name}`,
-                      }))}
-                    />
-                    <Button
-                      type="primary"
-                      disabled={!canStore || !genProject || !genEquip}
-                      loading={genLoading}
-                      onClick={() => void doGenerateIssue()}
-                    >
-                      生成领料单
-                    </Button>
-                    <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-                      按设备展开：自制件的原材料 + 整台设备的标准件；缺料会标出来，生成后到下面「领料」里备料 → 车间领走。
-                    </Typography.Text>
-                  </Space>
-                  {genErr && (
-                    <Alert
-                      type="warning"
-                      showIcon
-                      closable
-                      style={{ marginTop: 10 }}
-                      message="生成领料单失败"
-                      description={genErr}
-                      onClose={() => setGenErr(null)}
-                    />
-                  )}
-                </Card>
-                <Table<IssueRow>
-                  rowKey="id" size="small"
-                  dataSource={wb?.pending_issues ?? []} pagination={false}
-                  locale={{ emptyText: <Empty description="没有待处理的领料单" /> }}
-                  expandable={{
-                    expandedRowRender: (r) => (
-                      <Table
-                        rowKey="id" size="small" pagination={false} dataSource={r.lines}
-                        columns={[
-                          { title: '物料', dataIndex: 'display_name' },
-                          { title: '需要', dataIndex: 'qty_required', width: 100, render: (v: number, x) => `${v} ${x.unit ?? ''}` },
-                          { title: '库位', dataIndex: 'location_name', width: 150, render: (v: string | null) => v ?? '—' },
-                          { title: '给哪个零件', dataIndex: 'for_part', width: 220 },
-                          { title: '库存', dataIndex: 'shortage', width: 90, render: (v: boolean) => (v ? <Tag color="red">不足</Tag> : <Tag color="green">够</Tag>) },
-                        ]}
-                      />
-                    ),
-                  }}
-                  columns={[
-                    { title: '领料单', dataIndex: 'issue_no', width: 110, render: (v: string) => <Typography.Text strong>{v}</Typography.Text> },
-                    { title: '项目 / 设备', key: 'p', render: (_: unknown, r) => <a onClick={() => go(`/projects/${r.project_no}`)}>{r.project_no} · {r.equip_no ?? ''}</a> },
-                    { title: '物料数', dataIndex: 'line_count', width: 90 },
-                    { title: '缺料', dataIndex: 'shortage_count', width: 90, render: (v: number) => (v ? <Tag color="red">{v} 种</Tag> : <Tag color="green">齐</Tag>) },
-                    { title: '状态', dataIndex: 'status', width: 100, render: (v: string) => <Tag color={ISSUE_COLOR[v]}>{v}</Tag> },
-                    {
-                      title: '操作', key: 'a', width: 150,
-                      render: (_: unknown, r: IssueRow) => (
-                        <Space>
-                          {/* ★ 走查 2026-10-04 P2：部分领料也必须能**继续备料**（后端 /pick 支持；补货后补差额）——
-                              修前只在「待备料」给按钮，部分领料只剩「车间领走」→ 单据永久卡死、车间拿不到料 */}
-                          {(r.status === '待备料' || r.status === '部分领料') && <Button size="small" type={r.status === '部分领料' ? 'default' : 'primary'} disabled={!canStore} onClick={() => void issueAction(r.id, 'pick')}>{r.status === '部分领料' ? '继续备料' : '备料完成'}</Button>}
-                          {(r.status === '已备料' || r.status === '部分领料') && <Button size="small" type="primary" disabled={!canStore} onClick={() => void issueAction(r.id, 'hand-over')}>车间领走</Button>}
-                        </Space>
-                      ),
-                    },
-                  ]}
-                />
-              </>
-            ),
-          },
-          {
-            key: 'stock',
-            label: `库存 (${stock.length}) · 领料单 ${issueCount} 张`,
-            children: (
-              <>
-                <Typography.Paragraph type="secondary" style={{ fontSize: 12 }}>
-                  入库动作完成后才有库存；车间来领料按这个出库。
-                </Typography.Paragraph>
-                <Space style={{ marginBottom: 12 }}>
-                  <Button disabled={!canStore} onClick={() => setInboundOpen(true)}>
-                    其他入库（退料回库 / 盘盈）
-                  </Button>
-                </Space>
-                <Table<StockRow>
-                  rowKey="id" size="small" dataSource={stock} pagination={{ pageSize: 20, showSizeChanger: false }}
-                  locale={{ emptyText: <Empty description="还没有库存" /> }}
-                  columns={[
-                    { title: '物料', dataIndex: 'item_no', width: 140 },
-                    { title: '品名', dataIndex: 'display_name' },
-                    { title: '规格', dataIndex: 'spec_text' },
-                    { title: '库位', dataIndex: 'location_name', width: 160 },
-                    { title: '在库', dataIndex: 'qty_on_hand', width: 100, align: 'right', render: (v: number, r) => `${v} ${r.unit ?? ''}` },
-                    { title: '占用', dataIndex: 'qty_locked', width: 90, align: 'right' },
-                    { title: '可用', dataIndex: 'qty_available', width: 100, align: 'right', render: (v: number) => (v > 0 ? <Tag color="green">{v}</Tag> : <Tag color="red">{v}</Tag>) },
-                  ]}
-                />
-              </>
-            ),
-          },
-          {
-            key: 'moves',
-            label: '出入库流水',
-            children: (
-              <Table<MoveRow>
-                rowKey="id" size="small" dataSource={moves} pagination={{ pageSize: 20, showSizeChanger: false }}
+  const openCount = (wb?.incoming.length ?? 0) + (wb?.pending_storage.length ?? 0) + (wb?.pending_issues.length ?? 0)
+  // 体：按页签 key 取（顺序 / 标题 / 徽标 / 可见性全来自注册表 WAREHOUSE_BOARD）
+  const parts: Record<string, ReactNode> = {
+    incoming: (
+      <QueueBoard
+        emptyText="没有在路上、等到公司仓库的货。"
+        items={(wb?.incoming ?? []).map((r: IncomingRow) => ({
+          key: r.id,
+          lead: <Code to={r.item_no ? `/items/${r.item_no}` : undefined}>{r.po_no ?? '未编号'}</Code>,
+          title: r.display_name,
+          meta: `${r.qty} ${r.unit ?? ''}（已到 ${r.qty_received}） · 供应商 ${r.supplier_name ?? '—'} · ${
+            r.project_no ? `${r.project_no} ${r.equip_no ?? ''}` : (r.attribution ?? '辅料')
+          }`,
+          cells: [
+            {
+              text: r.expected_date ? (
+                <>
+                  {r.expected_date}
+                  {r.overdue && <Chip tone="err" style={{ marginLeft: 6 }}>赶不上</Chip>}
+                </>
+              ) : (
+                '未约期'
+              ),
+              title: '预计到货',
+            },
+          ],
+          action: (
+            <Button type="primary" size="small" disabled={!canStore} onClick={() => openAccept(r)}>
+              验收
+            </Button>
+          ),
+        }))}
+      />
+    ),
+    storage: (
+      <QueueBoard
+        emptyText="没有等待入库的货。"
+        items={(wb?.pending_storage ?? []).map((r: StorageRow) => ({
+          key: r.id,
+          lead: <Code>{r.receipt_no}</Code>,
+          title: r.display_name,
+          meta: `${r.qty ?? ''} ${r.unit ?? ''} · 验收 ${r.receipt_date ?? '—'} · ${r.project_no ?? ''} ${r.equip_no ?? ''}`,
+          cells: [{ text: r.po_no ?? '—', title: '采购单' }],
+          expand: (
+            <Space wrap>
+              <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                验收照片：
+              </Typography.Text>
+              {(r.photos ?? []).length ? (
+                (r.photos ?? []).map((p, i) => <AuthedImage key={i} path={p.url} size={72} />)
+              ) : (
+                <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                  验收时没拍照
+                </Typography.Text>
+              )}
+            </Space>
+          ),
+          action: (
+            <Button type="primary" size="small" disabled={!canStore} onClick={() => openStore(r)}>
+              入库
+            </Button>
+          ),
+        }))}
+      />
+    ),
+    issues: (
+      <>
+        <Card size="small" title="生成领料单（按设备）" style={{ marginBottom: 12 }}>
+          <Space wrap>
+            <Select
+              showSearch
+              optionFilterProp="label"
+              style={{ width: 260 }}
+              placeholder="项目"
+              value={genProject}
+              onChange={(v: string | undefined) => void onGenProject(v)}
+              options={genProjects.map((p) => ({
+                value: p.project_no,
+                label: `${p.project_no} ${p.project_name}`,
+              }))}
+            />
+            <Select
+              showSearch
+              optionFilterProp="label"
+              style={{ width: 220 }}
+              placeholder="设备"
+              value={genEquip}
+              onChange={setGenEquip}
+              options={genEquips.map((e) => ({
+                value: e.equip_no,
+                label: `${e.equip_no} ${e.equip_name}`,
+              }))}
+            />
+            <Button
+              type="primary"
+              disabled={!canStore || !genProject || !genEquip}
+              loading={genLoading}
+              onClick={() => void doGenerateIssue()}
+            >
+              生成领料单
+            </Button>
+            <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+              按设备展开：自制件的原材料 + 整台设备的标准件；缺料会标出来，生成后到下面「领料」里备料 → 车间领走。
+            </Typography.Text>
+          </Space>
+          {genErr && (
+            <Alert
+              type="warning"
+              showIcon
+              closable
+              style={{ marginTop: 10 }}
+              message="生成领料单失败"
+              description={genErr}
+              onClose={() => setGenErr(null)}
+            />
+          )}
+        </Card>
+        <QueueBoard
+          emptyText="没有待处理的领料单 —— 在「制造」下发排产后，按设备在这里生成领料单。"
+          items={(wb?.pending_issues ?? []).map((r: IssueRow) => ({
+            key: r.id,
+            lead: <Code>{r.issue_no}</Code>,
+            title: `${r.project_no} · ${r.equip_no ?? ''}`,
+            meta: `${r.line_count} 种物料 · ${
+              r.shortage_count ? `${r.shortage_count} 种缺料（补货后可继续备料）` : '料齐'
+            }`,
+            cells: [
+              { text: <Chip tone={toneOf(ISSUE_COLOR[r.status])}>{r.status}</Chip>, title: '状态' },
+            ],
+            expand: (
+              <Table
+                rowKey="id"
+                size="small"
+                pagination={false}
+                dataSource={r.lines}
                 columns={[
-                  { title: '类型', dataIndex: 'move_type', width: 80, render: (v: string) => <Tag color={v === '入库' ? 'green' : 'orange'}>{v}</Tag> },
-                  { title: '物料', dataIndex: 'item_no', width: 140 },
-                  { title: '品名', dataIndex: 'display_name' },
-                  { title: '数量', dataIndex: 'qty', width: 90, align: 'right' },
-                  { title: '库位', key: 'loc', width: 170, render: (_: unknown, r: MoveRow) => r.to_location ?? r.from_location ?? '—' },
-                  { title: '单据', dataIndex: 'ref_no', width: 130 },
-                  { title: '说明', dataIndex: 'remark' },
+                  { title: '物料', dataIndex: 'display_name' },
+                  { title: '需要', dataIndex: 'qty_required', width: 100, render: (v: number, x) => `${v} ${x.unit ?? ''}` },
+                  { title: '库位', dataIndex: 'location_name', width: 150, render: (v: string | null) => v ?? '—' },
+                  { title: '给哪个零件', dataIndex: 'for_part', width: 220 },
+                  { title: '库存', dataIndex: 'shortage', width: 90, render: (v: boolean) => (v ? <Chip tone="err">不足</Chip> : <Chip tone="ok">够</Chip>) },
                 ]}
               />
             ),
-          },
-          {
-            key: 'locations',
-            label: `库位 (${locs.length})`,
-            children: (
+            action: (
               <>
-                <Space style={{ marginBottom: 12 }}>
-                  <Button type="primary" disabled={!canStore} onClick={() => setLocOpen(true)}>
-                    新建库位
+                {/* ★ 走查 2026-10-04 P2：部分领料也必须能**继续备料**（后端 /pick 支持；补货后补差额） */}
+                {(r.status === '待备料' || r.status === '部分领料') && (
+                  <Button
+                    size="small"
+                    type={r.status === '部分领料' ? 'default' : 'primary'}
+                    disabled={!canStore}
+                    onClick={() => void issueAction(r.id, 'pick')}
+                  >
+                    {r.status === '部分领料' ? '继续备料' : '备料完成'}
                   </Button>
-                  <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-                    入库时选库位；这里可以集中看/补建库位。
-                  </Typography.Text>
-                </Space>
-                <Table<LocationRow>
-                  rowKey="id" size="small" dataSource={locs} pagination={{ pageSize: 20, showSizeChanger: false }}
-                  locale={{ emptyText: <Empty description="还没有库位" /> }}
-                  columns={[
-                    { title: '仓库', dataIndex: 'warehouse', width: 130 },
-                    { title: '库位编码', dataIndex: 'code', width: 160 },
-                    { title: '名称', dataIndex: 'name', render: (v: string | null) => v ?? '—' },
-                    { title: '在库物料数', dataIndex: 'item_count', width: 110, align: 'right' },
-                    {
-                      title: '状态', dataIndex: 'is_active', width: 90,
-                      render: (v: boolean) => (v ? <Tag color="green">启用</Tag> : <Tag>停用</Tag>),
-                    },
-                    { title: '备注', dataIndex: 'remark', render: (v: string | null) => v ?? '—' },
-                  ]}
-                />
+                )}
+                {(r.status === '已备料' || r.status === '部分领料') && (
+                  <Button size="small" type="primary" disabled={!canStore} onClick={() => void issueAction(r.id, 'hand-over')}>
+                    车间领走
+                  </Button>
+                )}
               </>
             ),
-          },
-        ].filter((x) => visKeys.includes(x.key))}
+          }))}
+        />
+      </>
+    ),
+    stock: (
+      <>
+        <Space style={{ marginBottom: 12 }}>
+          <Button disabled={!canStore} onClick={() => setInboundOpen(true)}>
+            其他入库（退料回库 / 盘盈）
+          </Button>
+        </Space>
+        <Table<StockRow>
+          rowKey="id" size="small" dataSource={stock} pagination={{ pageSize: 20, showSizeChanger: false }}
+          locale={{ emptyText: <DsEmpty text="还没有库存" /> }}
+          columns={[
+            { title: '物料', dataIndex: 'item_no', width: 140, render: (v: string) => <Code to={`/items/${v}`}>{v}</Code> },
+            { title: '品名', dataIndex: 'display_name' },
+            { title: '规格', dataIndex: 'spec_text' },
+            { title: '库位', dataIndex: 'location_name', width: 160 },
+            { title: '在库', dataIndex: 'qty_on_hand', width: 100, align: 'right', render: (v: number, r) => `${v} ${r.unit ?? ''}` },
+            { title: '占用', dataIndex: 'qty_locked', width: 90, align: 'right' },
+            { title: '可用', dataIndex: 'qty_available', width: 100, align: 'right', render: (v: number) => (v > 0 ? <Chip tone="ok">{v}</Chip> : <Chip tone="err">{v}</Chip>) },
+          ]}
+        />
+      </>
+
+    ),
+    moves: (
+      <Table<MoveRow>
+        rowKey="id" size="small" dataSource={moves} pagination={{ pageSize: 20, showSizeChanger: false }}
+        columns={[
+          { title: '类型', dataIndex: 'move_type', width: 80, render: (v: string) => <Chip tone={toneOf(v === '入库' ? 'green' : 'orange')}>{v}</Chip> },
+          { title: '物料', dataIndex: 'item_no', width: 140 },
+          { title: '品名', dataIndex: 'display_name' },
+          { title: '数量', dataIndex: 'qty', width: 90, align: 'right' },
+          { title: '库位', key: 'loc', width: 170, render: (_: unknown, r: MoveRow) => r.to_location ?? r.from_location ?? '—' },
+          { title: '单据', dataIndex: 'ref_no', width: 130 },
+          { title: '说明', dataIndex: 'remark' },
+        ]}
       />
+
+    ),
+    locations: (
+      <>
+        <Space style={{ marginBottom: 12 }}>
+          <Button type="primary" disabled={!canStore} onClick={() => setLocOpen(true)}>
+            新建库位
+          </Button>
+          <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+            入库时选库位；这里可以集中看/补建库位。
+          </Typography.Text>
+        </Space>
+        <Table<LocationRow>
+          rowKey="id" size="small" dataSource={locs} pagination={{ pageSize: 20, showSizeChanger: false }}
+          locale={{ emptyText: <DsEmpty text="还没有库位" /> }}
+          columns={[
+            { title: '仓库', dataIndex: 'warehouse', width: 130 },
+            { title: '库位编码', dataIndex: 'code', width: 160 },
+            { title: '名称', dataIndex: 'name', render: (v: string | null) => v ?? '—' },
+            { title: '在库物料数', dataIndex: 'item_count', width: 110, align: 'right' },
+            {
+              title: '状态', dataIndex: 'is_active', width: 90,
+              render: (v: boolean) => (v ? <Chip tone="ok">启用</Chip> : <Chip>停用</Chip>),
+            },
+            { title: '备注', dataIndex: 'remark', render: (v: string | null) => v ?? '—' },
+          ]}
+        />
+      </>
+
+    ),
+  }
+  return (
+    <div className="ds-page">
+      {/* ★ R3 统一壳：台 = PageHead（标题+一句现状+刷新） + Panel（装页签与内容）。
+          页签 key 一个没改（通知 link / ROUTE_REDIRECTS / ?tab= 深链靠它）。 */}
+      {/* ★ docs/15 台骨架四件套：台头 → 结论条 → 流程条（注册表驱动）→ 体 */}
+      <WorkbenchPage
+        board={WAREHOUSE_BOARD}
+        sub={
+          openCount > 0
+            ? `待办 ${openCount} 项 · 待验收 ${wb?.incoming.length ?? 0} · 待入库 ${wb?.pending_storage.length ?? 0} · 待领料 ${wb?.pending_issues.length ?? 0}`
+            : '今天没有待办的收货 / 入库 / 领料'
+        }
+        help="仓库只有两个动作：验收（合格/不合格）和入库；领料单在这里备料、车间来领走。上面的数字可点。"
+        actions={
+          <>
+            {(wb?.stock.out_of_stock ?? 0) > 0 && <Chip tone="err">缺货 {wb?.stock.out_of_stock} 种</Chip>}
+            <Button size="small" onClick={() => void load()}>
+              刷新
+            </Button>
+          </>
+        }
+        counts={{
+          incoming: wb?.incoming.length ?? 0,
+          storage: wb?.pending_storage.length ?? 0,
+          issues: wb?.pending_issues.length ?? 0,
+        }}
+        metrics={[
+          { key: 'incoming', label: '待验收', value: wb?.incoming.length ?? 0, unit: '单', tone: wb?.incoming.length ? 'warn' : undefined, dimZero: true, to: '?tab=incoming' },
+          { key: 'storage', label: '待入库', value: wb?.pending_storage.length ?? 0, unit: '单', tone: wb?.pending_storage.length ? 'warn' : undefined, dimZero: true, to: '?tab=storage' },
+          { key: 'issues', label: '待领料', value: wb?.pending_issues.length ?? 0, unit: '单', tone: wb?.pending_issues.length ? 'warn' : undefined, dimZero: true, to: '?tab=issues' },
+          { key: 'stock', label: '缺货', value: wb?.stock.out_of_stock ?? 0, unit: '种', tone: (wb?.stock.out_of_stock ?? 0) > 0 ? 'err' : undefined, dimZero: true, to: '?tab=stock' },
+          { key: 'moves', label: '领料单未结', value: issueCount, unit: '张', dimZero: true, to: '?tab=moves' },
+        ]}
+      >
+        {(t) => parts[t]}
+      </WorkbenchPage>
       {/* 其他入库 */}
       <Modal
         title="其他入库（退料回库 / 盘盈）"
@@ -790,6 +699,6 @@ export default function Warehouse() {
           </Form.Item>
         </Form>
       </Modal>
-    </Card>
+    </div>
   )
 }

@@ -1,46 +1,14 @@
 import { useUrlState } from '../../hooks/useUrlState'
 import { useAsmBoard } from '../../hooks/useAsmBoard'
-import {
-  App,
-  Button,
-  Card,
-  Col,
-  Empty,
-  Form,
-  Input,
-  InputNumber,
-  Progress,
-  Radio,
-  Row,
-  Select,
-  Space,
-  Table,
-  Tag,
-  Typography,
-} from 'antd'
-import {useEffect, useMemo, useState} from 'react'
-import {
-  debugAssembly,
-  errMsg,
-  finishAssembly,
-  getKitting,
-  hasPerm,
-  FUNNEL_ORDER,
-  kittingFunnel,
-  kittingProjects,
-  listProjects,
-  startAssembly,
-  type AssemblyRecordRow,
-  type KittingFunnel,
-  type KittingLine,
-  type KittingResult,
-  type ProjectFunnelRow,
-} from '../../api/client'
+import { App, Button, Card, Col, Empty, Form, Input, InputNumber, Progress, Radio, Row, Select, Space, Table, Typography } from 'antd'
+import { useEffect, useMemo, useState } from 'react'
+import { debugAssembly, errMsg, finishAssembly, getKitting, hasPerm, FUNNEL_ORDER, kittingFunnel, kittingProjects, listProjects, startAssembly, type AssemblyRecordRow, type KittingFunnel, type KittingLine, type KittingResult, type ProjectFunnelRow } from '../../api/client'
 import AuthedImage from '../../components/AuthedImage'
 import MfgPhotoPicker from '../../components/MfgPhotoPicker'
 import AppModal from '../../components/AppModal'
 import { mfgPhotoUrl } from '../../api/client'
-import { ASSEMBLY_STATUS as STATUS_COLOR } from '../../theme/status'
+import { ASSEMBLY_STATUS as STATUS_COLOR, toneOf } from '../../theme/status'
+import { PageHead, Panel, Status, Chip } from '../../components/ds'
 import { T } from '../../theme/tokens'
 import { useGoFrom } from '../../hooks/useFrom'
 const rateColor = (r: number) => (r >= 1 ? T.success : r >= 0.6 ? T.brand : T.warning)
@@ -168,15 +136,14 @@ export default function Assembly() {
     }
   }
   return (
-    <Card
-      title="装配 · 齐套率（S6）"
-      extra={
-        <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-          齐套率只做展示：装配随时能开工（56%、78% 都行），系统不设 100% 门槛
-        </Typography.Text>
-      }
-    >
-      <Space style={{ marginBottom: 12 }}>
+    <div className="ds-page">
+      <PageHead
+        title="装配与齐套"
+        sub={projectNo ? `选中的项目：${projectNo}` : '先选一个项目看齐套率'}
+        help="齐套率只做展示：装配随时能开工（56%、78% 都行），系统不设 100% 门槛。齐套率 = 到位零件种数 / 全部零件种数（自制件已转运、外协合格、采购件已到/入库、库存够）。"
+      />
+      <Panel>
+      <div className="ds-toolbar">
         <Select
           showSearch
           optionFilterProp="label"
@@ -186,10 +153,7 @@ export default function Assembly() {
           onChange={(v: string | undefined) => pickProject(v)}
           options={projects.map((p) => ({ value: p.project_no, label: `${p.project_no} ${p.project_name}` }))}
         />
-        <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-          齐套率 = 到位零件种数 / 全部零件种数（自制件已转运、外协合格、采购件已到/入库、库存够）
-        </Typography.Text>
-      </Space>
+      </div>
       {!projectNo && <Empty description="先选一个项目" />}
       {/* ★ G5 项目视角（主）：整个项目要的东西现在分布在哪一格 */}
       {projectNo && funnel && funnel.total > 0 && (
@@ -215,7 +179,7 @@ export default function Assembly() {
               <div style={{ fontSize: 12, color: T.textSecondary }}>物料类型</div>
               <div style={{ fontSize: 12, marginTop: 4 }}>
                 {Object.entries(funnel.by_kind).map(([k, v]) => (
-                  <Tag key={k}>{k} {v.count}</Tag>
+                  <Chip>{k} {v.count}</Chip>
                 ))}
               </div>
             </Col>
@@ -260,7 +224,7 @@ export default function Assembly() {
                     <a onClick={() => void openDetail(o.equip_no)}>明细</a>
                     {canEdit && (
                       WHOLE_DONE.includes(wholeState[o.equip_no] ?? '') ? (
-                        <Tag color="success">{wholeState[o.equip_no]}</Tag>
+                        <Chip tone="ok">{wholeState[o.equip_no]}</Chip>
                       ) : (
                         <a onClick={() => { setPhotos([]); setStartInitial({ sub_assembly: '整机装配' }); setStartTarget({ equip_no: o.equip_no, rate: o.kitting_rate }) }}>
                           {wholeState[o.equip_no] === '装配中' ? '继续装配（复用）' : '开始装配'}
@@ -298,7 +262,7 @@ export default function Assembly() {
             columns={[
               { title: '零件 / 物料', dataIndex: 'ref', width: 220 },
               { title: '名称', dataIndex: 'name', render: (v: string | null) => v ?? '—' },
-              { title: '类型', key: 'kind', width: 100, render: (_: unknown, r: KittingLine) => <Tag>{r.kind}</Tag> },
+              { title: '类型', key: 'kind', width: 100, render: (_: unknown, r: KittingLine) => <Chip>{r.kind}</Chip> },
               { title: '来源', dataIndex: 'source', width: 70 },
               { title: '需求', key: 'qty', width: 90, align: 'right' as const, render: (_: unknown, r: KittingLine) => `${r.qty} ${r.unit ?? ''}` },
               {
@@ -306,7 +270,7 @@ export default function Assembly() {
                 key: 'ready',
                 width: 160,
                 render: (_: unknown, r: KittingLine) =>
-                  r.ready ? <Tag color="success">{r.state}</Tag> : <Tag color="error">缺 · {r.state}</Tag>,
+                  r.ready ? <Chip tone="ok">{r.state}</Chip> : <Chip tone="err">缺 · {r.state}</Chip>,
               },
             ]}
           />
@@ -336,13 +300,13 @@ export default function Assembly() {
             title: '开工齐套率',
             dataIndex: 'kitting_rate',
             width: 120,
-            render: (v: number) => <Tag color={rateColor(v)}>{Math.round(v * 100)}%</Tag>,
+            render: (v: number) => <Chip tone={toneOf(rateColor(v))}>{Math.round(v * 100)}%</Chip>,
           },
           {
             title: '状态',
             dataIndex: 'status',
             width: 100,
-            render: (v: string) => <Tag color={STATUS_COLOR[v] ?? 'default'}>{v}</Tag>,
+            render: (v: string) => <Status tone={toneOf(STATUS_COLOR[v])}>{v}</Status>,
           },
           { title: '装配照片', key: 'ph', width: 140, render: (_: unknown, r: AssemblyRecordRow) => (
             <Space wrap>
@@ -355,9 +319,9 @@ export default function Assembly() {
             width: 160,
             render: (_: unknown, r: AssemblyRecordRow) =>
               r.debug_result ? (
-                <Tag color={r.debug_result === '合格' ? 'success' : 'error'}>
+                <Status tone={r.debug_result === '合格' ? 'ok' : 'err'}>
                   {r.debug_result} {r.debug_note ? `· ${r.debug_note}` : ''}
-                </Tag>
+                </Status>
               ) : (
                 '—'
               ),
@@ -494,6 +458,7 @@ export default function Assembly() {
             />
           </Form.Item>
       </AppModal>
-    </Card>
+    </Panel>
+    </div>
   )
 }

@@ -9,6 +9,51 @@
 import { newCtx, login, body, shot, check, summary, exitWith, results, BASE, API, FILES, apiLogin, apiGet, apiPost } from './lib.mjs';
 import path from 'node:path';
 
+/** 打开表单/档案页的某个分区（P4：分区条 `?tab=`）——跨步骤填字段前必须先切过去 */
+async function openSection(page, label) {
+  const b = page.locator('.ds-sec').filter({ hasText: label }).first()
+  if (await b.count()) { await b.click(); await page.waitForTimeout(350); return true }
+  return false
+}
+
+/** 打开台内某个视图（R3-B）：台页签现在是「组页签（≤4）+ 组内 Segmented」，
+ *  所以按**视图名**找：先在组页签里找，找不到就逐个组点开再看组内 Segmented。 */
+/**
+ * 按视图名打开页签 —— 兼容三条实现（docs/15 后统一为前两条）：
+ *   ① 单层流程条：`.ds-sec-nav button`（台/详情页通用）
+ *   ② 两层流程条：`ds-subtabs` 里的 Segmented（项那一行）
+ *   ③ 旧 antd Tabs（尚未迁移的页）
+ */
+async function openTab(page, label) {
+  const seg = page.locator('.ds-subtabs .ant-segmented-item').filter({ hasText: label }).first()
+  if (await seg.count()) { await seg.click(); await page.waitForTimeout(800); return true }
+  const sec = page.locator('.ds-sec-nav button').filter({ hasText: label }).first()
+  if (await sec.count()) { await sec.click(); await page.waitForTimeout(800); return true }
+  const t = page.locator('.ant-tabs-tab').filter({ hasText: label }).first()
+  if (await t.count()) { await t.click(); await page.waitForTimeout(700); return true }
+  const groups = page.locator('.ant-tabs-tab')
+  const n = await groups.count()
+  for (let i = 0; i < n; i++) {
+    await groups.nth(i).click(); await page.waitForTimeout(400)
+    const s2 = page.locator('.ant-segmented-item').filter({ hasText: label }).first()
+    if (await s2.count()) { await s2.click(); await page.waitForTimeout(800); return true }
+  }
+  return false
+}
+
+/** 流程条现状（新壳）：组那一行 / 项那一行 / 单层时两者相同 */
+async function navState(page) {
+  return page.evaluate(() => {
+    const sel = (root) =>
+      root?.querySelector('.ant-segmented-item-selected')?.textContent?.trim() ?? ''
+    const grp = document.querySelector('.ds-subtabs.ds-grp')
+    const itemRow = [...document.querySelectorAll('.ds-subtabs')].find((e) => !e.classList.contains('ds-grp'))
+    const single = document.querySelector('.ds-sec-nav button.ds-sec.on')?.textContent?.trim() ?? ''
+    const groupCount = grp ? grp.querySelectorAll('.ant-segmented-item').length : document.querySelectorAll('.ds-sec-nav button').length
+    return { groupSel: grp ? sel(grp) : single, itemSel: itemRow ? sel(itemRow) : '', groupCount }
+  })
+}
+
 const PHOTO = path.join(FILES, 'photo.png');
 const PC_ROUTES = [
   '/workbench', '/workbench/sales', '/workbench/pm', '/workbench/eng', '/workbench/shop',
@@ -218,13 +263,14 @@ try {
   {
     await page.goto(BASE + '/purchase?tab=arrivals', { waitUntil: 'networkidle' })
     await page.waitForTimeout(900)
-    const active = await page.locator('.ant-tabs-tab-active').first().innerText().catch(() => '')
-    const tabN = await page.locator('.ant-tabs-tab').count()
     const t = await body(page)
     const hasRows = (t.match(/PO\d{5}/g) || []).length > 0
     const hasEmpty = t.includes('没有在途采购单')
-    check('NAV-到货跟踪', active.includes('到货跟踪') && tabN >= 8 && (hasRows || hasEmpty),
-      `active=「${active.trim()}」 · 页签=${tabN} · 在途行=${hasRows}${hasEmpty ? '(空态引导)' : ''}`)
+    // ★ docs/15：台流程条统一成「组（Segmented）+ 组内项（Segmented）」；?tab=arrivals 落
+    //   「到货与验收」组、组内选中「到货跟踪」（key 没改，深链照旧）
+    const nav = await navState(page)
+    check('NAV-到货跟踪', /到货/.test(nav.groupSel) && /到货跟踪/.test(nav.itemSel || nav.groupSel) && nav.groupCount <= 4 && (hasRows || hasEmpty),
+      `组=「${nav.groupSel}」 · 组内选中=「${nav.itemSel}」 · 组数=${nav.groupCount}/4 · 在途行=${hasRows}${hasEmpty ? '(空态引导)' : ''}`)
   }
 
   // ── P0 修正：工作台 Tab 化（me 动态列表）+ 采购/仓库归位 + 角色裁剪 ──
@@ -291,10 +337,12 @@ try {
           return {
             h: Math.round((document.querySelector('.domain-content') || document.body).scrollHeight),
             no: inFold('.ant-breadcrumb') || txt(document.body).slice(0, 400).includes('TX'),
-            stage: inFold('.ant-tag'),
+            // ★ 2026-10-04 迁移：状态药丸从 antd `Tag` 换成了 ds 的 `Chip`/`Status`
+            //   （`.ds-ch` / `.ds-st`）—— 断言意图不变（首屏看得到阶段），选择器跟着换代。
+            stage: inFold('.ant-tag, .ds-ch, .ds-st'),
             // 注意：antd 会给两字按钮自动插空格（「立 项」），比对前先去掉空白
             nextBtn: Array.from(document.querySelectorAll('button')).some((b) => b.getBoundingClientRect().top < vh && /成交登记|立项|进入设计|去发运|登记回款|质保金/.test((b.innerText ?? '').replace(/\s+/g, ''))),
-            stageText: (document.querySelector('.ant-tag')?.innerText ?? ''),
+            stageText: (document.querySelector('.ant-tag, .ds-ch, .ds-st')?.innerText ?? ''),
             nums: (() => {
               const s = Array.from(document.querySelectorAll('*')).filter((e) => /设备|齐套|未收|客户/.test(e.textContent ?? '') && e.children.length <= 3)
               return s.length > 0 && s[0].getBoundingClientRect().top < vh
@@ -306,9 +354,14 @@ try {
         check('VIS-详情首屏给结论', fold.stage && fold.nums && (fold.nextBtn || terminal),
           `首屏: 阶段=${fold.stageText ?? fold.stage} 下一步=${fold.nextBtn}${terminal ? '(终态豁免)' : ''} 关键数字=${fold.nums} · 页高 ${fold.h}px`)
         check('VIS-详情页≤3屏', fold.h <= 2700, `页高 ${fold.h}px（改造前 7411px）`)
-        // 结构断言比像素更敏感：默认只许展开**一段**泳道（全展开就是回到 9 屏平铺的老路）
-        const openLanes = await vc.page.evaluate(() => document.querySelectorAll('.ant-collapse-item-active').length)
-        check('VIS-默认只展开一段泳道', openLanes === 1, `默认展开 ${openLanes} 段（>1 就是又回到平铺）`)
+        // ★ 2026-10-05 迁移（docs/14 P3）：折叠泳道已被**分区条**取代 —— 断言意图不变
+        //   （"一屏只呈现一块，不要回到平铺"），选择器从 .ant-collapse-item-active 换到 .ds-sec.on。
+        const sec = await vc.page.evaluate(() => {
+          const on = document.querySelectorAll('.ds-sec.on')
+          return { n: document.querySelectorAll('.ds-sec').length, on: on.length, label: (on[0]?.innerText ?? '').trim() }
+        })
+        check('OBJ-默认分区=概览', sec.n >= 3 && sec.on === 1 && /概览/.test(sec.label),
+          `分区 ${sec.n} 个 · 默认选中「${sec.label}」（选中数 ${sec.on}，应 1）`)
         // 空值不占位：只读页面上的「—」是注意力黑洞（改造前光首屏就 3 个）
         // 只判「字段区」：表格单元格留 — 是对的（行对齐需要占位），要治的是详情页那种
         // 一整屏 label 配 — 的空字段（改造前首屏就 3 个）
@@ -431,13 +484,13 @@ try {
     await page.goto(BASE + '/suppliers', { waitUntil: 'networkidle' })
     await page.waitForURL(/\/purchase\?tab=suppliers/, { timeout: 8000 }).catch(() => {})
     const landed = page.url().includes('tab=suppliers')
-    await page.waitForSelector('.ant-tabs-tab-active', { timeout: 8000 }).catch(() => {})
-    const active = await page.locator('.ant-tabs-tab-active').first().innerText().catch(() => '')
-    const tabN = await page.locator('.ant-tabs-tab').count()
+    await page.waitForTimeout(900)
+    const nav = await navState(page)
     const siderHasSupplier = await page.locator('.ant-layout-sider').innerText().catch(() => '')
     const noSideEntry = !siderHasSupplier.includes('供应商')
-    check('NAV-供应商入台', landed && active.includes('供应商') && noSideEntry && tabN >= 7,
-      `旧链→${page.url().split('?')[1] || page.url()} · active=「${active.trim()}」 · 页签=${tabN}/7 · 侧栏已收=${noSideEntry}`)
+    // ★ 供应商是「单 key 的组」→ 页签直接显示「供应商」（不造"主数据"这种听不懂的组名）
+    check('NAV-供应商入台', landed && nav.groupSel.includes('供应商') && noSideEntry && nav.groupCount <= 4,
+      `旧链→${page.url().split('?')[1] || page.url()} · active=「${nav.groupSel}」 · 组数=${nav.groupCount}/4 · 侧栏已收=${noSideEntry}`)
   }
 
   // 选中态 = 最长前缀（用户实测 bug：/workbench/eng 被错标「我的工作台」——eng/sales 两台都验）
@@ -472,28 +525,37 @@ try {
     await c2.browser.close()
   }
 
-  // —— P-09：空提交列表级错误 + 零 pageerror ——
+  // —— P-09：空提交必须给出**看得见、能定位**的校验反馈 + 零 pageerror ——
+  //   ★ 2026-10-05 迁移（docs/14 P4）：表单页分区后，错误可能落在**被藏起来的步骤**里。
+  //     断言意图不变（空提交不能让用户"点了没反应"），拆成两条：
+  //     ① 提交后**当前区**必须有可见的错误行；② 切到「客户信息」能看见列表级联系人错误。
   await page.goto(BASE + '/projects/new', { waitUntil: 'networkidle' });
   await page.waitForTimeout(700);
   errs.length = 0;
   await page.getByRole('button', { name: /建\s*立\s*商\s*机/ }).first().click();
   await page.waitForTimeout(900);
+  const visibleErrs = await page.locator('.ant-form-item-explain-error:visible').allInnerTexts();
+  await openSection(page, '客户信息');
   const t0 = await body(page);
-  check('P-09', t0.includes('至少要有一个客户方联系人') && errs.length === 0,
-    t0.includes('至少要有一个客户方联系人')
-      ? (errs.length === 0 ? '列表级错误渲染 + 零 pageerror' : `有异常: ${errs[0]}`)
-      : '未见列表级错误');
+  check('P-09', visibleErrs.length > 0 && t0.includes('至少要有一个客户方联系人') && errs.length === 0,
+    `可见错误 ${visibleErrs.length} 条（${visibleErrs.slice(0, 1).join('')}）· 列表级联系人错误=${t0.includes('至少要有一个客户方联系人')}${errs.length ? ' · 有异常: ' + errs[0] : ''}`);
 
   // —— S0 建商机（写链开始）——
+  // ★ P-09 结束时停在「② 客户信息」（为了看列表级错误）→ 这里先切回①，否则①的字段是隐藏的
+  await openSection(page, '基本信息');
   await page.getByLabel(/项目名称/).fill(`E2E回归-${new Date().toISOString().slice(5, 16).replace(/[-:]/g, '')}`);
   await page.getByLabel(/项目描述/).fill('e2e 护栏自动创建（可清理）');
+  await openSection(page, '客户信息');   // ★ 分区化后：客户名称与联系人都「② 客户信息」里
   await page.getByLabel(/客户名称/).fill('E2E回归客户');
   await page.getByRole('button', { name: /添\s*加\s*联\s*系\s*人/ }).click();
   await page.getByPlaceholder('姓名').first().fill('回归机器人');
   await page.getByPlaceholder('电话').first().fill('13900000000');
+  await openSection(page, '项目要求');   // ★ 项目地点在③ 项目要求
   await page.getByLabel(/项目地点/).fill('广东惠州回归路 1 号');
+  await openSection(page, '时间与金额');   // ★ 商机截止在④ 时间与金额
   const dl = page.locator('.ant-form-item').filter({ hasText: '商机截止时间' }).locator('input');
   await dl.click(); await page.keyboard.type('2026-12-31'); await page.keyboard.press('Enter');
+  await openSection(page, '商务跟进');   // ★ 销售负责人在⑥ 商务跟进
   await page.getByLabel(/销售负责人/).click(); await page.waitForTimeout(400);
   await page.keyboard.type('销售'); await page.waitForTimeout(500);
   await page.locator('.ant-select-dropdown:visible .ant-select-item').first().click();
@@ -531,6 +593,7 @@ try {
   await page.getByRole('button', { name: /^立\s*项$/ }).first().click();
   await page.waitForURL(/initiate/, { timeout: 8000 }).catch(() => {});
   await page.waitForTimeout(900);
+  await openSection(page, '设备清单');   // ★ 分区化后：「+ 新增设备」在「② 设备清单」里
   await page.getByRole('button', { name: /\+\s*新\s*增\s*设\s*备/ }).click();
   await page.waitForTimeout(500);
   await page.getByLabel(/设备名称/).fill('回归升降机');
@@ -640,7 +703,8 @@ try {
   errs.length = 0;
   await page.goto(BASE + '/warehouse', { waitUntil: 'networkidle' });
   await page.waitForTimeout(1100);
-  const poRow = page.locator('.ant-table-row', { hasText: poNo }).first();
+  // ★ docs/15：仓库「待验收」已改成队列行（一句结论 + 右侧唯一按钮），不再是表格行
+  const poRow = page.locator('.ds-row, .ant-table-row', { hasText: poNo }).first();
   const accBtn = poRow.getByRole('button', { name: /^\s*验\s*收\s*$/ });
   if (await accBtn.count()) {
     await accBtn.click(); await page.waitForTimeout(700);
@@ -660,8 +724,8 @@ try {
 
   // —— P-11：入库库位 = 下拉（有待入库行时）——
   // ★ P2 之后仓库台拆成 待验收/待入库/待领料 三个页签（与手机端同构）→ 先看「待入库」这一栏
-  const storageTab = page.locator('.ant-tabs-tab').filter({ hasText: /待入库/ }).first()
-  if (await storageTab.count()) { await storageTab.click(); await page.waitForTimeout(900) }
+  // ★ R3-B：待入库 现在在「待办」组内（Segmented）→ 按视图名打开
+  await openTab(page, '待入库')
   const storeBtn = page.getByRole('button', { name: /^\s*入\s*库\s*$/ }).first();
   if (await storeBtn.count()) {
     await storeBtn.click(); await page.waitForTimeout(700);
@@ -715,10 +779,216 @@ try {
   check('P-13b', rmSel > 0, rmSel ? '报修项目号=下拉' : '仍手填');
   await page.keyboard.press('Escape'); await page.waitForTimeout(400);
 
+  // —— OBJ：分区化档案页（docs/14）—— 结论常驻 + 切区进 URL + 页高受控 ——
+  //   为什么要这三条：分区化的**代价**是"一次只看得见一区"，所以必须保证
+  //   ① 结论（关键数字/卡点）**不在任何分区里**（切到哪一区都还在首屏）
+  //   ② 分区状态进 URL（刷新/收藏/通知深链都在）
+  //   ③ 切区之后页高仍受控（否则等于把"往下滑"挪到了分区内）
+  {
+    const nc = await newCtx()
+    try {
+      await login(nc.page, 'pm1', 'txgk@123')
+      const probe = await nc.page.evaluate(async (api) => {
+        const raw = JSON.parse(localStorage.getItem('txgk_session') || '{}')
+        const r = await fetch(api + '/api/v1/projects', { headers: { Authorization: 'Bearer ' + raw.token } })
+        const j = await r.json()
+        return Array.isArray(j) && j.length ? j[0].project_no : null
+      }, API)
+      // 找一个真有设备的项目（没有设备就没有档案页可验）
+      let target = null
+      for (const pn of [probe].filter(Boolean)) {
+        const ov = await (await apiGet(`/projects/${pn}/design-overview`, await apiLogin('pm1', 'txgk@123'))).json().catch(() => [])
+        const eq = Array.isArray(ov) && ov.length ? ov[0].equip_no : null
+        if (eq) { target = { pn, eq }; break }
+      }
+      if (!target) {
+        check('OBJ-设备档案分区化', false, '库里没有带设备的项目 —— 基线未跑（护栏不许空转）')
+      } else {
+        await nc.page.goto(`${BASE}/equipment/${target.pn}/${target.eq}`, { waitUntil: 'networkidle' })
+        await nc.page.waitForTimeout(1500)
+        const bar = await nc.page.locator('.ds-sec').count()
+        const h0 = await nc.page.evaluate(() => Math.round((document.querySelector('.domain-content') || document.body).scrollHeight))
+        check('OBJ-设备档案分区化', bar >= 3 && h0 <= 1400,
+          `分区 ${bar} 个 · 概览页高 ${h0}px（改造前 2106px = 2.3 屏）`)
+        // 切到最后一区：结论仍在首屏 + URL 带 tab + 页高受控
+        await nc.page.locator('.ds-sec').last().click()
+        await nc.page.waitForTimeout(800)
+        const m = await nc.page.evaluate(() => {
+          const vh = window.innerHeight
+          const inFold = (t) => [...document.querySelectorAll('*')].some((e) => {
+            if (e.children.length > 3) return false
+            const r = e.getBoundingClientRect()
+            return r.top >= 0 && r.bottom <= vh && (e.textContent || '').includes(t)
+          })
+          return {
+            h: Math.round((document.querySelector('.domain-content') || document.body).scrollHeight),
+            conclusion: inFold('齐套率'),
+            url: location.search,
+          }
+        })
+        check('OBJ-结论常驻（切区不丢）', m.conclusion,
+          `切到最后一区后：齐套率仍在首屏=${m.conclusion} · 页高 ${m.h}px`)
+        check('OBJ-分区进URL', /tab=/.test(m.url), `切区后 URL=${m.url || '（没有 tab）'}`)
+      }
+    } finally {
+      await nc.browser.close()
+    }
+  }
+
+  // —— OBJ-入口：从项目详情真点到设备档案（端到端证明"有入口、点得动"）——
+  //   用户实测反馈："设备档案和件档案我没有，在什么地方能看到入口" —— 静态 grep 不够，
+  //   这里走一遍真实点击链：项目详情 → 展开「范围与资料」→ 设备行 → 设备档案。
+  {
+    const nc = await newCtx()
+    try {
+      await login(nc.page, 'pm1', 'txgk@123')
+      const pn = await nc.page.evaluate(async (api) => {
+        const raw = JSON.parse(localStorage.getItem('txgk_session') || '{}')
+        const r = await fetch(api + '/api/v1/projects', { headers: { Authorization: 'Bearer ' + raw.token } })
+        const j = await r.json()
+        return Array.isArray(j) && j.length ? j[0].project_no : null
+      }, API)
+      if (!pn) {
+        check('OBJ-项目详情给设备档案入口', false, '库里没有项目 —— 基线未跑')
+      } else {
+        await nc.page.goto(`${BASE}/projects/${pn}`, { waitUntil: 'networkidle' })
+        await nc.page.waitForTimeout(1500)
+        // ★ 2026-10-05 迁移：项目详情从折叠泳道改成**分区条**（docs/14 P3）——
+        //   设备清单在「范围与资料」分区里，点分区而不是展开泳道。
+        await openSection(nc.page, '范围与资料')
+        const link = nc.page.locator(`a[href*="/equipment/${pn}/"]`).first()
+        const has = await link.count()
+        if (!has) {
+          check('OBJ-项目详情给设备档案入口', false, '项目详情里没有设备档案入口（用户反馈过的那条）')
+        } else {
+          await link.click()
+          await nc.page.waitForURL(/\/equipment\//, { timeout: 6000 }).catch(() => {})
+          // ★ 等分区条出现再数（档案页要拉数据；**新建项目的档案聚合较慢** —— 8s 不够，
+          //   实测偶发假红；给到 20s + 等 URL 先到位）
+          await nc.page.waitForURL(/\/equipment\//, { timeout: 8000 }).catch(() => {})
+          await nc.page.waitForSelector('.ds-sec', { timeout: 20000 }).catch(() => {})
+          const ok = /\/equipment\/\w+\/\w+/.test(nc.page.url())
+          const bar = await nc.page.locator('.ds-sec').count()
+          check('OBJ-项目详情给设备档案入口', ok && bar >= 3,
+            `点设备行 → ${nc.page.url().replace(BASE, '')} · 分区 ${bar} 个`)
+        }
+      }
+    } finally {
+      await nc.browser.close()
+    }
+  }
+
+  // —— GM 驾驶舱（00 卷 §2.1「一屏看完」）——
+  //   两条：① 有权限的角色**一屏**看到四块（在手订单/交付风险/卡点/售后质保）；
+  //        ② 没权限的角色进不去（弹回工作台、零 4xx）——入口可见性与路由守卫两头都要有。
+  {
+    const nc = await newCtx()
+    try {
+      await login(nc.page, 'gm', 'txgk@123')
+      await nc.page.goto(BASE + '/dashboard', { waitUntil: 'networkidle' })
+      await nc.page.waitForTimeout(1500)
+      const onDash = nc.page.url().includes('/dashboard')
+      const m = await nc.page.evaluate(() => {
+        const vh = window.innerHeight
+        const inFold = (t) => [...document.querySelectorAll('.ds-panel-h h3')].some((e) => {
+          const r = e.getBoundingClientRect()
+          return r.top >= 0 && r.bottom <= vh && (e.innerText || '').includes(t)
+        })
+        return {
+          h: Math.round((document.querySelector('.domain-content') || document.body).scrollHeight),
+          blocks: ['在手订单', '交付风险', '卡点榜', '售后与质保'].filter(inFold).length,
+        }
+      })
+      check('GM-驾驶舱一屏看完', onDash && m.blocks === 4 && m.h <= 1400,
+        `四块首屏可见 ${m.blocks}/4 · 页高 ${m.h}px`)
+    } finally {
+      await nc.browser.close()
+    }
+    const nc2 = await newCtx()
+    try {
+      const bad = []
+      nc2.page.on('response', (r) => {
+        if (r.status() >= 400 && r.url().includes('/api/')) bad.push(`${r.status()} ${r.url().replace(BASE, '')}`)
+      })
+      await login(nc2.page, 'wh1', 'txgk@123')
+      await nc2.page.goto(BASE + '/dashboard', { waitUntil: 'networkidle' })
+      await nc2.page.waitForTimeout(900)
+      const denied = !nc2.page.url().includes('/dashboard')
+      check('GM-驾驶舱无权限进不去', denied && bad.length === 0,
+        `仓管访问 → ${nc2.page.url().replace(BASE, '')} · 4xx=${bad.length ? bad[0] : '无'}`)
+    } finally {
+      await nc2.browser.close()
+    }
+  }
+
+  // —— PERM：越权敲 URL 不许制造 4xx（走查收尾 2026-10-04）——
+  //   实测过的病：/workbench/shop/assembly 只有"台可见性"过滤没有路由守卫，
+  //   无 mfg:view 的角色直接敲 URL 就进页面，然后连环 403（6 个角色各 1 条）。
+  //   与 docs/12 修的「看得见、点了必 403」是同一类：门禁要拦在**进来之前**。
+  {
+    const cases = [
+      { user: 'buyer1', path: '/workbench/shop/assembly', why: '采购无 mfg:view' },
+      { user: 'sales1', path: '/workbench/shop/mfg', why: '销售无 mfg:view' },
+    ]
+    for (const c of cases) {
+      const nc = await newCtx()
+      try {
+        const bad400 = []
+        nc.page.on('response', (r) => {
+          if (r.status() >= 400 && r.url().includes('/api/')) bad400.push(`${r.status()} ${r.url().replace(BASE, '')}`)
+        })
+        await login(nc.page, c.user, 'txgk@123')
+        await nc.page.goto(BASE + c.path, { waitUntil: 'networkidle' })
+        await nc.page.waitForTimeout(900)
+        const url = nc.page.url()
+        const denied = !url.includes('/workbench/shop')
+        check(`PERM-越权不进页面且无4xx(${c.user})`, denied && bad400.length === 0,
+          `${c.why}：URL→${url.replace(BASE, '')} · 4xx=${bad400.length ? bad400.slice(0, 2).join(',') : '无'}`)
+      } finally {
+        await nc.browser.close()
+      }
+    }
+  }
+
+  // —— CMDK：⌘K 打开命令栏 → 粘编号 → Enter 直达（R2 收尾）——
+  {
+    // 从「台」里按 ⌘K 跳走，落点必须带来源（返回口才回得来）
+    await page.goto(BASE + '/workbench', { waitUntil: 'networkidle' });
+    await page.waitForTimeout(1200);
+    await page.keyboard.press('Meta+k');
+    await page.waitForTimeout(400);
+    const opened = await page.locator('.cmdk').count();
+    const probe = 'TX26001';
+    await page.keyboard.type(probe);
+    await page.waitForTimeout(1200);
+    const rows = await page.locator('.cmdk-row').count();
+    const first = (await page.locator('.cmdk-row').first().innerText().catch(() => '')).replace(/\n/g, ' ');
+    if (opened && rows > 0) {
+      await page.keyboard.press('Enter');
+      await page.waitForTimeout(1400);
+      const u = page.url();
+      const landed = u.includes('TX26001') || u.includes('/items/');
+      check('CMDK-粘编号直达', landed && u.includes('from='),
+        `命中 ${rows} 条（首行「${first.slice(0, 30)}」）→ Enter 落到 ${u.replace(BASE, '')}`)
+    } else {
+      check('CMDK-粘编号直达', false, `命令栏没打开或没结果（opened=${opened} rows=${rows}）`)
+    }
+    // 查不到必须说人话，不许静默
+    await page.keyboard.press('Meta+k');
+    await page.waitForTimeout(300);
+    await page.keyboard.type('ZZZ-NOT-EXIST-999');
+    await page.waitForTimeout(1200);
+    const noHit = await body(page);
+    check('CMDK-查不到说人话', /没有找到/.test(noHit), noHit.includes('没有找到') ? '给了「没有找到」' : '静默无反馈')
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(300);
+  }
+
   // —— P-17（UI）：采购单页签有 ¥ ——
   await page.goto(BASE + '/purchase', { waitUntil: 'networkidle' });
   await page.waitForTimeout(700);
-  await page.getByRole('tab', { name: /采\s*购\s*单/ }).click();
+  // ★ R3-B：「采购单」现在在「采购」组内（Segmented）→ 按视图名打开
+  await openTab(page, '采购单');
   await page.waitForTimeout(800);
   check('P-17-ui', /¥/.test(await body(page)), '采购单显示金额 ¥');
 
@@ -773,6 +1043,9 @@ try {
   // —— P-08：API 预查有批次的项目 → UI 精准选择（不遍历下拉：antd 虚拟滚动下 nth(i) 随数据规模失效）——
   await page.goto(BASE + '/shipping', { waitUntil: 'networkidle' });
   await page.waitForTimeout(900);
+  // ★ docs/15：发运台默认落「待装车/待发运」队列（跨项目、进来就能动手）；
+  //   项目下拉在「发运批次」视图里 → 探针先切过去（筛选器不再当家结论用）
+  await openTab(page, '发运批次')
   let p08 = 'FAIL', p08note = '当前无「已装车」批次（软提示由 UI 探针 Z 系列 + API R5 链覆盖）';
   {
     const tok = await apiLogin('pm1', 'txgk@123');
@@ -841,16 +1114,18 @@ try {
     } else check('AUTH-退出查看', false, '无「退出查看」入口');
   } else check('AUTH-伪装进入', false, 'Users 页无伪装入口（权限？admin 应可见）');
 
-  // —— 2.5 品牌位：侧栏反白字标真实加载（naturalWidth>0 = 非裂图非404）——
+  // —— 2.5 品牌位：侧栏字标真实加载（naturalWidth>0 = 非裂图非404）——
+  //  ★ 2026-10-04 方案 A「纸面」：侧栏由深色改浅色，字标随之由**反白版**换成**正色版**
+  //  （反白版在浅底上不可见）。断言意图不变：侧栏品牌位必须有真图，不许裂图/404。
   {
     await page.waitForFunction(() => {
-      const i = document.querySelector('img[src*="logo-white"]');
+      const i = document.querySelector('.app-sider img[src*="brand/logo"]');
       return !!i && i.complete && i.naturalWidth > 0;
     }, { timeout: 5000 }).catch(() => {});
-    const logo = page.locator('img[src*="logo-white"]').first();
+    const logo = page.locator('.app-sider img[src*="brand/logo"]').first();
     const has = await logo.count();
     const nw = has ? await logo.evaluate((img) => img.naturalWidth).catch(() => 0) : 0;
-    check('BRAND-侧栏logo', has > 0 && nw > 0, has ? `naturalWidth=${nw}` : '侧栏找不到 logo-white img');
+    check('BRAND-侧栏logo', has > 0 && nw > 0, has ? `naturalWidth=${nw}（浅色侧栏用正色字标）` : '侧栏找不到品牌字标 img');
   }
 
   // —— 登出冒烟（session 清空 → 回登录页）——
@@ -930,7 +1205,7 @@ try {
 
 
 } catch (e) {
-  check('UI-写链', false, '异常中断: ' + String(e).slice(0, 250));
+  check('UI-写链', false, '异常中断: ' + String(e).slice(0, 700) + ' @ ' + (globalThis.__lastStep ?? '?'));
   await shot(page, 'ui-regress-crash');
 } finally {
   await c.browser.close();
@@ -1048,34 +1323,35 @@ try {
     //   所以逐个项目找：看到「已装配/调试中/调试完成」Tag 而无按钮 = 新护栏在位（也算过）；
     //   找到「开始装配」就点开验预填（原来的断言目标）。
     await login(page, 'assy1', 'txgk@123');
-    await page.goto(BASE + '/assembly', { waitUntil: 'networkidle' }); await page.waitForTimeout(1400);
+    // ★ 2026-10-04 修两处护栏自身的问题（都不是产品 bug）：
+    //   ① 原来只iterate 下拉**前 5 个选项**，而 e2e 连跑会攒测试项目（实测已 22 个）——
+    //      有装配记录的项目被挤到窗口外 → 误报「装配角色看不到」。
+    //      改成**从 API 取一个有装配记录的项目**，直接按 ?p= 打开（数据驱动，不猜顺序）。
+    //   ② 原来查 `.ant-card-body .ant-tag` —— 设备卡的状态 Tag 渲染在 Card 的 `extra` 里，
+    //      即 `.ant-card-head`，所以那一分支**永远查不到**（假绿的反面：注定红）。
+    const asmTok = await apiLogin('assy1', 'txgk@123');
+    const asmRows = (await (await apiGet('/assembly/records', asmTok)).json()) ?? [];
+    const asmProj = (Array.isArray(asmRows) ? asmRows : []).map((r) => r.project_no).find(Boolean);
     let asmHandled = false;
-    const sel = page.locator('.ant-select');
-    const selCount = await sel.count();
-    if (selCount) {
-      await sel.first().click(); await page.waitForTimeout(400);
-      const opts = page.locator('.ant-select-item-option');
-      const nOpts = Math.min(await opts.count(), 5);
-      for (let i = 0; i < nOpts && !asmHandled; i++) {
-        await opts.nth(i).click(); await page.waitForTimeout(1200);
-        const doneTag = await page.locator('.ant-card-body .ant-tag').filter({ hasText: /已装配|调试中|调试完成/ }).count();
-        const asm = page.locator('a,button').filter({ hasText: '开始装配' }).first();
-        if (await asm.count()) {
-          await asm.click(); await page.waitForTimeout(700);
-          const checked = await page.locator('.ant-modal-content .ant-radio-button-wrapper-checked').innerText().catch(() => '');
-          check('PREFILL-装配开始', /整机装配/.test(checked), checked ? `装配形态=${checked.trim()}` : '未预选整机装配');
-          asmHandled = true;
-          await page.keyboard.press('Escape'); await page.waitForTimeout(400);
-        } else if (doneTag > 0) {
-          check('PREFILL-装配开始', true, `已装配设备不再给「开始装配」入口，状态 Tag 在位（N2/F8 新行为）`);
-          asmHandled = true;
-        }
-        if (asmHandled) break;
-        await sel.first().click(); await page.waitForTimeout(400);
-        if (i + 1 >= nOpts) { await page.keyboard.press('Escape'); break; }
+    if (!asmProj) {
+      check('PREFILL-装配开始', false, '没有任何装配记录 —— 基线未跑（护栏不许空转，直接红）');
+    } else {
+      await page.goto(`${BASE}/workbench/shop/assembly?p=${asmProj}`, { waitUntil: 'networkidle' });
+      await page.waitForTimeout(1400);
+      const doneTag = await page.locator('.ant-card-head .ant-tag, .ant-card-head .ds-ch, .ant-card-head .ds-st').filter({ hasText: /已装配|调试中|调试完成/ }).count();
+      const asm = page.locator('a,button').filter({ hasText: /开始装配|继续装配/ }).first();
+      if (await asm.count()) {
+        await asm.click(); await page.waitForTimeout(700);
+        const checked = await page.locator('.ant-modal-content .ant-radio-button-wrapper-checked').innerText().catch(() => '');
+        check('PREFILL-装配开始', /整机装配/.test(checked), checked ? `装配形态=${checked.trim()}` : '未预选整机装配');
+        asmHandled = true;
+        await page.keyboard.press('Escape'); await page.waitForTimeout(400);
+      } else if (doneTag > 0) {
+        check('PREFILL-装配开始', true, `已装配设备不再给「开始装配」入口，状态 Tag 在位（N2/F8 新行为）`);
+        asmHandled = true;
       }
+      if (!asmHandled) check('PREFILL-装配开始', false, `${asmProj} 既没有「开始装配」入口、也没有已装配状态 Tag（是 bug，不是跳过）`);
     }
-    if (!asmHandled) check('PREFILL-装配开始', false, '装配角色在所有项目都看不到「开始装配」入口也没有已装配 Tag（是 bug，不是跳过）');
     // 现场来货清点（PC）：默认结论「齐」必须预选（曾先设后开丢值，护栏也只认 destroyOnHidden 而漏扫）
     let projWithIncoming = null;
     const toks = await apiLogin('pm1', 'txgk@123');
@@ -1096,8 +1372,8 @@ try {
       await page.locator('.ant-select-selector').first().click(); await page.waitForTimeout(400);
       await page.keyboard.type(projWithIncoming); await page.waitForTimeout(900);
       await page.locator('.ant-select-dropdown:visible .ant-select-item').first().click(); await page.waitForTimeout(1600);
-      const tab = page.locator('.ant-tabs-tab').filter({ hasText: /来货清点/ }).first();
-      if (await tab.count()) { await tab.click(); await page.waitForTimeout(1200); }
+      // ★ R3-B：来货清点 在「进场」组内（Segmented）
+      await openTab(page, '来货清点');
       const link = page.locator('a').filter({ hasText: /清点验收/ }).first();
       if (!(await link.count())) check('PREFILL-现场清点', false, '现场角色也看不到清点入口（是 bug，不是跳过）');
       else {

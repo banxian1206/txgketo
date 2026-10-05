@@ -173,6 +173,18 @@ def main() -> None:
         bom = call("post", f"/api/v1/projects/{p}/bom/std", who="mech_manager", ok=(201,),
                    label=f"设计 BOM：机架 ← {it2['item_no']} × 4",
                    json={"parent_ref": dr_frame["drawing_no"], "child_item_no": it2["item_no"], "qty": 4})
+        # ★ 产品硬规则（05 卷 §7-1）：**图纸没有上传文件，不允许提交评审**。
+        #   本脚本原来只建图号、不传文件 → 被 400 拦下（2026-10-04 修）。
+        for no, who in (
+            (f"{p}-01A-00-00-00-00", "mech_manager"),
+            (dr_root["drawing_no"], "mech_manager"),
+            (dr_frame["drawing_no"], "mech_manager"),
+            (dr_cover["drawing_no"], "mech_manager"),
+        ):
+            call("post", f"/api/v1/drawings/{no}/draft", who=who, ok=(200, 201),
+                 label=f"图纸草稿上传：{no}", data={"change_reason": "初稿"},
+                 files={"file": ("drawing.pdf", PDF, "application/pdf")})
+
         # 机械任务：提交 → 总监发布
         t_mech = c.get(f"/api/v1/projects/{p}/equipment/01A/my-design-tasks", headers=login("mech_manager")).json()
         tid = next(t["task_id"] for t in t_mech if t["profession"] == "机械")
@@ -214,15 +226,26 @@ def main() -> None:
         print(f"  ✅ 采购池：本项目 {len(mine)} 条需求")
         cover_req = next(r for r in mine if r["item_no"] == dr_cover["drawing_no"])
         rest = [r for r in mine if r["id"] != cover_req["id"]]
-        call("post", "/api/v1/purchase/merge-order", who="buyer1", ok=(200, 201),
+        po_a = call("post", "/api/v1/purchase/merge-order", who="buyer1", ok=(200, 201),
              label=f"合并下单 {len(rest)} 条 → 采购单（到公司仓库）",
              json={"supplier_id": sup["id"], "ordered_at": d(0), "expected_date": d(15),
                    "deliver_to": "公司仓库", "lines": [{"request_id": r["id"], "tax_incl": True, "unit_price": price_of(r["item_no"])} for r in rest]})
-        call("post", "/api/v1/purchase/merge-order", who="buyer1", ok=(200, 201),
+        po_b = call("post", "/api/v1/purchase/merge-order", who="buyer1", ok=(200, 201),
              label="外协防护罩：直发客户现场",
-             json={"supplier_id": sup["id"], "ordered_at": d(0), "deliver_to": "直发客户现场",
+             # ★ O3-A（2026-09-24 客户口径）：下单**必须有预计到货日**（不填就被 400 拦），
+             #   到货跟踪的排序/超期红/催货口径全靠它 —— 本脚本原来漏了这个字段（2026-10-04 修）
+             json={"supplier_id": sup["id"], "ordered_at": d(0), "expected_date": d(20),
+                   "deliver_to": "直发客户现场",
                    "deliver_address": "深圳龙华 创维工业园 3 号厂房",
                    "lines": [{"request_id": cover_req["id"], "tax_incl": True, "unit_price": price_of(cover_req["item_no"])}]})
+        # ★ 二期两级价格审批：下单即提交审批（采购经理 → 采购总监）。
+        #   不逐级通过，后面「验收」会被 400 拦（当前状态是「审批中」）—— 本脚本原来漏了这一步（2026-10-04 修）。
+        for pno in [x["po_no"] for x in (po_a, po_b) if x and x.get("po_no")]:
+            call("post", f"/api/v1/purchase/orders/{pno}/approve", who="purchase_manager", ok=(200,),
+                 label=f"采购审批：经理通过 {pno}", json={"action": "通过"})
+            call("post", f"/api/v1/purchase/orders/{pno}/approve", who="purchase_director", ok=(200,),
+                 label=f"采购审批：总监通过 {pno}", json={"action": "通过"})
+
         reqs = {r["id"]: r for r in c.get(f"/api/v1/projects/{p}/purchase-requests", headers=login("buyer1")).json()}
         for rid, r in reqs.items():
             ins = call("post", f"/api/v1/projects/{p}/purchase-requests/{rid}/inspect", who="wh1", ok=(200,),

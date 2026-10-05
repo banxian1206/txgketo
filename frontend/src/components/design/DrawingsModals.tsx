@@ -1,31 +1,12 @@
 import type { FormInstance } from 'antd'
+import { toneOf } from '../../theme/status'
+import { Chip } from '../../components/ds'
 // components/design/DrawingsModals.tsx —— 由 EquipmentDesign 拆出（重构 1.6 · 只拆不改）
-import {
-  Alert,
-  Button,
-  DatePicker,
-  Form,
-  Input,
-  InputNumber,
-  Modal,
-  Select,
-  Space,
-  Table,
-  Tag,
-  Tooltip,
-  Typography,
-  Upload,
-} from 'antd'
+import { Alert, Button, DatePicker, Form, Input, InputNumber, Modal, Select, Space, Table, Tooltip, Typography, Upload } from 'antd'
 
 
 
-import {
-  errMsg,
-  uploadDrawingDraft,
-  type GeneratePurchaseResult,
-  type StdItem,
-  type VersionRow,
-} from '../../api/client'
+import { errMsg, uploadDrawingDraft, type GeneratePurchaseResult, type StdItem, type VersionRow } from '../../api/client'
 import { useGoFrom } from '../../hooks/useFrom'
 import type { TreeNode } from './shared'
 
@@ -368,7 +349,7 @@ addForm: FormInstance;
               width: 80,
               render: (v: string, r: VersionRow) => (
                 <Tooltip title={r.is_current ? '当前有效版本（车间按这版干）' : '历史版本，只读留档'}>
-                  <Tag color={r.is_current ? 'green' : 'default'}>{v}</Tag>
+                  <Chip tone={toneOf(r.is_current ? 'green' : 'default')}>{v}</Chip>
                 </Tooltip>
               ),
             },

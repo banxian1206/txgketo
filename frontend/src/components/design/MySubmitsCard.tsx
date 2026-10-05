@@ -1,18 +1,11 @@
 // components/design/MySubmitsCard.tsx —— 由 EquipmentDesign 拆出（重构 1.6 · 只拆不改）
-import {
-  Card,
-  Space,
-  Table,
-  Tag,
-  Typography,
-} from 'antd'
+import { Card, Space, Table, Typography } from 'antd'
+import { Status, Chip } from '../../components/ds'
 
 
 
-import {
-  type MyDesignTask,
-} from '../../api/client'
-import { REVIEW_STATUS as REVIEW_STATUS_COLOR } from '../../theme/status'
+import { type MyDesignTask } from '../../api/client'
+import { REVIEW_STATUS as REVIEW_STATUS_COLOR, toneOf } from '../../theme/status'
 
 export default function MySubmitsCard({
 myTasks,
@@ -49,9 +42,9 @@ myTasks: MyDesignTask[];
                 width: 140,
                 render: (_: unknown, r: MyDesignTask) =>
                   r.ticket ? (
-                    <Tag color={REVIEW_STATUS_COLOR[r.ticket.status] ?? 'default'}>{r.ticket.status}</Tag>
+                    <Status tone={toneOf(REVIEW_STATUS_COLOR[r.ticket.status])}>{r.ticket.status}</Status>
                   ) : (
-                    <Tag>未提交</Tag>
+                    <Chip>未提交</Chip>
                   ),
               },
               {

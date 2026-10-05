@@ -1,27 +1,35 @@
 import { useShipBoard } from '../../hooks/useShipBoard'
-import { App, Button, Card, Checkbox, DatePicker, Empty, Form, Input, Modal, Select, Space, Tag, Typography } from 'antd'
-import {useEffect, useState} from 'react'
+import { App, Button, Checkbox, DatePicker, Form, Input, Modal, Select, Space, Typography } from 'antd'
+import { useEffect, useState } from 'react'
 
-import {
-  arriveShipment,
-  createShipment,
-  departShipment,
-  errMsg,
-  generateShipItems,
-  hasPerm,
-  listProjects,
-  loadShipment,
-  markShipItems,
-  receiptShipment,
-  shipPhotoUrl,
-  uploadShipPhotos,
-  type ShipmentRow,
-} from '../../api/client'
+import { arriveShipment, createShipment, departShipment, errMsg, generateShipItems, hasPerm, listProjects, loadShipment, markShipItems, receiptShipment, shipPhotoUrl, uploadShipPhotos, type ShipmentRow } from '../../api/client'
+import { MCard, MCheckRow, MChip, MEmpty, MStatus } from '../../components/ds/mobile'
 import AuthedImage from '../../components/AuthedImage'
 import { Muted } from '../../components/ui/Primitives'
 import MfgPhotoPicker from '../../components/MfgPhotoPicker'
-import { SHIP_STATUS as SHIP_COLOR } from '../../theme/status'
 import { T } from '../../theme/tokens'
+
+/** 发运状态 → 作业卡 tone（与 PC 同一套语义） */
+const SHIP_TONE: Record<string, 'ok' | 'warn' | 'err' | 'run' | undefined> = {
+  已指令: 'run', 发货中: 'run', 已装车: 'warn', 在途: 'run', 已到货: 'warn', 已签收: 'ok',
+}
+
+/** 动线步骤标（手机上明确"现在这步干什么"） */
+function MStep({ n, text }: { n: number; text: string }) {
+  return (
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+      <span
+        style={{
+          width: 20, height: 20, borderRadius: 999, background: 'var(--ds-acc)',
+          color: 'var(--ds-surface)', fontSize: 12, fontWeight: 600, display: 'inline-grid', placeItems: 'center',
+        }}
+      >
+        {n}
+      </span>
+      <span style={{ fontSize: 13.5, fontWeight: 600 }}>{text}</span>
+    </span>
+  )
+}
 
 /** 手机端 · 发运（S7）：散件发运，逐项勾「已发」+ 拍照；现场按清单清点。 */
 export default function ShippingM() {
@@ -173,88 +181,190 @@ export default function ShippingM() {
         options={projects.map((p) => ({ value: p.project_no, label: `${p.project_no} ${p.project_name}` }))}
       />
 
+      {/* 没选项目：先给「点一个项目」列表（移动端不留空屏） */}
+      {!projectNo && (
+        <>
+          <MEmpty text="先选一个项目，看它的待发设备与发运批次。" />
+          {projects.map((pj) => (
+            <MCard
+              key={pj.project_no}
+              head={<span className="ds-code" style={{ fontSize: 12 }}>{pj.project_no}</span>}
+              title={pj.project_name}
+              onClick={() => {
+                setProjectNo(pj.project_no)
+                setSelected([])
+                void load(pj.project_no)
+              }}
+            />
+          ))}
+        </>
+      )}
+
       {projectNo && (
-        <Card size="small" title="待发设备（勾本次要发的）" style={{ marginBottom: 10 }}>
-          {toShipRows.length === 0 && <Empty description="没有可发的设备（未装配完成，或已在未完成批次里）" />}
+        <MCard head={<MStep n={1} text="勾本次要发的设备" />}>
+          {toShipRows.length === 0 && (
+            <MEmpty text="没有可发的设备（未装配完成，或已在未完成批次里）。" />
+          )}
           {toShipRows.map((t) => (
-            <div key={t.equip_no} style={{ padding: '6px 0', borderBottom: `1px solid ${T.border}`, opacity: t.in_open_shipment ? 0.5 : 1 }}>
-              <Checkbox
-                disabled={t.in_open_shipment || !t.ready}
-                checked={selected.includes(t.equip_no)}
-                onChange={(e) => setSelected((s) => (e.target.checked ? [...s, t.equip_no] : s.filter((x) => x !== t.equip_no)))}
-              >
-                <b>{t.equip_no}</b> {t.equip_name}{' '}
-                <Tag color={t.ready ? 'success' : 'default'}>{t.assembly_status ?? '未装配'}</Tag>
-                <Tag>{Math.round(t.kitting_rate * 100)}%</Tag>
-                {t.in_open_shipment && <Tag color="orange">已在批次</Tag>}
-              </Checkbox>
-            </div>
+            <MCheckRow
+              key={t.equip_no}
+              checked={selected.includes(t.equip_no)}
+              onToggle={() => {
+                if (t.in_open_shipment || !t.ready) return
+                setSelected((x) => (x.includes(t.equip_no) ? x.filter((y) => y !== t.equip_no) : [...x, t.equip_no]))
+              }}
+              title={
+                <>
+                  {t.equip_no} {t.equip_name}
+                </>
+              }
+              sub={
+                <>
+                  {t.assembly_status ?? '未装配'} · 齐套 {Math.round(t.kitting_rate * 100)}%
+                  {t.in_open_shipment ? ' · 已在批次' : ''}
+                </>
+              }
+              right={
+                t.in_open_shipment ? (
+                  <MChip tone="warn">已在批次</MChip>
+                ) : t.ready ? (
+                  <MChip tone="ok">可发</MChip>
+                ) : (
+                  <MChip>未装配完</MChip>
+                )
+              }
+            />
           ))}
           {/* ★ F15：手机端没有 hover，禁用理由只能写成看得见的字 */}
           {canShip && selected.length === 0 && (
-            <div className="hint-note">
-              先在上面勾选设备；只有「装配完成」的能勾（没装配完的发不了）。
-            </div>
+            <div className="hint-note">先在上面勾选设备；只有「装配完成」的能勾（没装配完的发不了）。</div>
           )}
-          {!canShip && (
-            <div className="hint-note">
-              发货指令由项目经理/发运下达，你这边只能看。
-            </div>
-          )}
-          <Button type="primary" block style={{ marginTop: 10 }} disabled={!canShip || selected.length === 0} onClick={() => setInstructOpen(true)}>
-            下达发货指令（{selected.length} 台）
-          </Button>
-        </Card>
+          {!canShip && <div className="hint-note">发货指令由项目经理 / 发运下达，你这边只能看。</div>}
+          <div className="m-actions">
+            <Button block type="primary" disabled={!canShip || selected.length === 0} onClick={() => setInstructOpen(true)}>
+              下达发货指令（{selected.length} 台）
+            </Button>
+          </div>
+        </MCard>
       )}
 
-      {projectNo && <Typography.Title level={5}>发运批次</Typography.Title>}
-      {projectNo && shipments.length === 0 && <Empty description="还没有发货指令" />}
+      {projectNo && <div className="m-sec">发运批次</div>}
+      {projectNo && shipments.length === 0 && <MEmpty text="还没有发货指令。先在上面勾设备、再下达指令。" />}
       {projectNo &&
         shipments.map((s) => {
           const done = s.items.filter((i) => i.shipped).length
           return (
-            <Card key={s.id} size="small" style={{ marginBottom: 10 }} title={`${s.shipment_no} · ${s.lines.map((l) => l.equip_no).join('、')}`} extra={<Tag color={SHIP_COLOR[s.status] ?? 'default'}>{s.status}</Tag>}>
-              <div style={{ fontSize: 12, color: T.textSecondary }}>
-                {s.plate_no ?? ''} {s.driver ?? ''} · 已发 {done}/{s.items.length} 项
-              </div>
-              <Space wrap style={{ marginTop: 8 }}>
-                {canShip && ['已指令', '发货中', '已装车'].includes(s.status) &&
-                  <Button size="small" type="primary" onClick={() => void openTick(s)}>发运清单</Button>}
-                {canShip && s.status === '已装车' && <Button size="small" type="primary" onClick={() => void doDepart(s)}>发运</Button>}
-                {canShip && ['已指令', '发货中', '已装车'].includes(s.status) && <Button size="small" onClick={() => { if (!s.items.some((i) => i.shipped)) { message.warning('本批一项都没勾「已发」，不能装车——先到「发运清单」勾选实际发出的件并拍照'); return } setLoadPhotos([]); setLoadTarget(s) }}>装车</Button>}
-                {canShip && s.status === '在途' && <Button size="small" onClick={() => void doArrive(s)}>登记到货</Button>}
-                {canReceive && ['已到货', '在途'].includes(s.status) &&
+            <MCard
+              key={s.id}
+              tone={SHIP_TONE[s.status]}
+              head={
+                <>
+                  <span className="ds-code" style={{ fontSize: 12 }}>{s.shipment_no}</span>
+                  <MStatus tone={SHIP_TONE[s.status]}>{s.status}</MStatus>
+                  <span style={{ marginLeft: 'auto' }}>
+                    <MChip tone={done === s.items.length && s.items.length > 0 ? 'ok' : 'warn'}>
+                      已发 {done}/{s.items.length}
+                    </MChip>
+                  </span>
+                </>
+              }
+              title={s.lines.map((l) => l.equip_no).join('、')}
+              lines={[
+                <>
+                  {s.plate_no ?? '未装车'} {s.driver ?? ''}
+                  {s.plan_ship_date ? ` · 发货日 ${s.plan_ship_date}` : ''}
+                </>,
+              ]}
+            >
+              <div className="m-actions">
+                {canShip && ['已指令', '发货中', '已装车'].includes(s.status) && (
+                  <Button block type="primary" onClick={() => void openTick(s)}>
+                    发运清单（逐项勾已发 + 拍照）
+                  </Button>
+                )}
+                {canShip && ['已指令', '发货中', '已装车'].includes(s.status) && (
+                  <Button
+                    block
+                    onClick={() => {
+                      if (!s.items.some((i) => i.shipped)) {
+                        message.warning('本批一项都没勾「已发」，不能装车——先到「发运清单」勾选实际发出的件并拍照')
+                        return
+                      }
+                      setLoadPhotos([])
+                      setLoadTarget(s)
+                    }}
+                  >
+                    装车（车型 / 司机 / 车牌 + 拍照）
+                  </Button>
+                )}
+                {canShip && s.status === '已装车' && (
+                  <Button block type="primary" onClick={() => void doDepart(s)}>
+                    发运（在途）
+                  </Button>
+                )}
+                {canShip && s.status === '在途' && (
+                  <Button block onClick={() => void doArrive(s)}>
+                    登记到货
+                  </Button>
+                )}
+                {canReceive &&
+                  ['已到货', '在途'].includes(s.status) &&
                   (s.items.some((i) => i.shipped) ? (
-                    <Button size="small" type="primary" onClick={() => { setReceiptChecks({}); setReceiptPhotos([]); setReceiptTarget(s) }}>现场清点</Button>
+                    <Button
+                      block
+                      type="primary"
+                      onClick={() => {
+                        setReceiptChecks({})
+                        setReceiptPhotos([])
+                        setReceiptTarget(s)
+                      }}
+                    >
+                      现场清点（逐项到 / 缺 / 损）
+                    </Button>
                   ) : (
-                    <Typography.Text type="secondary" style={{ fontSize: 12 }}>未勾「已发」，不能清点</Typography.Text>
+                    <Button block disabled>
+                      未勾「已发」，不能清点
+                    </Button>
                   ))}
-                <a onClick={() => setExpanded(expanded === s.id ? null : s.id)}>{expanded === s.id ? '收起清单' : '看清单'}</a>
-              </Space>
+                <Button block onClick={() => setExpanded(expanded === s.id ? null : s.id)}>
+                  {expanded === s.id ? '收起清单' : `看清单（${s.items.length} 项）`}
+                </Button>
+              </div>
               {expanded === s.id && (
                 <div style={{ marginTop: 8 }}>
                   {s.items.map((it) => (
-                    <div key={it.id} style={{ fontSize: 12, padding: '3px 0', borderBottom: `1px solid ${T.border}`, display: 'flex', justifyContent: 'space-between' }}>
-                      <span>{it.equip_no} {it.ref} ×{it.qty}</span>
-                      {it.shipped ? <Tag color="success">已发</Tag> : <Tag>未发</Tag>}
+                    <div className="m-row" key={it.id}>
+                      <div className="m-row-tx">
+                        <div className="m-row-t" style={{ fontFamily: 'var(--ds-mono)', fontSize: 12.5 }}>{it.ref}</div>
+                        <div className="m-row-s">
+                          {it.equip_no} · ×{it.qty}
+                        </div>
+                      </div>
+                      <div className="m-row-r">
+                        <MChip tone={it.shipped ? 'ok' : undefined}>{it.shipped ? '已发' : '未发'}</MChip>
+                      </div>
                     </div>
                   ))}
                   {s.receipts.map((r) => (
-                    <div key={r.id} style={{ fontSize: 12, marginTop: 6 }}>
-                      清点：<Tag color={r.result === '齐' ? 'success' : 'error'}>{r.result}</Tag>
+                    <div key={r.id} style={{ marginTop: 6 }}>
+                      <div className="m-card-l">
+                        清点结论：{r.result}
+                      </div>
                       {r.shortage_detail.map((sd, i) => (
-                        <div key={i} style={{ color: T.error }}>{sd.item}：{sd.result}（实到 {sd.received_qty ?? '—'}）{sd.reason}</div>
+                        <div key={i} className="m-card-l" style={{ color: 'var(--ds-err)' }}>
+                          {sd.item}：{sd.result}（实到 {sd.received_qty ?? '—'}）{sd.reason}
+                        </div>
                       ))}
                     </div>
                   ))}
-                  <Space wrap style={{ marginTop: 6 }}>
+                  <div className="m-photos">
                     {[...s.photos, ...s.receipts.flatMap((r) => r.photos)].map((p) => (
                       <AuthedImage key={p} path={shipPhotoUrl(p)} size={48} />
                     ))}
-                  </Space>
+                  </div>
                 </div>
               )}
-            </Card>
+            </MCard>
           )
         })}
 
@@ -295,7 +405,7 @@ export default function ShippingM() {
               <Checkbox checked={it.shipped} disabled={ticking || it.shipped} onChange={() => void toggleShipped(tickTarget as ShipmentRow, it.id)}>
                 <span style={{ fontSize: 13 }}>{it.equip_no} {it.ref} ×{it.qty} {it.kind}</span>
               </Checkbox>
-              {it.shipped && <Tag color="success">已发</Tag>}
+              {it.shipped && <MChip tone="ok">已发</MChip>}
             </div>
           ))}
         </div>

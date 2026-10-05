@@ -1,7 +1,11 @@
+import {Chip, Code, Status, Empty as DsEmpty } from '../../components/ds'
+import QueueBoard from '../../components/ds/QueueBoard'
+import WorkbenchPage from '../../components/domain/WorkbenchPage'
+import { PURCHASE_BOARD } from '../../configs/boards'
 import { Muted } from '../../components/ui/Primitives'
-import { App, Button, Card, Empty, Space, Table, Tabs, Tag, Tooltip, Typography } from 'antd'
+import { App, Button, Space, Table, Tag, Typography } from 'antd'
 import dayjs from 'dayjs'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import SuppliersPage from './SuppliersPage'
 import ManualPurchaseModal from '../../components/ManualPurchaseModal'
 import PoApproveModal from '../../components/PoApproveModal'
@@ -25,11 +29,9 @@ import {
   type PurchasePoolDemand,
   type PurchasePoolGroup,
 } from '../../api/client'
-import { ORDER_STATUS as ORDER_STATUS_COLOR } from '../../theme/status'
+import { ORDER_STATUS as ORDER_STATUS_COLOR, toneOf } from '../../theme/status'
 import { RECEIPT_STATUS as RECEIPT_STATUS_COLOR } from '../../theme/status'
 import { T } from '../../theme/tokens'
-import { PURCHASE_TABS, filterTabs } from '../../configs/tabs'
-import { useTab } from '../../hooks/useTab'
 import { useGoFrom } from '../../hooks/useFrom'
 const today = () => dayjs().format('YYYY-MM-DD')
 /**
@@ -49,8 +51,6 @@ export default function PurchaseWorkbench() {
   const [selected, setSelected] = useState<string[]>([])
   // A1（v2 方案 §2.0.6）：页签 = URL query（?tab=suppliers 深链 / 旧 /suppliers redirect 落点 / 分享可还原）
   //  ★ 重整 P0：这段手写实现已抽成 hooks/useTab（全站同一套页签状态机，含未知值回退）
-  const visKeys = filterTabs(PURCHASE_TABS).map((x) => x.key)
-  const [tab, setTab] = useTab(visKeys, 'pool')
   const [manualOpen, setManualOpen] = useState(false)
   const [mergeOpen, setMergeOpen] = useState(false)
   const [orderKey, setOrderKey] = useState<string | null>(null)
@@ -141,905 +141,770 @@ export default function PurchaseWorkbench() {
     setNegotiate((n) => ({ ...n, open: false }))
     void load()
   }
-  return (
-    <Card
-      title={
-        <Space>
-          <span>采购工作台</span>
-          {overdueCount > 0 && <Tag color="red">{overdueCount} 单到货已超期</Tag>}
+  const openTotal = toApprove.length + toVehicle.length + poolRequests + openOrders.length
+
+  // 体：按页签 key 取（顺序 / 标题 / 徽标 / 可见性全来自注册表 PURCHASE_BOARD）
+  const parts: Record<string, ReactNode> = {
+    approve: (
+      <QueueBoard
+        emptyText="没有待我审批的采购单 —— 采购单提交后，轮到你这一级时才会出现在这里。"
+        items={toApprove.map((r) => ({
+          key: r.key,
+          lead: <Code>{r.po_no}</Code>,
+          title: r.supplier_name ?? '未选供应商',
+          meta: `共 ${r.line_count} 行 · 预计到货 ${r.expected_date ?? '未约期'}`,
+          cells: [{ text: <Status tone={toneOf(ORDER_STATUS_COLOR[r.po_status ?? ''])}>{r.po_status}</Status> }],
+          action: (
+            <Button type="primary" size="small" onClick={() => setApproveKey(r.key)}>
+              审批
+            </Button>
+          ),
+        }))}
+      />
+    ),
+    vehicle: (
+      <QueueBoard
+        search={
+          <Muted>
+            项目经理下达发货指令后，<b>车由采购叫</b>：按发货日当天把车订好，登记「几辆车 + 本次运费」。<b>没叫车，发运那边装不了车</b>。
+          </Muted>
+        }
+        emptyText="没有等着叫车的发货批次。"
+        items={toVehicle.map((r) => ({
+          key: r.id,
+          lead: <Code>{r.shipment_no}</Code>,
+          title: `${r.project_no} ${r.project_name ?? ''}`,
+          meta: r.plan_ship_date
+            ? `发货日 ${r.plan_ship_date}`
+            : '⚠ 没填发货日 —— 请找项目经理确认哪天发',
+          cells: [
+            { text: <Status tone="run">{r.status}</Status> },
+            { text: r.instruct_at ? dayjs(r.instruct_at).format('MM-DD HH:mm') : '—', title: '指令时间' },
+          ],
+          action: (
+            <Button type="primary" size="small" onClick={() => setVehicleTarget(r)}>
+              叫车
+            </Button>
+          ),
+        }))}
+      />
+    ),
+    pool: (
+      <>
+        <Typography.Paragraph type="secondary" style={{ fontSize: 12 }}>
+          <b>先查仓库 → 缺的进池 → 攒一攒合并下单</b>
+          。各设计小组下单节点不一样，但东西大差不差：勾选同类物料一起买，
+          量大了价格才好谈，供应商也愿意一次送。手工申请（车间耗品/现场缺件/辅料）免审核，提交即进池。
+        </Typography.Paragraph>
+        <Space style={{ marginBottom: 12 }} wrap>
+          <Button
+            type="primary"
+            disabled={selected.length === 0 || !canBuy}
+            title={selected.length === 0 ? '先在下面勾选要合并下单的物料行' : '把勾选的物料合并成一张采购单'}
+            onClick={() => setMergeOpen(true)}
+          >
+            合并下单
+            {selected.length > 0 ? `（${selected.length} 种 / ${selectedLines} 条）` : ''}
+          </Button>
+          {selected.length > 0 && (
+            <Button type="link" onClick={() => setSelected([])}>
+              清空选择
+            </Button>
+          )}
+          <Button onClick={() => setManualOpen(true)}>手工申请</Button>
+          <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+            单个物料只有一条需求时，点行尾「去下单」即可。
+          </Typography.Text>
         </Space>
-      }
-      extra={<Button onClick={() => void load()}>刷新</Button>}
-    >
-      <Tabs
-        activeKey={tab}
-        onChange={setTab}
-        items={[
-          // ---------------------------------------------------------------- ① 待我审批（二期）
-          {
-            key: 'approve',
-            label: `待我审批 (${toApprove.length})`,
-            children: (
-              <>
-                <Table
-                  rowKey="key"
-                  size="small"
-                  dataSource={toApprove}
-                  locale={{ emptyText: '没有待我审批的采购单' }}
-                  columns={[
-                    { title: '单号', dataIndex: 'po_no', width: 130 },
-                    { title: '供应商', dataIndex: 'supplier_name', width: 170, render: (v) => v ?? '—' },
-                    { title: '行数', dataIndex: 'line_count', width: 70 },
-                    {
-                      title: '状态',
-                      dataIndex: 'po_status',
-                      width: 110,
-                      render: (v: string) => <Tag color={ORDER_STATUS_COLOR[v] ?? 'default'}>{v}</Tag>,
-                    },
-                    { title: '预计到货', dataIndex: 'expected_date', width: 110, render: (v) => v ?? '—' },
-                    {
-                      title: '',
-                      key: 'a',
-                      width: 90,
-                      render: (_: unknown, r: PurchaseOrderSummary) => (
-                        <Button type="primary" size="small" onClick={() => setApproveKey(r.key)}>
-                          审批
-                        </Button>
-                      ),
-                    },
-                  ]}
-                />
-              </>
-            ),
-          },
-          // ---------------------------------------------------------------- ①b 待叫车（§2.2 一条指令、两个部门）
-          {
-            key: 'vehicle',
-            label: `待叫车 (${toVehicle.length})`,
-            children: (
-              <>
-                <Typography.Paragraph>
-                  <Muted>
-                    项目经理下达发货指令后，<b>车由采购叫</b>：按发货日当天把车订好，登记「几辆车 + 本次运费」。
-                    装货的人据此知道当天装几车 ——<b>没叫车，发运那边装不了车</b>。车辆费用只记本次金额，不进价格库。
-                  </Muted>
-                </Typography.Paragraph>
-                <Table<ToVehicleRow>
-                  rowKey="id"
-                  size="small"
-                  loading={loading}
-                  dataSource={toVehicle}
-                  pagination={false}
-                  locale={{ emptyText: <Empty description="没有等着叫车的发货批次" /> }}
-                  columns={[
-                    { title: '发运单号', dataIndex: 'shipment_no', width: 130 },
-                    {
-                      title: '项目 / 发货日',
-                      key: 'p',
-                      render: (_: unknown, r: ToVehicleRow) => (
-                        <Space direction="vertical" size={0}>
-                          <span>{r.project_no} {r.project_name ?? ''}</span>
-                          <Typography.Text type={r.plan_ship_date ? 'secondary' : 'warning'} style={{ fontSize: 12 }}>
-                            {r.plan_ship_date ? `发货日 ${r.plan_ship_date}` : '⚠ 没填发货日 —— 请找项目经理确认哪天发'}
-                          </Typography.Text>
-                        </Space>
-                      ),
-                    },
-                    { title: '批次状态', dataIndex: 'status', width: 100 },
-                    {
-                      title: '指令时间',
-                      dataIndex: 'instruct_at',
-                      width: 130,
-                      render: (v?: string | null) => (v ? dayjs(v).format('MM-DD HH:mm') : '—'),
-                    },
-                    {
-                      title: '',
-                      key: 'a',
-                      width: 100,
-                      render: (_: unknown, r: ToVehicleRow) => (
-                        <Button type="primary" size="small" onClick={() => setVehicleTarget(r)}>
-                          叫车
-                        </Button>
-                      ),
-                    },
-                  ]}
-                />
-              </>
-            ),
-          },
-          // ---------------------------------------------------------------- ① 采购池
-          {
-            key: 'pool',
-            label: (
-              <Tooltip title="先查仓库 → 缺的进池 → 攒一攒合并下单：勾选同类物料一起买，量大了价格才好谈、供应商也愿意一次送。手工申请（车间耗品/现场缺件/辅料）免审核，提交即进池。">
-                <span>采购池 ({pool.length} 种 / {poolRequests} 条)</span>
-              </Tooltip>
-            ),
-            children: (
-              <>
-                <Typography.Paragraph type="secondary" style={{ fontSize: 12 }}>
-                  <b>先查仓库 → 缺的进池 → 攒一攒合并下单</b>
-                  （00 卷 §3.1②）。各设计小组下单节点不一样，但东西大差不差：勾选同类物料一起买，
-                  量大了价格才好谈，供应商也愿意一次送。手工申请（车间耗品/现场缺件/辅料）免审核，提交即进池。
-                </Typography.Paragraph>
-                <Space style={{ marginBottom: 12 }} wrap>
-                  <Button
-                    type="primary"
-                    disabled={selected.length === 0 || !canBuy}
-                    title={selected.length === 0 ? '先在下面勾选要合并下单的物料行' : '把勾选的物料合并成一张采购单'}
-                    onClick={() => setMergeOpen(true)}
-                  >
-                    合并下单
-                    {selected.length > 0 ? `（${selected.length} 种 / ${selectedLines} 条）` : ''}
-                  </Button>
-                  {selected.length > 0 && (
-                    <Button type="link" onClick={() => setSelected([])}>
-                      清空选择
-                    </Button>
-                  )}
-                  <Button onClick={() => setManualOpen(true)}>手工申请</Button>
-                  <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-                    单个物料只有一条需求时，点行尾「去下单」即可。
-                  </Typography.Text>
-                </Space>
-                <Table<PurchasePoolGroup>
-                  rowKey="item_no"
-                  size="middle"
-                  loading={loading}
-                  dataSource={pool}
-                  pagination={{ pageSize: 20, showSizeChanger: false }}
-                  scroll={{ x: 960 }}
-                  rowSelection={{
-                    selectedRowKeys: selected,
-                    onChange: (keys) => setSelected(keys as string[]),
-                    columnWidth: 46,
-                  }}
-                  locale={{
-                    emptyText: <Empty description="采购池是空的：BOM 需求先查仓库，有库存的不进池" />,
-                  }}
-                  expandable={{
-                    expandedRowRender: (g) => (
-                      <Table<PurchasePoolDemand>
-                        rowKey="id"
-                        size="small"
-                        pagination={false}
-                        dataSource={g.requests}
-                        scroll={{ x: 1160 }}
-                        columns={[
-                          {
-                            // ★ 列治理：项目为主、设备为副（合并单里每行需求本来就带着归属）
-                            title: '项目 / 设备（归属）',
-                            dataIndex: 'project_no',
-                            width: 240,
-                            render: (v: string | null, r) =>
-                              v ? (
-                                <>
-                                  <a onClick={() => go(`/projects/${v}`)}>
-                                    {v} {r.project_name ?? ''}
-                                  </a>
-                                  <div style={{ fontSize: 12, color: T.textSecondary }}>
-                                    {r.equip_no ?? '未分到设备'}
-                                  </div>
-                                </>
-                              ) : (
-                                <Tag color="blue">{r.attribution ?? '公司级'}</Tag>
-                              ),
-                          },
-                          {
-                            title: '零件',
-                            key: 'part',
-                            width: 200,
-                            render: (_: unknown, r) =>
-                              r.part_no ? (
-                                <>
-                                  <div style={{ fontSize: 12 }}>{r.part_no}</div>
-                                  <div style={{ fontSize: 12, color: T.textSecondary }}>
-                                    {r.part_title ?? ''}
-                                  </div>
-                                </>
-                              ) : (
-                                '—'
-                              ),
-                          },
-                          {
-                            title: '数量',
-                            dataIndex: 'qty',
-                            width: 110,
-                            render: (v: number) => `${v} ${g.unit ?? ''}`,
-                          },
-                          {
-                            // 主=需要到货日，副=该物料的采购周期（下单前一眼看出赶不赶得上）
-                            title: '需要到货（· 采购周期）',
-                            dataIndex: 'need_date',
-                            width: 150,
-                            render: (v: string | null, r) => (
-                              <>
-                                <Space size={4}>
-                                  <span>{v ?? '—'}</span>
-                                  {v && v < today() && <Tag color="red">已过期</Tag>}
-                                </Space>
-                                <div style={{ fontSize: 12, color: T.textSecondary }}>
-                                  周期 {r.lead_days ? `${r.lead_days} 天` : '未配'}
-                                </div>
-                              </>
-                            ),
-                          },
-                          {
-                            title: '来源',
-                            dataIndex: 'source',
-                            width: 150,
-                            render: (v: string, r) =>
-                              REBUY_SOURCES.includes(v) ? (
-                                <>
-                                  {/* ★ 文案取真实来源（N20：条件已泛化而文案曾写死「退货重采」，
-                                      会把现场缺件/破损标成仓库退货，责任方与处理动作都不同） */}
-                                  <Tag color="orange">{v}</Tag>
-                                  {r.origin_po_no && (
-                                    <div style={{ fontSize: 12, color: T.textSecondary }}>
-                                      原 {r.origin_po_no}
-                                    </div>
-                                  )}
-                                </>
-                              ) : (
-                                <>
-                                  <Tag>{v}</Tag>
-                                  {r.source_release_no && (
-                                    <div style={{ fontSize: 12, color: T.textSecondary }}>
-                                      {r.source_release_no}
-                                    </div>
-                                  )}
-                                  {v === '手工' && r.requester_name && (
-                                    <div style={{ fontSize: 12, color: T.textSecondary }}>
-                                      {r.requester_name}
-                                    </div>
-                                  )}
-                                </>
-                              ),
-                          },
-                          { title: '备注', dataIndex: 'remark', render: (v) => v ?? '—' },
-                        ]}
-                      />
-                    ),
-                  }}
-                  columns={[
-                    {
-                      title: '物料',
-                      key: 'item',
-                      width: 260,
-                      fixed: 'left',
-                      render: (_: unknown, g) => (
+        <Table<PurchasePoolGroup>
+          rowKey="item_no"
+          size="middle"
+          loading={loading}
+          dataSource={pool}
+          pagination={{ pageSize: 20, showSizeChanger: false }}
+          scroll={{ x: 960 }}
+          rowSelection={{
+            selectedRowKeys: selected,
+            onChange: (keys) => setSelected(keys as string[]),
+            columnWidth: 46,
+          }}
+          locale={{
+            emptyText: <DsEmpty text="采购池是空的：BOM 需求先查仓库，有库存的不进池" />,
+          }}
+          expandable={{
+            expandedRowRender: (g) => (
+              <Table<PurchasePoolDemand>
+                rowKey="id"
+                size="small"
+                pagination={false}
+                dataSource={g.requests}
+                scroll={{ x: 1160 }}
+                columns={[
+                  {
+                    // ★ 列治理：项目为主、设备为副（合并单里每行需求本来就带着归属）
+                    title: '项目 / 设备（归属）',
+                    dataIndex: 'project_no',
+                    width: 240,
+                    render: (v: string | null, r) =>
+                      v ? (
                         <>
-                          <b>{g.display_name}</b>
+                          <a onClick={() => go(`/projects/${v}`)}>
+                            {v} {r.project_name ?? ''}
+                          </a>
                           <div style={{ fontSize: 12, color: T.textSecondary }}>
-                            {g.item_no}
-                            {g.spec_text ? ` · ${g.spec_text}` : ''}
+                            {r.equip_no ?? '未分到设备'}
                           </div>
                         </>
+                      ) : (
+                        <Tag color="blue">{r.attribution ?? '公司级'}</Tag>
                       ),
-                    },
-                    {
-                      title: '需求',
-                      key: 'demand',
-                      width: 140,
-                      render: (_: unknown, g) => (
-                        <Space size={4}>
-                          <span>{g.request_count} 条</span>
-                          {g.mergeable && <Tag color="gold">★可合并</Tag>}
-                        </Space>
+                  },
+                  {
+                    title: '零件',
+                    key: 'part',
+                    width: 200,
+                    render: (_: unknown, r) =>
+                      r.part_no ? (
+                        <>
+                          <div style={{ fontSize: 12 }}>{r.part_no}</div>
+                          <div style={{ fontSize: 12, color: T.textSecondary }}>
+                            {r.part_title ?? ''}
+                          </div>
+                        </>
+                      ) : (
+                        '—'
                       ),
-                    },
-                    {
-                      title: '合计数量',
-                      dataIndex: 'total_qty',
-                      width: 110,
-                      align: 'right',
-                      render: (v: number, g) => (
-                        <b>
-                          {v} {g.unit ?? ''}
-                        </b>
-                      ),
-                    },
-                    {
-                      title: '最紧要货',
-                      dataIndex: 'earliest_need',
-                      width: 150,
-                      render: (v: string | null) => (
+                  },
+                  {
+                    title: '数量',
+                    dataIndex: 'qty',
+                    width: 110,
+                    render: (v: number) => `${v} ${g.unit ?? ''}`,
+                  },
+                  {
+                    // 主=需要到货日，副=该物料的采购周期（下单前一眼看出赶不赶得上）
+                    title: '需要到货（· 采购周期）',
+                    dataIndex: 'need_date',
+                    width: 150,
+                    render: (v: string | null, r) => (
+                      <>
                         <Space size={4}>
                           <span>{v ?? '—'}</span>
                           {v && v < today() && <Tag color="red">已过期</Tag>}
                         </Space>
-                      ),
-                    },
-                    {
-                      title: '涉及项目',
-                      key: 'projects',
-                      width: 170,
-                      render: (_: unknown, g) => {
-                        const projs = [...new Set(g.requests.map((r) => r.project_no))]
-                        return (
-                          <span title={projs.join('、')}>
-                            {projs.length > 2 ? `${projs.length} 个项目` : projs.join('、')}
-                          </span>
-                        )
-                      },
-                    },
-                    {
-                      title: '操作',
-                      key: 'action',
-                      width: 130,
-                      fixed: 'right',
-                      render: (_: unknown, g) => (
-                        <Button
-                          size="small"
-                          type={g.mergeable ? 'default' : 'primary'}
-                          disabled={!canBuy}
-                          onClick={() => openMerge([g])}
-                        >
-                          {g.mergeable ? '合并下单' : '去下单'}
-                        </Button>
-                      ),
-                    },
-                  ]}
-                />
-              </>
-            ),
-          },
-          // ---------------------------------------------------------------- ② 采购单
-          {
-            key: 'orders',
-            label: `采购单 (${openOrders.length})`,
-            children: (
-              <>
-                <Typography.Paragraph type="secondary" style={{ fontSize: 12 }}>
-                  一张单 = 一个采购单号，下面挂着各项目/设备的需求（合并下单的「归属」都在详情里）。
-                  采购只做三件事：<b>下单 · 取消 · 更改供应商</b>；到货、验收、入库由仓库做。
-                </Typography.Paragraph>
-                <Table<PurchaseOrderSummary>
-                  rowKey="key"
-                  size="middle"
-                  loading={loading}
-                  dataSource={orders}
-                  pagination={{ pageSize: 20, showSizeChanger: false }}
-                  scroll={{ x: 1180 }}
-                  locale={{ emptyText: <Empty description="还没有下过采购单" /> }}
-                  columns={[
-                    {
-                      title: '采购单号',
-                      dataIndex: 'po_no',
-                      width: 150,
-                      fixed: 'left',
-                      render: (v: string | null, o) => (
-                        <>
-                          <b>{v ?? '未编号'}</b>
-                          <div style={{ fontSize: 12, color: T.textSecondary }}>
-                            {o.line_count} 条 · {o.item_kinds} 种物料
-                          </div>
-                        </>
-                      ),
-                    },
-                    {
-                      title: '供应商',
-                      dataIndex: 'supplier_name',
-                      width: 150,
-                      render: (v: string | null) => v ?? '—',
-                    },
-                    {
-                      title: '需求归属（项目 / 设备）',
-                      key: 'belong',
-                      width: 260,
-                      render: (_: unknown, o) => (
-                        <>
-                          {o.projects.map((p) => (
-                            <Tag key={p.project_no}>{p.project_no}</Tag>
-                          ))}
-                          {o.equipments.map((e) => (
-                            <Tag key={`${e.project_no}-${e.equip_no}`} color="blue">
-                              {e.equip_no} {e.equip_name ?? ''}
-                            </Tag>
-                          ))}
-                          {o.equipments.length === 0 && (
-                            <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-                              没挂具体设备
-                            </Typography.Text>
-                          )}
-                        </>
-                      ),
-                    },
-                    {
-                      // 主=下单日期，副=预计到货（超期照旧标橙）
-                      title: '日期（下单 → 预计到货）',
-                      key: 'dates',
-                      width: 165,
-                      render: (_: unknown, o) => (
-                        <>
-                          <div>{o.ordered_at ?? '—'}</div>
-                          <Space size={4}>
-                            <Muted>{o.expected_date ?? '—'}</Muted>
-                            {o.expected_date && o.expected_date < today() && ['在途', '部分到货'].includes(o.status) && (
-                              <Tag color="orange">已超期</Tag>
-                            )}
-                          </Space>
-                        </>
-                      ),
-                    },
-                    {
-                      title: '金额',
-                      dataIndex: 'total_amount',
-                      width: 120,
-                      align: 'right',
-                      render: (v: number) => (v > 0 ? `¥${v.toLocaleString()}` : '—'),
-                    },
-                    {
-                      title: '状态',
-                      dataIndex: 'status',
-                      width: 95,
-                      render: (v: string, o) => (
-                        <>
-                          <Tag color={ORDER_STATUS_COLOR[v]}>{v}</Tag>
-                          {o.exchanged_qty > 0 && (
-                            <div>
-                              <Tag color="orange">换 {o.exchanged_qty}</Tag>
-                            </div>
-                          )}
-                          {o.returned_qty > 0 && (
-                            <div>
-                              <Tag>退 {o.returned_qty}</Tag>
-                            </div>
-                          )}
-                        </>
-                      ),
-                    },
-                    {
-                      title: '操作',
-                      key: 'action',
-                      width: 90,
-                      fixed: 'right',
-                      render: (_: unknown, o) => (
-                        <Button size="small" onClick={() => openOrder(o.key)}>
-                          详情
-                        </Button>
-                      ),
-                    },
-                  ]}
-                />
-              </>
-            ),
-          },
-          // A4：到货跟踪（v2 §2.0.4「催到货」—— 只聚合在途信息，不发明催货动作）
-          {
-            key: 'arrivals',
-            label: `到货跟踪 (${arrivals.length})`,
-            children: (
-              <Table<PurchaseOrderSummary>
-                rowKey="key"
-                dataSource={arrivals}
-                pagination={{ pageSize: 20, showSizeChanger: false }}
-                locale={{
-                  emptyText: <Empty description="当前没有在途采购单 —— 下单后到「采购单」页签盯发货，验收后自动流转" />,
-                }}
-                columns={[
-                  {
-                    title: '采购单',
-                    dataIndex: 'po_no',
-                    width: 110,
-                    render: (v: string | null, r) => (v ? <a onClick={() => openOrder(r.key)}>{v}</a> : '—'),
-                  },
-                  { title: '物料 / 行数', width: 120, render: (_v, r) => `${r.item_kinds} 种 · ${r.line_count} 行` },
-                  { title: '归属项目', render: (_v, r) => r.projects.map((x) => x.project_no).join(' / ') || '辅料 / 其他' },
-                  {
-                    title: '收货地',
-                    dataIndex: 'deliver_to',
-                    width: 140,
-                    render: (v: string | null) =>
-                      v ? <Tag color={v.includes('直发') ? 'purple' : 'blue'}>{v}</Tag> : '—',
+                        <div style={{ fontSize: 12, color: T.textSecondary }}>
+                          周期 {r.lead_days ? `${r.lead_days} 天` : '未配'}
+                        </div>
+                      </>
+                    ),
                   },
                   {
-                    title: '预计到货',
-                    dataIndex: 'expected_date',
+                    title: '来源',
+                    dataIndex: 'source',
                     width: 150,
-                    defaultSortOrder: 'ascend',
-                    sorter: (a, b) =>
-                      String(a.expected_date ?? '9999-99-99').localeCompare(String(b.expected_date ?? '9999-99-99')),
-                    render: (v: string | null) => {
-                      if (!v) return <Typography.Text type="secondary">未约期</Typography.Text>
-                      const d = dayjs(v)
-                      if (d.isBefore(dayjs(), 'day')) return <span><Tag color="error">超期</Tag>{v}</span>
-                      if (d.diff(dayjs(), 'day') <= 3) return <span><Tag color="warning">临期</Tag>{v}</span>
-                      return v
-                    },
-                  },
-                  {
-                    title: '供应商 / 联系',
-                    render: (_v, r) => {
-                      const sup = r.supplier_id != null ? supMap[r.supplier_id] : undefined
-                      return (
+                    render: (v: string, r) =>
+                      REBUY_SOURCES.includes(v) ? (
                         <>
-                          {r.supplier_name ?? '—'}
-                          {sup && (sup.contact_name || sup.phone) && (
-                            <Typography.Text type="secondary" style={{ fontSize: 12, display: 'block' }}>
-                              {[sup.contact_name, sup.phone].filter(Boolean).join(' · ')}
-                            </Typography.Text>
+                          {/* ★ 文案取真实来源（N20：条件已泛化而文案曾写死「退货重采」，
+                              会把现场缺件/破损标成仓库退货，责任方与处理动作都不同） */}
+                          <Tag color="orange">{v}</Tag>
+                          {r.origin_po_no && (
+                            <div style={{ fontSize: 12, color: T.textSecondary }}>
+                              原 {r.origin_po_no}
+                            </div>
                           )}
                         </>
-                      )
-                    },
+                      ) : (
+                        <>
+                          <Tag>{v}</Tag>
+                          {r.source_release_no && (
+                            <div style={{ fontSize: 12, color: T.textSecondary }}>
+                              {r.source_release_no}
+                            </div>
+                          )}
+                          {v === '手工' && r.requester_name && (
+                            <div style={{ fontSize: 12, color: T.textSecondary }}>
+                              {r.requester_name}
+                            </div>
+                          )}
+                        </>
+                      ),
                   },
-                  {
-                    title: '状态',
-                    dataIndex: 'status',
-                    width: 100,
-                    render: (v: string) => <Tag color={ORDER_STATUS_COLOR[v] ?? 'default'}>{v}</Tag>,
-                  },
+                  { title: '备注', dataIndex: 'remark', render: (v) => v ?? '—' },
                 ]}
               />
             ),
-          },
-          // ---------------------------------------------------------------- ③ 验收不合格（采购协商）
+          }}
+          columns={[
+            {
+              title: '物料',
+              key: 'item',
+              width: 260,
+              fixed: 'left',
+              render: (_: unknown, g) => (
+                <>
+                  <div>
+                    <Code to={`/items/${g.item_no}`}>{g.item_no}</Code> <b>{g.display_name}</b>
+                  </div>
+                  {g.spec_text ? <div style={{ fontSize: 12, color: T.textSecondary }}>{g.spec_text}</div> : null}
+                </>
+              ),
+            },
+            {
+              title: '需求',
+              key: 'demand',
+              width: 140,
+              render: (_: unknown, g) => (
+                <Space size={4}>
+                  <span>{g.request_count} 条</span>
+                  {g.mergeable && <Tag color="gold">★可合并</Tag>}
+                </Space>
+              ),
+            },
+            {
+              title: '合计数量',
+              dataIndex: 'total_qty',
+              width: 110,
+              align: 'right',
+              render: (v: number, g) => (
+                <b>
+                  {v} {g.unit ?? ''}
+                </b>
+              ),
+            },
+            {
+              title: '最紧要货',
+              dataIndex: 'earliest_need',
+              width: 150,
+              render: (v: string | null) => (
+                <Space size={4}>
+                  <span>{v ?? '—'}</span>
+                  {v && v < today() && <Tag color="red">已过期</Tag>}
+                </Space>
+              ),
+            },
+            {
+              title: '涉及项目',
+              key: 'projects',
+              width: 170,
+              render: (_: unknown, g) => {
+                const projs = [...new Set(g.requests.map((r) => r.project_no))]
+                return (
+                  <span title={projs.join('、')}>
+                    {projs.length > 2 ? `${projs.length} 个项目` : projs.join('、')}
+                  </span>
+                )
+              },
+            },
+            {
+              title: '操作',
+              key: 'action',
+              width: 130,
+              fixed: 'right',
+              render: (_: unknown, g) => (
+                <Button
+                  size="small"
+                  type={g.mergeable ? 'default' : 'primary'}
+                  disabled={!canBuy}
+                  onClick={() => openMerge([g])}
+                >
+                  {g.mergeable ? '合并下单' : '去下单'}
+                </Button>
+              ),
+            },
+          ]}
+        />
+      </>
+
+    ),
+    orders: (
+      <>
+        <Typography.Paragraph type="secondary" style={{ fontSize: 12 }}>
+          一张单 = 一个采购单号，下面挂着各项目/设备的需求（合并下单的「归属」都在详情里）。
+          采购只做三件事：<b>下单 · 取消 · 更改供应商</b>；到货、验收、入库由仓库做。
+        </Typography.Paragraph>
+        <Table<PurchaseOrderSummary>
+          rowKey="key"
+          size="middle"
+          loading={loading}
+          dataSource={orders}
+          pagination={{ pageSize: 20, showSizeChanger: false }}
+          scroll={{ x: 1180 }}
+          locale={{ emptyText: <DsEmpty text="还没有下过采购单" /> }}
+          columns={[
+            {
+              title: '采购单号',
+              dataIndex: 'po_no',
+              width: 150,
+              fixed: 'left',
+              render: (v: string | null, o) => (
+                <>
+                  <b>{v ?? '未编号'}</b>
+                  <div style={{ fontSize: 12, color: T.textSecondary }}>
+                    {o.line_count} 条 · {o.item_kinds} 种物料
+                  </div>
+                </>
+              ),
+            },
+            {
+              title: '供应商',
+              dataIndex: 'supplier_name',
+              width: 150,
+              render: (v: string | null) => v ?? '—',
+            },
+            {
+              title: '需求归属（项目 / 设备）',
+              key: 'belong',
+              width: 260,
+              render: (_: unknown, o) => (
+                <>
+                  {o.projects.map((p) => (
+                    <Tag key={p.project_no}>{p.project_no}</Tag>
+                  ))}
+                  {o.equipments.map((e) => (
+                    <Tag key={`${e.project_no}-${e.equip_no}`} color="blue">
+                      {e.equip_no} {e.equip_name ?? ''}
+                    </Tag>
+                  ))}
+                  {o.equipments.length === 0 && (
+                    <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                      没挂具体设备
+                    </Typography.Text>
+                  )}
+                </>
+              ),
+            },
+            {
+              // 主=下单日期，副=预计到货（超期照旧标橙）
+              title: '日期（下单 → 预计到货）',
+              key: 'dates',
+              width: 165,
+              render: (_: unknown, o) => (
+                <>
+                  <div>{o.ordered_at ?? '—'}</div>
+                  <Space size={4}>
+                    <Muted>{o.expected_date ?? '—'}</Muted>
+                    {o.expected_date && o.expected_date < today() && ['在途', '部分到货'].includes(o.status) && (
+                      <Tag color="orange">已超期</Tag>
+                    )}
+                  </Space>
+                </>
+              ),
+            },
+            {
+              title: '金额',
+              dataIndex: 'total_amount',
+              width: 120,
+              align: 'right',
+              render: (v: number) => (v > 0 ? `¥${v.toLocaleString()}` : '—'),
+            },
+            {
+              title: '状态',
+              dataIndex: 'status',
+              width: 95,
+              render: (v: string, o) => (
+                <>
+                  <Tag color={ORDER_STATUS_COLOR[v]}>{v}</Tag>
+                  {o.exchanged_qty > 0 && (
+                    <div>
+                      <Tag color="orange">换 {o.exchanged_qty}</Tag>
+                    </div>
+                  )}
+                  {o.returned_qty > 0 && (
+                    <div>
+                      <Tag>退 {o.returned_qty}</Tag>
+                    </div>
+                  )}
+                </>
+              ),
+            },
+            {
+              title: '操作',
+              key: 'action',
+              width: 90,
+              fixed: 'right',
+              render: (_: unknown, o) => (
+                <Button size="small" onClick={() => openOrder(o.key)}>
+                  详情
+                </Button>
+              ),
+            },
+          ]}
+        />
+      </>
+
+    ),
+    arrivals: (
+      <Table<PurchaseOrderSummary>
+        rowKey="key"
+        dataSource={arrivals}
+        pagination={{ pageSize: 20, showSizeChanger: false }}
+        locale={{
+          emptyText: <DsEmpty text="当前没有在途采购单 —— 下单后到「采购单」页签盯发货，验收后自动流转" />,
+        }}
+        columns={[
           {
-            key: 'failed',
-            label: `验收不合格 (${failedReceipts.length})`,
-            children: (
-              <>
-                <Typography.Paragraph type="secondary" style={{ fontSize: 12 }}>
-                  仓库验收不合格的货退到这里。<b>采购跟供应商协商</b>后处理：
-                  <Tag color="orange">换货</Tag>＝原供应商补发，留在原单等货；
-                  <Tag>退货</Tag>＝这家的货不要了，<b>需求回到采购池重新买</b>（可换供应商、可再合并）。
-                </Typography.Paragraph>
-                <Table<GoodsReceiptRow>
-                  rowKey="id"
-                  size="middle"
-                  loading={loading}
-                  dataSource={failedReceipts}
-                  pagination={false}
-                  scroll={{ x: 1230 }}
-                  locale={{ emptyText: <Empty description="没有验收不合格的货" /> }}
-                  columns={[
-                    {
-                      // ★ 列治理（docs/12 §2-A）：到货单为主、采购单号为副，一列顶原来两列
-                      title: '到货单 / 采购单',
-                      dataIndex: 'receipt_no',
-                      width: 140,
-                      fixed: 'left',
-                      render: (v: string, r: GoodsReceiptRow) => (
-                        <>
-                          <Typography.Text strong>{v}</Typography.Text>
-                          <div style={{ fontSize: 12 }}>
-                            {r.po_no ? <a onClick={() => openOrder(r.po_no as string)}>{r.po_no}</a> : <Muted>未编号</Muted>}
-                          </div>
-                        </>
-                      ),
-                    },
-                    {
-                      title: '物料',
-                      key: 'item',
-                      width: 220,
-                      render: (_: unknown, r) => (
-                        <>
-                          <b>{r.display_name}</b>
-                          <div style={{ fontSize: 12, color: T.textSecondary }}>{r.item_no}</div>
-                        </>
-                      ),
-                    },
-                    {
-                      title: '数量',
-                      dataIndex: 'qty',
-                      width: 85,
-                      render: (v: number | null, r) => (v ? `${v} ${r.unit ?? ''}` : '—'),
-                    },
-                    {
-                      title: '项目 / 设备',
-                      key: 'belong',
-                      width: 180,
-                      render: (_: unknown, r) => (
-                        <>
-                          <div>{r.project_no}</div>
-                          <div style={{ fontSize: 12, color: T.textSecondary }}>
-                            {r.equip_no ? `${r.equip_no} ${r.equip_name ?? ''}` : (r.project_name ?? '')}
-                          </div>
-                        </>
-                      ),
-                    },
-                    {
-                      title: '不合格原因',
-                      dataIndex: 'inspect_note',
-                      width: 170,
-                      render: (v: string | null) => v ?? '—',
-                    },
-                    {
-                      title: '验收',
-                      key: 'inspect',
-                      width: 150,
-                      render: (_: unknown, r) => (
-                        <>
-                          <div>{r.inspected_by ?? '—'}</div>
-                          <div style={{ fontSize: 12, color: T.textSecondary }}>
-                            {r.inspected_at ? dayjs(r.inspected_at ?? '').format('MM-DD HH:mm') : ''}
-                          </div>
-                        </>
-                      ),
-                    },
-                    {
-                      title: '操作',
-                      key: 'action',
-                      width: 100,
-                      fixed: 'right',
-                      render: (_: unknown, r) => (
-                        <Button
-                          danger
-                          size="small"
-                          onClick={() =>
-                            setNegotiate({
-                              open: true,
-                              orderKey: r.po_no ?? null,
-                              requestIds: r.request_id ? [r.request_id] : [],
-                              itemLabel: r.display_name ?? '',
-                              leadDays: r.lead_days ?? null,
-                            })
-                          }
-                        >
-                          处理
-                        </Button>
-                      ),
-                    },
-                  ]}
-                />
-              </>
-            ),
+            title: '采购单',
+            dataIndex: 'po_no',
+            width: 110,
+            render: (v: string | null, r) => (v ? <a onClick={() => openOrder(r.key)}>{v}</a> : '—'),
           },
-          // ---------------------------------------------------------------- ④ 退换记录
+          { title: '物料 / 行数', width: 120, render: (_v, r) => `${r.item_kinds} 种 · ${r.line_count} 行` },
+          { title: '归属项目', render: (_v, r) => r.projects.map((x) => x.project_no).join(' / ') || '辅料 / 其他' },
           {
-            key: 'resolve',
-            label: `退换记录 (${resolveReceipts.length})`,
-            children: (
-              <>
-                <Typography.Paragraph type="secondary" style={{ fontSize: 12 }}>
-                  验收不合格后采购跟供应商协商的结果都留在这里：
-                  <Tag color="orange">换货</Tag>＝原供应商补发；<Tag>退货</Tag>＝需求已回采购池重采（看「后续」列）。
-                  每条都带着仓库验收的不合格原因、采购的协商备注，以及验收人和处理人。
-                </Typography.Paragraph>
-                <Table<GoodsReceiptRow>
-                  rowKey="id"
-                  size="middle"
-                  loading={loading}
-                  dataSource={resolveReceipts}
-                  pagination={{ pageSize: 20, showSizeChanger: false }}
-                  scroll={{ x: 1640 }}
-                  locale={{ emptyText: <Empty description="还没有换货 / 退货记录" /> }}
-                  columns={[
-                    {
-                      // ★ 列治理（docs/12 §2-A）：到货单为主、采购单号为副，一列顶原来两列
-                      title: '到货单 / 采购单',
-                      dataIndex: 'receipt_no',
-                      width: 140,
-                      fixed: 'left',
-                      render: (v: string, r: GoodsReceiptRow) => (
-                        <>
-                          <Typography.Text strong>{v}</Typography.Text>
-                          <div style={{ fontSize: 12 }}>
-                            {r.po_no ? <a onClick={() => openOrder(r.po_no as string)}>{r.po_no}</a> : <Muted>未编号</Muted>}
-                          </div>
-                        </>
-                      ),
-                    },
-                    {
-                      title: '物料',
-                      key: 'item',
-                      width: 220,
-                      render: (_: unknown, r) => (
-                        <>
-                          <b>{r.display_name}</b>
-                          <div style={{ fontSize: 12, color: T.textSecondary }}>{r.item_no}</div>
-                        </>
-                      ),
-                    },
-                    {
-                      title: '数量',
-                      dataIndex: 'qty',
-                      width: 85,
-                      render: (v: number | null, r) => (v ? `${v} ${r.unit ?? ''}` : '—'),
-                    },
-                    {
-                      title: '项目 / 设备',
-                      key: 'belong',
-                      width: 180,
-                      render: (_: unknown, r) => (
-                        <>
-                          <div>{r.project_no}</div>
-                          <div style={{ fontSize: 12, color: T.textSecondary }}>
-                            {r.equip_no ? `${r.equip_no} ${r.equip_name ?? ''}` : (r.project_name ?? '')}
-                          </div>
-                        </>
-                      ),
-                    },
-                    {
-                      // 主=仓库给的原因，副=采购的协商备注（原来两列并一列，读起来还是"问题→怎么谈"）
-                      title: '问题与协商',
-                      key: 'notes',
-                      width: 240,
-                      render: (_: unknown, r) => (
-                        <>
-                          <div>{r.inspect_note ?? '—'}</div>
-                          <Muted>协商：{r.resolve_note ?? '（无）'}</Muted>
-                        </>
-                      ),
-                    },
-                    {
-                      title: '处理与后续',
-                      key: 'retry',
-                      width: 190,
-                      render: (_: unknown, r) => {
-                        // 主行=采购怎么处理的（换货/退货），副行=后续去向（重采单号 / 回池）
-                        const tag =
-                          r.status === '已换货' ? <Tag color="orange">换货</Tag> : <Tag>退货</Tag>
-                        const rs = r.retries ?? []
-                        const next =
-                          r.status === '已换货' ? (
-                            <Muted>留在原单等补发</Muted>
-                          ) : rs.length === 0 ? (
-                            <Muted>—</Muted>
-                          ) : (
-                            <span>
-                              {rs.map((x) =>
-                          x.po_no ? (
-                            <Tag
-                              key={x.id}
-                              color="blue"
-                              style={{ cursor: 'pointer' }}
-                              onClick={() => openOrder(x.po_no as string)}
-                            >
-                              重采 {x.po_no}
-                            </Tag>
-                          ) : (
-                              <Tag key={x.id} color="gold">
-                                回采购池 #{x.id}（{x.status}）
-                              </Tag>
-                            ),
-                          )
-                            }
-                          </span>
-                        )
-                        return (
-                          <>
-                            <div>{tag}</div>
-                            <div style={{ fontSize: 12 }}>{next}</div>
-                          </>
-                        )
-                      },
-                    },
-                    {
-                      // 验收与处理两笔经办合成一列（上=谁验的，下=谁处理的）
-                      title: '经办（验收 / 处理）',
-                      key: 'who',
-                      width: 150,
-                      render: (_: unknown, r) => (
-                        <>
-                          <div>
-                            {r.inspected_by ?? '—'}
-                            <Muted> {r.inspected_at ? dayjs(r.inspected_at ?? '').format('MM-DD HH:mm') : ''}</Muted>
-                          </div>
-                          <div>
-                            {r.resolved_by ?? '—'}
-                            <Muted> {r.resolved_at ? dayjs(r.resolved_at ?? '').format('MM-DD HH:mm') : ''}</Muted>
-                          </div>
-                        </>
-                      ),
-                    },
-                  ]}
-                />
-              </>
-            ),
+            title: '收货地',
+            dataIndex: 'deliver_to',
+            width: 140,
+            render: (v: string | null) =>
+              v ? <Tag color={v.includes('直发') ? 'purple' : 'blue'}>{v}</Tag> : '—',
           },
-          // ---------------------------------------------------------------- ⑤ 入库记录
           {
-            key: 'storage',
-            label: `入库记录 (${doneReceipts.length})`,
-            children: (
-              <>
-                <Typography.Paragraph type="secondary" style={{ fontSize: 12 }}>
-                  <Tag color="processing">待入库</Tag>＝仓库验收合格、还没入库；
-                  <Tag color="success">已入库</Tag>＝已进公司仓库（记了库位）；
-                  <Tag color="purple">现场已验收</Tag>＝直发客户现场，不进公司库存。分批送的货分批入库。
-                </Typography.Paragraph>
-                <Table<GoodsReceiptRow>
-                  rowKey="id"
-                  size="middle"
-                  loading={loading}
-                  dataSource={doneReceipts}
-                  pagination={{ pageSize: 20, showSizeChanger: false }}
-                  scroll={{ x: 1230 }}
-                  locale={{ emptyText: <Empty description="还没有到货记录" /> }}
-                  columns={[
-                    {
-                      // ★ 列治理（docs/12 §2-A）：到货单为主、采购单号为副，一列顶原来两列
-                      title: '到货单 / 采购单',
-                      dataIndex: 'receipt_no',
-                      width: 140,
-                      fixed: 'left',
-                      render: (v: string, r: GoodsReceiptRow) => (
-                        <>
-                          <Typography.Text strong>{v}</Typography.Text>
-                          <div style={{ fontSize: 12 }}>
-                            {r.po_no ? <a onClick={() => openOrder(r.po_no as string)}>{r.po_no}</a> : <Muted>未编号</Muted>}
-                          </div>
-                        </>
-                      ),
-                    },
-                    {
-                      title: '物料',
-                      key: 'item',
-                      width: 220,
-                      render: (_: unknown, r) => (
-                        <>
-                          <b>{r.display_name}</b>
-                          <div style={{ fontSize: 12, color: T.textSecondary }}>{r.item_no}</div>
-                        </>
-                      ),
-                    },
-                    {
-                      title: '数量',
-                      dataIndex: 'qty',
-                      width: 85,
-                      render: (v: number | null, r) => (v ? `${v} ${r.unit ?? ''}` : '—'),
-                    },
-                    {
-                      title: '项目 / 设备',
-                      key: 'belong',
-                      width: 180,
-                      render: (_: unknown, r) => (
-                        <>
-                          <div>{r.project_no}</div>
-                          <div style={{ fontSize: 12, color: T.textSecondary }}>
-                            {r.equip_no ? `${r.equip_no} ${r.equip_name ?? ''}` : (r.project_name ?? '')}
-                          </div>
-                        </>
-                      ),
-                    },
-                    {
-                      // 主=到货日期，副=入库时间
-                      title: '时间（到货 → 入库）',
-                      key: 'times',
-                      width: 140,
-                      render: (_: unknown, r) => (
-                        <>
-                          <div>{r.receipt_date ?? '—'}</div>
-                          <Muted>{r.stored_at ? dayjs(r.stored_at ?? '').format('MM-DD HH:mm') : '未入库'}</Muted>
-                        </>
-                      ),
-                    },
-                    {
-                      title: '状态',
-                      dataIndex: 'status',
-                      width: 100,
-                      render: (v: string) => <Tag color={RECEIPT_STATUS_COLOR[v]}>{v}</Tag>,
-                    },
-                    {
-                      title: '库位',
-                      dataIndex: 'location',
-                      width: 140,
-                      render: (v: string | null) => v ?? '—',
-                    },
-                  ]}
-                />
-              </>
-            ),
+            title: '预计到货',
+            dataIndex: 'expected_date',
+            width: 150,
+            defaultSortOrder: 'ascend',
+            sorter: (a, b) =>
+              String(a.expected_date ?? '9999-99-99').localeCompare(String(b.expected_date ?? '9999-99-99')),
+            render: (v: string | null) => {
+              if (!v) return <Typography.Text type="secondary">未约期</Typography.Text>
+              const d = dayjs(v)
+              if (d.isBefore(dayjs(), 'day')) return <span><Tag color="error">超期</Tag>{v}</span>
+              if (d.diff(dayjs(), 'day') <= 3) return <span><Tag color="warning">临期</Tag>{v}</span>
+              return v
+            },
           },
-          ...(hasPerm('purchase:price')
-            ? [
-                {
-                  key: 'reference',
-                  label: '价格参考',
-                  children: <PriceReferencePanel />,
-                },
-              ]
-            : []),
-          // A1：供应商入采购台（v2 拍板①）——可见性随台（采购角色可见）
           {
-            key: 'suppliers',
-            label: '供应商',
-            children: <SuppliersPage />,
+            title: '供应商 / 联系',
+            render: (_v, r) => {
+              const sup = r.supplier_id != null ? supMap[r.supplier_id] : undefined
+              return (
+                <>
+                  {r.supplier_name ?? '—'}
+                  {sup && (sup.contact_name || sup.phone) && (
+                    <Typography.Text type="secondary" style={{ fontSize: 12, display: 'block' }}>
+                      {[sup.contact_name, sup.phone].filter(Boolean).join(' · ')}
+                    </Typography.Text>
+                  )}
+                </>
+              )
+            },
           },
-        ].filter((x) => visKeys.includes(x.key))}
+          {
+            title: '状态',
+            dataIndex: 'status',
+            width: 100,
+            render: (v: string) => <Tag color={ORDER_STATUS_COLOR[v] ?? 'default'}>{v}</Tag>,
+          },
+        ]}
       />
+
+    ),
+    failed: (
+      <QueueBoard
+        search={
+          <Muted>
+            仓库验收不合格的货退到这里。<b>采购跟供应商协商</b>：换货＝原供应商补发（留在原单等货）；退货＝这家的货不要了，<b>需求回采购池重新买</b>。
+          </Muted>
+        }
+        emptyText="没有验收不合格的货。"
+        items={failedReceipts.map((r) => ({
+          key: r.id,
+          lead: <Code>{r.receipt_no}</Code>,
+          title: r.display_name ?? '—',
+          meta: `${r.qty ?? '—'} ${r.unit ?? ''} · ${r.project_no ?? ''} ${r.equip_no ?? ''} · 不合格原因：${r.inspect_note ?? '未填'}`,
+          cells: [
+            { text: r.inspected_at ? dayjs(r.inspected_at).format('MM-DD HH:mm') : '—', title: `验收人 ${r.inspected_by ?? '—'}` },
+          ],
+          action: (
+            <Button
+              danger
+              size="small"
+              onClick={() =>
+                setNegotiate({
+                  open: true,
+                  orderKey: r.po_no ?? null,
+                  requestIds: r.request_id ? [r.request_id] : [],
+                  itemLabel: r.display_name ?? '',
+                  leadDays: r.lead_days ?? null,
+                })
+              }
+            >
+              处理
+            </Button>
+          ),
+        }))}
+      />
+    ),
+    resolve: (
+      <>
+        <Typography.Paragraph type="secondary" style={{ fontSize: 12 }}>
+          验收不合格后采购跟供应商协商的结果都留在这里：
+          <Tag color="orange">换货</Tag>＝原供应商补发；<Tag>退货</Tag>＝需求已回采购池重采（看「后续」列）。
+          每条都带着仓库验收的不合格原因、采购的协商备注，以及验收人和处理人。
+        </Typography.Paragraph>
+        <Table<GoodsReceiptRow>
+          rowKey="id"
+          size="middle"
+          loading={loading}
+          dataSource={resolveReceipts}
+          pagination={{ pageSize: 20, showSizeChanger: false }}
+          scroll={{ x: 1640 }}
+          locale={{ emptyText: <DsEmpty text="还没有换货 / 退货记录" /> }}
+          columns={[
+            {
+              // ★ 列治理（docs/12 §2-A）：到货单为主、采购单号为副，一列顶原来两列
+              title: '到货单 / 采购单',
+              dataIndex: 'receipt_no',
+              width: 140,
+              fixed: 'left',
+              render: (v: string, r: GoodsReceiptRow) => (
+                <>
+                  <Typography.Text strong>{v}</Typography.Text>
+                  <div style={{ fontSize: 12 }}>
+                    {r.po_no ? <a onClick={() => openOrder(r.po_no as string)}>{r.po_no}</a> : <Muted>未编号</Muted>}
+                  </div>
+                </>
+              ),
+            },
+            {
+              title: '物料',
+              key: 'item',
+              width: 220,
+              render: (_: unknown, r) => (
+                <>
+                  <b>{r.display_name}</b>
+                  <div style={{ fontSize: 12, color: T.textSecondary }}>{r.item_no}</div>
+                </>
+              ),
+            },
+            {
+              title: '数量',
+              dataIndex: 'qty',
+              width: 85,
+              render: (v: number | null, r) => (v ? `${v} ${r.unit ?? ''}` : '—'),
+            },
+            {
+              title: '项目 / 设备',
+              key: 'belong',
+              width: 180,
+              render: (_: unknown, r) => (
+                <>
+                  <div>{r.project_no}</div>
+                  <div style={{ fontSize: 12, color: T.textSecondary }}>
+                    {r.equip_no ? `${r.equip_no} ${r.equip_name ?? ''}` : (r.project_name ?? '')}
+                  </div>
+                </>
+              ),
+            },
+            {
+              // 主=仓库给的原因，副=采购的协商备注（原来两列并一列，读起来还是"问题→怎么谈"）
+              title: '问题与协商',
+              key: 'notes',
+              width: 240,
+              render: (_: unknown, r) => (
+                <>
+                  <div>{r.inspect_note ?? '—'}</div>
+                  <Muted>协商：{r.resolve_note ?? '（无）'}</Muted>
+                </>
+              ),
+            },
+            {
+              title: '处理与后续',
+              key: 'retry',
+              width: 190,
+              render: (_: unknown, r) => {
+                // 主行=采购怎么处理的（换货/退货），副行=后续去向（重采单号 / 回池）
+                const tag =
+                  r.status === '已换货' ? <Tag color="orange">换货</Tag> : <Tag>退货</Tag>
+                const rs = r.retries ?? []
+                const next =
+                  r.status === '已换货' ? (
+                    <Muted>留在原单等补发</Muted>
+                  ) : rs.length === 0 ? (
+                    <Muted>—</Muted>
+                  ) : (
+                    <span>
+                      {rs.map((x) =>
+                  x.po_no ? (
+                    <Tag
+                      key={x.id}
+                      color="blue"
+                      style={{ cursor: 'pointer' }}
+                      onClick={() => openOrder(x.po_no as string)}
+                    >
+                      重采 {x.po_no}
+                    </Tag>
+                  ) : (
+                      <Tag key={x.id} color="gold">
+                        回采购池 #{x.id}（{x.status}）
+                      </Tag>
+                    ),
+                  )
+                    }
+                  </span>
+                )
+                return (
+                  <>
+                    <div>{tag}</div>
+                    <div style={{ fontSize: 12 }}>{next}</div>
+                  </>
+                )
+              },
+            },
+            {
+              // 验收与处理两笔经办合成一列（上=谁验的，下=谁处理的）
+              title: '经办（验收 / 处理）',
+              key: 'who',
+              width: 150,
+              render: (_: unknown, r) => (
+                <>
+                  <div>
+                    {r.inspected_by ?? '—'}
+                    <Muted> {r.inspected_at ? dayjs(r.inspected_at ?? '').format('MM-DD HH:mm') : ''}</Muted>
+                  </div>
+                  <div>
+                    {r.resolved_by ?? '—'}
+                    <Muted> {r.resolved_at ? dayjs(r.resolved_at ?? '').format('MM-DD HH:mm') : ''}</Muted>
+                  </div>
+                </>
+              ),
+            },
+          ]}
+        />
+      </>
+
+    ),
+    storage: (
+      <>
+        <Typography.Paragraph type="secondary" style={{ fontSize: 12 }}>
+          <Tag color="processing">待入库</Tag>＝仓库验收合格、还没入库；
+          <Tag color="success">已入库</Tag>＝已进公司仓库（记了库位）；
+          <Tag color="purple">现场已验收</Tag>＝直发客户现场，不进公司库存。分批送的货分批入库。
+        </Typography.Paragraph>
+        <Table<GoodsReceiptRow>
+          rowKey="id"
+          size="middle"
+          loading={loading}
+          dataSource={doneReceipts}
+          pagination={{ pageSize: 20, showSizeChanger: false }}
+          scroll={{ x: 1230 }}
+          locale={{ emptyText: <DsEmpty text="还没有到货记录" /> }}
+          columns={[
+            {
+              // ★ 列治理（docs/12 §2-A）：到货单为主、采购单号为副，一列顶原来两列
+              title: '到货单 / 采购单',
+              dataIndex: 'receipt_no',
+              width: 140,
+              fixed: 'left',
+              render: (v: string, r: GoodsReceiptRow) => (
+                <>
+                  <Typography.Text strong>{v}</Typography.Text>
+                  <div style={{ fontSize: 12 }}>
+                    {r.po_no ? <a onClick={() => openOrder(r.po_no as string)}>{r.po_no}</a> : <Muted>未编号</Muted>}
+                  </div>
+                </>
+              ),
+            },
+            {
+              title: '物料',
+              key: 'item',
+              width: 220,
+              render: (_: unknown, r) => (
+                <>
+                  <b>{r.display_name}</b>
+                  <div style={{ fontSize: 12, color: T.textSecondary }}>{r.item_no}</div>
+                </>
+              ),
+            },
+            {
+              title: '数量',
+              dataIndex: 'qty',
+              width: 85,
+              render: (v: number | null, r) => (v ? `${v} ${r.unit ?? ''}` : '—'),
+            },
+            {
+              title: '项目 / 设备',
+              key: 'belong',
+              width: 180,
+              render: (_: unknown, r) => (
+                <>
+                  <div>{r.project_no}</div>
+                  <div style={{ fontSize: 12, color: T.textSecondary }}>
+                    {r.equip_no ? `${r.equip_no} ${r.equip_name ?? ''}` : (r.project_name ?? '')}
+                  </div>
+                </>
+              ),
+            },
+            {
+              // 主=到货日期，副=入库时间
+              title: '时间（到货 → 入库）',
+              key: 'times',
+              width: 140,
+              render: (_: unknown, r) => (
+                <>
+                  <div>{r.receipt_date ?? '—'}</div>
+                  <Muted>{r.stored_at ? dayjs(r.stored_at ?? '').format('MM-DD HH:mm') : '未入库'}</Muted>
+                </>
+              ),
+            },
+            {
+              title: '状态',
+              dataIndex: 'status',
+              width: 100,
+              render: (v: string) => <Tag color={RECEIPT_STATUS_COLOR[v]}>{v}</Tag>,
+            },
+            {
+              title: '库位',
+              dataIndex: 'location',
+              width: 140,
+              render: (v: string | null) => v ?? '—',
+            },
+          ]}
+        />
+      </>
+
+    ),
+    reference: (
+<PriceReferencePanel />
+    ),
+    suppliers: (
+<SuppliersPage />
+    ),
+  }
+
+  return (
+    <>
+      {/* ★ docs/15 台骨架四件套：台头 → 结论条 → 流程条（注册表驱动）→ 体 */}
+      <WorkbenchPage
+        board={PURCHASE_BOARD}
+        sub={`待办 ${openTotal} 项 · 待审批 ${toApprove.length} · 待叫车 ${toVehicle.length} · 采购池 ${poolRequests} 条需求 · 在途单 ${openOrders.length}`}
+        help="采购的活分五类：待我审批 / 待叫车 / 采购池 / 在途与到货 / 主数据。上面的数字可点，点了就切到对应队列。"
+        actions={
+          <>
+            {overdueCount > 0 && <Chip tone="err">{overdueCount} 单到货已超期</Chip>}
+            <Button size="small" onClick={() => void load()}>
+              刷新
+            </Button>
+          </>
+        }
+        counts={{
+          approve: toApprove.length,
+          vehicle: toVehicle.length,
+          pool: poolRequests,
+          orders: openOrders.length,
+          arrivals: arrivals.length,
+          failed: failedReceipts.length,
+        }}
+        metrics={[
+          { key: 'approve', label: '待我审批', value: toApprove.length, unit: '单', tone: toApprove.length ? 'warn' : undefined, dimZero: true, to: '?tab=approve' },
+          { key: 'vehicle', label: '待叫车', value: toVehicle.length, unit: '单', tone: toVehicle.length ? 'warn' : undefined, dimZero: true, to: '?tab=vehicle' },
+          { key: 'pool', label: '采购池', value: poolRequests, unit: '条需求', dimZero: true, to: '?tab=pool' },
+          { key: 'orders', label: '在途单', value: openOrders.length, unit: '单', dimZero: true, to: '?tab=orders' },
+          { key: 'overdue', label: '到货已超期', value: overdueCount, unit: '单', tone: overdueCount ? 'err' : undefined, dimZero: true, to: '?tab=arrivals' },
+        ]}
+      >
+        {(t) => parts[t]}
+      </WorkbenchPage>
       <PoApproveModal
         open={approveKey !== null}
         orderKey={approveKey}
@@ -1077,6 +942,6 @@ export default function PurchaseWorkbench() {
         onCancel={() => setNegotiate((n) => ({ ...n, open: false }))}
         onDone={handleNegotiated}
       />
-    </Card>
+    </>
   )
 }

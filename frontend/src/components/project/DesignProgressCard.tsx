@@ -1,17 +1,8 @@
 // components/project/DesignProgressCard.tsx —— 由 ProjectDetailPage 拆出（重构 1.6b · 只拆不改）
-import {
-  Button,
-  Card,
-  Empty,
-  Space,
-  Table,
-  Tag,
-  Typography,
-} from 'antd'
+import { Button, Card, Empty, Space, Table, Typography } from 'antd'
+import { Chip } from '../../components/ds'
 
-import {
-  type DesignOverviewRow,
-} from '../../api/client'
+import { type DesignOverviewRow } from '../../api/client'
 import { useGoFrom } from '../../hooks/useFrom'
 
 export default function DesignProgressCard({
@@ -42,9 +33,21 @@ export default function DesignProgressCard({
                       key: 'eq',
                       width: 180,
                       render: (_: unknown, r: DesignOverviewRow) => (
-                        <Space size={6}>
-                          <Typography.Text strong>{r.equip_no}</Typography.Text>
-                          <span>{r.equip_name}</span>
+                        <Space size="middle">
+                          <Button
+                            type="primary"
+                            size="small"
+                            onClick={() => go(`/projects/${projectNo}/design/${r.equip_no}`)}
+                          >
+                            进入设计
+                          </Button>
+                          {/* ★ 入口（2026-10-05）：设备档案 —— 设计面之外，项目经理/售后也要看这台设备的一生 */}
+                          <Button size="small" onClick={() => go(`/equipment/${projectNo}/${r.equip_no}`)}>
+                            设备档案
+                          </Button>
+                          <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                            出图 / BOM
+                          </Typography.Text>
                         </Space>
                       ),
                     },
@@ -54,13 +57,13 @@ export default function DesignProgressCard({
                       width: 130,
                       render: (v: string) =>
                         v === 'BOM完整' ? (
-                          <Tag color="success">BOM完整</Tag>
+                          <Chip tone="ok">BOM完整</Chip>
                         ) : v === '设计BOM已提交' ? (
-                          <Tag color="gold">设计BOM已提交</Tag>
+                          <Chip tone="warn">设计BOM已提交</Chip>
                         ) : v === '设计中' ? (
-                          <Tag color="processing">设计中</Tag>
+                          <Chip tone="run">设计中</Chip>
                         ) : (
-                          <Tag>未开始</Tag>
+                          <Chip>未开始</Chip>
                         ),
                     },
                     {
@@ -70,9 +73,9 @@ export default function DesignProgressCard({
                         <Space size={12} style={{ fontSize: 12 }}>
                           <span>图 {r.drawings}</span>
                           <span>零件 {r.parts}</span>
-                          {r.unpublished > 0 && <Tag color="blue">{r.unpublished} 张待发布</Tag>}
+                          {r.unpublished > 0 && <Chip tone="run">{r.unpublished} 张待发布</Chip>}
                           {r.parts_without_material > 0 && (
-                            <Tag color="orange">{r.parts_without_material} 个缺材料</Tag>
+                            <Chip tone="warn">{r.parts_without_material} 个缺材料</Chip>
                           )}
                         </Space>
                       ),
@@ -80,9 +83,9 @@ export default function DesignProgressCard({
                     {
                       title: '操作',
                       key: 'a',
-                      width: 200,
+                      width: 210,
                       render: (_: unknown, r: DesignOverviewRow) => (
-                        <Space size="middle">
+                        <Space size={8}>
                           <Button
                             type="primary"
                             size="small"
@@ -90,9 +93,11 @@ export default function DesignProgressCard({
                           >
                             进入设计
                           </Button>
-                          <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-                            出图 / BOM
-                          </Typography.Text>
+                          {/* ★ 入口（2026-10-05 用户实测"找不到设备档案"）：设计面之外，
+                              项目经理 / 售后也要看这台设备的一生 */}
+                          <Button size="small" onClick={() => go(`/equipment/${projectNo}/${r.equip_no}`)}>
+                            设备档案
+                          </Button>
                         </Space>
                       ),
                     },

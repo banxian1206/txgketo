@@ -1,21 +1,6 @@
-import {
-  App,
-  Button,
-  Descriptions,
-  Drawer,
-  Empty,
-  Form,
-  Input,
-  InputNumber,
-  Modal,
-  Popconfirm,
-  Select,
-  Space,
-  Table,
-  Tag,
-  Typography,
-} from 'antd'
+import { App, Button, Descriptions, Drawer, Empty, Form, Input, InputNumber, Modal, Popconfirm, Select, Space, Table, Typography } from 'antd'
 import { useCallback, useEffect, useState } from 'react'
+import { Chip } from '../components/ds'
 
 import dayjs from 'dayjs'
 
@@ -23,21 +8,8 @@ import ReceiptNegotiateModal from './ReceiptNegotiateModal'
 import MarkPaidModal from './MarkPaidModal'
 import PoApproveModal from './PoApproveModal'
 import { REBUY_SOURCES } from '../configs/domain'
-import {
-  cancelPurchaseOrder,
-  changeOrderSupplier,
-  closeReturnPurchaseOrder,
-  errMsg,
-  listSuppliers,
-  purchaseOrderDetail,
-  submitPurchaseOrder,
-  voidPurchaseOrder,
-  withdrawPurchaseOrder,
-  type PurchaseOrderDetail,
-  type PurchaseOrderLine,
-  type SupplierRow,
-} from '../api/client'
-import { PURCHASE_LINE_STATUS as STATUS_COLOR } from '../theme/status'
+import { cancelPurchaseOrder, changeOrderSupplier, closeReturnPurchaseOrder, errMsg, listSuppliers, purchaseOrderDetail, submitPurchaseOrder, voidPurchaseOrder, withdrawPurchaseOrder, type PurchaseOrderDetail, type PurchaseOrderLine, type SupplierRow } from '../api/client'
+import { PURCHASE_LINE_STATUS as STATUS_COLOR, toneOf } from '../theme/status'
 import { RECEIPT_STATUS as RECEIPT_COLOR } from '../theme/status'
 import { ORDER_STATUS as ORDER_STATUS_COLOR } from '../theme/status'
 import { T } from '../theme/tokens'
@@ -248,7 +220,7 @@ export default function PurchaseOrderDrawer({
       title={
         <Space>
           <span>采购单 {o?.po_no ?? '（未编号）'}</span>
-          {o && <Tag color={ORDER_STATUS_COLOR[o.status]}>{o.status}</Tag>}
+          {o && <Chip tone={toneOf(ORDER_STATUS_COLOR[o.status])}>{o.status}</Chip>}
         </Space>
       }
       width={1100}
@@ -319,16 +291,16 @@ export default function PurchaseOrderDrawer({
             <Descriptions.Item label="预计到货">{o.expected_date ?? '—'}</Descriptions.Item>
             <Descriptions.Item label="收货地点">
               {o.deliver_to === '直发客户现场' ? (
-                <Tag color="purple">直发客户现场</Tag>
+                <Chip tone="run">直发客户现场</Chip>
               ) : (
-                <Tag>公司仓库</Tag>
+                <Chip>公司仓库</Chip>
               )}
             </Descriptions.Item>
             <Descriptions.Item label="送货地址">{o.deliver_address ?? '—'}</Descriptions.Item>
             {(o.exchanged_qty > 0 || o.returned_qty > 0) && (
               <Descriptions.Item label="退换货" span={2}>
-                {o.exchanged_qty > 0 && <Tag color="orange">换货 {o.exchanged_qty}</Tag>}
-                {o.returned_qty > 0 && <Tag>退货 {o.returned_qty}</Tag>}
+                {o.exchanged_qty > 0 && <Chip tone="warn">换货 {o.exchanged_qty}</Chip>}
+                {o.returned_qty > 0 && <Chip>退货 {o.returned_qty}</Chip>}
                 <Typography.Text type="secondary" style={{ fontSize: 12 }}>
                   　展开下面每行看原因和采购处理记录
                 </Typography.Text>
@@ -336,14 +308,14 @@ export default function PurchaseOrderDrawer({
             )}
             <Descriptions.Item label="需求归属" span={2}>
               {o.projects.map((p) => (
-                <Tag key={p.project_no}>
+                <Chip key={p.project_no}>
                   {p.project_no} {p.project_name ?? ''}
-                </Tag>
+                </Chip>
               ))}
               {o.equipments.map((e) => (
-                <Tag key={`${e.project_no}-${e.equip_no}`} color="blue">
+                <Chip key={`${e.project_no}-${e.equip_no}`} tone="run">
                   {e.equip_no} {e.equip_name ?? ''}
-                </Tag>
+                </Chip>
               ))}
               {o.equipments.length === 0 && (
                 <Typography.Text type="secondary" style={{ fontSize: 12 }}>
@@ -393,13 +365,13 @@ export default function PurchaseOrderDrawer({
                       render: (_: unknown, g) =>
                         g.status === '不合格' || g.status === '已换货' || g.status === '已退货' ? (
                           <>
-                            <Tag color="red">不合格</Tag>
+                            <Chip tone="err">不合格</Chip>
                             <div style={{ fontSize: 12, color: T.textSecondary }}>{g.inspect_note ?? '—'}</div>
                           </>
                         ) : (
-                          <Tag color="green">
+                          <Chip tone="ok">
                             {g.status === '现场已验收' ? '合格（现场）' : '合格'}
-                          </Tag>
+                          </Chip>
                         ),
                     },
                     {
@@ -410,7 +382,7 @@ export default function PurchaseOrderDrawer({
                         if (g.status === '已换货') {
                           return (
                             <>
-                              <Tag color="orange">换货</Tag>
+                              <Chip tone="warn">换货</Chip>
                               <span style={{ fontSize: 12, color: T.textSecondary }}>{g.resolve_note ?? '等供应商补发'}</span>
                             </>
                           )
@@ -418,7 +390,7 @@ export default function PurchaseOrderDrawer({
                         if (g.status === '已退货') {
                           return (
                             <>
-                              <Tag>退货</Tag>
+                              <Chip>退货</Chip>
                               <span style={{ fontSize: 12, color: T.textSecondary }}>{g.resolve_note ?? '—'}</span>
                               {(g.retries ?? []).length > 0 && (
                                 <div style={{ fontSize: 12, color: T.brand }}>
@@ -431,10 +403,10 @@ export default function PurchaseOrderDrawer({
                             </>
                           )
                         }
-                        if (g.status === '不合格') return <Tag color="error">等采购协商</Tag>
-                        if (g.status === '待入库') return <Tag color="processing">等入库</Tag>
-                        if (g.status === '已入库') return <Tag color="success">入库 {g.location ?? ''}</Tag>
-                        return <Tag color="purple">现场验收</Tag>
+                        if (g.status === '不合格') return <Chip tone="err">等采购协商</Chip>
+                        if (g.status === '待入库') return <Chip tone="run">等入库</Chip>
+                        if (g.status === '已入库') return <Chip tone="ok">入库 {g.location ?? ''}</Chip>
+                        return <Chip tone="run">现场验收</Chip>
                       },
                     },
                     {
@@ -481,9 +453,9 @@ export default function PurchaseOrderDrawer({
                   <>
                     <b>{l.item_name}</b>
                     {REBUY_SOURCES.includes(l.source) && (
-                      <Tag color="orange" style={{ marginLeft: 4 }}>
+                      <Chip tone="warn" style={{ marginLeft: 4 }}>
                         {l.source}
-                      </Tag>
+                      </Chip>
                     )}
                     <div style={{ fontSize: 12, color: T.textSecondary }}>
                       {l.item_no}
@@ -554,7 +526,7 @@ export default function PurchaseOrderDrawer({
                 title: '状态',
                 dataIndex: 'status',
                 width: 80,
-                render: (v: string) => <Tag color={STATUS_COLOR[v]}>{v}</Tag>,
+                render: (v: string) => <Chip tone={toneOf(STATUS_COLOR[v])}>{v}</Chip>,
               },
               {
                 title: '到货情况',
@@ -567,9 +539,9 @@ export default function PurchaseOrderDrawer({
                     </Typography.Text>
                   ) : (
                     l.receipts.map((g) => (
-                      <Tag
+                      <Chip
                         key={g.receipt_no}
-                        color={RECEIPT_COLOR[g.status]}
+                        tone={toneOf(RECEIPT_COLOR[g.status])}
                         title={
                           `${g.receipt_no} ${RECEIPT_LABEL[g.status] ?? g.status} ${g.qty ?? ''}${g.unit ?? ''}` +
                           (g.location ? ` · ${g.location}` : '') +
@@ -579,7 +551,7 @@ export default function PurchaseOrderDrawer({
                         style={{ marginBottom: 2 }}
                       >
                         {g.receipt_no} {RECEIPT_LABEL[g.status] ?? g.status} {g.qty ?? ''}
-                      </Tag>
+                      </Chip>
                     ))
                   ),
               },

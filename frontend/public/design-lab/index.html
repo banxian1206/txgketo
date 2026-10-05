@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>TXGK · UI 方案对比（A 纸面 / B 墨蓝 / C 密排 / D 移动）</title>
+<style>
+:root{
+  --bg:#f5f6f8; --surface:#fff; --line:#e6e8ec; --line2:#d7dbe1;
+  --ink:#14161a; --ink2:#575f6b; --ink3:#8a929e; --ink4:#b3bac4;
+  --acc:#1f5fd0; --accSoft:#eef4ff;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font:400 14px/1.6 -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;
+  background:var(--bg);color:var(--ink);-webkit-font-smoothing:antialiased;font-variant-numeric:tabular-nums}
+.mono{font-family:var(--mono)}
+.hero{background:linear-gradient(140deg,#0f2b52 0%,#12315a 55%,#1a3f74 100%);color:#fff;padding:38px 40px 34px;position:relative;overflow:hidden}
+.hero::before{content:"";position:absolute;inset:0;background-image:
+  repeating-linear-gradient(0deg,transparent 0 39px,rgba(255,255,255,.05) 39px 40px),
+  repeating-linear-gradient(90deg,transparent 0 39px,rgba(255,255,255,.05) 39px 40px);
+  -webkit-mask-image:radial-gradient(ellipse 70% 60% at 22% 40%,#000,transparent 100%);
+  mask-image:radial-gradient(ellipse 70% 60% at 22% 40%,#000,transparent 100%)}
+.hero .in{position:relative;max-width:1280px;margin:0 auto}
+.hero .k{font:500 11px/1 var(--mono);letter-spacing:2px;opacity:.6;margin-bottom:12px}
+.hero h1{font-size:26px;font-weight:600;letter-spacing:-.4px;margin-bottom:10px}
+.hero p{font-size:14px;opacity:.78;max-width:760px}
+.hero .rule{width:44px;height:3px;background:#e08000;margin:16px 0 14px}
+.wrap{max-width:1280px;margin:0 auto;padding:30px 40px 70px}
+h2.sec{font-size:16px;font-weight:600;margin:34px 0 6px;letter-spacing:-.2px}
+h2.sec:first-child{margin-top:0}
+p.sub{font-size:13px;color:var(--ink3);margin-bottom:16px}
+
+/* 方案卡 */
+.cards{display:grid;grid-template-columns:repeat(2,1fr);gap:18px}
+@media (max-width:1100px){.cards{grid-template-columns:1fr}}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:14px;overflow:hidden;
+  box-shadow:0 1px 2px rgba(16,24,40,.04);display:flex;flex-direction:column}
+.card .hd{display:flex;align-items:center;gap:10px;padding:13px 16px;border-bottom:1px solid var(--line)}
+.card .hd .tag{font:600 11px/20px var(--mono);letter-spacing:.5px;padding:0 8px;border-radius:5px;background:var(--ink);color:#fff}
+.card .hd b{font-size:15px;font-weight:600;letter-spacing:-.2px}
+.card .hd .go{margin-left:auto;font-size:12.5px;color:var(--acc);text-decoration:none;font-weight:500}
+.card .hd .go:hover{text-decoration:underline}
+.shot{position:relative;height:330px;background:#eef1f4;overflow:hidden;border-bottom:1px solid var(--line);cursor:pointer}
+.shot iframe{position:absolute;top:0;left:0;width:1440px;height:900px;border:0;transform:scale(.42);transform-origin:0 0;pointer-events:none}
+.shot.mob iframe{width:1300px;height:900px;transform:scale(.46)}
+.shot .hint{position:absolute;right:10px;bottom:10px;font-size:11.5px;background:rgba(20,22,26,.85);color:#fff;
+  padding:4px 9px;border-radius:6px;opacity:0;transition:opacity .15s}
+.shot:hover .hint{opacity:1}
+.card .bd{padding:13px 16px 16px;font-size:13px;color:var(--ink2)}
+.card .bd ul{list-style:none;margin-top:8px;display:grid;gap:5px}
+.card .bd li{display:grid;grid-template-columns:52px 1fr;gap:8px;font-size:12.5px}
+.card .bd li i{font-style:normal;font-size:11px;color:var(--ink4);letter-spacing:.4px;padding-top:1px}
+.sw{display:flex;gap:4px;margin-top:11px}
+.sw span{width:16px;height:16px;border-radius:4px;border:1px solid rgba(0,0,0,.08)}
+
+/* 规矩表 */
+table{width:100%;border-collapse:collapse;background:var(--surface);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+th{font-size:11.5px;font-weight:600;color:var(--ink3);text-align:left;padding:10px 14px;background:#fafbfc;border-bottom:1px solid var(--line);letter-spacing:.3px}
+td{padding:11px 14px;border-bottom:1px solid var(--line);font-size:13px;color:var(--ink2);vertical-align:top}
+tr:last-child td{border-bottom:0}
+td.k{color:var(--ink);font-weight:500;white-space:nowrap}
+td .mono{font-size:12px;color:var(--ink2)}
+.ok{color:#0b7a4c;font-weight:500} .no{color:#c02626;font-weight:500}
+
+/* 字号演示 */
+.demo{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:18px 20px;display:grid;
+  grid-template-columns:repeat(6,1fr);gap:14px;align-items:end}
+.demo div{text-align:center}
+.demo .n{font:500 11px/1 var(--mono);color:var(--ink4);margin-top:8px}
+.lead{font-size:14px;color:var(--ink2);background:var(--accSoft);border:1px solid #cfe0fa;border-radius:12px;padding:14px 16px;margin-bottom:22px}
+.lead b{color:var(--ink)}
+</style>
+</head>
+<body>
+<div class="hero"><div class="in">
+  <div class="k">TXGK · PROJECT MANAGEMENT SYSTEM · UI DIRECTION</div>
+  <h1>四个可选方向 —— 同一套真数据，三种页面观感</h1>
+  <div class="rule"></div>
+  <p>每套都能点进<b>收件箱 / 项目列表 / 项目详情</b>三个真实页面（底部黑色切换条）。
+     它们共用<b>同一套规矩</b>（字号刻度、8px 间距、圆角、色板、状态表达），差别只在<b>导航模型、密度、层级怎么拉开</b>。
+     选一套（或"A 的导航 + C 的密度"这种混搭都行），我按它落地到全站。</p>
+</div></div>
+
+<div class="wrap">
+  <div class="lead">先说结论：<b>三套都解决了"页面各自为政"</b> —— 因为它们的字号/间距/圆角/颜色全部来自同一张 token 表（见文末）。
+    真正的区别是：<b>A 最耐看、B 最有"系统感"、C 最高效</b>。移动端 D 与三套共用 token，只换壳。</div>
+
+  <h2 class="sec">五个方向（移动端主页可在页内一键切换 A/B/C）</h2>
+  <p class="sub">缩略图是实时页面（不是截图）。点卡片或右上"打开"进全尺寸，底部黑色条切换三个页面。</p>
+  <div class="cards">
+    <div class="card">
+      <div class="hd"><span class="tag">A</span><b>纸面 Paper</b><a class="go" href="./a-paper.html">打开 →</a></div>
+      <div class="shot" onclick="location.href='./a-paper.html'">
+        <iframe src="./a-paper.html" tabindex="-1"></iframe><span class="hint">点开全尺寸</span></div>
+      <div class="bd">浅色、无阴影堆叠，层级靠"描边 + 背景分层"。<b>最接近现代 SaaS 的克制审美</b>，长时间看不累。
+        <ul>
+          <li><i>导航</i>左侧栏 236px（浅色，分组标题）</li>
+          <li><i>密度</i>中 · 行高 44 · 字号 13 基准</li>
+          <li><i>状态</i>圆点 + 彩色文字（不用彩色药丸堆）</li>
+          <li><i>适合</i>办公室 8 小时重度使用：采购 / 设计 / PM</li>
+        </ul>
+        <div class="sw"><span style="background:#1f5fd0"></span><span style="background:#14161a"></span><span style="background:#0f9d63"></span><span style="background:#c4761a"></span><span style="background:#d23b3b"></span><span style="background:#f6f7f9"></span></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="hd"><span class="tag">B</span><b>墨蓝 Console</b><a class="go" href="./b-console.html">打开 →</a></div>
+      <div class="shot" onclick="location.href='./b-console.html'">
+        <iframe src="./b-console.html" tabindex="-1"></iframe><span class="hint">点开全尺寸</span></div>
+      <div class="bd">深色导航 + 冷灰底 + 描边面板；<b>沿用你现在的品牌深空蓝</b>，指标条底部带色标，队列行首 3px 色条。
+        <ul>
+          <li><i>导航</i>左侧栏 208px（深色，选中态左色条）</li>
+          <li><i>密度</i>中高 · 行高 40 · 字号 12.5 基准</li>
+          <li><i>状态</i>方块点 + 文字 + 行首色条（三处冗余表达，扫读最快）</li>
+          <li><i>适合</i>要"像个生产系统"、且保留现有品牌基因</li>
+        </ul>
+        <div class="sw"><span style="background:#0c1a2b"></span><span style="background:#2f6fed"></span><span style="background:#0d8a5f"></span><span style="background:#b96a10"></span><span style="background:#c92f2f"></span><span style="background:#eef1f5"></span></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="hd"><span class="tag">C</span><b>密排 Ledger</b><a class="go" href="./c-ledger.html">打开 →</a></div>
+      <div class="shot" onclick="location.href='./c-ledger.html'">
+        <iframe src="./c-ledger.html" tabindex="-1"></iframe><span class="hint">点开全尺寸</span></div>
+      <div class="bd">无侧栏、单张白纸 + 发丝分隔线，<b>等宽数字当主角</b>，左侧留一栏做分组标签。屏幕利用率最高。
+        <ul>
+          <li><i>导航</i>顶部一行（省掉 236px 侧栏 → 表格更宽）</li>
+          <li><i>密度</i>高 · 行高 34 · 字号 12.5 / 数字 11.5 等宽</li>
+          <li><i>状态</i>只保留圆点 + 灰字，颜色只给"异常"</li>
+          <li><i>适合</i>表格控、一天要过几百行的人（采购 / 仓库 / 财务）</li>
+        </ul>
+        <div class="sw"><span style="background:#101315"></span><span style="background:#0b62d6"></span><span style="background:#0a7f52"></span><span style="background:#a8620b"></span><span style="background:#c02626"></span><span style="background:#fbfbfa"></span></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="hd"><span class="tag">D</span><b>移动 · 作业卡</b><a class="go" href="./d-mobile.html">打开 →</a></div>
+      <div class="shot mob" onclick="location.href='./d-mobile.html'">
+        <iframe src="./d-mobile.html" tabindex="-1"></iframe><span class="hint">点开全尺寸</span></div>
+      <div class="bd">仓库 / 车间 / 现场的主终端。<b>今日任务流</b>（替代现在 14 个数字格）、<b>同一采购单折叠成一组</b>、
+        逐条勾选 + 拍照 + 吸底主按钮、<b>0 不占位</b>。三屏：今日 / 验收作业 / 设备档案。
+        <ul>
+          <li><i>触控</i>主按钮 48、列表行 ≥56、卡片左侧色条表状态</li>
+          <li><i>关键</i>照片直接上卡片（照片是本系统的主要凭证）</li>
+          <li><i>与 PC</i>共用同一套 token，只换壳，不换词</li>
+        </ul>
+      </div>
+    </div>
+    <div class="card">
+      <div class="hd"><span class="tag">E</span><b>移动端主页 · 三种风格切换</b><a class="go" href="./mobile-home.html">打开 →</a></div>
+      <div class="shot mob" onclick="location.href='./mobile-home.html'">
+        <iframe src="./mobile-home.html" tabindex="-1"></iframe><span class="hint">点开全尺寸（页内可切 A/B/C）</span></div>
+      <div class="bd">同一屏，A/B/C 三种风格<b>即时对比</b>：渐变概览卡（A）· 深色顶栏+指标色标（B）· 无卡片发丝列表+大号等宽数字（C）。
+        <ul>
+          <li><i>内容</i>今日任务流 3 条 + 折叠说明 + 吸底主按钮</li>
+          <li><i>一致</i>与 PC 同 token、同词汇、同状态表达</li>
+          <li><i>用途</i>定风格用，不是最终布局</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <h2 class="sec">"规整"靠什么保证 —— 三套共用的同一张规矩表</h2>
+  <p class="sub">这就是解决"每个页面各写各的"的技术手段：<b>只允许这 6 档字号、6 档间距、3 档圆角、1 张色板</b>，
+     页面里不许出现别的值（落地时做成 4 条静态护栏，谁破坏谁红）。</p>
+  <div class="demo" style="margin-bottom:14px">
+    <div><div style="font-size:11px;color:var(--ink3)">分组标题 / 极小注释</div><div style="font-size:11px;font-weight:600">Aa 11</div><div class="n">11</div></div>
+    <div><div style="font-size:12px;color:var(--ink3)">表格辅助 / 时间</div><div style="font-size:12px;font-weight:600">Aa 12</div><div class="n">12</div></div>
+    <div><div style="font-size:13px">正文 / 表格主体</div><div style="font-size:13px;font-weight:600">Aa 13</div><div class="n">13</div></div>
+    <div><div style="font-size:15px">区块标题</div><div style="font-size:15px;font-weight:600">Aa 15</div><div class="n">15</div></div>
+    <div><div style="font-size:18px">页面标题</div><div style="font-size:18px;font-weight:600">Aa 18</div><div class="n">18</div></div>
+    <div><div style="font-size:26px;font-weight:600">26</div><div class="n">26 · 仅数字/首屏标题</div></div>
+  </div>
+  <table>
+    <thead><tr><th style="width:120px">维度</th><th>规矩（三套一致）</th><th style="width:340px">今天的问题</th></tr></thead>
+    <tbody>
+      <tr><td class="k">字体</td><td>中文系统栈（苹方 / 微软雅黑）；<b>编号、数量、金额、日期一律等宽</b> <span class="mono">ui-monospace</span> + <span class="mono">tabular-nums</span></td><td class="no">等宽只在 3 个文件里用了，表格数字对不齐 → 扫读变逐字读</td></tr>
+      <tr><td class="k">字号</td><td>只允许 <span class="mono">11 / 12 / 13 / 15 / 18 / 26</span></td><td>规范已定，但页面里仍散着 12.5/13.5/14 等自由值</td></tr>
+      <tr><td class="k">间距</td><td>只允许 <span class="mono">4 / 8 / 12 / 16 / 24 / 32</span>（8px 刻度）</td><td class="no">859 处 inline style，margin/gap 随手写</td></tr>
+      <tr><td class="k">圆角</td><td>容器 <span class="mono">12</span> · 控件 <span class="mono">8</span> · 小元素 <span class="mono">6</span> · 胶囊 <span class="mono">999</span>（三档封顶）</td><td>6 / 8 / 10 / 12 混用</td></tr>
+      <tr><td class="k">色板</td><td>灰阶 6 档 + 语义 5 色（成功/警告/危险/进行中/中性），<b>业务代码零裸 hex</b></td><td class="ok">✅ 这条已经做到了（theme/status.ts + tokens.ts），三套直接继承</td></tr>
+      <tr><td class="k">状态表达</td><td><b>一个状态在屏幕上只有一种画法</b>：列表用色条/圆点+文字，只有"当前状态"和"异常"才允许用色块</td><td class="no">265 个彩色 Tag，满屏都是最高权重 → 等于没有权重</td></tr>
+      <tr><td class="k">图标</td><td>单一来源、线性、1.5px 描边，尺寸只允许 <span class="mono">14 / 16 / 20</span>；emoji 不进界面</td><td class="ok">✅ emoji 已清零；图标仍散在 3 处引入，未集中</td></tr>
+      <tr><td class="k">层级</td><td>页面标题 18 → 区块标题 15 → 正文 13 → 辅助 12；<b>层级靠字号+间距拉开，不靠卡片套卡片</b></td><td class="no">125 张 Card，卡里嵌卡，只靠 16px 灰缝区分</td></tr>
+    </tbody>
+  </table>
+
+  <h2 class="sec">三套的差别，一句话</h2>
+  <table>
+    <thead><tr><th style="width:110px">方案</th><th style="width:150px">导航模型</th><th style="width:110px">信息密度</th><th>观感关键词</th><th style="width:190px">我的建议</th></tr></thead>
+    <tbody>
+      <tr><td class="k">A 纸面</td><td>左侧栏（浅色）</td><td>中</td><td>克制、现代、耐看、留白多</td><td>最安全的选择，PC/移动同一气质</td></tr>
+      <tr><td class="k">B 墨蓝</td><td>左侧栏（深色，延续现有品牌）</td><td>中高</td><td>系统感、控制室、专业</td><td>想要"一眼是生产系统"就选它</td></tr>
+      <tr><td class="k">C 密排</td><td>顶部一行（无侧栏）</td><td>高</td><td>高效、数据、终端、极规整</td><td>表格最多的采购/仓库/财务最省力</td></tr>
+      <tr><td class="k">D 移动</td><td>底部 4 项 + 吸底动作</td><td>一屏一事</td><td>作业卡、照片优先</td><td>必做（现场/仓库/车间的主终端）</td></tr>
+    </tbody>
+  </table>
+
+  <h2 class="sec">选定之后我怎么落地（不改后端业务逻辑）</h2>
+  <table>
+    <thead><tr><th style="width:70px">步</th><th>做什么</th><th style="width:250px">验收</th></tr></thead>
+    <tbody>
+      <tr><td class="k">1</td><td>把选中的方案抽成 <b>token + 6 个壳组件</b>（AppShell / PageHead / MetricStrip / QueueRow / Rail / ObjectHead），写进 <span class="mono">components/ds/</span>，全站只准用这 6 个</td><td>字号/间距/圆角取值集合 = 允许值，静态护栏盯</td></tr>
+      <tr><td class="k">2</td><td>先换 <b>3 张样板页</b>（收件箱 / 项目列表 / 项目详情）—— 就是你现在看的这三屏，接真接口</td><td>浏览器实测首屏、列宽、状态表达一致</td></tr>
+      <tr><td class="k">3</td><td>再套 <b>10 个部门台</b>（页签 51 → ≤4/台，其余变分组），每套一个台跑一次全量</td><td>旧断言迁移，一条不删</td></tr>
+      <tr><td class="k">4</td><td>移动端 6 条动线换成 D 的作业卡（含照片上卡片、同单折叠）</td><td>触控 ≥44、0 不占位、断网可暂存</td></tr>
+    </tbody>
+  </table>
+  <p class="sub" style="margin-top:18px">⚠ 这些是<b>静态样机</b>（HTML/CSS，零依赖、不进业务代码），只用来定方向；选定后我会把它翻译成 React 组件 + token，不会把这些文件接进系统。</p>
+</div>
+</body>
+</html>

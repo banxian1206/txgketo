@@ -21,6 +21,8 @@ const ProjectDetailPage = lazy(() => import('./features/project/DetailPage'))
 const ProjectInitiate = lazy(() => import('./features/project/InitiatePage'))
 const Library = lazy(() => import('./features/admin/LibraryPage'))
 const EquipmentDesign = lazy(() => import('./features/design/Page'))
+const ItemDossier = lazy(() => import('./features/dossier/ItemPage'))
+const EquipmentDossier = lazy(() => import('./features/dossier/EquipmentPage'))
 const Projects = lazy(() => import('./features/project/Page'))
 const PurchaseWorkbench = lazy(() => import('./features/purchase/Page'))
 const Users = lazy(() => import('./features/admin/Page'))
@@ -36,6 +38,7 @@ const ShippingM = lazy(() => import('./features/shipping/MobilePage'))
 const SiteM = lazy(() => import('./features/site/MobilePage'))
 const ServiceM = lazy(() => import('./features/service/MobilePage'))
 const Workbench = lazy(() => import('./features/workbench/Page'))
+const Dashboard = lazy(() => import('./features/dashboard/Page'))
 import ShopShell from './features/workbench/ShopShell'
 const DeptWorkbench = lazy(() => import('./features/workbench/DeptWorkbench'))
 const EngWorkbench = lazy(() => import('./features/workbench/EngWorkbench'))
@@ -116,7 +119,19 @@ export default function App() {
         <Route path="workbench/pm" element={<PmWorkbench />} />
         <Route path="workbench/eng" element={<EngWorkbench />} />
         {/* A5：车间台收编制造/装配 —— 台内 card 页签（v2 拍板③：交付执行组保留，双入口中间态） */}
-        <Route path="workbench/shop" element={<ShopShell />}>
+        {/* ★ 走查收尾（2026-10-04）：车间台**必须加路由守卫** —— 它过去只有"台可见性"过滤，
+            直接敲 URL 就能进：无 `mfg:view` 的角色（采购/仓库/商务/交付/售后/工程总监）
+            会进到页面里然后连环 403（实测 6 个角色各 1 条）。这与 docs/12 修的
+            「看得见、点了必 403」是同一类病 —— 门禁要拦在**进来之前**。
+            守卫加在父路由上，子路由（看板/制造/装配）一起生效。 */}
+        <Route
+          path="workbench/shop"
+          element={
+            <RequirePerm anyOf={['mfg:view']}>
+              <ShopShell />
+            </RequirePerm>
+          }
+        >
           <Route index element={<DeptWorkbench kind="shop" />} />
           <Route path="mfg" element={<Manufacturing />} />
           <Route path="assembly" element={<Assembly />} />
@@ -127,6 +142,8 @@ export default function App() {
         <Route path="workbench/changes" element={<Workbench />} />
         <Route path="purchase" element={<RequirePerm anyOf={['purchase:view', 'purchase:edit', 'purchase:price']}><PurchaseWorkbench /></RequirePerm>} />
         <Route path="warehouse" element={<RequirePerm anyOf={['warehouse:view', 'warehouse:edit']}><Warehouse /></RequirePerm>} />
+        {/* ★ 经营驾驶舱（00 卷 §2.1）：只有能看金额/成本的角色进得来（GM / FIN） */}
+        <Route path="dashboard" element={<RequirePerm anyOf={['project:amount', 'cost:view']}><Dashboard /></RequirePerm>} />
         {/* ★ 重整 P1（docs/10 §8.4）：「交付执行」域删除，业务线只在台里跑。
             URL 一个没改（/delivery/shipping|site|service 原样），只是换壳：由 WorkbenchShell 包，
             所以顶部是「我的工作台 · 发运工作台」这种**角色台**条，而不是 6 项流水线域条。 */}
@@ -143,6 +160,9 @@ export default function App() {
         <Route path="projects/:projectNo" element={<ProjectDetailPage />} />
         <Route path="projects/:projectNo/initiate" element={<ProjectInitiate />} />
         <Route path="projects/:projectNo/design/:equipNo" element={<EquipmentDesign />} />
+        {/* ★ R2：件档案 / 设备档案（00 卷 §2.1 承诺过的两个视图）—— 都是只读汇总，干活仍回各台 */}
+        <Route path="items/:itemNo" element={<ItemDossier />} />
+        <Route path="equipment/:projectNo/:equipNo" element={<EquipmentDossier />} />
         </Route>
         {/* ★ 交付域壳已删：制造/装配唯一入口=车间台；发运/现场/售后见上面 WorkbenchShell 内。
             /delivery、/delivery/mfg、/delivery/acceptance 等旧路径走 ROUTE_REDIRECTS 一跳到位。 */}

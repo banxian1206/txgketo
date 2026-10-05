@@ -1,3 +1,8 @@
+import SectionNav from '../../components/ds/SectionNav'
+import { INITIATE_SECTIONS, defaultSectionKey } from '../../configs/sections'
+import { useTab } from '../../hooks/useTab'
+import { Chip } from '../../components/ds'
+import { toneOf } from '../../theme/status'
 import {
   Alert,
   App,
@@ -10,36 +15,13 @@ import {
   Space,
   Spin,
   Table,
-  Tag,
   Typography,
 } from 'antd'
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 
-import {
-  EquipmentEditor,
-  LongLeadEditor,
-  MilestoneEditor,
-  TeamEditor,
-} from '../../components/InitiationEditors'
-import {
-  errMsg,
-  generateMilestones,
-  generateTasks,
-  listProjectTasks,
-  type TaskItem,
-  getProjectDetail,
-  initiateProject,
-  listEquipment,
-  listMembers,
-  listMilestones,
-  listPurchaseRequests,
-  listUsers,
-  type EquipmentItem,
-  type MilestoneItem,
-  type ProjectDetail,
-  type PurchaseRequestItem,
-} from '../../api/client'
+import { EquipmentEditor, LongLeadEditor, MilestoneEditor, TeamEditor } from '../../components/InitiationEditors'
+import { errMsg, generateMilestones, generateTasks, listProjectTasks, type TaskItem, getProjectDetail, initiateProject, listEquipment, listMembers, listMilestones, listPurchaseRequests, listUsers, type EquipmentItem, type MilestoneItem, type ProjectDetail, type PurchaseRequestItem } from '../../api/client'
 import { useBack, useGoFrom } from '../../hooks/useFrom'
 
 /**
@@ -69,6 +51,8 @@ export default function ProjectInitiate() {
   const [genLoading, setGenLoading] = useState(false)
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
+  // ★ P4：分区（= 步骤）进 URL
+  const [tab, setTab] = useTab(INITIATE_SECTIONS.map((x) => x.key), defaultSectionKey(INITIATE_SECTIONS))
 
   const load = useCallback(async () => {
     if (!projectNo) return
@@ -175,7 +159,10 @@ export default function ProjectInitiate() {
 
   return (
     <>
-      <Card style={{ marginBottom: 16 }}>
+      {/* ── 常驻区（切分区不动）：能不能立项的结论 + 确认按钮 ──────────────
+          原来是页首一张 Card，往下滑 2.6 屏才看到 ①…⑤ —— 现在它在最上面、切区不动 */}
+      <div className="ds-panel" style={{ marginBottom: 16 }}>
+        <div className="ds-panel-b">
         <Row align="middle">
           <Col flex="auto">
             <Space size={8}>
@@ -184,7 +171,7 @@ export default function ProjectInitiate() {
                 立项 · {projectNo}
               </Typography.Text>
               <Typography.Text>{p?.project_name}</Typography.Text>
-              <Tag color="gold">{p?.stage}</Tag>
+              <Chip tone="warn">{p?.stage}</Chip>
             </Space>
             <div style={{ marginTop: 6 }}>
               <Typography.Text type="secondary" style={{ fontSize: 13 }}>
@@ -221,7 +208,8 @@ export default function ProjectInitiate() {
             </Space>
           </Col>
         </Row>
-      </Card>
+        </div>
+      </div>
 
       {notOrdered.length > 0 && (
         <Alert
@@ -235,14 +223,21 @@ export default function ProjectInitiate() {
         />
       )}
 
-      <Card size="small" title="① 项目团队（统一理解 · 谁负责什么）" style={{ marginBottom: 16 }}>
-        <TeamEditor projectNo={projectNo} users={users} onChanged={load} />
-      </Card>
-
-      <Card size="small" title="② 设备清单（任务分配 · 设备号自动发）" style={{ marginBottom: 16 }}>
-        <EquipmentEditor projectNo={projectNo} onChanged={load} />
-      </Card>
-
+      {/* ── 分区：①–⑤（docs/14 P4）—— 表单页的"分区"就是**步骤导航**，
+          原来 ①…⑤ 一路往下摆（2297px = 2.6 屏），现在横向切、提交按钮在常驻区 ── */}
+      <SectionNav
+        tab={tab}
+        onTab={setTab}
+        emptyText="这一步还没有内容。"
+        sections={[
+          { key: 'team', label: '① 项目团队', badge: members.length, children: <TeamEditor projectNo={projectNo} users={users} onChanged={load} /> },
+          { key: 'equipment', label: '② 设备清单', badge: equipment.length, children: <EquipmentEditor projectNo={projectNo} onChanged={load} /> },
+          {
+            key: 'milestone',
+            label: '③ 节点计划',
+            badge: milestones.length,
+            children: (
+              <>
       <Card
         size="small"
         title="③ 节点计划（每个节点的时间段）"
@@ -268,11 +263,26 @@ export default function ProjectInitiate() {
       >
         <MilestoneEditor projectNo={projectNo} users={users} onChanged={load} />
       </Card>
-
+              </>
+            ),
+          },
+          {
+            key: 'longlead',
+            label: '④ 长周期采购',
+            children: (
+              <>
       <Card size="small" title="④ 长周期采购（立项即下单）" style={{ marginBottom: 16 }}>
         <LongLeadEditor projectNo={projectNo} onChanged={load} />
       </Card>
-
+              </>
+            ),
+          },
+          {
+            key: 'tasks',
+            label: '⑤ 任务分派',
+            badge: tasks.length,
+            children: (
+              <>
       <Card
         size="small"
         title="⑤ 任务分派（立项后任务开始并行）"
@@ -316,7 +326,7 @@ export default function ProjectInitiate() {
               width: 110,
               render: (v: string, r: TaskItem) => (
                 <Space size={4}>
-                  <Tag color={v === '设计' ? 'blue' : 'gold'}>{v}</Tag>
+                  <Chip tone={toneOf(v === '设计' ? 'blue' : 'gold')}>{v}</Chip>
                   {r.profession && r.profession !== '采购' && (
                     <Typography.Text type="secondary" style={{ fontSize: 12 }}>
                       {r.profession}
@@ -331,17 +341,23 @@ export default function ProjectInitiate() {
               dataIndex: 'owner_name',
               width: 130,
               render: (v: string | null) =>
-                v ?? <Tag color="red">未指派</Tag>,
+                v ?? <Chip tone="err">未指派</Chip>,
             },
             {
               title: '状态',
               dataIndex: 'status',
               width: 90,
-              render: (v: string) => <Tag>{v}</Tag>,
+              render: (v: string) => <Chip>{v}</Chip>,
             },
           ]}
         />
       </Card>
+              </>
+            ),
+          },
+        ]}
+      />
+
     </>
   )
 }

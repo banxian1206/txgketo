@@ -1,10 +1,11 @@
 import { CheckCircleOutlined, CloseCircleOutlined } from '@ant-design/icons'
-import { App, Alert, AutoComplete, Button, Card, Form, Input, Select, Space, Tag, Typography } from 'antd'
+import { Chip } from '../../components/ds'
+import { App, Alert, AutoComplete, Button, Card, Form, Input, Select, Space, Typography } from 'antd'
 import { useCallback, useEffect, useState } from 'react'
 
 import { getOcrIntegration, setOcrIntegration, testOcrIntegration, type OcrConfig } from '../../api/integration'
 import { errMsg } from '../../api/client'
-import { OCR_STATE as STATE_COLOR, OCR_STATE_TEXT as STATE_TEXT } from '../../theme/status'
+import { OCR_STATE as STATE_COLOR, OCR_STATE_TEXT as STATE_TEXT, toneOf } from '../../theme/status'
 
 /** 外部集成（OCR）—— 后台填 API Key 的入口。
  *
@@ -77,7 +78,7 @@ export default function IntegrationPanel() {
         extra={
           <Space size={4}>
             {/* ★ 徽标按 state 说实话：`available` 只说明"配没配"，Key 失效时它仍是 true（实测踩过） */}
-            <Tag color={STATE_COLOR[cfg?.state ?? 'unconfigured']}>{STATE_TEXT[cfg?.state ?? 'unconfigured']}</Tag>
+            <Chip tone={toneOf(STATE_COLOR[cfg?.state ?? 'unconfigured'])}>{STATE_TEXT[cfg?.state ?? 'unconfigured']}</Chip>
             <Button size="small" onClick={() => void doTest()} loading={testing} disabled={!cfg?.available}>
               测试连接
             </Button>

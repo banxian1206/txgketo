@@ -1,14 +1,7 @@
 import { useEffect, useState } from 'react'
 import { App, DatePicker, Form, Input, InputNumber, Select, Typography } from 'antd'
 
-import {
-  ATTRIBUTIONS,
-  createManualPurchaseRequest,
-  errMsg,
-  listEquipment,
-  listProjects,
-  type EquipmentItem,
-} from '../api/client'
+import { ATTRIBUTIONS, createManualPurchaseRequest, errMsg, listEquipment, listProjects, type EquipmentItem } from '../api/client'
 import { SelectStdItem } from './fields'
 import AppModal from './AppModal'
 

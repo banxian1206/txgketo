@@ -1,24 +1,12 @@
 // components/design/ProgramsCard.tsx —— 由 EquipmentDesign 拆出（重构 1.6 · 只拆不改）
-import {
-  Button,
-  Card,
-  Empty,
-  Popconfirm,
-  Space,
-  Table,
-  Tag,
-  Tooltip,
-} from 'antd'
+import { Button, Card, Empty, Popconfirm, Space, Table, Tooltip } from 'antd'
+import { Status, Chip } from '../../components/ds'
 
 
 import AuthedFileLink from '../AuthedFileLink'
 
-import {
-  programFileUrl,
-  type ProgramItem,
-  type User,
-} from '../../api/client'
-import { DRAWING_STATUS as STATUS_COLOR } from '../../theme/status'
+import { programFileUrl, type ProgramItem, type User } from '../../api/client'
+import { DRAWING_STATUS as STATUS_COLOR, toneOf } from '../../theme/status'
 import { CHANGE_STATUS as CHANGE_STATUS_COLOR } from '../../theme/status'
 
 import { changeActionAvailable as CHANGE_ACTION_AVAILABLE } from './shared'
@@ -73,7 +61,7 @@ export default function ProgramsCard({
               title: '版本',
               dataIndex: 'current_version',
               width: 70,
-              render: (v: string) => <Tag>{v}</Tag>,
+              render: (v: string) => <Chip>{v}</Chip>,
             },
             {
               title: '文件',
@@ -85,7 +73,7 @@ export default function ProgramsCard({
               title: '状态',
               dataIndex: 'status',
               width: 90,
-              render: (v: string) => <Tag color={STATUS_COLOR[v] ?? 'default'}>{v}</Tag>,
+              render: (v: string) => <Status tone={toneOf(STATUS_COLOR[v])}>{v}</Status>,
             },
             {
               title: '操作',
@@ -122,9 +110,9 @@ export default function ProgramsCard({
                   )}
                   {p.status === '已发布' && p.change_request && (
                     <Tooltip title={`改版申请 ${p.change_request.cr_no}：${p.change_request.status}`}>
-                      <Tag color={CHANGE_STATUS_COLOR[p.change_request.status] ?? 'default'}>
+                      <Chip tone={toneOf(CHANGE_STATUS_COLOR[p.change_request.status])}>
                         {p.change_request.status}
-                      </Tag>
+                      </Chip>
                     </Tooltip>
                   )}
                   {CHANGE_ACTION_AVAILABLE(p.change_request) &&

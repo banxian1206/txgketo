@@ -1,20 +1,6 @@
-import {
-  Button,
-  Card,
-  Checkbox,
-  Col,
-  DatePicker,
-  Form,
-  Input,
-  InputNumber,
-  Row,
-  Select,
-  Space,
-  Switch,
-  Typography,
-} from 'antd'
+import { Button, Card, Checkbox, Col, DatePicker, Form, Input, InputNumber, Row, Select, Space, Switch, Typography } from 'antd'
 import type { Dayjs } from 'dayjs'
-import type { ReactNode } from 'react'
+import { createContext, useContext, type ReactNode } from 'react'
 import { T } from '../theme/tokens'
 
 /** 项目表单的全部字段（新建 / 编辑共用） */
@@ -79,8 +65,25 @@ export const RECEIVED_DOCS = [
   '其他',
 ]
 
-function Group({ title, hint, children }: { title: string; hint?: ReactNode; children: ReactNode }) {
+/** 当前分区（表单页用：非当前区的组**只藏不卸** —— antd Form 字段卸载就丢值） */
+const SecCtx = createContext<string | undefined>(undefined)
+
+function Group({
+  title,
+  hint,
+  sec,
+  children,
+}: {
+  title: string
+  hint?: ReactNode
+  /** 属于哪个分区（与 `configs/sections.ts` 的 CREATE_SECTIONS key 对应） */
+  sec?: string
+  children: ReactNode
+}) {
+  const active = useContext(SecCtx)
+  const hidden = !!sec && !!active && sec !== active
   return (
+    <div data-section={sec} style={{ display: hidden ? 'none' : undefined }}>
     <Card
       size="small"
       title={
@@ -98,6 +101,7 @@ function Group({ title, hint, children }: { title: string; hint?: ReactNode; chi
     >
       {children}
     </Card>
+    </div>
   )
 }
 
@@ -110,6 +114,12 @@ interface Props {
   docsExtra?: ReactNode
   /** 显示第 ⑦ 组「成交信息」（编辑时用；新建商机时还没有合同） */
   withDeal?: boolean
+  /**
+   * ★ 表单页分区（P4）：传了就等于"分区模式" —— 非当前区的组**只藏不卸**。
+   *   为什么：antd Form 字段一卸载就丢值（切步骤把已填内容清空是灾难）。
+   *   代价：隐藏区的校验错误看不见 → 提交失败时页面要**跳到第一个出错的区**。
+   */
+  activeSection?: string
 }
 
 /**
@@ -122,10 +132,14 @@ export default function ProjectFormFields({
   withContacts = false,
   docsExtra,
   withDeal = false,
+
+  activeSection,
 }: Props) {
   return (
+    <SecCtx.Provider value={activeSection}>
+
     <>
-      <Group title="① 基本信息">
+      <Group sec="basic" title="① 基本信息">
         <Row gutter={16}>
           <Col span={10}>
             <Form.Item
@@ -169,7 +183,7 @@ export default function ProjectFormFields({
         </Row>
       </Group>
 
-      <Group title="② 客户信息">
+      <Group sec="customer" title="② 客户信息">
         <Row gutter={16}>
           <Col span={10}>
             <Form.Item
@@ -265,7 +279,7 @@ export default function ProjectFormFields({
         )}
       </Group>
 
-      <Group title="③ 项目要求">
+      <Group sec="require" title="③ 项目要求">
         <Row gutter={16}>
           <Col span={7}>
             <Form.Item
@@ -306,6 +320,7 @@ export default function ProjectFormFields({
       </Group>
 
       <Group
+        sec="time"
         title="④ 时间与金额"
         hint="商机截止 ≠ 项目交期：前者是客户要求何时定下来，后者是签约后干多少天"
       >
@@ -374,14 +389,14 @@ export default function ProjectFormFields({
         </Row>
       </Group>
 
-      <Group title="⑤ 接收到的资料" hint="勾选拿到哪些，并把文件传上来">
+      <Group sec="atts" title="⑤ 接收到的资料" hint="勾选拿到哪些，并把文件传上来">
         <Form.Item name="received_docs" style={{ marginBottom: docsExtra ? 12 : 0 }}>
           <Checkbox.Group options={RECEIVED_DOCS.map((d) => ({ value: d, label: d }))} />
         </Form.Item>
         {docsExtra}
       </Group>
 
-      <Group title="⑥ 商务跟进" hint="内部用">
+      <Group sec="follow" title="⑥ 商务跟进" hint="内部用">
         <Row gutter={16}>
           <Col span={6}>
             <Form.Item
@@ -475,5 +490,6 @@ export default function ProjectFormFields({
         </Group>
       )}
     </>
+    </SecCtx.Provider>
   )
 }

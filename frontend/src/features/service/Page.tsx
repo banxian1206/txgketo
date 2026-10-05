@@ -1,23 +1,21 @@
 import { useSvcBoard } from '../../hooks/useSvcBoard'
+import { Chip, Code, Empty as DsEmpty, Status } from '../../components/ds'
+import QueueBoard from '../../components/ds/QueueBoard'
+import WorkbenchPage from '../../components/domain/WorkbenchPage'
+import { SERVICE_BOARD } from '../../configs/boards'
 import {
   App,
   Button,
-  Card,
-  Col,
-  Empty,
   Form,
   Input,
   InputNumber,
-  Row,
   Select,
   Space,
-  Statistic,
   Table,
-  Tabs,
   Tag,
   Typography,
 } from 'antd'
-import {useState} from 'react'
+import { useState, type ReactNode } from 'react'
 
 import {
   arriveServiceOrder,
@@ -39,10 +37,7 @@ import MfgPhotoPicker from '../../components/MfgPhotoPicker'
 import AppModal from '../../components/AppModal'
 import { SelectEquipment, SelectProject } from '../../components/fields'
 import ItemSelect from '../../components/fields/ItemSelect'
-import { SERVICE_ORDER_STATUS as SO_COLOR } from '../../theme/status'
-import { T } from '../../theme/tokens'
-import { SERVICE_TABS, filterTabs } from '../../configs/tabs'
-import { useTab } from '../../hooks/useTab'
+import { SERVICE_ORDER_STATUS as SO_COLOR, toneOf } from '../../theme/status'
 
 type Kind = 'create' | 'dispatch' | 'fix' | 'sign' | 'part' | 'move'
 
@@ -53,8 +48,6 @@ export default function Service() {
 
   const [moves, setMoves] = useState<Record<number, { move_type: string; qty: number; moved_at?: string | null }[]>>({})
   // ★ 重整 P0（docs/10 §3.2/§3.3）：页签条按**真实权限码**过滤，状态写进 URL（?tab=）
-  const visKeys = filterTabs(SERVICE_TABS).map((x) => x.key)
-  const [tab, setTab] = useTab(visKeys, 'orders')
 
   const [modal, setModal] = useState<{ kind: Kind; order?: ServiceOrderRow; part?: SparePartRow } | null>(null)
   const [modalInitial, setModalInitial] = useState<Record<string, unknown>>({})
@@ -65,7 +58,7 @@ export default function Service() {
   const watchProject = Form.useWatch('project_no', form)
 
   // 重构 2.3：看板数据走共享 hook（与另一端同源）
-  const { wb, parts, reload: load } = useSvcBoard({ full: true })
+  const { wb, parts: partsList, reload: load } = useSvcBoard({ full: true })
 
   const open = (kind: Kind, order?: ServiceOrderRow, part?: SparePartRow) => {
     setPhotos([])
@@ -124,134 +117,137 @@ export default function Service() {
   }
 
   const c = wb?.counts
-  const partOptions = parts.map((p) => ({ value: p.id, label: `${p.item_no} ${p.item_name ?? ''}（库存 ${p.qty_stock}）` }))
+  const partOptions = partsList.map((p) => ({ value: p.id, label: `${p.item_no} ${p.item_name ?? ''}（库存 ${p.qty_stock}）` }))
 
+  // 体：按页签 key 取（顺序 / 标题 / 徽标 / 可见性全来自注册表 SERVICE_BOARD）
+  const partsOf: Record<string, ReactNode> = {
+    orders: (
+      <>
+        <div className="ds-q-bar">
+          <div className="l">
+            <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+              报修时自动判定这台设备在保 / 过保；每一步（派工→到场→处理→签字）都在行尾那一个按钮上。
+            </Typography.Text>
+          </div>
+          <div className="r">
+            <Button type="primary" size="small" disabled={!canEdit} onClick={() => open('create')}>
+              报修（新建工单）
+            </Button>
+          </div>
+        </div>
+        <QueueBoard
+          emptyText="还没有服务工单 —— 客户报修后在这里受理、派工、处理、签字关单。"
+          items={(wb?.orders ?? []).map((r) => ({
+            key: r.id,
+            lead: <Code>{r.so_no}</Code>,
+            title: r.fault ?? '（未填故障描述）',
+            meta: `${r.project_no}${r.equip_no ? ` · ${r.equip_no}` : ''} · 处理人 ${r.dispatched_to ?? '待派工'}`,
+            cells: [
+              {
+                text: r.in_warranty == null ? '—' : r.in_warranty ? <Chip tone="ok">在保</Chip> : <Chip tone="warn">过保</Chip>,
+                title: '质保',
+              },
+              { text: <Status tone={toneOf(SO_COLOR[r.status])}>{r.status}</Status>, title: '状态' },
+            ],
+            action: !canEdit ? undefined : r.status === '待受理' ? (
+              <Button type="primary" size="small" onClick={() => open('dispatch', r)}>
+                派工
+              </Button>
+            ) : r.status === '已派工' ? (
+              <Button
+                type="primary"
+                size="small"
+                onClick={() => void arriveServiceOrder(r.id).then(() => void load()).catch((e) => message.error(errMsg(e)))}
+              >
+                到场
+              </Button>
+            ) : r.status === '已到场' ? (
+              <Button type="primary" size="small" onClick={() => open('fix', r)}>
+                处理完成
+              </Button>
+            ) : r.status === '待客户签字' ? (
+              <Button type="primary" size="small" onClick={() => open('sign', r)}>
+                客户签字
+              </Button>
+            ) : undefined,
+          }))}
+        />
+      </>
+    ),
+    parts: (
+      <>
+        <Space style={{ marginBottom: 10 }}>
+          <Button type="primary" disabled={!canEdit} onClick={() => open('part')}>备件建账</Button>
+          <Button disabled={!canEdit || partsList.length === 0} onClick={() => open('move')}>备件收发（领出/退回/补货）</Button>
+          <Typography.Text type="secondary" style={{ fontSize: 12 }}>领出可关联服务工单；低于安全库存会标红。</Typography.Text>
+        </Space>
+        <Table<SparePartRow>
+          rowKey="id"
+          size="small"
+          dataSource={partsList}
+          pagination={{ pageSize: 10, showSizeChanger: false }}
+          locale={{ emptyText: <DsEmpty text="还没有备件" /> }}
+          columns={[
+            { title: '物料', dataIndex: 'item_no', width: 180 },
+            { title: '名称', dataIndex: 'item_name', render: (v: string | null) => v ?? '—' },
+            { title: '项目 / 设备', key: 'pe', width: 160, render: (_: unknown, r: SparePartRow) => `${r.project_no ?? ''}${r.equip_no ? ` · ${r.equip_no}` : ''}` || '通用' },
+            {
+              title: '备件库存',
+              dataIndex: 'qty_stock',
+              width: 110,
+              align: 'right',
+              render: (v: number, r: SparePartRow) =>
+                r.min_qty != null && v < r.min_qty ? <Tag color="red">{v}（低于 {r.min_qty}）</Tag> : v,
+            },
+            { title: '装机数', dataIndex: 'qty_installed', width: 90, align: 'right' },
+            {
+              title: '收发记录',
+              key: 'm',
+              width: 120,
+              render: (_: unknown, r: SparePartRow) =>
+                moves[r.id] ? (
+                  <span style={{ fontSize: 12 }}>
+                    {moves[r.id].slice(0, 3).map((m, i) => (
+                      <div key={i}>{m.move_type} ×{m.qty}</div>
+                    ))}
+                  </span>
+                ) : (
+                  <a onClick={() => void loadMoves(r.id)}>查看</a>
+                ),
+            },
+          ]}
+        />
+      </>
+
+    ),
+  }
+
+  // ★ docs/15 台骨架四件套：台头 → 结论条 → 流程条（注册表驱动）→ 体
   return (
-    <Card
-      title="售后（S11）"
-      extra={
-        <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-          报修受理 → 派工 → 到场 → 处理（备件更换）→ 客户签字 → 关闭；报修自动判定在保 / 过保
-        </Typography.Text>
-      }
-    >
-      <Row gutter={12} style={{ marginBottom: 12 }}>
-        <Col span={4}><Statistic title="未关闭工单" value={c?.open ?? 0} /></Col>
-        <Col span={4}><Statistic title="待受理" value={c?.wait ?? 0} valueStyle={{ color: c?.wait ? T.error : undefined }} /></Col>
-        <Col span={4}><Statistic title="处理中" value={c?.in_progress ?? 0} /></Col>
-        <Col span={4}><Statistic title="待客户签字" value={c?.to_sign ?? 0} /></Col>
-        <Col span={4}><Statistic title="已关闭" value={c?.closed ?? 0} /></Col>
-        <Col span={4}><Statistic title="备件低库存" value={c?.low_parts ?? 0} valueStyle={{ color: c?.low_parts ? T.error : undefined }} /></Col>
-      </Row>
-
-      <Tabs
-        activeKey={tab}
-        onChange={setTab}
-        items={[
-          {
-            key: 'orders',
-            label: `服务工单 (${wb?.orders.length ?? 0})`,
-            children: (
-              <>
-                <Space style={{ marginBottom: 10 }}>
-                  <Button type="primary" disabled={!canEdit} onClick={() => open('create')}>报修（新建工单）</Button>
-                  <Typography.Text type="secondary" style={{ fontSize: 12 }}>报修时自动判定这台设备是否还在质保期内。</Typography.Text>
-                </Space>
-                <Table<ServiceOrderRow>
-                  rowKey="id"
-                  size="small"
-                  dataSource={wb?.orders ?? []}
-                  pagination={{ pageSize: 10, showSizeChanger: false }}
-                  locale={{ emptyText: <Empty description="还没有服务工单" /> }}
-                  columns={[
-                    { title: '工单号', dataIndex: 'so_no', width: 110 },
-                    {
-                      title: '项目 / 设备',
-                      key: 'pe',
-                      width: 170,
-                      render: (_: unknown, r: ServiceOrderRow) => `${r.project_no}${r.equip_no ? ` · ${r.equip_no}` : ''}`,
-                    },
-                    { title: '故障', dataIndex: 'fault', render: (v: string | null) => v ?? '—' },
-                    {
-                      title: '质保',
-                      dataIndex: 'in_warranty',
-                      width: 80,
-                      render: (v: boolean | null) =>
-                        v == null ? '—' : v ? <Tag color="success">在保</Tag> : <Tag color="red">过保</Tag>,
-                    },
-                    { title: '状态', dataIndex: 'status', width: 110, render: (v: string) => <Tag color={SO_COLOR[v] ?? 'default'}>{v}</Tag> },
-                    { title: '处理人', dataIndex: 'dispatched_to', width: 100, render: (v: string | null) => v ?? '—' },
-                    {
-                      title: '操作',
-                      key: 'a',
-                      width: 220,
-                      render: (_: unknown, r: ServiceOrderRow) => (
-                        <Space size={4} wrap>
-                          {canEdit && r.status === '待受理' && <a onClick={() => open('dispatch', r)}>派工</a>}
-                          {canEdit && r.status === '已派工' && (
-                            <a onClick={() => void arriveServiceOrder(r.id).then(() => void load()).catch((e) => message.error(errMsg(e)))}>到场</a>
-                          )}
-                          {canEdit && r.status === '已到场' && <a onClick={() => open('fix', r)}>处理完成</a>}
-                          {canEdit && r.status === '待客户签字' && <a onClick={() => open('sign', r)}>客户签字</a>}
-                        </Space>
-                      ),
-                    },
-                  ]}
-                />
-              </>
-            ),
-          },
-          {
-            key: 'parts',
-            label: `备件 (${parts.length})`,
-            children: (
-              <>
-                <Space style={{ marginBottom: 10 }}>
-                  <Button type="primary" disabled={!canEdit} onClick={() => open('part')}>备件建账</Button>
-                  <Button disabled={!canEdit || parts.length === 0} onClick={() => open('move')}>备件收发（领出/退回/补货）</Button>
-                  <Typography.Text type="secondary" style={{ fontSize: 12 }}>领出可关联服务工单；低于安全库存会标红。</Typography.Text>
-                </Space>
-                <Table<SparePartRow>
-                  rowKey="id"
-                  size="small"
-                  dataSource={parts}
-                  pagination={{ pageSize: 10, showSizeChanger: false }}
-                  locale={{ emptyText: <Empty description="还没有备件" /> }}
-                  columns={[
-                    { title: '物料', dataIndex: 'item_no', width: 180 },
-                    { title: '名称', dataIndex: 'item_name', render: (v: string | null) => v ?? '—' },
-                    { title: '项目 / 设备', key: 'pe', width: 160, render: (_: unknown, r: SparePartRow) => `${r.project_no ?? ''}${r.equip_no ? ` · ${r.equip_no}` : ''}` || '通用' },
-                    {
-                      title: '备件库存',
-                      dataIndex: 'qty_stock',
-                      width: 110,
-                      align: 'right',
-                      render: (v: number, r: SparePartRow) =>
-                        r.min_qty != null && v < r.min_qty ? <Tag color="red">{v}（低于 {r.min_qty}）</Tag> : v,
-                    },
-                    { title: '装机数', dataIndex: 'qty_installed', width: 90, align: 'right' },
-                    {
-                      title: '收发记录',
-                      key: 'm',
-                      width: 120,
-                      render: (_: unknown, r: SparePartRow) =>
-                        moves[r.id] ? (
-                          <span style={{ fontSize: 12 }}>
-                            {moves[r.id].slice(0, 3).map((m, i) => (
-                              <div key={i}>{m.move_type} ×{m.qty}</div>
-                            ))}
-                          </span>
-                        ) : (
-                          <a onClick={() => void loadMoves(r.id)}>查看</a>
-                        ),
-                    },
-                  ]}
-                />
-              </>
-            ),
-          },
-        ].filter((x) => visKeys.includes(x.key))}
-      />
+    <>
+      <WorkbenchPage
+        board={SERVICE_BOARD}
+        sub={`未关闭 ${c?.open ?? 0} 单 · 待受理 ${c?.wait ?? 0} · 处理中 ${c?.in_progress ?? 0} · 待客户签字 ${c?.to_sign ?? 0}`}
+        help="报修受理 → 派工 → 到场 → 处理（备件更换）→ 客户签字 → 关闭；报修时自动判定这台设备在保 / 过保。"
+        actions={
+          <>
+            {(c?.low_parts ?? 0) > 0 && <Chip tone="err">备件低库存 {c?.low_parts}</Chip>}
+            <Button size="small" onClick={() => void load()}>
+              刷新
+            </Button>
+          </>
+        }
+        counts={{ orders: wb?.orders.length ?? 0, parts: partsList.length }}
+        metrics={[
+          { key: 'wait', label: '待受理', value: c?.wait ?? 0, unit: '单', tone: c?.wait ? 'err' : undefined, dimZero: true, to: '?tab=orders' },
+          { key: 'run', label: '处理中', value: c?.in_progress ?? 0, unit: '单', dimZero: true, to: '?tab=orders' },
+          { key: 'sign', label: '待客户签字', value: c?.to_sign ?? 0, unit: '单', dimZero: true, to: '?tab=orders' },
+          { key: 'part', label: '备件低库存', value: c?.low_parts ?? 0, unit: '种', tone: c?.low_parts ? 'warn' : undefined, dimZero: true, to: '?tab=parts' },
+          { key: 'open', label: '未关闭工单', value: c?.open ?? 0, unit: '单', dimZero: true, to: '?tab=orders' },
+        ]}
+      >
+        {(t) => partsOf[t]}
+      </WorkbenchPage>
 
       <AppModal
         open={!!modal}
@@ -342,6 +338,7 @@ export default function Service() {
             </>
           )}
       </AppModal>
-    </Card>
+    </>
   )
 }
+

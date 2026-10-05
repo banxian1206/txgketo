@@ -1,22 +1,12 @@
 import type { FormInstance } from 'antd'
+import { toneOf } from '../../theme/status'
+import { Chip } from '../../components/ds'
 // components/design/ProgramsModals.tsx —— 由 EquipmentDesign 拆出（重构 1.6 · 只拆不改）
-import {
-  Button,
-  Form,
-  Input,
-  Modal,
-  Table,
-  Tag,
-  Typography,
-  Upload,
-} from 'antd'
+import { Button, Form, Input, Modal, Table, Typography, Upload } from 'antd'
 
 
 
-import {
-  type ProgramItem,
-  type ProgramVersionRow,
-} from '../../api/client'
+import { type ProgramItem, type ProgramVersionRow } from '../../api/client'
 
 export default function ProgramsModals({
 doCreateProgram,
@@ -118,7 +108,7 @@ doCreateProgram: (...args: any[]) => any;
               dataIndex: 'version',
               width: 80,
               render: (v: string, r: ProgramVersionRow) => (
-                <Tag color={r.is_current ? 'green' : 'default'}>{v}</Tag>
+                <Chip tone={toneOf(r.is_current ? 'green' : 'default')}>{v}</Chip>
               ),
             },
             { title: '文件', dataIndex: 'filename', render: (v: string | null) => v || '—' },

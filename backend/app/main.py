@@ -11,6 +11,8 @@ from app.api.routes import (
     assembly,
     auth,
     changes,
+    dashboard,
+    dossier,
     engineering,
     health,
     initiation,
@@ -99,6 +101,8 @@ app.add_middleware(
 for r in (
     health,
     auth,
+    dashboard,
+    dossier,  # ★ R2：对象档案 / 全局检索（只读聚合）
     acceptance,
     assembly,
     platform,

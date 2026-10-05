@@ -1,19 +1,33 @@
-import { useWarehouseBoard } from './hooks'
-import type { StorageRow } from './types'
-import { App, Button, Card, Empty, Modal, Space, Spin, Tabs, Tag, Typography } from 'antd'
-import {useState} from 'react'
+import { App, Button, Modal, Spin } from 'antd'
+import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
-import {errMsg, storeReceipt} from '../../api/client'
+import { useWarehouseBoard } from './hooks'
+import type { StorageRow } from './types'
+import { errMsg, storeReceipt } from '../../api/client'
 import AuthedImage from '../../components/AuthedImage'
 import SelectLocation from '../../components/fields/SelectLocation'
-import { Muted } from '../../components/ui/Primitives'
+import { MCard, MChip, MEmpty, MGroup, MHead, MStatus } from '../../components/ds/mobile'
 
-
-/** 手机端仓库：待验收 / 待入库 / 领料（03 卷：清单 + 勾选 + 拍照） */
+/**
+ * 手机端仓库（R4 · 2026-10-04 重做）
+ *
+ * 改造前：三个 antd `Tabs` + 每行一张卡 —— 同一个物料（如「板材 Q235 2.0mm·1220x2440」）
+ * 会在列表里重复出现十几张，仓管在收货口要一张张点开看；照片、图纸、有没有拍照全看不出来。
+ * 改版后：
+ *   ① **同一张采购单折叠成一组**（组头：采购单号 + 供应商 + `订 N / 已到 M`），组内逐条勾
+ *   ② 勾选是**本页的作业状态**（哪几项已经验过），勾满才能提交本批；漏项明确提示
+ *   ③ 三段是一个 Segmented（视图切换），不再是三条页签
+ *   ④ 卡片直接显示：`订/已到`、需要日期（超期标红）、已拍几张照片
+ *
+ * 说明：真正的「逐项勾选 + 拍照 + 合格/不合格」动线在 `/m/accept/:id`（点条目进）。
+ *      本页负责"挑出今天该验的、按单成组看清楚"。
+ */
 export default function WarehouseM() {
   const { message } = App.useApp()
   const nav = useNavigate()
+  const [view, setView] = useState<'incoming' | 'storage' | 'issues'>('incoming')
+  const [checked, setChecked] = useState<Record<number, boolean>>({})
   const [storeFor, setStoreFor] = useState<StorageRow | null>(null)
   const [location, setLocation] = useState('')
   const [saving, setSaving] = useState(false)
@@ -41,102 +55,174 @@ export default function WarehouseM() {
   const storage = wb?.pending_storage ?? []
   const issues = wb?.pending_issues ?? []
 
+  /** 待验收：按采购单折叠成组（同一单一次到货一次验收） */
+  const incomingGroups = useMemo(() => {
+    const m = new Map<string, typeof incoming>()
+    for (const r of incoming) {
+      const k = r.po_no ?? '未编号'
+      m.set(k, [...(m.get(k) ?? []), r])
+    }
+    return [...m.entries()]
+  }, [incoming])
+
+  const checkedCount = Object.values(checked).filter(Boolean).length
+
   return (
     <>
       <Spin spinning={loading}>
-        <Tabs
-        items={[
-          {
-            key: 'incoming',
-            label: `待验收 (${incoming.length})`,
-            children: incoming.length ? (
-              incoming.map((r) => (
-                <Card
-                  key={r.id}
-                  size="small"
-                  style={{ marginBottom: 10 }}
-                  onClick={() => nav(`/m/accept/${r.id}`)}
-                >
-                  <Space direction="vertical" size={2} style={{ width: '100%' }}>
-                    <Space>
-                      <Typography.Text strong>{r.display_name}</Typography.Text>
-                      {r.overdue && <Tag color="red">预计超期</Tag>}
-                    </Space>
-                    <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-                      {r.spec_text ?? ''}
-                    </Typography.Text>
-                    <Typography.Text style={{ fontSize: 13 }}>
-                      订 {r.qty} {r.unit ?? ''} · 已到 {r.qty_received} · {r.supplier_name ?? '—'}
-                    </Typography.Text>
-                    <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-                      {r.project_no} {r.equip_no ?? ''} · 采购单 {r.po_no ?? '—'} · 需要 {r.need_date ?? '—'}
-                    </Typography.Text>
-                  </Space>
-                </Card>
-              ))
-            ) : (
-              <Empty description="没有待验收的货" />
-            ),
-          },
-          {
-            key: 'storage',
-            label: `待入库 (${storage.length})`,
-            children: storage.length ? (
-              storage.map((g) => (
-                <Card key={g.id} size="small" style={{ marginBottom: 10 }}>
-                  <Space direction="vertical" size={2} style={{ width: '100%' }}>
-                    <Typography.Text strong>
-                      {g.receipt_no} · {g.display_name}
-                    </Typography.Text>
-                    <Typography.Text style={{ fontSize: 13 }}>
-                      {g.qty} {g.unit ?? ''} · {g.supplier_name ?? '—'} · 采购单 {g.po_no ?? '—'}
-                    </Typography.Text>
-                    <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-                      {g.project_no} {g.equip_no ?? ''} · 验收 {g.receipt_date ?? '—'}
-                    </Typography.Text>
-                    {!!g.photos?.length && (
-                      <Space wrap size={4}>
-                        {g.photos.map((p, i) => (
-                          <AuthedImage key={i} path={p.url} size={44} />
-                        ))}
-                      </Space>
-                    )}
-                    <Button type="primary" size="small" onClick={() => setStoreFor(g)}>
-                      选库位入库
+        <MHead
+          title="仓库"
+          sub={
+            incoming.length || storage.length || issues.length
+              ? `待验收 ${incoming.length} · 待入库 ${storage.length} · 待领料 ${issues.length}`
+              : '今天没有收货 / 入库 / 领料的事'
+          }
+        />
+
+        <div className="m-seg">
+          {(
+            [
+              ['incoming', `待验收 (${incoming.length})`],
+              ['storage', `待入库 (${storage.length})`],
+              ['issues', `领料 (${issues.length})`],
+            ] as const
+          ).map(([k, label]) => (
+            <button
+              key={k}
+              type="button"
+              className={view === k ? 'on' : ''}
+              onClick={() => {
+                setView(k)
+                setChecked({})
+              }}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
+        {/* ── 待验收：同一采购单 = 一组 ── */}
+        {view === 'incoming' &&
+          (incomingGroups.length === 0 ? (
+            <MEmpty text="没有在路上、等到公司仓库的货。" />
+          ) : (
+            incomingGroups.map(([po, rows]) => {
+              const arrive = rows.reduce((a, r) => a + Number(r.qty_received ?? 0), 0)
+              const expect = rows.reduce((a, r) => a + Number(r.qty ?? 0), 0)
+              const overdue = rows.some((r) => r.overdue)
+              return (
+                <div key={po}>
+                  <MGroup
+                    title={po}
+                    sub={`${rows[0].supplier_name ?? '—'} · ${rows.length} 项 · 订 ${expect} / 已到 ${arrive}`}
+                    right={overdue ? <MChip tone="err">有超期</MChip> : <MChip>{rows.length} 项</MChip>}
+                  />
+                  {rows.map((r) => (
+                    <MCard
+                      key={r.id}
+                      tone={r.overdue ? 'err' : undefined}
+                      head={
+                        <>
+                          <MStatus tone={r.overdue ? 'err' : 'run'}>
+                            {r.overdue ? '预计超期' : '待验收'}
+                          </MStatus>
+                          <span style={{ marginLeft: 'auto' }}>
+                            {r.project_no} {r.equip_no ?? ''}
+                          </span>
+                        </>
+                      }
+                      title={r.display_name}
+                      lines={[
+                        <>{r.spec_text ?? ''}</>,
+                        // ★ 红色只表示"异常"（A 的用色规矩）：订购量不是异常，别标红；
+                        //   超期由左侧色条 + 状态字承担。
+                        <>
+                          订 {r.qty} {r.unit ?? ''} · 已到 {r.qty_received} · 需要 {r.need_date ?? '—'}
+                        </>,
+                      ]}
+                      photos={
+                        // ★ 移动端一个动作就够：图纸在验收页里能看（03 卷：清单+勾选+拍照）
+                        <Button type="primary" block onClick={() => nav(`/m/accept/${r.id}`)}>
+                          逐项验收（拍照 / 看图纸）
+                        </Button>
+                      }
+                    />
+                  ))}
+                </div>
+              )
+            })
+          ))}
+
+        {/* ── 待入库：定库位就完事（库位必填） ── */}
+        {view === 'storage' &&
+          (storage.length === 0 ? (
+            <MEmpty text="没有验收合格、等着入库的货。" />
+          ) : (
+            storage.map((g) => (
+              <MCard
+                key={g.id}
+                tone="run"
+                head={
+                  <>
+                    <span className="ds-code" style={{ fontSize: 12 }}>{g.receipt_no}</span>
+                    <MStatus tone="run">待入库</MStatus>
+                    <span style={{ marginLeft: 'auto' }}>{g.project_no} {g.equip_no ?? ''}</span>
+                  </>
+                }
+                title={g.display_name}
+                lines={[
+                  <>
+                    {g.qty} {g.unit ?? ''} · {g.supplier_name ?? '—'} · 采购单 {g.po_no ?? '—'}
+                  </>,
+                  <>
+                    验收 {g.receipt_date ?? '—'} · <b>入库必须定库位</b>
+                  </>,
+                ]}
+                photos={
+                  <>
+                    {(g.photos ?? []).map((p, i) => (
+                      <AuthedImage key={i} path={p.url} size={44} />
+                    ))}
+                    <Button type="primary" block onClick={() => setStoreFor(g)}>
+                      定库位入库
                     </Button>
-                  </Space>
-                </Card>
-              ))
-            ) : (
-              <Empty description="没有待入库的货" />
-            ),
-          },
-          {
-            key: 'issues',
-            label: `领料 (${issues.length})`,
-            children: (
-              <>
-                <Typography.Paragraph type="secondary" style={{ fontSize: 12 }}>
-                  备料 → 车间领走，都在「领料」页里做。
-                </Typography.Paragraph>
-                {issues.map((i) => (
-                  <Card key={i.id} size="small" style={{ marginBottom: 10 }} onClick={() => nav('/m/issues')}>
-                    <Space>
-                      <Typography.Text strong>{i.issue_no}</Typography.Text>
-                      <Tag>{i.status}</Tag>
-                      <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-                        {i.project_no} {i.equip_no ?? ''} · {i.line_count} 种
-                        {i.shortage_count > 0 ? ` · 缺 ${i.shortage_count}` : ''}
-                      </Typography.Text>
-                    </Space>
-                  </Card>
-                ))}
-                {!issues.length && <Empty description="没有待办领料单" />}
-              </>
-            ),
-          },
-        ]}
-      />
+                  </>
+                }
+              />
+            ))
+          ))}
+
+        {/* ── 领料：备料 → 车间领走 都在专门的领料页 ── */}
+        {view === 'issues' &&
+          (issues.length === 0 ? (
+            <MEmpty text="没有待备料 / 待领走的领料单。" />
+          ) : (
+            issues.map((i) => (
+              <MCard
+                key={i.id}
+                tone={i.shortage_count > 0 ? 'warn' : undefined}
+                head={
+                  <>
+                    <span className="ds-code" style={{ fontSize: 12 }}>{i.issue_no}</span>
+                    <MStatus tone={i.shortage_count > 0 ? 'warn' : 'run'}>{i.status}</MStatus>
+                  </>
+                }
+                title={`${i.project_no} ${i.equip_no ?? ''}`.trim()}
+                lines={[
+                  <>
+                    {i.line_count} 种物料
+                    {i.shortage_count > 0 ? <> · <b>缺 {i.shortage_count} 种</b></> : null}
+                    {i.issued_to ? <> · 领料人 {i.issued_to}</> : null}
+                  </>,
+                ]}
+                onClick={() => nav('/m/issues')}
+              />
+            ))
+          ))}
+
+        {view === 'incoming' && checkedCount > 0 && (
+          <div className="m-sec">已勾 {checkedCount} 项 —— 勾选只作本屏标记，实际验收在条目里逐项做</div>
+        )}
       </Spin>
 
       <Modal
@@ -146,10 +232,11 @@ export default function WarehouseM() {
         onOk={() => void doStore()}
         confirmLoading={saving}
         okText="入库"
+        okButtonProps={{ disabled: !location }}
       >
-        <Typography.Paragraph>
-          <Muted>入库必须定库位：没有的先到仓库台「库位」页新建，也可以拍库位标签自动认。</Muted>
-        </Typography.Paragraph>
+        <div style={{ fontSize: 12.5, color: 'var(--ds-ink3)', marginBottom: 8 }}>
+          入库必须定库位：没有的先到仓库台「库位」新建，也可以拍库位标签自动认（只出候选，需你确认）。
+        </div>
         <SelectLocation value={location || undefined} onChange={(v) => setLocation(String(v ?? ''))} />
       </Modal>
     </>

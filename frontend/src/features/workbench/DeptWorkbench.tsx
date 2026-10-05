@@ -1,9 +1,9 @@
-import { Alert, App, Button, Card, Col, Row, Space, Statistic, Typography } from 'antd'
+import { App, Button, Space } from 'antd'
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
 import { errMsg, workbenchMe, type WorkbenchMe } from '../../api/client'
-import { T } from '../../theme/tokens'
+import { Metrics, PageHead, Panel } from '../../components/ds'
 
 type CountKey = keyof WorkbenchMe['counts']
 
@@ -94,32 +94,25 @@ export default function DeptWorkbench({ kind }: { kind: 'sales' | 'pm' | 'eng' |
 
   return (
     <>
-      <Card size="small" style={{ marginBottom: 12 }}>
-        <Space direction="vertical" size={6} style={{ width: '100%' }}>
-          <Typography.Title level={5} style={{ margin: 0 }}>
-            {cfg.title}
-          </Typography.Title>
-        </Space>
-      </Card>
+      <div className="ds-page">
+      <PageHead
+        title={cfg.title}
+        sub={cfg.todos.map((t) => `${t.label} ${c?.[t.key] ?? 0}`).join(' · ')}
+        help={`${cfg.note ?? ''} 范围按岗位自动过滤（组员=本人 / 经理=本组 / 总监=本部门）。`}
+      />
+      <Metrics
+        items={cfg.todos.map((t) => ({
+          key: String(t.key),
+          label: t.label,
+          value: c?.[t.key] ?? 0,
+          unit: '项',
+          tone: (c?.[t.key] ?? 0) > 0 ? ('run' as const) : undefined,
+          dimZero: true,
+          onClick: () => nav(t.to),
+        }))}
+      />
 
-      {cfg.note && <Alert type="info" showIcon style={{ marginBottom: 12 }} message={cfg.note} />}
-
-      <Typography.Text strong>待我处理</Typography.Text>
-      <Row gutter={[12, 12]} style={{ marginTop: 8 }}>
-        {cfg.todos.map((t) => (
-          <Col xs={12} sm={8} md={6} lg={4} key={t.label}>
-            <Card size="small" hoverable onClick={() => nav(t.to)} style={{ textAlign: 'center' }}>
-              <Statistic
-                title={t.label}
-                value={c?.[t.key] ?? 0}
-                valueStyle={{ fontSize: 20, color: (c?.[t.key] ?? 0) ? T.brand : T.textDisabled }}
-              />
-            </Card>
-          </Col>
-        ))}
-      </Row>
-
-      <Card size="small" title="我负责的 / 范围看板" style={{ marginTop: 12 }}>
+      <Panel title="其余看板" sub="去对应的队列按流程干活">
         <Space wrap>
           {cfg.quick.map((q) => (
             <Button key={q.to} onClick={() => nav(q.to)}>
@@ -127,10 +120,8 @@ export default function DeptWorkbench({ kind }: { kind: 'sales' | 'pm' | 'eng' |
             </Button>
           ))}
         </Space>
-        <Typography.Paragraph type="secondary" style={{ fontSize: 12, marginTop: 8, marginBottom: 0 }}>
-          范围按岗位自动过滤（组员=本人 / 经理=本组 / 总监=本部门）。
-        </Typography.Paragraph>
-      </Card>
+      </Panel>
+      </div>
     </>
   )
 }

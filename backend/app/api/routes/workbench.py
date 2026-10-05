@@ -46,6 +46,9 @@ WORKBENCHES: list[dict] = [
     #     发运角色点自己的台会落进【制造页】并吃 403（无 mfg:view）。这就是那次实测故障的根因。
     #   名字统一「XX工作台」（D）。
     {"key": "mine", "name": "我的工作台", "route": "/workbench", "roles": None},
+    # ★ 00 卷 §2.1 对总经理的承诺：「在手订单/交付风险/项目毛利/售后质量，一屏看完」
+    #   —— 经营决策与财务可见（他俩有 project:amount / cost:view）
+    {"key": "gm", "name": "经营驾驶舱", "route": "/dashboard", "roles": ("GM", "FIN")},
     {"key": "sales", "name": "商务部工作台", "route": "/workbench/sales", "roles": ("SALES", "SCHEME")},
     {"key": "pm", "name": "项目经理工作台", "route": "/workbench/pm", "roles": ("PM",)},
     {"key": "eng", "name": "工程部工作台", "route": "/workbench/eng", "roles": ("DESIGN", "DESIGN_AUDIT", "CRAFT")},

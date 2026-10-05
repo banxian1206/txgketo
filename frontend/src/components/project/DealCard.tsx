@@ -1,28 +1,13 @@
 // components/project/DealCard.tsx —— 由 ProjectDetailPage 拆出（重构 1.6b · 只拆不改）
 import type { FormInstance } from 'antd'
+import { Chip } from '../../components/ds'
 import dayjs from 'dayjs'
 import type { Project } from '../../api/client'
-import {
-  Button,
-  Card,
-  DatePicker,
-  Divider,
-  Empty,
-  Form,
-  Input,
-  InputNumber,
-  Space,
-  Table,
-  Tag,
-  Typography,
-} from 'antd'
+import { Button, Card, DatePicker, Divider, Empty, Form, Input, InputNumber, Space, Table, Typography } from 'antd'
 
 import AppModal from '../AppModal'
 import EditableField from '../EditableField'
-import {
-  type ProjectDetail as Detail,
-  hasPerm,
-} from '../../api/client'
+import { type ProjectDetail as Detail, hasPerm } from '../../api/client'
 
 export default function DealCard({
   detail,
@@ -170,7 +155,7 @@ export default function DealCard({
                       title: '触发',
                       dataIndex: 'trigger_node',
                       width: 80,
-                      render: (v?: string | null) => (v ? <Tag>{v}</Tag> : '—'),
+                      render: (v?: string | null) => (v ? <Chip>{v}</Chip> : '—'),
                     },
                     {
                       title: '比例',
@@ -192,7 +177,7 @@ export default function DealCard({
                       dataIndex: 'received_amount',
                       width: 110,
                       align: 'right',
-                      render: (v: number | null) => (v ? `¥${v.toLocaleString()}` : <Tag>未收</Tag>),
+                      render: (v: number | null) => (v ? `¥${v.toLocaleString()}` : <Chip>未收</Chip>),
                     },
                     {
                       title: '操作',
@@ -203,12 +188,12 @@ export default function DealCard({
                         if (!hasPerm('payment:edit')) return <Typography.Text type="secondary">—</Typography.Text>
                         // ★ 这一条没录金额（amount 空）→ 不是“已收齐”，是“还没定”（2026-09-30 P2）
                         if (t.amount === null || t.amount === undefined) {
-                          return <Tag>未录金额</Tag>
+                          return <Chip>未录金额</Chip>
                         }
                         return unpaid > 0 ? (
                           <a onClick={() => openReceive(t)}>登记回款</a>
                         ) : (
-                          <Tag color="success">已收齐</Tag>
+                          <Chip tone="ok">已收齐</Chip>
                         )
                       },
                     },

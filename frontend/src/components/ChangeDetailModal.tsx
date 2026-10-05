@@ -1,37 +1,9 @@
-import {
-  Alert,
-  App,
-  Button,
-  Descriptions,
-  Divider,
-  Form,
-  Drawer,
-  Input,
-  InputNumber,
-  Modal,
-  Select,
-  Space,
-  Table,
-  Tag,
-  Typography,
-} from 'antd'
+import { Alert, App, Button, Descriptions, Divider, Form, Drawer, Input, InputNumber, Modal, Select, Space, Table, Typography } from 'antd'
 import { useCallback, useEffect, useState } from 'react'
+import { Status, Chip } from '../components/ds'
 
-import {
-  changeImpact,
-  decideChangeRequest,
-  dispatchChangeRequest,
-  errMsg,
-  getChangeRequest,
-  listUsers,
-  me,
-  reviseChangeBom,
-  type ChangeImpact,
-  type ChangeRequestRow,
-  type User,
-  type UserRow,
-} from '../api/client'
-import { CHANGE_STATUS as STATUS_COLOR } from '../theme/status'
+import { changeImpact, decideChangeRequest, dispatchChangeRequest, errMsg, getChangeRequest, listUsers, me, reviseChangeBom, type ChangeImpact, type ChangeRequestRow, type User, type UserRow } from '../api/client'
+import { CHANGE_STATUS as STATUS_COLOR, toneOf } from '../theme/status'
 
 interface Props {
   crId: number | null
@@ -125,7 +97,7 @@ export default function ChangeDetailModal({ crId, open, onClose, onChanged }: Pr
         cr ? (
           <Space>
             <span>改版申请 {cr.cr_no}</span>
-            <Tag color={STATUS_COLOR[cr.status] ?? 'default'}>{cr.status}</Tag>
+            <Status tone={toneOf(STATUS_COLOR[cr.status])}>{cr.status}</Status>
           </Space>
         ) : (
           '改版申请'
@@ -260,7 +232,7 @@ export default function ChangeDetailModal({ crId, open, onClose, onChanged }: Pr
                 width: 90,
                 render: (v: number, r: { unit?: string | null }) => `${v} ${r.unit ?? ''}`,
               },
-              { title: '状态', dataIndex: 'status', width: 90, render: (v: string) => <Tag>{v}</Tag> },
+              { title: '状态', dataIndex: 'status', width: 90, render: (v: string) => <Chip>{v}</Chip> },
               { title: '来源', dataIndex: 'source', width: 90 },
               { title: '采购单', dataIndex: 'po_no', render: (v: string | null) => v ?? '—' },
             ]}

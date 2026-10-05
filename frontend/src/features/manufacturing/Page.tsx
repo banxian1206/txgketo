@@ -1,52 +1,18 @@
 import { useMfgBoard } from '../../hooks/useMfgBoard'
-import {
-  App,
-  Button,
-  Card,
-  DatePicker,
-  Descriptions,
-  Drawer,
-  Empty,
-  Form,
-  Input,
-  InputNumber,
-  Radio,
-  Select,
-  Space,
-  Table,
-  Tabs,
-  Tag,
-  Typography,
-} from 'antd'
+import { App, Button, Card, DatePicker, Descriptions, Drawer, Form, Input, InputNumber, Radio, Select, Space, Table, Typography } from 'antd'
 import dayjs from 'dayjs'
-import {useEffect, useState} from 'react'
-import {
-  acceptOutsource,
-  acceptProdOrder,
-  dispatchProdOrder,
-  drawingFileUrl,
-  errMsg,
-  generateProdOrders,
-  hasPerm,
-  listEquipment,
-  listProjects,
-  mfgPhotoUrl,
-  returnOutsource,
-  sendOutsource,
-  startProdOrder,
-  transferProdOrder,
-  type OutsourceRow,
-  type ProdOrderRow,
-} from '../../api/client'
+import { useEffect, useState, type ReactNode } from 'react'
+import { acceptOutsource, acceptProdOrder, dispatchProdOrder, drawingFileUrl, errMsg, generateProdOrders, hasPerm, listEquipment, listProjects, mfgPhotoUrl, returnOutsource, sendOutsource, startProdOrder, transferProdOrder, type OutsourceRow, type ProdOrderRow } from '../../api/client'
 import MfgPhotoPicker from '../../components/MfgPhotoPicker'
 import AppModal from '../../components/AppModal'
 import AuthedImage from '../../components/AuthedImage'
 import AuthedFileLink from '../../components/AuthedFileLink'
-import { PROD_STATUS as STATUS_COLOR } from '../../theme/status'
+import { PROD_STATUS as STATUS_COLOR, toneOf } from '../../theme/status'
 import { OUTSOURCE_STATUS as OS_COLOR } from '../../theme/status'
+import {Chip, Code, Status, Empty as DsEmpty } from '../../components/ds'
 import { T } from '../../theme/tokens'
-import { MFG_TABS, filterTabs } from '../../configs/tabs'
-import { useTab } from '../../hooks/useTab'
+import { SHOP_BOARD } from '../../configs/boards'
+import WorkbenchPage from '../../components/domain/WorkbenchPage'
 import { useGoFrom } from '../../hooks/useFrom'
 const TEAMS = ['下料', '机加', '焊接', '钣金', '喷涂']
 type ActionKind = 'dispatch' | 'accept' | 'transfer' | 'os-send' | 'os-accept'
@@ -55,9 +21,6 @@ export default function Manufacturing() {
   // ★ docs/11：跳去别的域时带上 ?from= （来源台/来源页），回来还在原来那一层
   const go = useGoFrom()
   const canEdit = hasPerm('mfg:edit')
-  // ★ 重整 P0（docs/10 §3.2/§3.3）：页签条按**真实权限码**过滤，状态写进 URL（?tab=）
-  const visKeys = filterTabs(MFG_TABS).map((x) => x.key)
-  const [tab, setTab] = useTab(visKeys, 'wait')
   // 生成排产
   const [genProject, setGenProject] = useState<string | undefined>()
   const [genEquip, setGenEquip] = useState<string | undefined>()
@@ -189,7 +152,6 @@ export default function Manufacturing() {
       message.error(errMsg(e))
     }
   }
-  const canGo = hasPerm('mfg:view')
   const orderColumns = (kind: 'wait' | 'running' | 'transfer' | 'rework') => [
     {
       title: '单号',
@@ -211,10 +173,11 @@ export default function Manufacturing() {
       title: '零件（图号）',
       key: 'item',
       render: (_: unknown, r: ProdOrderRow) => (
+        // ★ 入口（2026-10-05）：车间按图号干活 → 图号直接进件档案（看是按哪版图、料到没到）
         <>
-          <div>{r.item_no}</div>
+          <Code to={`/items/${r.item_no}`}>{r.item_no}</Code>
           <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-            {r.item_name ?? ''}
+            {' '}{r.item_name ?? ''}
           </Typography.Text>
         </>
       ),
@@ -227,7 +190,7 @@ export default function Manufacturing() {
       render: (v: string | null, r: ProdOrderRow) => (
         <Space size={4}>
           {v ?? '—'}
-          {r.overdue && <Tag color="red">超期</Tag>}
+          {r.overdue && <Chip tone="err">超期</Chip>}
         </Space>
       ),
     },
@@ -235,7 +198,7 @@ export default function Manufacturing() {
       title: '状态',
       dataIndex: 'status',
       width: 110,
-      render: (v: string) => <Tag color={STATUS_COLOR[v] ?? 'default'}>{v}</Tag>,
+      render: (v: string) => <Status tone={toneOf(STATUS_COLOR[v])}>{v}</Status>,
     },
     {
       title: '操作',
@@ -266,10 +229,11 @@ export default function Manufacturing() {
       title: '零件（图号）',
       key: 'item',
       render: (_: unknown, r: OutsourceRow) => (
+        // ★ 入口（2026-10-05）：车间按图号干活 → 图号直接进件档案（看是按哪版图、料到没到）
         <>
-          <div>{r.item_no}</div>
+          <Code to={`/items/${r.item_no}`}>{r.item_no}</Code>
           <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-            {r.item_name ?? ''}
+            {' '}{r.item_name ?? ''}
           </Typography.Text>
         </>
       ),
@@ -281,7 +245,7 @@ export default function Manufacturing() {
       title: '状态',
       dataIndex: 'status',
       width: 100,
-      render: (v: string) => <Tag color={OS_COLOR[v] ?? 'default'}>{v}</Tag>,
+      render: (v: string) => <Status tone={toneOf(OS_COLOR[v])}>{v}</Status>,
     },
     {
       title: '操作',
@@ -297,95 +261,88 @@ export default function Manufacturing() {
     },
   ]
   const c = wb?.counts
-  return (
-    <Card
-      title={
-        <Space>
-          <span>制造（S5）</span>
-          {c?.overdue ? <Tag color="red">超期 {c.overdue}</Tag> : null}
-          {c?.transferred ? <Tag color="green">已转运 {c.transferred}</Tag> : null}
-        </Space>
-      }
-      extra={
-        <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-          只管两头：下发（原材料 + 图纸，拍照）→ 到期验收（拍照）→ 转运装配区（拍照）
-        </Typography.Text>
-      }
-    >
-      {!canGo && <Empty description="没有查看制造任务的权限（找管理员开 mfg:view）" />}
-      {canGo && (
-        <>
-          <Card size="small" title="生成排产单（按设备）" style={{ marginBottom: 12 }}>
-            <Space wrap>
-              <Select
-                showSearch
-                optionFilterProp="label"
-                style={{ width: 240 }}
-                placeholder="项目"
-                value={genProject}
-                onChange={(v: string | undefined) => void onGenProject(v)}
-                options={projects.map((p) => ({ value: p.project_no, label: `${p.project_no} ${p.project_name}` }))}
-              />
-              <Select
-                showSearch
-                optionFilterProp="label"
-                style={{ width: 200 }}
-                placeholder="设备"
-                value={genEquip}
-                onChange={setGenEquip}
-                options={equips.map((e) => ({ value: e.equip_no, label: `${e.equip_no} ${e.equip_name}` }))}
-              />
-              <Button type="primary" disabled={!canEdit || !genProject || !genEquip} loading={genLoading} onClick={() => void doGenerate()}>
-                生成排产单
-              </Button>
-              <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-                按这台设备**已发布**的图纸展开：自制件 → 排产单，外协件 → 外协任务（重复生成不会重复建）。
-              </Typography.Text>
-            </Space>
-          </Card>
-          <Tabs
-            activeKey={tab}
-            onChange={setTab}
-            items={[
-              {
-                key: 'wait',
-                label: `待下发 (${wb?.wait.length ?? 0})`,
-                children: (
-                  <Table<ProdOrderRow> rowKey="id" size="small" loading={loading} dataSource={wb?.wait ?? []} pagination={{ pageSize: 10, showSizeChanger: false }} locale={{ emptyText: <Empty description="没有待下发的排产单" /> }} columns={orderColumns('wait')} />
-                ),
-              },
-              {
-                key: 'running',
-                label: `在制 / 待验收 (${wb?.running.length ?? 0})`,
-                children: (
-                  <Table<ProdOrderRow> rowKey="id" size="small" loading={loading} dataSource={wb?.running ?? []} pagination={{ pageSize: 10, showSizeChanger: false }} locale={{ emptyText: <Empty description="没有在制的零件" /> }} columns={orderColumns('running')} />
-                ),
-              },
-              {
-                key: 'transfer',
-                label: `待转运 (${wb?.to_transfer.length ?? 0})`,
-                children: (
-                  <Table<ProdOrderRow> rowKey="id" size="small" loading={loading} dataSource={wb?.to_transfer ?? []} pagination={{ pageSize: 10, showSizeChanger: false }} locale={{ emptyText: <Empty description="没有待转运的零件" /> }} columns={orderColumns('transfer')} />
-                ),
-              },
-              {
-                key: 'rework',
-                label: `返工 (${wb?.rework.length ?? 0})`,
-                children: (
-                  <Table<ProdOrderRow> rowKey="id" size="small" loading={loading} dataSource={wb?.rework ?? []} pagination={{ pageSize: 10, showSizeChanger: false }} locale={{ emptyText: <Empty description="没有返工件" /> }} columns={orderColumns('rework')} />
-                ),
-              },
-              {
-                key: 'outsource',
-                label: `外协 (${wb?.outsource.length ?? 0})`,
-                children: (
-                  <Table<OutsourceRow> rowKey="id" size="small" loading={loading} dataSource={wb?.outsource ?? []} pagination={{ pageSize: 10, showSizeChanger: false }} locale={{ emptyText: <Empty description="没有外协任务" /> }} columns={osColumns} />
-                ),
-              },
-            ].filter((x) => visKeys.includes(x.key))}
+  // 体：按页签 key 取（顺序 / 标题 / 徽标 / 可见性全来自注册表 SHOP_BOARD）
+  const parts: Record<string, ReactNode> = {
+    wait: (
+      <>
+      <Card size="small" title="生成排产单（按设备）" style={{ marginBottom: 12 }}>
+        <Space wrap>
+          <Select
+            showSearch
+            optionFilterProp="label"
+            style={{ width: 240 }}
+            placeholder="项目"
+            value={genProject}
+            onChange={(v: string | undefined) => void onGenProject(v)}
+            options={projects.map((p) => ({ value: p.project_no, label: `${p.project_no} ${p.project_name}` }))}
           />
-        </>
-      )}
+          <Select
+            showSearch
+            optionFilterProp="label"
+            style={{ width: 200 }}
+            placeholder="设备"
+            value={genEquip}
+            onChange={setGenEquip}
+            options={equips.map((e) => ({ value: e.equip_no, label: `${e.equip_no} ${e.equip_name}` }))}
+          />
+          <Button type="primary" disabled={!canEdit || !genProject || !genEquip} loading={genLoading} onClick={() => void doGenerate()}>
+            生成排产单
+          </Button>
+          <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+            按这台设备已发布的图纸展开：自制件 → 排产单，外协件 → 外协任务（重复生成不会重复建）。
+          </Typography.Text>
+        </Space>
+      </Card>
+          <Table<ProdOrderRow> rowKey="id" size="small" loading={loading} dataSource={wb?.wait ?? []} pagination={{ pageSize: 10, showSizeChanger: false }} locale={{ emptyText: <DsEmpty text="没有待下发的排产单" /> }} columns={orderColumns('wait')} />
+          <Table<ProdOrderRow> rowKey="id" size="small" loading={loading} dataSource={wb?.wait ?? []} pagination={{ pageSize: 10, showSizeChanger: false }} locale={{ emptyText: <DsEmpty text="没有待下发的排产单" /> }} columns={orderColumns('wait')} />
+      </>
+    ),
+    running: (
+          <Table<ProdOrderRow> rowKey="id" size="small" loading={loading} dataSource={wb?.running ?? []} pagination={{ pageSize: 10, showSizeChanger: false }} locale={{ emptyText: <DsEmpty text="没有在制的零件" /> }} columns={orderColumns('running')} />
+        
+    ),
+    transfer: (
+          <Table<ProdOrderRow> rowKey="id" size="small" loading={loading} dataSource={wb?.to_transfer ?? []} pagination={{ pageSize: 10, showSizeChanger: false }} locale={{ emptyText: <DsEmpty text="没有待转运的零件" /> }} columns={orderColumns('transfer')} />
+        
+    ),
+    rework: (
+          <Table<ProdOrderRow> rowKey="id" size="small" loading={loading} dataSource={wb?.rework ?? []} pagination={{ pageSize: 10, showSizeChanger: false }} locale={{ emptyText: <DsEmpty text="没有返工件" /> }} columns={orderColumns('rework')} />
+        
+    ),
+    outsource: (
+          <Table<OutsourceRow> rowKey="id" size="small" loading={loading} dataSource={wb?.outsource ?? []} pagination={{ pageSize: 10, showSizeChanger: false }} locale={{ emptyText: <DsEmpty text="没有外协任务" /> }} columns={osColumns} />
+        
+    ),
+  }
+
+  return (
+    <div className="ds-page">
+      {/* ★ docs/15 台骨架四件套（制造视图）：台头 → 结论条 → 流程条（注册表驱动）→ 体 */}
+      <WorkbenchPage
+        board={SHOP_BOARD}
+        sub={c?.overdue ? `有 ${c.overdue} 张排产单已超期` : '没有超期的排产单'}
+        help="车间只管两头：下任务 + 验收零件。上面数字可点，点了切到对应队列。"
+        actions={
+          <Button size="small" onClick={() => void load()}>
+            刷新
+          </Button>
+        }
+        counts={{
+          wait: (c?.wait ?? 0),
+          running: (c?.running ?? 0),
+          transfer: (c?.to_transfer ?? 0),
+          rework: (c?.rework ?? 0),
+        }}
+        metrics={[
+          { key: 'wait', label: '待下发', value: c?.wait ?? 0, unit: '项', tone: c?.wait ? 'warn' : undefined, dimZero: true, to: '?tab=wait' },
+          { key: 'running', label: '在制 / 待验收', value: c?.running ?? 0, unit: '项', dimZero: true, to: '?tab=running' },
+          { key: 'transfer', label: '待转运装配区', value: c?.to_transfer ?? 0, unit: '项', dimZero: true, to: '?tab=transfer' },
+          { key: 'rework', label: '返工', value: c?.rework ?? 0, unit: '项', tone: c?.rework ? 'err' : undefined, dimZero: true, to: '?tab=rework' },
+          { key: 'overdue', label: '超期排产单', value: c?.overdue ?? 0, unit: '张', tone: c?.overdue ? 'err' : undefined, dimZero: true, to: '?tab=running' },
+        ]}
+      >
+        {(t) => parts[t]}
+      </WorkbenchPage>
       {/* 动作弹窗 */}
       <AppModal
         open={!!action}
@@ -510,11 +467,11 @@ export default function Manufacturing() {
               <Descriptions.Item label="零件">{detail.item_no} {detail.item_name ?? ''}</Descriptions.Item>
               <Descriptions.Item label="数量">{detail.qty} {detail.unit}</Descriptions.Item>
               <Descriptions.Item label="计划">{detail.plan_start ?? '—'} ~ {detail.plan_end ?? '—'}</Descriptions.Item>
-              <Descriptions.Item label="状态"><Tag color={STATUS_COLOR[detail.status] ?? 'default'}>{detail.status}</Tag></Descriptions.Item>
+              <Descriptions.Item label="状态"><Status tone={toneOf(STATUS_COLOR[detail.status])}>{detail.status}</Status></Descriptions.Item>
               <Descriptions.Item label="原材料">{detail.material_item_no ?? '—'}</Descriptions.Item>
             </Descriptions>
             <Typography.Title level={5} style={{ marginTop: 16 }}>下发记录</Typography.Title>
-            {(detail.tasks ?? []).length === 0 && <Empty description="还没下发" />}
+            {(detail.tasks ?? []).length === 0 && <DsEmpty text="还没下发" />}
             {(detail.tasks ?? []).map((t) => (
               <Card key={t.id} size="small" style={{ marginBottom: 8 }}>
                 <div>
@@ -531,10 +488,10 @@ export default function Manufacturing() {
               </Card>
             ))}
             <Typography.Title level={5} style={{ marginTop: 16 }}>验收 / 转运</Typography.Title>
-            {(detail.acceptances ?? []).length === 0 && <Empty description="还没验收" />}
+            {(detail.acceptances ?? []).length === 0 && <DsEmpty text="还没验收" />}
             {(detail.acceptances ?? []).map((a) => (
               <Card key={a.id} size="small" style={{ marginBottom: 8 }}>
-                <Tag color={a.result === '合格' ? 'success' : 'error'}>{a.result}</Tag>
+                <Status tone={a.result === '合格' ? 'ok' : 'err'}>{a.result}</Status>
                 {a.reason}
                 <div style={{ fontSize: 12, color: T.textSecondary }}>
                   {a.accepted_at?.slice(0, 16).replace('T', ' ') ?? ''}
@@ -550,6 +507,6 @@ export default function Manufacturing() {
           </>
         )}
       </Drawer>
-    </Card>
+    </div>
   )
 }

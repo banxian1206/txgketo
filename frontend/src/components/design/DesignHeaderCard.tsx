@@ -1,23 +1,14 @@
+import { Link } from 'react-router-dom'
+import { Chip } from '../../components/ds'
 import type { FormInstance } from 'antd'
 // components/design/DesignHeaderCard.tsx —— 由 EquipmentDesign 拆出（重构 1.6 · 只拆不改）
-import {
-  Button,
-  Card,
-  Col,
-  Row,
-  Space,
-  Tag,
-  Typography,
-} from 'antd'
+import { Button, Card, Col, Row, Space, Typography } from 'antd'
 import { useBack } from '../../hooks/useFrom'
 
 
 
-import {
-  type DesignRoot,
-  type DesignTree,
-} from '../../api/client'
-import { DESIGN_STATE as STATE_COLOR } from '../../theme/status'
+import { type DesignRoot, type DesignTree } from '../../api/client'
+import { DESIGN_STATE as STATE_COLOR, toneOf } from '../../theme/status'
 
 export default function DesignHeaderCard({
 data,
@@ -56,7 +47,7 @@ data: DesignTree | null;
                     {root.exists ? '' : '（未创建）'}
                   </Typography.Text>
                 )}
-                <Tag color={STATE_COLOR[data?.state ?? '未开始']}>{data?.state}</Tag>
+                <Chip tone={toneOf(STATE_COLOR[data?.state ?? '未开始'])}>{data?.state}</Chip>
                 <Typography.Text type="secondary" style={{ fontSize: 13 }}>
                   图 {data?.counts.drawings ?? 0} 张 · 组件 {data?.counts.components ?? 0} · 零件{' '}
                   {data?.counts.parts ?? 0}（自制 {data?.counts.self_made ?? 0} / 外协{' '}
@@ -66,6 +57,11 @@ data: DesignTree | null;
               </Space>
             </Col>
             <Col>
+              {/* ★ R2：设备档案 = 这台设备的一生（只读汇总 + 跳各台干活）；
+                  设计面只负责"设计"这一环，别互相抄 */}
+              <Link to={`/equipment/${projectNo}/${equipNo}`} style={{ marginRight: 8 }}>
+                <Button>设备档案</Button>
+              </Link>
               <Button
                 type="primary"
                 onClick={() => {

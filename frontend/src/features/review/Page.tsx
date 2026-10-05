@@ -1,11 +1,13 @@
-import { App, Button, Card, Table, Tabs, Tag, Typography } from 'antd'
+import { App, Button, Card, Table, Tooltip, Typography } from 'antd'
+import { Status } from '../../components/ds'
 import type { ColumnsType } from 'antd/es/table'
 import { useCallback, useEffect, useState } from 'react'
 
+import WorkbenchTabs from '../../components/ds/WorkbenchTabs'
 import ReviewDetailModal from '../../components/ReviewDetailModal'
 import { errMsg, listReviewTickets, me, type ReviewTicketBrief, type User } from '../../api/client'
-import { REVIEW_STATUS as STATUS_COLOR } from '../../theme/status'
-import { REVIEW_TABS, filterTabs } from '../../configs/tabs'
+import { REVIEW_STATUS as STATUS_COLOR, toneOf } from '../../theme/status'
+import { REVIEW_TABS, filterTabs, REVIEW_GROUPS } from '../../configs/tabs'
 import { useTab } from '../../hooks/useTab'
 
 /** 设计评审：待我审核 / 我提交的 / 全部（05 卷 §3、§9 评审工作台） */
@@ -86,7 +88,7 @@ export default function Reviews() {
       title: '状态',
       dataIndex: 'status',
       width: 100,
-      render: (v: string) => <Tag color={STATUS_COLOR[v] ?? 'default'}>{v}</Tag>,
+      render: (v: string) => <Status tone={toneOf(STATUS_COLOR[v])}>{v}</Status>,
     },
     {
       title: '轮次',
@@ -112,12 +114,20 @@ export default function Reviews() {
 
   return (
     <Card
-      title="设计评审"
+      title={
+        <>
+          设计评审{' '}
+          <Tooltip title="审核链：组员提交 → 本部门经理（一级）→ 总监（二级）→ 发布（= 冻结）。发布后这一轮内容成为冻结版本，采购按发布批次触发。">
+            <span className="ds-help">?</span>
+          </Tooltip>
+        </>
+      }
       extra={<Button onClick={() => void load()}>刷新</Button>}
     >
-      <Tabs
-        activeKey={scope}
-        onChange={setTab}
+      <WorkbenchTabs
+        groups={REVIEW_GROUPS}
+        tab={scope}
+        onTab={setTab}
         items={[
           { key: 'todo', label: `待我审核 (${scope === 'todo' ? rows.length : '—'})` },
           { key: 'mine', label: '我提交的' },
@@ -132,10 +142,6 @@ export default function Reviews() {
         columns={columns}
         pagination={{ pageSize: 20, showSizeChanger: false }}
       />
-      <Typography.Paragraph type="secondary" style={{ fontSize: 12, marginTop: 12 }}>
-        审核链：组员提交 → 本部门经理（一级）→ 总监（二级）→ 发布（= 冻结）。
-        发布后这一轮内容成为冻结版本，采购按发布批次触发（05 卷 §3、§5）。
-      </Typography.Paragraph>
       <ReviewDetailModal
         ticketId={ticketId}
         open={open}

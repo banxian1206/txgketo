@@ -32,13 +32,6 @@ export interface Workbench {
   stock: { item_kinds: number; out_of_stock: number }
 }
 
-export interface Workbench {
-  incoming: IncomingRow[]
-  pending_storage: StorageRow[]
-  pending_issues: IssueRow[]
-  stock: { item_kinds: number; out_of_stock: number }
-}
-
 export interface StockRow {
   id: number; item_no: string; display_name: string; spec_text?: string | null; unit?: string | null
   location_name?: string | null; qty_on_hand: number; qty_locked: number; qty_available: number

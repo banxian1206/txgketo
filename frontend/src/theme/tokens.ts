@@ -3,8 +3,11 @@
 // 灰阶 6 档封顶：标题/正文次/辅助/禁用字/分割线/浅底 —— 旧值 #999 #888 已归并到 #8c8c8c、
 // #bbb #aaa → #bfbfbf、#666 → #595959、两套红 #cf1322/#f5222d → error 统一。
 export const T = {
-  /** 品牌蓝（logo 橙只做品牌点缀，界面功能色一律用它 —— 视觉规范 §6.2 蓝橙分工） */
-  brand: '#1f6feb',
+  /** 品牌蓝（logo 橙只做品牌点缀，界面功能色一律用它 —— 视觉规范 §6.2 蓝橙分工）
+   *  ★ 2026-10-04 方案 A「纸面」：由 #1f6feb（GitHub 蓝）收敛为 #1f5fd0（更深、更稳，
+   *  与 A 的冷灰底 #f6f7f9 对比更干净；旧值在浅底上偏「亮蓝」，长看疲劳） */
+  brand: '#1f5fd0',
+  brandHover: '#134aa8',
   brandDeep: '#0f2b52',
   /** 中性 */
   bg: '#ffffff',
@@ -54,3 +57,64 @@ export const SP = { xxs: 4, xs: 8, sm: 12, md: 16, lg: 24, xl: 32 } as const
  */
 export const MONO =
   'ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace'
+
+/**
+ * ★ 方案 A「纸面 Paper」的中性色板（2026-10-04 客户选定）。
+ *
+ * 为什么要单列：旧 token 只有语义色 + 极简灰阶（bg/border/3 档文字色），
+ * 页面要「分层」只能各写各的 hex —— 这正是 docs/12 §1.2 说「8 层灰阶缺失」的那条。
+ * 现在把 A 的 9 档中性色定死在这里（业务 tsx 不许再出现裸 hex，`VIS-hex` 盯着）。
+ * 层级原则：**靠「描边 + 背景分层」拉开，不靠阴影堆叠**（A 的核心视觉决策）。
+ */
+export const PAPER = {
+  /** 页面底 */
+  bg: '#f6f7f9',
+  /** 面板底 */
+  surface: '#ffffff',
+  /** 面板内浅底（表头 / 分组头 / 行 hover） */
+  surface2: '#fbfcfd',
+  /** 再深一档（禁用底 / 分隔块） */
+  surface3: '#f2f4f7',
+  /** 发丝线：1px 主分隔 */
+  line: '#e7e9ee',
+  /** 控件描边（比发丝线重一档） */
+  line2: '#d8dce3',
+  /** 正文 / 标题 */
+  ink: '#14161a',
+  /** 次要正文 */
+  ink2: '#59616e',
+  /** 辅助说明 */
+  ink3: '#8b93a1',
+  /** 占位 / 弱标 */
+  ink4: '#b8bfc9',
+  /** 主色浅底（选中态、当前阶段） */
+  accentSoft: '#eef4ff',
+  /** 主色浅边 */
+  accentLine: '#c9dcf8',
+  /** 语义浅底（状态条 / 徽标） */
+  okSoft: '#e8f7f0',
+  warnSoft: '#fdf3e6',
+  errSoft: '#fdecec',
+  /** 语义描边（浅底配套） */
+  okLine: '#bfe3d1',
+  warnLine: '#f0dcb8',
+  errLine: '#f3c9c9',
+  /**
+   * 语义文字色（★ A 的对比度决策）—— antd 默认的 #faad14/#f5222d 在浅底上偏刺眼：
+   * 「警告」用深一些的金棕，长看不累，且与红色仍能区分。
+   */
+  ok: '#0f9d63',
+  warn: '#c4761a',
+  err: '#d23b3b',
+  /** 中性状态（未开始 / 无状态） */
+  idle: '#98a1ae',
+} as const
+
+/**
+ * ★ 圆角三档封顶（视觉规范 §1.3 原本允许 6/999/2 三种「混着用」）。
+ * A 的规矩：**容器 12 / 控件 8 / 小元素 6 / 胶囊 999** —— 一个页面里只准出现这 4 个值。
+ */
+export const R = { lg: 12, md: 8, sm: 6, pill: 999 } as const
+
+/** 阴影只此一档（A 不做多层阴影；卡片靠发丝线，不靠浮起来） */
+export const SHADOW = '0 1px 2px rgba(16, 24, 40, 0.05)'

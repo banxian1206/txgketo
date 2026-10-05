@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>方案 C · 密排 Ledger</title>
+<style>
+/* ══════ 方案 C「密排 Ledger」══════
+   无侧栏、单张白纸 + 发丝分隔线；等宽数字为主角；顶部一行导航。
+   气质：数据终端 / 账本。密度最高，屏幕利用率优先，装饰最少。 */
+:root{
+  --bg:#fbfbfa; --sheet:#fff; --tint:#f5f6f7; --tint2:#eef0f2;
+  --hair:#e6e8ea; --hair2:#d4d8dc;
+  --ink:#101315; --ink2:#4c555c; --ink3:#79838c; --ink4:#a4adb5;
+  --acc:#0b62d6; --accTint:#eaf2fd;
+  --ok:#0a7f52; --warn:#a8620b; --err:#c02626; --run:#0b62d6; --idle:#98a1a9;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font:400 12.5px/1.5 -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;
+  background:var(--bg);color:var(--ink);-webkit-font-smoothing:antialiased;font-variant-numeric:tabular-nums}
+.m{font-family:var(--mono);font-size:12px;letter-spacing:-.15px}
+.up{font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--ink4);font-weight:600}
+
+/* ── 顶部导航（唯一一层）── */
+header{position:sticky;top:0;z-index:20;background:var(--sheet);border-bottom:1px solid var(--hair)}
+.h1{display:flex;align-items:center;gap:18px;height:44px;padding:0 22px}
+.brand{display:flex;align-items:center;gap:8px}
+.brand .k{width:20px;height:20px;border-radius:4px;background:#101315;color:#fff;display:grid;place-items:center;font:700 9px/1 var(--mono)}
+.brand b{font-size:13px;font-weight:600;letter-spacing:-.1px}
+.brand span{font-size:10px;color:var(--ink4);letter-spacing:.8px;margin-left:2px}
+nav{display:flex;gap:1px;align-items:center}
+nav a{font-size:12.5px;color:var(--ink2);text-decoration:none;padding:5px 10px;border-radius:5px;display:flex;align-items:center;gap:5px}
+nav a:hover{background:var(--tint);color:var(--ink)}
+nav a.on{background:var(--ink);color:#fff;font-weight:500}
+nav a .n{font:500 10px/1 var(--mono);opacity:.75}
+.h1 .right{margin-left:auto;display:flex;align-items:center;gap:8px}
+.find{display:flex;align-items:center;gap:7px;height:28px;padding:0 9px;border:1px solid var(--hair2);border-radius:6px;
+  color:var(--ink4);font-size:12px;background:var(--tint);min-width:250px}
+.find:hover{background:#fff;border-color:var(--acc);color:var(--ink3)}
+.find svg{width:12px;height:12px;stroke-width:2}
+.kbd{font:600 9.5px/14px var(--mono);border:1px solid var(--hair2);border-radius:4px;padding:0 4px;color:var(--ink4);background:#fff}
+.ava{width:24px;height:24px;border-radius:6px;background:var(--tint2);color:var(--ink2);display:grid;place-items:center;font-size:11px;font-weight:600}
+
+/* ── 上下文条 ── */
+.ctx{display:flex;align-items:center;gap:14px;height:38px;padding:0 22px;border-bottom:1px solid var(--hair);background:var(--sheet)}
+.ctx .tabs{display:flex;gap:14px}
+.ctx .tabs a{font-size:12.5px;color:var(--ink3);text-decoration:none;padding:9px 0;border-bottom:2px solid transparent;margin-bottom:-1px}
+.ctx .tabs a.on{color:var(--ink);font-weight:600;border-bottom-color:var(--ink)}
+.ctx .tabs a .c{font-family:var(--mono);font-size:10.5px;color:var(--ink4);margin-left:4px}
+.ctx .rt{margin-left:auto;display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--ink3)}
+.flt{border:1px solid var(--hair);background:#fff;border-radius:5px;height:24px;padding:0 8px;font-size:11.5px;color:var(--ink2);font-family:inherit;display:inline-flex;align-items:center;gap:5px}
+.flt b{color:var(--ink);font-weight:500}
+
+.wrap{padding:18px 22px 60px;max-width:1320px}
+/* ── 白纸 ── */
+.sheet{background:var(--sheet);border:1px solid var(--hair);border-radius:8px}
+.sheet+.sheet{margin-top:14px}
+.sh{display:flex;align-items:baseline;gap:10px;padding:11px 16px;border-bottom:1px solid var(--hair)}
+.sh h2{font-size:13px;font-weight:600;letter-spacing:-.1px}
+.sh .sub{font-size:11px;color:var(--ink4)}
+.sh .rt{margin-left:auto;display:flex;gap:6px;align-items:center}
+
+.btn{height:26px;padding:0 10px;border-radius:6px;border:1px solid var(--hair2);background:#fff;font-size:12px;
+  font-weight:500;color:var(--ink);cursor:pointer;font-family:inline,inherit;display:inline-flex;align-items:center;gap:5px}
+.btn:hover{background:var(--tint)}
+.btn.blk{background:var(--ink);border-color:var(--ink);color:#fff;letter-spacing:.2px}
+.btn.blk:hover{background:#26292c}
+.btn.sm{height:22px;padding:0 7px;font-size:11.5px;border-radius:5px}
+.btn.lnk{border-color:transparent;background:transparent;color:var(--ink3)} .btn.lnk:hover{color:var(--ink);background:var(--tint)}
+
+/* ── 关键数字：一行账目 ── */
+.legs{display:flex;flex-wrap:wrap}
+.leg{flex:1;min-width:132px;padding:12px 16px;border-right:1px solid var(--hair);border-bottom:1px solid var(--hair)}
+.leg:last-child{border-right:0}
+.leg .k{font-size:10px;letter-spacing:.9px;text-transform:uppercase;color:var(--ink4);font-weight:600;margin-bottom:6px}
+.leg .v{font:600 19px/1 var(--mono);letter-spacing:-.8px}
+.leg .v small{font-size:11px;font-weight:400;letter-spacing:0;color:var(--ink3);font-family:var(--mono)}
+.leg.e .v{color:var(--err)} .leg.o .v{color:var(--ok)} .leg.w .v{color:var(--warn)}
+.leg .n{font-size:10.5px;color:var(--ink4);margin-top:5px}
+
+/* ── 状态：点 + 灰字 ── */
+.s{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;color:var(--ink2);white-space:nowrap}
+.s i{width:6px;height:6px;border-radius:50%;background:var(--idle);flex:none}
+.s.ok i{background:var(--ok)}.s.ok{color:var(--ok)}
+.s.e i{background:var(--err)}.s.e{color:var(--err)}
+.s.w i{background:var(--warn)}.s.w{color:var(--warn)}
+.s.r i{background:var(--run)}.s.r{color:var(--run)}
+.s.idle{color:var(--ink3)}
+
+/* ── 队列：发丝 + 左标签栏 ── */
+.q{display:grid;grid-template-columns:112px 1fr}
+.q .gut{padding:12px 0 0 16px}
+.q .gut .up{display:block}
+.q .gut .cnt{font:600 11px/1 var(--mono);color:var(--ink4);margin-top:4px}
+.q .lst{border-left:1px solid var(--hair)}
+.it{display:grid;grid-template-columns:1fr 126px 100px 96px 164px;gap:12px;align-items:center;
+  padding:9px 16px 9px 14px;border-bottom:1px solid var(--hair)}
+.it:last-child{border-bottom:0}
+.it:hover{background:var(--tint)}
+.it .t{min-width:0}
+.it .t .a{display:flex;align-items:center;gap:8px}
+.it .t .id{font:500 12px/1 var(--mono);letter-spacing:-.2px}
+.it .t .ttl{font-size:12.5px;font-weight:500}
+.it .t .mt{font-size:11px;color:var(--ink3);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.it .t .mt b{color:var(--err);font-weight:500}
+.it .c{font-size:11.5px;color:var(--ink2)}
+.it .c.e{color:var(--err);font-weight:500} .it .c.w{color:var(--warn);font-weight:500}
+.it .a2{display:flex;justify-content:flex-end;gap:5px;opacity:.55;white-space:nowrap}
+.it .a2 .btn{flex:none}
+.it:hover .a2{opacity:1}
+
+/* ── 表 ── */
+table{width:100%;border-collapse:collapse}
+th{font-size:10px;letter-spacing:.7px;text-transform:uppercase;color:var(--ink4);font-weight:600;text-align:left;
+  padding:7px 16px;border-bottom:1px solid var(--hair2);background:var(--sheet)}
+td{padding:8px 16px;border-bottom:1px solid var(--hair);font-size:12px;color:var(--ink2);white-space:nowrap}
+tbody tr:hover td{background:var(--tint)}
+td.n,th.n{text-align:right;font-family:var(--mono);font-size:11.5px;letter-spacing:-.15px}
+td.nm{color:var(--ink);font-weight:500}
+.lk{color:var(--ink);text-decoration:none;border-bottom:1px solid var(--hair2)}
+.lk:hover{color:var(--acc);border-bottom-color:var(--acc)}
+
+/* ── 轨道：刻度尺 ── */
+.ruler{padding:14px 16px 10px}
+.ruler .ln{position:relative;height:26px;border-bottom:1px solid var(--hair2);margin-bottom:8px}
+.ruler .tk{position:absolute;bottom:-1px;width:1px;height:8px;background:var(--hair2)}
+.ruler .tk.on{height:14px;background:var(--ink)}
+.ruler .seg{position:absolute;bottom:-1px;height:3px;background:var(--ok)}
+.ruler .seg.e{background:var(--err)} .ruler .seg.r{background:var(--acc)}
+.ruler .names{display:flex}
+.ruler .nm{flex:1;min-width:0;padding-right:6px}
+.ruler .nm .n1{font-size:10.5px;color:var(--ink4);display:flex;align-items:center;gap:4px;white-space:nowrap;overflow:hidden}
+.ruler .nm .n1 i{width:5px;height:5px;border-radius:50%;background:var(--idle);flex:none}
+.ruler .nm.done .n1 i{background:var(--ok)} .ruler .nm.now .n1 i{background:var(--acc)} .ruler .nm.block .n1 i{background:var(--err)}
+.ruler .nm .n2{font-size:11.5px;font-weight:500;margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ruler .nm.block .n2{color:var(--err)} .ruler .nm.now .n2{color:var(--acc)}
+.ruler .nm .n3{font:400 10px/1.4 var(--mono);color:var(--ink4)}
+
+.cols{display:grid;grid-template-columns:1fr 316px;gap:14px;align-items:start}
+.tl{padding:6px 16px 12px}
+.tli{display:grid;grid-template-columns:64px 1fr;gap:10px;padding:7px 0;border-bottom:1px dashed var(--hair)}
+.tli:last-child{border-bottom:0}
+.tli .tm{font:400 10.5px/1.5 var(--mono);color:var(--ink4);padding-top:1px}
+.tli .tx{font-size:11.5px;color:var(--ink2)}
+.tli .tx b{color:var(--ink);font-weight:500}
+.tli .pic{display:inline-block;width:38px;height:28px;border-radius:4px;border:1px solid var(--hair);
+  background:linear-gradient(135deg,#f2f4f6,#e6eaee);margin:5px 5px 0 0;font-size:9px;color:var(--ink4);text-align:center;line-height:28px}
+.kv{padding:8px 16px 12px}
+.kvi{display:flex;gap:10px;padding:5px 0;border-bottom:1px dashed var(--hair);font-size:11.5px}
+.kvi:last-child{border-bottom:0}
+.kvi .k{width:74px;color:var(--ink4);flex:none}
+.kvi .v{color:var(--ink)}
+
+.vsw{position:fixed;bottom:14px;left:50%;transform:translateX(-50%);z-index:99;display:flex;gap:2px;
+  background:rgba(16,19,21,.94);backdrop-filter:blur(8px);border-radius:999px;padding:4px;box-shadow:0 8px 28px rgba(0,0,0,.25)}
+.vsw button{border:0;background:transparent;color:#a4adb5;font-size:12px;padding:5px 13px;border-radius:999px;cursor:pointer;font-family:inherit}
+.vsw button.on{background:#fff;color:#101315;font-weight:500}
+.vsw a{color:#8a939b;font-size:12px;padding:5px 10px;border-radius:999px;text-decoration:none}
+.vsw a:hover{color:#fff}
+.view{display:none}.view.on{display:block}
+</style>
+</head>
+<body>
+<header>
+  <div class="h1">
+    <div class="brand"><span class="k">TX</span><b>同兴高科</b><span>PROJECT LEDGER</span></div>
+    <nav>
+      <a class="on" data-go="v-inbox" href="#">收件箱 <span class="n">11</span></a>
+      <a data-go="v-list" href="#">项目 <span class="n">9</span></a>
+      <a href="#">采购 <span class="n">2</span></a>
+      <a href="#">仓库 <span class="n">13</span></a>
+      <a href="#">车间</a><a href="#">装配</a><a href="#">发运 <span class="n">1</span></a>
+      <a href="#">现场 <span class="n">2</span></a><a href="#">售后 <span class="n">2</span></a>
+      <a href="#">主数据</a>
+    </nav>
+    <div class="right">
+      <div class="find"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+        粘贴任意编号 / 图号 / 物料号<span class="kbd">⌘K</span></div>
+      <div class="ava">项</div>
+    </div>
+  </div>
+</header>
+
+<!-- ═══ 视图 1 收件箱 ═══ -->
+<section class="view on" id="v-inbox">
+  <div class="ctx">
+    <div class="tabs"><a class="on" href="#">待办<span class="c">11</span></a><a href="#">我的项目<span class="c">4</span></a>
+      <a href="#">消息<span class="c">2</span></a><a href="#">稍后处理<span class="c">5</span></a></div>
+    <div class="rt"><span class="flt">范围 <b>我负责 + 我部门</b></span><span class="flt">排序 <b>阻塞优先</b></span>
+      <button class="btn sm">＋ 新建商机</button></div>
+  </div>
+  <div class="wrap">
+    <div class="sheet">
+      <div class="legs">
+        <div class="leg e"><div class="k">阻塞下游</div><div class="v">3</div><div class="n">仓库收货 · 排产 · 装车</div></div>
+        <div class="leg w"><div class="k">今天到期</div><div class="v">5</div><div class="n">最紧 FH26005 14:00</div></div>
+        <div class="leg"><div class="k">本周</div><div class="v">12</div><div class="n">上周 9 · +3</div></div>
+        <div class="leg o"><div class="k">我的项目</div><div class="v">4<small> 个</small></div><div class="n">1 个交付风险</div></div>
+        <div class="leg"><div class="k">未读消息</div><div class="v">2</div><div class="n">25 条系统通知已折叠</div></div>
+        <div class="leg"><div class="k">超期未关</div><div class="v">1</div><div class="n">TX26001 交期已过 12 天</div></div>
+      </div>
+    </div>
+
+    <div class="sheet">
+      <div class="q">
+        <div class="gut"><span class="up">阻塞下游</span><div class="cnt">03</div></div>
+        <div class="lst">
+          <div class="it">
+            <div class="t"><div class="a"><span class="id">PO26034</span><span class="s e"><i></i>待你审批</span></div>
+              <div class="mt">板材 Q235 2.0mm·1220x2440 ×5 张 · ¥46,500 · TX26001 / 01A · 采购组员 提交 2h 前 · <b>仓库收货卡在单上</b></div></div>
+            <div class="c">采购 → 你</div><div class="c e">等 2 小时</div><div class="s r"><i></i>价格审批</div>
+            <div class="a2"><button class="btn sm">退回</button><button class="btn sm blk">通过</button></div>
+          </div>
+          <div class="it">
+            <div class="t"><div class="a"><span class="id">CR26002</span><span class="s e"><i></i>待裁决</span></div>
+              <div class="mt">定制底板 自制→外协 · 影响已发布 V1 · <b>01A 齐套率卡在 54%</b> · 工艺组员申请</div></div>
+            <div class="c">工程总监</div><div class="c e">超期 1 天</div><div class="s e"><i></i>阻塞排产</div>
+            <div class="a2"><button class="btn sm">否决</button><button class="btn sm blk">批准下发</button></div>
+          </div>
+          <div class="it">
+            <div class="t"><div class="a"><span class="id">FH26005</span><span class="s e"><i></i>待叫车</span></div>
+              <div class="mt">01A 点胶机 已装配完成 · 发货日 10-05 · 采购未叫车 → 装车硬拦</div></div>
+            <div class="c">交付发运</div><div class="c e">今天 14:00</div><div class="s w"><i></i>发运前置</div>
+            <div class="a2"><button class="btn sm">看清单</button><button class="btn sm blk">催采购</button></div>
+          </div>
+        </div>
+      </div>
+      <div class="q">
+        <div class="gut"><span class="up">今天到期</span><div class="cnt">02</div></div>
+        <div class="lst">
+          <div class="it">
+            <div class="t"><div class="a"><span class="id">TX26001</span><span class="s w"><i></i>质保金到期前 60 天</span></div>
+              <div class="mt">审计客户A · 质保金 ¥300,000 · 质保至 2027-09-29 · 前三节点已收齐</div></div>
+            <div class="c">商务专员</div><div class="c w">今天</div><div class="s ok"><i></i>已收 75%</div>
+            <div class="a2"><button class="btn sm blk">登记回款</button></div>
+          </div>
+          <div class="it">
+            <div class="t"><div class="a"><span class="id">MI26003</span><span class="s w"><i></i>部分领料</span></div>
+              <div class="mt">缺 2 行（导轨 HGR20 已补货）· 车间等料开工 · 可继续备料</div></div>
+            <div class="c">仓管组员</div><div class="c w">今天 18:00</div><div class="s r"><i></i>备料中</div>
+            <div class="a2"><button class="btn sm">继续备料</button><button class="btn sm blk">车间领走</button></div>
+          </div>
+        </div>
+      </div>
+      <div class="q">
+        <div class="gut"><span class="up">本周</span><div class="cnt">06</div></div>
+        <div class="lst">
+          <div class="it"><div class="t"><div class="a"><span class="id">RV26007</span><span class="s r"><i></i>待经理审</span></div>
+            <div class="mt">01A 机械 · 图纸 4 张 + 设计 BOM 2 行 · 总装图已随批</div></div>
+            <div class="c">机械经理</div><div class="c">10-06</div><div class="s idle"><i></i>第 1 轮</div>
+            <div class="a2"><button class="btn sm blk">开始评审</button></div></div>
+          <div class="it"><div class="t"><div class="a"><span class="id">WX26002</span><span class="s r"><i></i>外协中</span></div>
+            <div class="mt">TX26001-01A-01-01-00-00 定制底板 · 我方供料 · 约定回厂 11-08</div></div>
+            <div class="c">丙外协</div><div class="c">11-08</div><div class="s idle"><i></i>在途</div>
+            <div class="a2"><button class="btn sm">登记回厂</button></div></div>
+          <div class="it"><div class="t"><div class="a"><span class="id">SITE-缺件</span><span class="s idle"><i></i>现场清点缺 2 项</span></div>
+            <div class="mt">FH26004 已签收 · 密封圈 ×12 / 传感器支架 ×2 · 已回采购池</div></div>
+            <div class="c">采购组员</div><div class="c">10-09</div><div class="s w"><i></i>待补发</div>
+            <div class="a2"><button class="btn sm">去采购池</button></div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="sheet">
+      <div class="sh"><h2>我的项目</h2><span class="sub">轨道 = 现在走到哪、卡在哪</span><div class="rt"><button class="btn lnk sm">全部 9 个项目 →</button></div></div>
+      <table>
+        <thead><tr><th style="width:96px">项目号</th><th style="width:186px">名称 / 客户</th><th style="width:82px">阶段</th>
+          <th>生命周期</th><th class="n" style="width:58px">齐套</th><th class="n" style="width:92px">未收</th><th style="width:92px">交期</th><th class="n" style="width:56px">卡点</th></tr></thead>
+        <tbody>
+          <tr><td><a class="lk m" data-go="v-detail" href="#">TX26001</a></td><td class="nm">E2E审计-整线 <span style="color:var(--ink4);font-weight:400">审计客户A</span></td>
+            <td><span class="s w"><i></i>质保</span></td>
+            <td><div style="display:flex;height:4px;gap:1px"><span style="flex:1;background:var(--ok)"></span><span style="flex:1;background:var(--ok)"></span><span style="flex:1;background:var(--ok)"></span><span style="flex:1;background:var(--ok)"></span><span style="flex:1;background:var(--ok)"></span><span style="flex:1;background:var(--ok)"></span><span style="flex:1;background:var(--ok)"></span><span style="flex:1;background:var(--err)"></span><span style="flex:1;background:var(--ok)"></span><span style="flex:1;background:var(--acc)"></span></div></td>
+            <td class="n" style="color:var(--ok)">100%</td><td class="n" style="color:var(--err)">300,000</td><td style="color:var(--ink4)">已过 12 天</td><td class="n" style="color:var(--err)">2</td></tr>
+          <tr><td><a class="lk m" href="#">TX26007</a></td><td class="nm">护栏-付款变更 <span style="color:var(--ink4);font-weight:400">创维</span></td>
+            <td><span class="s e"><i></i>执行中</span></td>
+            <td><div style="display:flex;height:4px;gap:1px"><span style="flex:2;background:var(--ok)"></span><span style="flex:1;background:var(--err)"></span><span style="flex:7;background:var(--tint2)"></span></div></td>
+            <td class="n" style="color:var(--warn)">41%</td><td class="n">540,000</td><td style="color:var(--err)">超期 3 天</td><td class="n" style="color:var(--err)">4</td></tr>
+          <tr><td><a class="lk m" href="#">TX26009</a></td><td class="nm">E2E回归-1004 <span style="color:var(--ink4);font-weight:400">美的</span></td>
+            <td><span class="s r"><i></i>成交待立项</span></td>
+            <td><div style="display:flex;height:4px;gap:1px"><span style="flex:1;background:var(--ok)"></span><span style="flex:1;background:var(--acc)"></span><span style="flex:8;background:var(--tint2)"></span></div></td>
+            <td class="n" style="color:var(--ink4)">—</td><td class="n">1,200,000</td><td>11-30</td><td class="n" style="color:var(--ink4)">0</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ 视图 2 项目列表 ═══ -->
+<section class="view" id="v-list">
+  <div class="ctx">
+    <div class="tabs"><a class="on" href="#">全部<span class="c">9</span></a><a href="#">线索<span class="c">3</span></a>
+      <a href="#">执行中<span class="c">2</span></a><a href="#">交付中<span class="c">1</span></a><a href="#">质保<span class="c">2</span></a><a href="#">已关闭<span class="c">1</span></a></div>
+    <div class="rt"><span class="flt">负责人 <b>我</b></span><span class="flt">交期 <b>未来 30 天</b></span>
+      <input class="flt" placeholder="搜项目号 / 名称 / 客户" style="width:180px"><button class="btn sm">＋ 新建商机</button></div>
+  </div>
+  <div class="wrap">
+    <div class="sheet">
+      <table>
+        <thead><tr><th style="width:96px">项目号</th><th style="width:210px">名称 / 客户</th><th style="width:82px">阶段</th>
+          <th style="width:118px">销售 / 来源</th><th style="width:92px">交期</th><th class="n" style="width:96px">合同额</th>
+          <th class="n" style="width:58px">齐套</th><th class="n" style="width:56px">卡点</th><th class="n" style="width:46px">资料</th></tr></thead>
+        <tbody>
+          <tr><td><a class="lk m" data-go="v-detail" href="#">TX26001</a></td><td class="nm">E2E审计-整线 <span style="color:var(--ink4);font-weight:400">审计客户A</span></td>
+            <td><span class="s w"><i></i>质保</span></td><td>销售组员 <span style="color:var(--ink4)">老客户复购</span></td><td style="color:var(--ink4)">已过 12 天</td>
+            <td class="n">1,680,000</td><td class="n" style="color:var(--ok)">100%</td><td class="n" style="color:var(--err)">2</td><td class="n" style="color:var(--ink4)">7</td></tr>
+          <tr><td><a class="lk m" href="#">TX26009</a></td><td class="nm">E2E回归-1004 <span style="color:var(--ink4);font-weight:400">美的</span></td>
+            <td><span class="s r"><i></i>成交待立项</span></td><td>销售组员 <span style="color:var(--ink4)">客户询价</span></td><td>11-30</td>
+            <td class="n">1,200,000</td><td class="n" style="color:var(--ink4)">—</td><td class="n" style="color:var(--ink4)">0</td><td class="n" style="color:var(--ink4)">3</td></tr>
+          <tr><td><a class="lk m" href="#">TX26007</a></td><td class="nm">护栏-付款变更 <span style="color:var(--ink4);font-weight:400">创维</span></td>
+            <td><span class="s e"><i></i>执行中</span></td><td>销售组员 <span style="color:var(--ink4)">招标平台</span></td><td style="color:var(--err)">超期 3 天</td>
+            <td class="n">540,000</td><td class="n" style="color:var(--warn)">41%</td><td class="n" style="color:var(--err)">4</td><td class="n" style="color:var(--ink4)">5</td></tr>
+          <tr><td><a class="lk m" href="#">TX26008</a></td><td class="nm">护栏-F9重复提交 <span style="color:var(--ink4);font-weight:400">康佳</span></td>
+            <td><span class="s idle"><i></i>线索</span></td><td>销售组员 <span style="color:var(--ink4)">展会</span></td><td style="color:var(--ink4)">—</td>
+            <td class="n" style="color:var(--ink4)">未成交</td><td class="n" style="color:var(--ink4)">—</td><td class="n" style="color:var(--ink4)">0</td><td class="n" style="color:var(--ink4)">1</td></tr>
+          <tr><td><a class="lk m" href="#">TX26006</a></td><td class="nm">P05-验收门禁探针 <span style="color:var(--ink4);font-weight:400">长虹</span></td>
+            <td><span class="s idle"><i></i>线索</span></td><td>销售组员 <span style="color:var(--ink4)">销售拜访</span></td><td style="color:var(--ink4)">—</td>
+            <td class="n" style="color:var(--ink4)">未成交</td><td class="n" style="color:var(--ink4)">—</td><td class="n" style="color:var(--ink4)">0</td><td class="n" style="color:var(--ink4)">0</td></tr>
+          <tr><td><a class="lk m" href="#">TX26005</a></td><td class="nm">E2E护栏-F9重复提交 <span style="color:var(--ink4);font-weight:400">TCL</span></td>
+            <td><span class="s idle"><i></i>线索</span></td><td>销售组员 <span style="color:var(--ink4)">转介绍</span></td><td style="color:var(--ink4)">—</td>
+            <td class="n" style="color:var(--ink4)">未成交</td><td class="n" style="color:var(--ink4)">—</td><td class="n" style="color:var(--ink4)">0</td><td class="n" style="color:var(--ink4)">2</td></tr>
+        </tbody>
+      </table>
+      <div style="display:flex;align-items:center;padding:8px 16px;font-size:11.5px;color:var(--ink4);border-top:1px solid var(--hair)">
+        共 9 条 · 每页 20 <span class="m">1 / 1</span>
+        <div style="margin-left:auto;display:flex;gap:5px"><button class="btn sm">← 上一页</button><button class="btn sm">下一页 →</button></div></div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ 视图 3 项目详情 ═══ -->
+<section class="view" id="v-detail">
+  <div class="ctx">
+    <div class="tabs"><a class="on" href="#">卡点<span class="c">2</span></a><a href="#">设备与 BOM<span class="c">1</span></a>
+      <a href="#">单据<span class="c">29</span></a><a href="#">团队<span class="c">6</span></a><a href="#">资料<span class="c">7</span></a>
+      <a href="#">合同与回款</a><a href="#">活动流</a></div>
+    <div class="rt"><span class="flt">技术协议 <b>已冻结</b></span><button class="btn sm">付款计划变更</button><button class="btn sm blk">登记回款 / 质保金</button></div>
+  </div>
+  <div class="wrap">
+    <div class="sheet">
+      <div class="sh" style="padding:14px 16px">
+        <div>
+          <div style="font-size:11px;color:var(--ink4);margin-bottom:3px"><a class="lk" data-go="v-list" href="#" style="border:0;color:var(--ink3)">项目</a> / <span class="m">TX26001</span></div>
+          <h2 style="font-size:17px;display:flex;align-items:center;gap:9px">E2E审计-整线 <span class="s w"><i></i>质保</span></h2>
+          <div class="sub" style="margin-top:3px">审计客户A · 1 台 01A 点胶机 · 签订 2026-06-18 · 合同交期 2026-09-22</div>
+        </div>
+      </div>
+      <div class="ruler">
+        <div class="ln">
+          <span class="seg" style="left:0;width:70%"></span><span class="seg e" style="left:70%;width:10%"></span><span class="seg r" style="left:80%;width:10%"></span>
+          <span class="tk on" style="left:0%"></span><span class="tk" style="left:10%"></span><span class="tk" style="left:20%"></span><span class="tk" style="left:30%"></span>
+          <span class="tk" style="left:40%"></span><span class="tk" style="left:50%"></span><span class="tk" style="left:60%"></span><span class="tk on" style="left:70%"></span>
+          <span class="tk" style="left:80%"></span><span class="tk on" style="left:90%"></span><span class="tk" style="left:100%"></span>
+        </div>
+        <div class="names">
+          <div class="nm done"><div class="n1"><i></i>商机</div><div class="n2">已成交</div><div class="n3">06-18</div></div>
+          <div class="nm done"><div class="n1"><i></i>立项</div><div class="n2">6 人</div><div class="n3">06-25</div></div>
+          <div class="nm done"><div class="n1"><i></i>设计</div><div class="n2">V1</div><div class="n3">07-30</div></div>
+          <div class="nm done"><div class="n1"><i></i>采购</div><div class="n2">16 单</div><div class="n3">09-12</div></div>
+          <div class="nm done"><div class="n1"><i></i>制造</div><div class="n2">已转运</div><div class="n3">09-26</div></div>
+          <div class="nm done"><div class="n1"><i></i>装配</div><div class="n2">调试完成</div><div class="n3">10-02</div></div>
+          <div class="nm done"><div class="n1"><i></i>发运</div><div class="n2">3 批</div><div class="n3">10-04</div></div>
+          <div class="nm block"><div class="n1"><i></i>现场</div><div class="n2">缺件 2</div><div class="n3">待补发</div></div>
+          <div class="nm done"><div class="n1"><i></i>验收</div><div class="n2">已签字</div><div class="n3">10-04</div></div>
+          <div class="nm now"><div class="n1"><i></i>质保</div><div class="n2">进行中</div><div class="n3">2027-09-29</div></div>
+        </div>
+      </div>
+      <div class="legs" style="border-top:1px solid var(--hair)">
+        <div class="leg"><div class="k">设备</div><div class="v">1<small> 台</small></div><div class="n">01A 点胶机 · BOM 完整</div></div>
+        <div class="leg o"><div class="k">齐套率</div><div class="v">100%</div><div class="n">自制/外协/采购全到</div></div>
+        <div class="leg e"><div class="k">未收</div><div class="v">¥300<small>K</small></div><div class="n">质保金 · 60 天内到期</div></div>
+        <div class="leg"><div class="k">发运批次</div><div class="v">3</div><div class="n">均已签收</div></div>
+        <div class="leg w"><div class="k">售后工单</div><div class="v">2</div><div class="n">在保 · 待受理</div></div>
+        <div class="leg"><div class="k">合同额</div><div class="v">¥1.68<small>M</small></div><div class="n">含税 · 已收 75%</div></div>
+      </div>
+    </div>
+
+    <div class="cols">
+      <div class="sheet">
+        <div class="sh"><h2>卡点</h2><span class="sub">现在需要有人动手的两件事</span></div>
+        <div class="q" style="grid-template-columns:1fr">
+          <div class="lst" style="border-left:0">
+            <div class="it" style="grid-template-columns:1fr 118px 96px 130px">
+              <div class="t"><div class="a"><span class="id">FH26004</span><span class="s e"><i></i>现场缺件</span></div>
+                <div class="mt">密封圈 ×12 / 传感器支架 ×2 · 已回采购池（现场缺件）· <b>客户产线等待</b></div></div>
+              <div class="c">采购组员</div><div class="c e">超期 1 天</div>
+              <div class="a2" style="opacity:1"><button class="btn sm">去采购池</button><button class="btn sm blk">下单</button></div></div>
+            <div class="it" style="grid-template-columns:1fr 118px 96px 130px">
+              <div class="t"><div class="a"><span class="id">SV26003</span><span class="s e"><i></i>售后待受理</span></div>
+                <div class="mt">点胶阀漏胶 · 在保 · 报修 10-04 14:06 · 尚未派工</div></div>
+              <div class="c">售后工程师</div><div class="c w">承诺 4 小时</div>
+              <div class="a2" style="opacity:1"><button class="btn sm">查看</button><button class="btn sm blk">派工</button></div></div>
+            <div class="it" style="grid-template-columns:1fr 118px 96px 130px;opacity:.72">
+              <div class="t"><div class="a"><span class="id">GR26017</span><span class="s ok"><i></i>已入库</span></div>
+                <div class="mt">轴承 NSK 6204DDU ×5 · 乙标准件 · 库位 A-03-12 · 已闭环</div></div>
+              <div class="c">仓管组员</div><div class="c">10-04 13:56</div>
+              <div class="a2" style="opacity:1"><button class="btn lnk sm">看单据</button></div></div>
+          </div>
+        </div>
+        <div class="sh" style="border-top:1px solid var(--hair)"><h2>设备 01A</h2><span class="sub">点胶机 · 图号 TX26001-01A-00-00-00-00</span>
+          <div class="rt"><button class="btn sm">进设计面</button></div></div>
+        <table>
+          <thead><tr><th style="width:230px">图号 / 名称</th><th class="n" style="width:56px">数量</th><th style="width:78px">来源</th>
+            <th style="width:70px">版本</th><th style="width:92px">状态</th><th>现在在哪</th></tr></thead>
+          <tbody>
+            <tr><td class="nm"><a class="lk m" href="#">TX26001-01A-01-00-00-00</a> 主体组件</td><td class="n">2</td><td>自制件</td><td class="m">V1</td>
+              <td><span class="s ok"><i></i>已发布</span></td><td>已转运装配区 · 09-26</td></tr>
+            <tr><td class="nm"><a class="lk m" href="#">TX26001-01A-01-01-00-00</a> 定制底板</td><td class="n">3</td><td><span class="s w"><i></i>外协件</span></td><td class="m">V1</td>
+              <td><span class="s ok"><i></i>已发布</span></td><td><b style="color:var(--err);font-weight:500">外协 WX26002 未回厂（11-08 约定）</b></td></tr>
+            <tr><td class="nm"><a class="lk m" href="#">TX26001-01A-01-02-00-00</a> 外协罩壳</td><td class="n">1</td><td>外协件</td><td class="m">V1</td>
+              <td><span class="s ok"><i></i>已发布</span></td><td>合格 · 已装配</td></tr>
+            <tr><td class="nm"><a class="lk m" href="#">YL-BC-0001</a> 板材 Q235 2.0mm·1220x2440</td><td class="n">153</td><td>原材料</td><td class="m">—</td>
+              <td><span class="s ok"><i></i>已入库</span></td><td>库位 A-03-12 · MI26003 已领</td></tr>
+            <tr><td class="nm"><a class="lk m" href="#">BZ-ZC-0001</a> 轴承 NSK 6204DDU</td><td class="n">5</td><td>标准件</td><td class="m">—</td>
+              <td><span class="s ok"><i></i>已入库</span></td><td>库位 A-03-12</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div>
+        <div class="sheet">
+          <div class="sh"><h2>活动流</h2><div class="rt"><button class="btn lnk sm">筛选</button></div></div>
+          <div class="tl">
+            <div class="tli"><div class="tm">10-04<br>14:06</div><div class="tx"><b>售后 孙七</b> 受理报修 <span class="m">SV26003</span>（在保），已通知派工</div></div>
+            <div class="tli"><div class="tm">10-04<br>14:02</div><div class="tx"><b>采购组员</b> 直发件 <span class="m">BZ-DJ-0001</span> ×1 下单，待现场清点</div></div>
+            <div class="tli"><div class="tm">10-04<br>13:58</div><div class="tx"><b>客户 赵经理</b> 验收签字通过 → 自动进入质保期（至 2027-09-29）· 资料包 8 份</div></div>
+            <div class="tli"><div class="tm">10-04<br>13:56</div><div class="tx"><b>仓管组员</b> 入库 <span class="m">YL-BC-0001</span> ×153 → A-03-12<span><span class="pic">标签</span><span class="pic">货位</span></span></div></div>
+            <div class="tli"><div class="tm">10-04<br>11:20</div><div class="tx"><b>发运</b> <span class="m">FH26004</span> 现场清点：到 41 / 缺 2 / 损 0 → 缺件已回采购池</div></div>
+            <div class="tli"><div class="tm">09-28<br>09:20</div><div class="tx"><b>工艺组员</b> 提改版 <span class="m">CR26002</span>：定制底板 自制→外协</div></div>
+          </div>
+        </div>
+        <div class="sheet">
+          <div class="sh"><h2>合同与回款</h2><div class="rt"><button class="btn sm blk">登记回款</button></div></div>
+          <div class="kv">
+            <div class="kvi"><div class="k">合同额</div><div class="v m">¥1,680,000.00 含税</div></div>
+            <div class="kvi"><div class="k">签订 / 交期</div><div class="v m">2026-06-18 → 2026-09-22</div></div>
+            <div class="kvi"><div class="k">质保</div><div class="v">12 个月 · 至 <span class="m">2027-09-29</span></div></div>
+          </div>
+          <table>
+            <thead><tr><th>节点</th><th>触发</th><th class="n">比例</th><th class="n">已收 / 应收</th></tr></thead>
+            <tbody>
+              <tr><td class="nm">预付款</td><td><span class="s ok"><i></i>立项</span></td><td class="n">30%</td><td class="n" style="color:var(--ok)">504,000 / 504,000</td></tr>
+              <tr><td class="nm">发货款</td><td><span class="s ok"><i></i>发货</span></td><td class="n">40%</td><td class="n" style="color:var(--ok)">672,000 / 672,000</td></tr>
+              <tr><td class="nm">验收款</td><td><span class="s ok"><i></i>验收</span></td><td class="n">25%</td><td class="n" style="color:var(--ok)">420,000 / 420,000</td></tr>
+              <tr><td class="nm">质保金</td><td><span class="s w"><i></i>质保</span></td><td class="n">5%</td><td class="n" style="color:var(--err)">0 / 300,000</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="vsw">
+  <button class="on" data-v="v-inbox">收件箱</button><button data-v="v-list">项目列表</button><button data-v="v-detail">项目详情</button>
+  <a href="./index.html">← 对比其他方案</a>
+</div>
+<script>
+function go(id){
+  document.querySelectorAll('.view').forEach(v=>v.classList.toggle('on',v.id===id));
+  document.querySelectorAll('.vsw button').forEach(b=>b.classList.toggle('on',b.dataset.v===id));
+  document.querySelectorAll('nav a[data-go]').forEach(a=>a.classList.toggle('on',a.dataset.go===id));
+  scrollTo(0,0);
+}
+document.querySelectorAll('[data-v]').forEach(b=>b.onclick=e=>{e.preventDefault();go(b.dataset.v)});
+document.querySelectorAll('[data-go]').forEach(b=>b.onclick=e=>{e.preventDefault();go(b.dataset.go)});
+</script>
+</body>
+</html>

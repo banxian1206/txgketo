@@ -24,6 +24,14 @@ export interface TabDef {
   show?: () => boolean
   /** 角标取自哪个计数字段（>0 才显示，全站唯一口径） */
   countKey?: string
+  /**
+   * ★ 体内语言（docs/15 工作台队列化）：**这一行有没有唯一的"下一步动作"？**
+   *   · `queue`  = 有 → 用队列行（`QueueBoard`/`QueueRow`），右侧一个主按钮
+   *   · `ledger` = 没有（只是查 / 对账 / 要排序导出）→ 用表格
+   * 声明出来是为了**可校验**：护栏会盯着"声明 queue 的页签里必须出现队列行"，
+   * 免得又变成"同一个东西每个台摆法不同"（这是这轮返工的根因）。
+   */
+  kind?: 'queue' | 'ledger'
 }
 
 /** 是否处于「以某人身份查看」（只读，06 卷 §4） */
@@ -153,3 +161,88 @@ export const TASK_TABS: TabDef[] = [
   { key: '已完成', label: '已完成' },
   { key: '全部', label: '全部' },
 ]
+
+/* ─────────────────────── 台内页签分组（R3-B · 2026-10-04）───────────────────────
+ *
+ * 为什么分组：采购台 10 个页签、仓库台 6 个 —— 一排横着摆，用户得先扫一遍才知道点哪个。
+ * 分组后**一层组页签（≤4）+ 一层 Segmented**，`?tab=<key>` 深链、通知 link、
+ * `ROUTE_REDIRECTS` 全都继续用原来的 key（**key 一个都不许改**）。
+ *
+ * 两条规则：
+ *   ① 组数 ≤4（护栏 `SHELL-台页签分组≤4` 盯着）；
+ *   ② **单 key 的组，页签直接显示那一项的标题**（不凭空造一个组名 —— 否则
+ *      「供应商」「库位」会变成「主数据」这种听不懂的组名，也破坏通知文案）。
+ *
+ * 未定义的台 = 每个页签自成一组（等价旧行为，UI 不变）。
+ */
+export interface TabGroup {
+  key: string
+  label: string
+  /** 组内成员的 tab key（顺序 = Segmented 顺序） */
+  keys: string[]
+}
+
+export const PURCHASE_GROUPS: TabGroup[] = [
+  { key: 'todo', label: '待办', keys: ['approve', 'vehicle'] },
+  { key: 'buy', label: '采购', keys: ['pool', 'orders', 'reference'] },
+  { key: 'goods', label: '到货与验收', keys: ['arrivals', 'failed', 'storage', 'resolve'] },
+  { key: 'master', label: '主数据', keys: ['suppliers'] },
+]
+
+export const WAREHOUSE_GROUPS: TabGroup[] = [
+  { key: 'todo', label: '待办', keys: ['incoming', 'storage', 'issues'] },
+  { key: 'stock', label: '库存', keys: ['stock', 'moves'] },
+  { key: 'loc', label: '库位', keys: ['locations'] },
+]
+
+export const MFG_GROUPS: TabGroup[] = [
+  { key: 'flow', label: '在制流程', keys: ['wait', 'running', 'transfer'] },
+  { key: 'abn', label: '返工与外协', keys: ['rework', 'outsource'] },
+]
+
+export const SITE_GROUPS: TabGroup[] = [
+  { key: 'prep', label: '进场', keys: ['survey', 'incoming'] },
+  { key: 'run', label: '安装过程', keys: ['daily', 'issues'] },
+  { key: 'debug', label: '申请调试', keys: ['commission'] },
+]
+
+export const SERVICE_GROUPS: TabGroup[] = [
+  { key: 'svc', label: '售后', keys: ['orders', 'parts'] },
+]
+export const ENG_GROUPS: TabGroup[] = [
+  { key: 'view', label: '视图', keys: ['mine', 'team', 'board'] },
+]
+export const PM_GROUPS: TabGroup[] = [
+  { key: 'view', label: '视图', keys: ['board', 'acceptance'] },
+]
+export const REVIEW_GROUPS: TabGroup[] = [
+  { key: 'view', label: '视图', keys: ['todo', 'mine', 'all'] },
+]
+export const CHANGE_GROUPS: TabGroup[] = [
+  { key: 'view', label: '视图', keys: ['pending', 'todo', 'mine', 'all'] },
+]
+export const TASK_GROUPS: TabGroup[] = [
+  { key: 'view', label: '状态', keys: ['未完成', '待开始', '进行中', '已完成', '全部'] },
+]
+export const USERS_GROUPS: TabGroup[] = [
+  { key: 'people', label: '人员与组织', keys: ['users', 'org', 'roles'] },
+  { key: 'system', label: '系统', keys: ['integration', 'logs'] },
+]
+
+/**
+ * 把「组定义 + 当前可见页签」算成实际要画的组（过滤掉不可见的 key 与空组）。
+ * 单 key 组的页签标题由调用方用该项自己的 label（见 WorkbenchTabs）。
+ */
+export function groupsOf(groups: TabGroup[] | undefined, visibleKeys: string[]): TabGroup[] {
+  const defs: TabGroup[] =
+    groups ??
+    visibleKeys.map((k) => ({ key: k, label: k, keys: [k] }))
+  return defs
+    .map((g) => ({ ...g, keys: g.keys.filter((k) => visibleKeys.includes(k)) }))
+    .filter((g) => g.keys.length > 0)
+}
+
+/** 当前 tab 落在哪个组（找不到就落第一组）—— 深链 `?tab=` 靠它定位 */
+export function groupOf(groups: TabGroup[], tab: string): TabGroup | undefined {
+  return groups.find((g) => g.keys.includes(tab)) ?? groups[0]
+}

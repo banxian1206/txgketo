@@ -1,42 +1,38 @@
 import { CameraOutlined, FileTextOutlined } from '@ant-design/icons'
-import {
-  Alert,
-  App,
-  Button,
-  Card,
-  DatePicker,
-  Divider,
-  Empty,
-  Image,
-  Input,
-  InputNumber,
-  Modal,
-  Radio,
-  Select,
-  Space,
-  Spin,
-  Tag,
-  Typography,
-} from 'antd'
+import { Alert, App, Button, DatePicker, Empty, Image, Input, InputNumber, Modal, Radio, Select, Space, Spin, Typography } from 'antd'
 import dayjs from 'dayjs'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 
 import AuthedImage from '../../components/AuthedImage'
 import SelectLocation from '../../components/fields/SelectLocation'
-import { Muted } from '../../components/ui/Primitives'
-import {
-  errMsg,
-  fetchFileBlob,
-  hasPerm,
-  inspectPurchase,
-  mobileMaterial,
-  storeReceipt,
-  uploadReceiptPhotos,
-  type MobileMaterial,
-} from '../../api/client'
+import { MCard, MChip, MEmpty, MHead, MStatus } from '../../components/ds/mobile'
+import { errMsg, fetchFileBlob, hasPerm, inspectPurchase, mobileMaterial, storeReceipt, uploadReceiptPhotos, type MobileMaterial } from '../../api/client'
 import { compressImage } from '../../utils/image'
-import { RECEIPT_STATUS as RECEIPT_COLOR } from '../../theme/status'
+
+/** 到货单状态 → 作业卡 tone（与 PC 同一套语义，只此一处翻译） */
+const RECEIPT_TONE: Record<string, 'ok' | 'warn' | 'err' | 'run' | undefined> = {
+  已入库: 'ok', 现场已验收: 'ok', 不合格: 'err', 已退货: 'err', 已换货: 'warn',
+  待入库: 'run', 现场待验收: 'warn',
+}
+const toneOfReceipt = (st: string) => RECEIPT_TONE[st]
+
+/** 动线步骤标（① 拍照 → ② 验货 → ③ 入库）—— 手机上明确"现在这步干什么" */
+function MStep({ n, text }: { n: number; text: string }) {
+  return (
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+      <span
+        style={{
+          width: 20, height: 20, borderRadius: 999, background: 'var(--ds-acc)', color: 'var(--ds-surface)',
+          fontSize: 12, fontWeight: 600, display: 'inline-grid', placeItems: 'center',
+        }}
+      >
+        {n}
+      </span>
+      <span style={{ fontSize: 13.5, fontWeight: 600 }}>{text}</span>
+    </span>
+  )
+}
 
 /** 手机端到货验收动线（03 卷）：看电子图纸 → 拍照 → 合格/不合格 → 入库 */
 export default function AcceptM() {
@@ -181,38 +177,49 @@ export default function AcceptM() {
 
   return (
     <>
-      <Button type="link" style={{ paddingLeft: 0 }} onClick={() => nav('/m/warehouse')}>
+      <Button block onClick={() => nav('/m/warehouse')}>
         ← 返回仓库
       </Button>
 
-      <Card size="small" style={{ marginBottom: 10 }}>
-        <Typography.Title level={5} style={{ margin: 0 }}>
-          {data.display_name}
-        </Typography.Title>
-        <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-          {data.spec_text ?? ''} {data.brand ? `· ${data.brand}` : ''}
-        </Typography.Text>
-        <Divider style={{ margin: '8px 0' }} />
-        <Space direction="vertical" size={2} style={{ fontSize: 13 }}>
-          <span>
-            订 {data.qty} {data.unit ?? ''} · 已到 {data.qty_received} · 状态 <Tag>{data.status}</Tag>
-          </span>
-          <span>
-            供应商 {data.supplier_name ?? '—'} · 采购单 {data.po_no ?? '—'}
-          </span>
-          <span>
-            {data.project_no ?? '（辅料 / 办公）'} {data.equip_no ?? ''} · 需要到货 {data.need_date ?? '—'} · 预计{' '}
-            {data.expected_date ?? '—'}
-          </span>
-        </Space>
-        {data.drawing && (
-          <Button type="primary" ghost size="small" style={{ marginTop: 10 }} onClick={() => void openDrawing()}>
-            <FileTextOutlined /> 看电子图纸 {data.drawing.drawing_no}（{data.drawing.version}）
-          </Button>
-        )}
-      </Card>
+      <MHead
+        title={data.display_name}
+        sub={
+          <>
+            {data.spec_text ?? ''} {data.brand ? `· ${data.brand}` : ''}
+          </>
+        }
+      />
 
-      <Card size="small" title="① 拍照" style={{ marginBottom: 10 }}>
+      {/* 一张卡说清"验的是哪一件"：订/已到/供应商/采购单/归属/两个日期 */}
+      <MCard
+        tone={fullyReceived ? 'ok' : data.status === '不合格' ? 'err' : undefined}
+        head={
+          <>
+            <span className="ds-code" style={{ fontSize: 12 }}>{data.po_no ?? '—'}</span>
+            <MStatus tone={toneOfReceipt(data.status)}>{data.status}</MStatus>
+            <span style={{ marginLeft: 'auto' }}>
+              <MChip tone={fullyReceived ? 'ok' : 'run'}>
+                订 {data.qty} / 已到 {data.qty_received}
+              </MChip>
+            </span>
+          </>
+        }
+        title={`${data.project_no ?? '（辅料 / 办公）'} ${data.equip_no ?? ''}`.trim()}
+        lines={[
+          <>供应商 {data.supplier_name ?? '—'}</>,
+          <>需要到货 {data.need_date ?? '—'} · 预计 {data.expected_date ?? '—'}</>,
+        ]}
+      >
+        <div className="m-actions">
+          {data.drawing && (
+            <Button block onClick={() => void openDrawing()}>
+              <FileTextOutlined /> 看电子图纸 {data.drawing.drawing_no}（{data.drawing.version}）
+            </Button>
+          )}
+        </div>
+      </MCard>
+
+      <MCard head={<MStep n={1} text="拍照留痕" />}>
         <Space wrap>
           <Button onClick={() => fileRef.current?.click()}><CameraOutlined /> 拍照 / 选图</Button>
           <input
@@ -237,9 +244,9 @@ export default function AcceptM() {
             </Image.PreviewGroup>
           </div>
         )}
-      </Card>
+      </MCard>
 
-      <Card size="small" title="② 验货" style={{ marginBottom: 10 }}>
+      <MCard head={<MStep n={2} text="验货（数量 + 合格判定）" />}>
         <Space direction="vertical" size={10} style={{ width: '100%' }}>
           <Space>
             <span>到货日期</span>
@@ -313,58 +320,59 @@ export default function AcceptM() {
             </Button>
           </div>
         </Space>
-      </Card>
+      </MCard>
 
       {pendingStorage.length > 0 && (
-        <Card size="small" title="③ 入库" style={{ marginBottom: 10 }}>
+        <MCard head={<MStep n={3} text="入库（定库位）" />}>
           {pendingStorage.map((g) => (
-            <div key={g.id} style={{ marginBottom: 8 }}>
-              <Space>
-                <Tag color={RECEIPT_COLOR[g.status] ?? 'default'}>{g.status}</Tag>
-                <span>
-                  {g.receipt_no} · {g.qty} {g.unit ?? ''}
-                </span>
-                <Button size="small" type="primary" disabled={!canStore} onClick={() => setStoreFor({ id: g.id, no: g.receipt_no })}>
-                  选库位入库
-                </Button>
-              </Space>
+            <div className="m-actions" key={g.id}>
+              <div className="m-card-l">
+                <span className="ds-code" style={{ fontSize: 12 }}>{g.receipt_no}</span> · {g.qty} {g.unit ?? ''}
+              </div>
+              <Button block type="primary" disabled={!canStore} onClick={() => setStoreFor({ id: g.id, no: g.receipt_no })}>
+                选库位入库
+              </Button>
             </div>
           ))}
-        </Card>
+        </MCard>
       )}
 
-      <Card size="small" title="到货单记录">
-        {data.receipts.length === 0 && <Empty description="还没有到货单" />}
-        {data.receipts.map((g) => (
-          <div key={g.id} style={{ marginBottom: 10 }}>
-            <Space>
-              <Tag color={RECEIPT_COLOR[g.status] ?? 'default'}>{g.status}</Tag>
-              <Typography.Text>
-                {g.receipt_no} · {g.qty} {g.unit ?? ''} · {g.receipt_date ?? ''}
-              </Typography.Text>
-              {g.location && <Typography.Text type="secondary">{g.location}</Typography.Text>}
-            </Space>
-            {g.inspect_note && (
-              <div>
-                <Typography.Text type="danger" style={{ fontSize: 12 }}>
-                  {g.inspect_note}
-                </Typography.Text>
-              </div>
-            )}
-            {g.photos.length > 0 && (
-              <div style={{ marginTop: 6 }}>
+      <div className="m-sec">到货单记录</div>
+      {data.receipts.length === 0 ? (
+        <MEmpty text="还没有到货单。本次验收提交后会自动生成一张。" />
+      ) : (
+        data.receipts.map((g) => (
+          <MCard
+            key={g.id}
+            tone={toneOfReceipt(g.status)}
+            head={
+              <>
+                <span className="ds-code" style={{ fontSize: 12 }}>{g.receipt_no}</span>
+                <MStatus tone={toneOfReceipt(g.status)}>{g.status}</MStatus>
+                <span style={{ marginLeft: 'auto' }}>
+                  <MChip>{g.qty} {g.unit ?? ''}</MChip>
+                </span>
+              </>
+            }
+            lines={[
+              <>
+                {g.receipt_date ?? ''}
+                {g.location ? ` · 库位 ${g.location}` : ''}
+              </>,
+              ...(g.inspect_note ? [<span key="n" style={{ color: 'var(--ds-err)' }}>{g.inspect_note}</span>] : []),
+            ]}
+            photos={
+              g.photos.length > 0 ? (
                 <Image.PreviewGroup>
                   {g.photos.map((p) => (
-                    <span key={p.url} style={{ marginRight: 6 }}>
-                      <AuthedImage path={p.url} />
-                    </span>
+                    <AuthedImage key={p.url} path={p.url} size={56} />
                   ))}
                 </Image.PreviewGroup>
-              </div>
-            )}
-          </div>
-        ))}
-      </Card>
+              ) : undefined
+            }
+          />
+        ))
+      )}
 
       <Modal
         open={!!viewer}
@@ -388,10 +396,11 @@ export default function AcceptM() {
         onOk={() => void doStore()}
         confirmLoading={saving}
         okText="入库"
+        okButtonProps={{ disabled: !location }}
       >
-        <Typography.Paragraph>
-          <Muted>入库必须定库位：没有的先到仓库台「库位」页新建，也可以拍库位标签自动认。</Muted>
-        </Typography.Paragraph>
+        <div style={{ fontSize: 12.5, color: 'var(--ds-ink3)', marginBottom: 8 }}>
+          入库必须定库位：没有的先到仓库台「库位」页新建，也可以拍库位标签自动认（只出候选，需你确认）。
+        </div>
         <SelectLocation value={location || undefined} onChange={(v) => setLocation(String(v ?? ''))} />
       </Modal>
     </>

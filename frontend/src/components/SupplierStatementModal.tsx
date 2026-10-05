@@ -1,8 +1,9 @@
-import { App, Drawer, Table, Tabs, Tag, Typography } from 'antd'
+import { App, Drawer, Table, Tabs, Typography } from 'antd'
+import { Status, Chip } from '../components/ds'
 import { useEffect, useState } from 'react'
 
 import { errMsg, supplierStatement, type StatementPo, type SupplierStatement } from '../api/client'
-import { ORDER_STATUS as ORDER_STATUS_COLOR } from '../theme/status'
+import { ORDER_STATUS as ORDER_STATUS_COLOR, toneOf } from '../theme/status'
 
 function cols(paidTab: boolean) {
   const base = [
@@ -19,13 +20,13 @@ function cols(paidTab: boolean) {
       title: '状态',
       dataIndex: 'status',
       width: 100,
-      render: (v: string) => <Tag color={ORDER_STATUS_COLOR[v] ?? 'default'}>{v}</Tag>,
+      render: (v: string) => <Status tone={toneOf(ORDER_STATUS_COLOR[v])}>{v}</Status>,
     },
     {
       title: '逾期',
       dataIndex: 'delay_days',
       width: 80,
-      render: (v: number | null) => (v != null && v > 0 ? <Tag color="red">+{v} 天</Tag> : '—'),
+      render: (v: number | null) => (v != null && v > 0 ? <Chip tone="err">+{v} 天</Chip> : '—'),
     },
   ]
   if (!paidTab) return base

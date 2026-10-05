@@ -1,30 +1,15 @@
+import { Link } from 'react-router-dom'
+import { Chip } from '../../components/ds'
 import type { FormInstance } from 'antd'
 // components/design/DrawingsCard.tsx —— 由 EquipmentDesign 拆出（重构 1.6 · 只拆不改）
 import { AppstoreOutlined, BlockOutlined, FolderOpenOutlined } from '@ant-design/icons'
-import {
-  Alert,
-  Button,
-  Card,
-  Empty,
-  Popconfirm,
-  Space,
-  Table,
-  Tag,
-  Tooltip,
-  Typography,
-} from 'antd'
+import { Alert, Button, Card, Empty, Popconfirm, Space, Table, Tooltip, Typography } from 'antd'
 
 
 import AuthedFileLink from '../AuthedFileLink'
 
-import {
-  deleteDrawing,
-  drawingFileUrl,
-  errMsg,
-  type DesignRoot,
-  type User,
-} from '../../api/client'
-import { DRAWING_STATUS as STATUS_COLOR } from '../../theme/status'
+import { deleteDrawing, drawingFileUrl, errMsg, type DesignRoot, type User } from '../../api/client'
+import { DRAWING_STATUS as STATUS_COLOR, toneOf } from '../../theme/status'
 import { CHANGE_STATUS as CHANGE_STATUS_COLOR } from '../../theme/status'
 import { changeActionAvailable as CHANGE_ACTION_AVAILABLE } from './shared'
 import type { TreeNode } from './shared'
@@ -162,7 +147,14 @@ export default function DrawingsCard({
               render: (v: string, r: TreeNode) => (
                 <span style={{ paddingLeft: r.level * 16 }}>
                   {r.level === 0 ? <AppstoreOutlined style={{ marginRight: 4 }} /> : r.is_part ? <BlockOutlined style={{ marginRight: 4 }} /> : <FolderOpenOutlined style={{ marginRight: 4 }} />}
-                  <Typography.Text strong={r.level === 0}>{v}</Typography.Text>
+                  {/* ★ R2：图号 = 物料号 → 点它看这个件的一生（采购/领料/排产/发运/售后都在那一页） */}
+                  <Link
+                    to={`/items/${v}`}
+                    title="看这个件的一生（需求 / 采购 / 领料 / 排产 / 发运 / 售后）"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <Typography.Text strong={r.level === 0}>{v}</Typography.Text>
+                  </Link>
                 </span>
               ),
             },
@@ -196,11 +188,11 @@ export default function DrawingsCard({
               width: 90,
               render: (v: string) =>
                 v === '自制件' ? (
-                  <Tag>自制</Tag>
+                  <Chip>自制</Chip>
                 ) : v === '外协件' ? (
-                  <Tag color="purple">外协</Tag>
+                  <Chip tone="run">外协</Chip>
                 ) : (
-                  <Tag color="gold">外购</Tag>
+                  <Chip tone="warn">外购</Chip>
                 ),
             },
             {
@@ -212,7 +204,7 @@ export default function DrawingsCard({
               title: '状态',
               dataIndex: 'status',
               width: 90,
-              render: (v: string) => <Tag color={STATUS_COLOR[v]}>{v}</Tag>,
+              render: (v: string) => <Chip tone={toneOf(STATUS_COLOR[v])}>{v}</Chip>,
             },
             {
               title: '操作',
@@ -265,9 +257,9 @@ export default function DrawingsCard({
                   )}
                   {r.status === '已发布' && r.change_request && (
                     <Tooltip title={`改版申请 ${r.change_request.cr_no}：${r.change_request.status}`}>
-                      <Tag color={CHANGE_STATUS_COLOR[r.change_request.status] ?? 'default'}>
+                      <Chip tone={toneOf(CHANGE_STATUS_COLOR[r.change_request.status])}>
                         {r.change_request.status}
-                      </Tag>
+                      </Chip>
                     </Tooltip>
                   )}
                   {CHANGE_ACTION_AVAILABLE(r.change_request) &&

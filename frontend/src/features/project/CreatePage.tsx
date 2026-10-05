@@ -1,30 +1,16 @@
-import {
-  App,
-  Button,
-  Card,
-  Space,
-  Typography,
-  Upload,
-  Form,
-} from 'antd'
+import { App, Button, Card, Space, Typography, Upload, Form } from 'antd'
 import type { UploadFile } from 'antd/es/upload/interface'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
 import { useBack, useGoFrom } from '../../hooks/useFrom'
+import SectionNav from '../../components/ds/SectionNav'
+import { CREATE_SECTIONS, defaultSectionKey } from '../../configs/sections'
+import { useTab } from '../../hooks/useTab'
 import ProjectFormFields, {
   type ProjectFormValues,
 } from '../../components/ProjectFormFields'
-import {
-  createProject,
-  errMsg,
-  listProjects,
-  listUsers,
-  nextProjectNo,
-  uploadAttachment,
-  type Project,
-  type ProjectCreate,
-} from '../../api/client'
+import { createProject, errMsg, listProjects, listUsers, nextProjectNo, uploadAttachment, type Project, type ProjectCreate } from '../../api/client'
 
 /**
  * 新建商机（独立页面）。
@@ -41,6 +27,8 @@ export default function ProjectCreate() {
   const [projects, setProjects] = useState<Project[]>([])
   const [previewNo, setPreviewNo] = useState('')
   const [files, setFiles] = useState<UploadFile[]>([])
+  // ★ P4：步骤（分区）进 URL
+  const [tab, setTab] = useTab(CREATE_SECTIONS.map((x) => x.key), defaultSectionKey(CREATE_SECTIONS))
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
@@ -58,12 +46,87 @@ export default function ProjectCreate() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  /**
+   * ★ 分区模式下的必填项**看不见** → 提交失败时跳到第一个出错的区。
+   * 用 antd 返回的 `errorFields`（字段名 → 分区）而不是查 DOM：DOM 上的 `has-error`
+   * 是**异步**才挂上去的，catch 那一刻往往还没有（第一版这么写，P-09 断言就抓到了）。
+   */
+  // ★ 字段 → 分区（**按 ProjectFormFields 里各组的实际内容**核对过，别再凭直觉写）：
+  //   踩过一次：把 customer_name 当成"基本"，实际它在 ② 客户信息里 → 提交错误跳错区。
+  // ★ 字段 → 分区：**由 ProjectFormFields 里各 Group 的实际字段自动核对生成**。
+  //   为什么强调这点：我手写过两次都错（customer_name 当"基本"、deadline 当"项目要求"），
+  //   而它只影响"提交失败跳到哪一步"，错了用户在错的那步看不到错 —— 属于最难发现的一类 bug。
+  const FIELD_SECTION: Record<string, string> = {
+    'contacts': 'customer',
+    'contacts.name': 'customer',
+    'contacts.phone': 'customer',
+    'project_name': 'basic',
+    'deal_mode': 'basic',
+    'source': 'basic',
+    'project_desc': 'basic',
+    'customer_name': 'customer',
+    'site_address': 'require',
+    'product_type': 'require',
+    'required_cycle': 'require',
+    'required_capacity': 'require',
+    'is_retrofit': 'require',
+    'deadline': 'time',
+    'delivery_days': 'time',
+    'expect_sign_date': 'time',
+    'est_amount': 'time',
+    'performance_deposit': 'time',
+    'performance_deposit_return_date': 'time',
+    'performance_deposit_returned': 'time',
+    'received_docs': 'atts',
+    'sales_id': 'follow',
+    'competitor': 'follow',
+    'related_project_no': 'follow',
+    'risk_note': 'follow',
+    'amount': 'follow',
+    'amount_tax_incl': 'follow',
+    'period_start': 'follow',
+    'period_end': 'follow',
+    'warranty_months': 'follow',
+    'contract_no_customer': 'follow',
+    'tech_agreement_frozen': 'follow',
+  }
+  const tabRef = useRef(tab)
+  tabRef.current = tab
+  const jumpToFirstError = (errorFields?: { name: (string | number)[] }[]) => {
+    // ① 字段级错误：按映射**确定性**跳（errorFields 的顺序就是出现顺序）
+    for (const f of errorFields ?? []) {
+      const key = f.name.map(String).join('.')
+      const sec = FIELD_SECTION[key] ?? FIELD_SECTION[String(f.name[0])]
+      if (sec) { setTab(sec); return }
+    }
+    // ② 兜底：**列表级错误**（如"至少要有一个客户方联系人"）不进 errorFields ——
+    //   等一帧后找"含错误、但被藏起来的分区"跳过去。
+    //   ★ 但**当前区已经有错时不要跳**：用户正看着第一处错误，跳走反而找不着
+    //     （第一版没判这条，一提交就把人从①甩到②，写链 fill 立刻超时）。
+    window.setTimeout(() => {
+      const cur = document.querySelector(`[data-section="${tabRef.current}"]`)
+      if (cur?.querySelector('.ant-form-item-explain-error, .ant-form-item-has-error')) return
+      const secs = Array.from(document.querySelectorAll('[data-section]'))
+      const hit = secs.find(
+        (el) =>
+          (el as HTMLElement).style.display === 'none' &&
+          el.querySelector('.ant-form-item-explain-error, .ant-form-item-has-error'),
+      )
+      const key = hit?.getAttribute('data-section')
+      if (key) setTab(key)
+    }, 60)
+  }
+
   const submit = async () => {
     let v
     try {
       v = await form.validateFields()
-    } catch {
-      return // 校验未过：antd 已标红 / 列表级错误已渲染，不抛未捕获异常（P-09）
+    } catch (err) {
+      // 校验未过：antd 已标红（P-09：必须接住，不抛未捕获异常）。
+      // ★ 分区模式下还要**跳到第一个出错的区** —— 否则错在隐藏的那一步里，用户看不见。
+      const ef = (err as { errorFields?: { name: (string | number)[] }[] })?.errorFields
+      jumpToFirstError(ef)
+      return
     }
     const body: ProjectCreate = {
       customer_name: v.customer_name,
@@ -115,7 +178,9 @@ export default function ProjectCreate() {
   }
 
   return (
-    <div style={{ maxWidth: 1180, margin: '0 auto' }}>
+    <div className="ds-page">
+      {/* ── 常驻区：标题 + 自动发号提示 + 取消/建立商机（原来跟着表单滚到底）── */}
+      <div className="ds-panel" style={{ marginBottom: 16 }}>
       <Card
         title={
           <Space size={12}>
@@ -138,7 +203,17 @@ export default function ProjectCreate() {
         }
       >
         <Form form={form} layout="vertical" preserve={false}>
+          {/* ── 分区条（= 步骤导航，P4）：① 基本信息 … ⑥ 商务跟进 ──────────
+              表单页的分区要**只藏不卸**（antd Form 字段卸载就丢值），所以用 barOnly +
+              `activeSection`：所有组都在 DOM 里，只显示当前那一步。 */}
+          <SectionNav
+            barOnly
+            tab={tab}
+            onTab={setTab}
+            sections={CREATE_SECTIONS.map((x) => ({ key: x.key, label: x.label }))}
+          />
           <ProjectFormFields
+            activeSection={tab}
             users={users}
             projects={projects}
             withContacts
@@ -172,6 +247,7 @@ export default function ProjectCreate() {
           </div>
         </Form>
       </Card>
+    </div>
     </div>
   )
 }

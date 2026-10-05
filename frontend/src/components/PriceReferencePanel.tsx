@@ -1,19 +1,10 @@
-import { App, Alert, Button, Card, Col, Empty, Modal, Row, Select, Space, Statistic, Table, Tag, Typography, Upload } from 'antd'
+import { App, Alert, Button, Card, Col, Empty, Modal, Row, Select, Space, Statistic, Table, Typography, Upload } from 'antd'
+import { toneOf } from '../theme/status'
+import { Chip } from '../components/ds'
 import { useState } from 'react'
 
 import { hasPerm } from '../api/user'
-import {
-  errMsg,
-  importPurchaseHistory,
-  priceReference,
-  recommendSuppliers,
-  searchItems,
-  type ItemLite,
-  type PriceReference,
-  type QuoteRow,
-  type ImportHistoryResult,
-  type RecommendResult,
-} from '../api/client'
+import { errMsg, importPurchaseHistory, priceReference, recommendSuppliers, searchItems, type ItemLite, type PriceReference, type QuoteRow, type ImportHistoryResult, type RecommendResult } from '../api/client'
 
 const money = (v?: number | null) => (v == null ? '—' : `¥${Number(v).toLocaleString()}`)
 const date = (v?: string | null) => (v ? v.slice(0, 10) : '—')
@@ -248,7 +239,7 @@ export default function PriceReferencePanel() {
                 { title: '日期', dataIndex: 'quote_date', width: 110, render: date },
                 { title: '供应商', dataIndex: 'supplier_name', width: 200, render: (v: string | null) => v ?? '—' },
                 { title: '报价', dataIndex: 'price', width: 120, align: 'right', render: money },
-                { title: '类型', dataIndex: 'price_type', width: 90, render: (v: string) => <Tag>{v}</Tag> },
+                { title: '类型', dataIndex: 'price_type', width: 90, render: (v: string) => <Chip>{v}</Chip> },
                 { title: '交期(天)', dataIndex: 'lead_days', width: 90, align: 'right', render: (v: number | null) => v ?? '—' },
                 { title: '有效期', dataIndex: 'valid_until', width: 110, render: date },
               ]}
@@ -265,13 +256,13 @@ export default function PriceReferencePanel() {
                 columns={[
                   { title: '供应商', dataIndex: 'name', width: 220, render: (v: string, r) => (
                     <>
-                      {v} <Tag color={r.match_level === '优选' ? 'green' : r.match_level === '备选' ? 'blue' : 'default'}>{r.match_level}</Tag>
+                      {v} <Chip tone={toneOf(r.match_level === '优选' ? 'green' : r.match_level === '备选' ? 'blue' : 'default')}>{r.match_level}</Chip>
                     </>
                   ) },
                   { title: '评分', dataIndex: 'score', width: 80, align: 'right' },
                   { title: '参考价', dataIndex: 'price_hint', width: 120, align: 'right', render: money },
                   { title: '交期(天)', dataIndex: 'lead_days', width: 90, align: 'right', render: (v: number | null, r) => (
-                    <>{v ?? '—'}{r.late ? <Tag color="red" style={{ marginLeft: 4 }}>赶不上</Tag> : null}</>
+                    <>{v ?? '—'}{r.late ? <Chip tone="err" style={{ marginLeft: 4 }}>赶不上</Chip> : null}</>
                   ) },
                   { title: '理由', dataIndex: 'reasons', render: (v: string[]) => v.join('；') },
                 ]}

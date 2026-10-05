@@ -1,19 +1,13 @@
-import { App, Button, Card, Col, DatePicker, Divider, Empty, Form, Input, InputNumber, Modal, Popconfirm, Row, Select, Space, Table, Tag, Typography } from 'antd'
+import { App, Button, Card, Col, DatePicker, Divider, Empty, Form, Input, InputNumber, Modal, Popconfirm, Row, Select, Space, Table, Typography } from 'antd'
+import { Status } from '../../components/ds'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
-import {
-  createPaymentChange,
-  decidePaymentChange,
-  listMyPendingPaymentChanges,
-  listPaymentChanges,
-  withdrawPaymentChange,
-  type PayChangeRow,
-} from '../../api/paymentChange'
+import { createPaymentChange, decidePaymentChange, listMyPendingPaymentChanges, listPaymentChanges, withdrawPaymentChange, type PayChangeRow } from '../../api/paymentChange'
 import { errMsg, hasPerm } from '../../api/client'
 import dayjs from 'dayjs'
 import AppModal from '../AppModal'
 import { Muted, Stack } from '../ui/Primitives'
-import { PAY_CHANGE_STATUS } from '../../theme/status'
+import { PAY_CHANGE_STATUS, toneOf } from '../../theme/status'
 
 const TRIGGERS = ['发货', '到货', '验收', '质保']
 
@@ -179,7 +173,7 @@ export default function PaymentChangeCard({
         locale={{ emptyText: <Empty description="没有付款计划变更记录" /> }}
         columns={[
           { title: '变更单', dataIndex: 'change_no', width: 110 },
-          { title: '状态', dataIndex: 'status', width: 120, render: (v: string) => <Tag color={PAY_CHANGE_STATUS[v] ?? 'default'}>{v}</Tag> },
+          { title: '状态', dataIndex: 'status', width: 120, render: (v: string) => <Status tone={toneOf(PAY_CHANGE_STATUS[v])}>{v}</Status> },
           { title: '原因', dataIndex: 'reason', ellipsis: true },
           { title: '提交人', dataIndex: 'requested_by_name', width: 100, render: (v?: string | null) => v ?? '—' },
           {

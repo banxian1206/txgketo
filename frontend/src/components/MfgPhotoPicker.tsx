@@ -1,4 +1,5 @@
-import { App, Button, Space, Tag, Upload } from 'antd'
+import { App, Button, Space, Upload } from 'antd'
+import { Chip } from '../components/ds'
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { errMsg, mfgPhotoUrl, uploadMfgPhotos } from '../api/client'
@@ -161,9 +162,9 @@ export default function MfgPhotoPicker({
                 alt="离线暂存"
                 style={{ width: 56, height: 56, objectFit: 'cover', borderRadius: 4, opacity: 0.75 }}
               />
-              <Tag color="orange" style={{ position: 'absolute', top: 0, right: 0, fontSize: 12, margin: 0 }}>
+              <Chip tone="warn" style={{ position: 'absolute', top: 0, right: 0, fontSize: 12, margin: 0 }}>
                 ⏳
-              </Tag>
+              </Chip>
               <a
                 style={{ fontSize: 12, marginLeft: 4 }}
                 onClick={() => { void queueRemove(q.id).then(() => myQueued()).then(setQueued) }}
@@ -172,7 +173,7 @@ export default function MfgPhotoPicker({
               </a>
             </div>
           ))}
-          <Tag color="orange">离线暂存 {queued.length} 张，联网自动同步</Tag>
+          <Chip tone="warn">离线暂存 {queued.length} 张，联网自动同步</Chip>
         </Space>
       )}
     </Space>

@@ -1,7 +1,9 @@
-import { App, Button, Card, Col, Empty, Row, Space, Spin, Table, Tabs, Tag, Typography } from 'antd'
+import { App, Button, Card, Col, Row, Space, Spin, Table, Tag, Typography } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
+
+import { Empty as DsEmpty } from '../../components/ds'
 
 import {
   engBoard,
@@ -20,11 +22,12 @@ import {
 import { ENG_BOARD_STATE as STATE_COLOR } from '../../theme/status'
 import { TASK_STATUS as TASK_STATUS_COLOR } from '../../theme/status'
 import { T } from '../../theme/tokens'
-import { ENG_TABS, filterTabs } from '../../configs/tabs'
-import { useTab } from '../../hooks/useTab'
 import { useGoFrom } from '../../hooks/useFrom'
 
 const PROFS = ['机械', '电气', '程序', '工艺']
+
+import WorkbenchPage from '../../components/domain/WorkbenchPage'
+import { ENG_BOARD } from '../../configs/boards'
 
 /** 工程部工作台（06 卷 §3）：组员 / 经理 / 总监 三视角 */
 export default function EngWorkbench() {
@@ -32,7 +35,7 @@ export default function EngWorkbench() {
   const nav = useNavigate()
   // ★ docs/11：跳去别的域时带上 ?from= （来源台/来源页），回来还在原来那一层
   const go = useGoFrom()
-  const [me, setMe] = useState<WorkbenchMe | null>(null)
+  const [, setMe] = useState<WorkbenchMe | null>(null)
   const [board, setBoard] = useState<EngBoard | null>(null)
   const [myTasks, setMyTasks] = useState<TaskItem[]>([])
   const [teamTasks, setTeamTasks] = useState<TaskItem[]>([])
@@ -71,9 +74,9 @@ export default function EngWorkbench() {
     void load()
   }, [load])
 
-  const position = me?.user.position ?? ''
-  const isLead = position === '经理' || position === '总监'
-  const isDirector = position === '总监' || me?.user.roles.includes('ADMIN')
+  // ★ docs/15：页签可见性交给注册表（ENG_TABS 的权限码），**不再用 position 猜岗位**
+  //   —— 后端 /my-tasks?scope=team 与 /workbench/eng/board 本来就只要登录，
+  //   用岗位裁是"看得见的活别人点不到"的老病（M-04）。
 
   const taskColumns: ColumnsType<TaskItem> = [
     { title: '任务号', dataIndex: 'task_no', width: 100 },
@@ -176,220 +179,210 @@ export default function EngWorkbench() {
     },
   ]
 
-  // ★ 台内页签：按权限过滤 + 状态进 URL（docs/10 P0）。
-  //   「我组 / 部门看板」只给有审核权的角色（经理/总监），组员看到的是干净的一层。
-  const visKeys = filterTabs(ENG_TABS).map((x) => x.key)
-  const [tab, setTab] = useTab(visKeys, 'mine')
+
+  // 体：按页签 key 取（顺序 / 标题 / 徽标 / 可见性全来自注册表 ENG_BOARD）
+  const partsOf: Record<string, ReactNode> = {
+    mine: (
+      <>
+        <Card size="small" title="我的任务" style={{ marginBottom: 12 }}>
+          <Table
+            rowKey="id"
+            size="small"
+            dataSource={myTasks}
+            columns={taskColumns}
+            pagination={false}
+            locale={{ emptyText: <DsEmpty text="没有指派给我的任务" /> }}
+          />
+        </Card>
+        <Row gutter={12}>
+          <Col xs={24} lg={12}>
+            <Card size="small" title="我提交的评审单">
+              <Table
+                rowKey="id"
+                size="small"
+                dataSource={mineTickets}
+                columns={ticketColumns}
+                pagination={false}
+              />
+            </Card>
+          </Col>
+          <Col xs={24} lg={12}>
+            <Card size="small" title="待我改版">
+              <Table
+                rowKey="id"
+                size="small"
+                dataSource={myChanges}
+                pagination={false}
+                locale={{ emptyText: <DsEmpty text="没有待我改版的申请" /> }}
+                columns={[
+                  { title: '申请号', dataIndex: 'cr_no', width: 100 },
+                  { title: '对象', dataIndex: 'target_title' },
+                  { title: '状态', dataIndex: 'status', width: 90, render: (v: string) => <Tag>{v}</Tag> },
+                ]}
+              />
+            </Card>
+          </Col>
+        </Row>
+      </>
+
+    ),
+    team: (
+            <>
+              <Card size="small" title="待我审核" style={{ marginBottom: 12 }}>
+                <Table
+                  rowKey="id"
+                  size="small"
+                  dataSource={todoTickets}
+                  columns={ticketColumns}
+                  pagination={false}
+                  locale={{ emptyText: <DsEmpty text="没有待我审核的评审单" /> }}
+                />
+              </Card>
+              <Card size="small" title="组员任务进度">
+                <Table
+                  rowKey="id"
+                  size="small"
+                  dataSource={teamTasks}
+                  columns={taskColumns}
+                  pagination={{ pageSize: 20, showSizeChanger: false }}
+                />
+              </Card>
+            </>
+          
+    ),
+    board: (
+            <>
+              <Row gutter={[12, 12]} style={{ marginBottom: 12 }}>
+                {[
+                  { label: '设备总数', value: board?.summary.equipments ?? 0 },
+                  { label: '全部专业已发布', value: board?.summary.all_released ?? 0 },
+                  { label: '卡住设备', value: board?.summary.blocked ?? 0 },
+                  { label: '待我终审', value: board?.summary.pending_reviews ?? 0, to: '/workbench/reviews' },
+                  { label: '待我裁决改版', value: board?.summary.pending_changes ?? 0, to: '/workbench/changes' },
+                  { label: '超期任务', value: board?.summary.overdue_tasks ?? 0 },
+                ].map((s) => (
+                  <Col xs={12} sm={8} md={4} key={s.label}>
+                    <Card
+                      size="small"
+                      hoverable={!!s.to}
+                      onClick={() => s.to && nav(s.to)}
+                      style={{ textAlign: 'center' }}
+                    >
+                      <div style={{ fontSize: 12, color: T.textSecondary }}>{s.label}</div>
+                      <div style={{ fontSize: 20, fontWeight: 600, color: s.value ? T.brand : T.textDisabled }}>
+                        {s.value}
+                      </div>
+                    </Card>
+                  </Col>
+                ))}
+              </Row>
+
+              <Card size="small" title="设备设计进度（机械 / 电气 / 程序 / 工艺）" style={{ marginBottom: 12 }}>
+                <Table
+                  rowKey={(r) => `${r.project_no}-${r.equip_no}`}
+                  size="small"
+                  dataSource={board?.equipments ?? []}
+                  columns={equipColumns}
+                  pagination={{ pageSize: 20, showSizeChanger: false }}
+                />
+              </Card>
+
+              <Row gutter={12}>
+                <Col xs={24} lg={12}>
+                  <Card size="small" title="待我终审" style={{ marginBottom: 12 }}>
+                    <Table
+                      rowKey="id"
+                      size="small"
+                      dataSource={board?.pending_reviews ?? []}
+                      pagination={false}
+                      locale={{ emptyText: <DsEmpty text="没有待终审的评审单" /> }}
+                      columns={[
+                        { title: '评审单', dataIndex: 'ticket_no' },
+                        {
+                          title: '设备',
+                          key: 'e',
+                          render: (_: unknown, r) => `${r.project_no} ${r.equip_no ?? ''}`,
+                        },
+                        { title: '专业', dataIndex: 'profession' },
+                        { title: '提交人', dataIndex: 'submitter' },
+                      ]}
+                    />
+                  </Card>
+                </Col>
+                <Col xs={24} lg={12}>
+                  <Card size="small" title="待我裁决的改版" style={{ marginBottom: 12 }}>
+                    <Table
+                      rowKey="id"
+                      size="small"
+                      dataSource={board?.pending_changes ?? []}
+                      pagination={false}
+                      locale={{ emptyText: <DsEmpty text="没有待裁决的改版申请" /> }}
+                      columns={[
+                        { title: '申请号', dataIndex: 'cr_no' },
+                        { title: '对象', dataIndex: 'target_ref' },
+                        {
+                          title: '设备',
+                          key: 'e',
+                          render: (_: unknown, r) => `${r.project_no} ${r.equip_no ?? ''}`,
+                        },
+                        { title: '问题', dataIndex: 'reason', ellipsis: true },
+                      ]}
+                    />
+                  </Card>
+                </Col>
+              </Row>
+
+              <Card size="small" title="超期任务">
+                <Table
+                  rowKey="id"
+                  size="small"
+                  dataSource={board?.overdue_tasks ?? []}
+                  pagination={false}
+                  locale={{ emptyText: <DsEmpty text="没有超期任务" /> }}
+                  columns={[
+                    { title: '任务号', dataIndex: 'task_no', width: 100 },
+                    { title: '任务', dataIndex: 'title' },
+                    { title: '专业', dataIndex: 'profession', width: 70 },
+                    { title: '负责人', dataIndex: 'owner', width: 90 },
+                    { title: '计划完成', dataIndex: 'plan_end', width: 110 },
+                    { title: '状态', dataIndex: 'status', width: 90, render: (v: string) => <Tag>{v}</Tag> },
+                  ]}
+                />
+              </Card>
+            </>
+          
+    ),
+  }
 
   return (
     <Spin spinning={loading}>
-      <Card size="small" style={{ marginBottom: 12 }}>
-        <Space wrap>
-          <Typography.Title level={5} style={{ margin: 0 }}>
-            工程部工作台
-          </Typography.Title>
-          <Tag color="blue">{position || '—'}</Tag>
-          {me?.user.department && <Tag>{me.user.department.name}</Tag>}
-          {me?.user.profession && <Tag>{me.user.profession}</Tag>}
+      <div className="ds-page">
+      {/* ★ docs/15 台骨架四件套：台头 → 结论条 → 流程条（注册表驱动）→ 体 */}
+      <WorkbenchPage
+        board={ENG_BOARD}
+        sub="设计任务 → 提交评审 → 经理一级审 → 总监二级审 → 发布（冻结，自动触发采购）；改版走 ECN，不能私下改图"
+        help="上面的数字可点，点了切到对应队列。"
+        actions={
           <Button size="small" onClick={() => void load()}>
             刷新
           </Button>
-        </Space>
-      </Card>
-
-      <Tabs
-        activeKey={tab}
-        onChange={setTab}
-        items={[
-          {
-            key: 'mine',
-            label: `我的（${myTasks.length} 任务）`,
-            children: (
-              <>
-                <Card size="small" title="我的任务" style={{ marginBottom: 12 }}>
-                  <Table
-                    rowKey="id"
-                    size="small"
-                    dataSource={myTasks}
-                    columns={taskColumns}
-                    pagination={false}
-                    locale={{ emptyText: <Empty description="没有指派给我的任务" /> }}
-                  />
-                </Card>
-                <Row gutter={12}>
-                  <Col xs={24} lg={12}>
-                    <Card size="small" title="我提交的评审单">
-                      <Table
-                        rowKey="id"
-                        size="small"
-                        dataSource={mineTickets}
-                        columns={ticketColumns}
-                        pagination={false}
-                      />
-                    </Card>
-                  </Col>
-                  <Col xs={24} lg={12}>
-                    <Card size="small" title="待我改版">
-                      <Table
-                        rowKey="id"
-                        size="small"
-                        dataSource={myChanges}
-                        pagination={false}
-                        locale={{ emptyText: <Empty description="没有待我改版的申请" /> }}
-                        columns={[
-                          { title: '申请号', dataIndex: 'cr_no', width: 100 },
-                          { title: '对象', dataIndex: 'target_title' },
-                          { title: '状态', dataIndex: 'status', width: 90, render: (v: string) => <Tag>{v}</Tag> },
-                        ]}
-                      />
-                    </Card>
-                  </Col>
-                </Row>
-              </>
-            ),
-          },
-          ...(isLead
-            ? [
-                {
-                  key: 'team',
-                  label: `我组（${teamTasks.length} 任务 / 待审 ${todoTickets.length}）`,
-                  children: (
-                    <>
-                      <Card size="small" title="待我审核" style={{ marginBottom: 12 }}>
-                        <Table
-                          rowKey="id"
-                          size="small"
-                          dataSource={todoTickets}
-                          columns={ticketColumns}
-                          pagination={false}
-                          locale={{ emptyText: <Empty description="没有待我审核的评审单" /> }}
-                        />
-                      </Card>
-                      <Card size="small" title="组员任务进度">
-                        <Table
-                          rowKey="id"
-                          size="small"
-                          dataSource={teamTasks}
-                          columns={taskColumns}
-                          pagination={{ pageSize: 20, showSizeChanger: false }}
-                        />
-                      </Card>
-                    </>
-                  ),
-                },
-              ]
-            : []),
-          ...(isDirector
-            ? [
-                {
-                  key: 'board',
-                  label: '部门看板',
-                  children: (
-                    <>
-                      <Row gutter={[12, 12]} style={{ marginBottom: 12 }}>
-                        {[
-                          { label: '设备总数', value: board?.summary.equipments ?? 0 },
-                          { label: '全部专业已发布', value: board?.summary.all_released ?? 0 },
-                          { label: '卡住设备', value: board?.summary.blocked ?? 0 },
-                          { label: '待我终审', value: board?.summary.pending_reviews ?? 0, to: '/workbench/reviews' },
-                          { label: '待我裁决改版', value: board?.summary.pending_changes ?? 0, to: '/workbench/changes' },
-                          { label: '超期任务', value: board?.summary.overdue_tasks ?? 0 },
-                        ].map((s) => (
-                          <Col xs={12} sm={8} md={4} key={s.label}>
-                            <Card
-                              size="small"
-                              hoverable={!!s.to}
-                              onClick={() => s.to && nav(s.to)}
-                              style={{ textAlign: 'center' }}
-                            >
-                              <div style={{ fontSize: 12, color: T.textSecondary }}>{s.label}</div>
-                              <div style={{ fontSize: 20, fontWeight: 600, color: s.value ? T.brand : T.textDisabled }}>
-                                {s.value}
-                              </div>
-                            </Card>
-                          </Col>
-                        ))}
-                      </Row>
-
-                      <Card size="small" title="设备设计进度（机械 / 电气 / 程序 / 工艺）" style={{ marginBottom: 12 }}>
-                        <Table
-                          rowKey={(r) => `${r.project_no}-${r.equip_no}`}
-                          size="small"
-                          dataSource={board?.equipments ?? []}
-                          columns={equipColumns}
-                          pagination={{ pageSize: 20, showSizeChanger: false }}
-                        />
-                      </Card>
-
-                      <Row gutter={12}>
-                        <Col xs={24} lg={12}>
-                          <Card size="small" title="待我终审" style={{ marginBottom: 12 }}>
-                            <Table
-                              rowKey="id"
-                              size="small"
-                              dataSource={board?.pending_reviews ?? []}
-                              pagination={false}
-                              locale={{ emptyText: <Empty description="没有待终审的评审单" /> }}
-                              columns={[
-                                { title: '评审单', dataIndex: 'ticket_no' },
-                                {
-                                  title: '设备',
-                                  key: 'e',
-                                  render: (_: unknown, r) => `${r.project_no} ${r.equip_no ?? ''}`,
-                                },
-                                { title: '专业', dataIndex: 'profession' },
-                                { title: '提交人', dataIndex: 'submitter' },
-                              ]}
-                            />
-                          </Card>
-                        </Col>
-                        <Col xs={24} lg={12}>
-                          <Card size="small" title="待我裁决的改版" style={{ marginBottom: 12 }}>
-                            <Table
-                              rowKey="id"
-                              size="small"
-                              dataSource={board?.pending_changes ?? []}
-                              pagination={false}
-                              locale={{ emptyText: <Empty description="没有待裁决的改版申请" /> }}
-                              columns={[
-                                { title: '申请号', dataIndex: 'cr_no' },
-                                { title: '对象', dataIndex: 'target_ref' },
-                                {
-                                  title: '设备',
-                                  key: 'e',
-                                  render: (_: unknown, r) => `${r.project_no} ${r.equip_no ?? ''}`,
-                                },
-                                { title: '问题', dataIndex: 'reason', ellipsis: true },
-                              ]}
-                            />
-                          </Card>
-                        </Col>
-                      </Row>
-
-                      <Card size="small" title="超期任务">
-                        <Table
-                          rowKey="id"
-                          size="small"
-                          dataSource={board?.overdue_tasks ?? []}
-                          pagination={false}
-                          locale={{ emptyText: <Empty description="没有超期任务" /> }}
-                          columns={[
-                            { title: '任务号', dataIndex: 'task_no', width: 100 },
-                            { title: '任务', dataIndex: 'title' },
-                            { title: '专业', dataIndex: 'profession', width: 70 },
-                            { title: '负责人', dataIndex: 'owner', width: 90 },
-                            { title: '计划完成', dataIndex: 'plan_end', width: 110 },
-                            { title: '状态', dataIndex: 'status', width: 90, render: (v: string) => <Tag>{v}</Tag> },
-                          ]}
-                        />
-                      </Card>
-                    </>
-                  ),
-                },
-              ]
-            : []),
-        ].filter((x) => visKeys.includes(x.key))}
-      />
+        }
+        counts={{
+          mine: myTasks.length,
+          team: teamTasks.length,
+          board: board?.summary.blocked ?? 0,
+        }}
+        metrics={[
+          { key: 'mine', label: '我的任务', value: myTasks.length, unit: '项', tone: myTasks.length ? 'warn' : undefined, dimZero: true, to: '?tab=mine' },
+          { key: 'blocked', label: '卡住的任务', value: myTasks.filter((t) => t.blocked).length, unit: '项', tone: 'err', dimZero: true, to: '?tab=mine' },
+          { key: 'review', label: '待我审 / 待终审', value: board?.summary.pending_reviews ?? 0, unit: '张', tone: (board?.summary.pending_reviews ?? 0) > 0 ? 'warn' : undefined, dimZero: true, to: '?tab=team' },
+          { key: 'change', label: '待我裁决改版', value: board?.summary.pending_changes ?? 0, unit: '张', tone: (board?.summary.pending_changes ?? 0) > 0 ? 'warn' : undefined, dimZero: true, to: '?tab=team' },
+          { key: 'equip', label: '卡住设备', value: board?.summary.blocked ?? 0, unit: '台', tone: (board?.summary.blocked ?? 0) > 0 ? 'err' : undefined, dimZero: true, to: '?tab=board' },
+        ]}
+      >
+        {(t) => partsOf[t]}
+      </WorkbenchPage>
+      </div>
     </Spin>
   )
 }

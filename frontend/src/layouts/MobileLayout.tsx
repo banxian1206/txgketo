@@ -3,18 +3,7 @@ import { Badge, Space, Typography } from 'antd'
 import type { ReactNode } from 'react'
 import { useCallback, useEffect, useState } from 'react'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
-import {
-  BellOutlined,
-  BuildOutlined,
-  CarOutlined,
-  ExportOutlined,
-  HomeOutlined,
-  SettingOutlined,
-  InboxOutlined,
-  ApartmentOutlined,
-  ToolOutlined,
-  UserOutlined,
-} from '@ant-design/icons'
+import { BellOutlined, BuildOutlined, CarOutlined, ExportOutlined, HomeOutlined, SettingOutlined, InboxOutlined, ApartmentOutlined, ToolOutlined, UserOutlined } from '@ant-design/icons'
 
 import NotificationsDrawer from '../components/NotificationsDrawer'
 import { useAuth } from '../contexts/AuthContext'
