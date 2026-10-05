@@ -323,6 +323,7 @@ export default function Manufacturing() {
           </Button>
         }
         toolbar={<ShopViews />}
+        flowSize="small"
         counts={{
           wait: (c?.wait ?? 0),
           running: (c?.running ?? 0),

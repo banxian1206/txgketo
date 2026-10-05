@@ -29,7 +29,6 @@ export default function ShopViews() {
   return (
     <div className="ds-subtabs shop-views">
       <Segmented
-        size="small"
         value={active}
         onChange={(k) => nav(k === 'shop' ? '/workbench/shop' : `/workbench/shop/${k}`)}
         options={VIEWS.map((v) => ({ value: v.key, label: v.label }))}

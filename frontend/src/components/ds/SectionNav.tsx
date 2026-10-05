@@ -37,12 +37,27 @@ export default function SectionNav({
   keepMounted = false,
   barOnly = false,
   groups,
+  variant = 'section',
+  flowSize = 'default',
 }: {
   sections: SectionDef[]
   tab: string
   onTab: (key: string) => void
   /** 空分区的兜底文案（页面可覆盖） */
   emptyText?: string
+  /**
+   * 切换器形态：
+   *   · `section`（默认）= 详情页「分区条」：浅色按钮行（`ds-sec`），比台条轻一档
+   *   · `flow`         = 台内「流程条」：**一律胶囊 Segmented**（第 1 级 default、第 2 级 small）
+   *
+   * ★ 为什么要分（2026-10-05 客户实测"采购车间、仓库现场的 tab 样式不一样"）：
+   *   台内切换器过去是**两种组件混用** —— >4 项的台第 1 级走 antd 下划线 Tabs、≤4 项的台
+   *   走浅色按钮行；同一屏里既有"下划线"又有"胶囊"，看着就不是一套。
+   *   现在台内**只用胶囊**，层级靠尺寸区分；详情页分区条保持"更轻一档"（不与台条抢）。
+   */
+  variant?: 'section' | 'flow'
+  /** flow 形态下的尺寸：`small` = 第 2 级（页面自己还有一条更重的视图条时用） */
+  flowSize?: 'default' | 'small'
   /**
    * 两层流程条（台类页）：>4 项时先出"组"，组内再出"项"；≤4 项时调用方不该传它。
    * ⚠ tab key 语义不变（组只是**多一层选择**，不改 key、不改 `?tab=`）。
@@ -105,7 +120,7 @@ export default function SectionNav({
       <>
         <div className="ds-subtabs ds-grp">
           <Segmented
-            size="small"
+            size={flowSize === "small" ? "small" : undefined}
             value={g.key}
             // 点组 = 进该组第一个可见项（与 WorkbenchTabs 同口径：切组不保留另一组的项）
             onChange={(k) => {
@@ -128,6 +143,28 @@ export default function SectionNav({
             />
           </div>
         )}
+        <div className="ds-sec-body" ref={bodyRef}>
+          {renderBody(active, emptyText)}
+        </div>
+      </>
+    )
+  }
+  // flow：单层也画胶囊（与台内其它行同款）
+  if (variant === 'flow') {
+    const bar2 = (
+      <div className="ds-subtabs is-flow">
+        <Segmented
+          size={flowSize === "small" ? "small" : undefined}
+          value={active?.key}
+          onChange={(k) => go(String(k))}
+          options={sections.map((x) => ({ value: x.key, label: badgeText(x.badge) ? `${x.label} (${badgeText(x.badge)})` : x.label, key: x.key }))}
+        />
+      </div>
+    )
+    if (barOnly) return bar2
+    return (
+      <>
+        {bar2}
         <div className="ds-sec-body" ref={bodyRef}>
           {renderBody(active, emptyText)}
         </div>

@@ -20,7 +20,6 @@
 import {
   ENG_GROUPS,
   ENG_TABS,
-  MFG_GROUPS,
   MFG_TABS,
   PM_GROUPS,
   PM_TABS,
@@ -132,7 +131,9 @@ export const SHOP_BOARD: BoardDef = {
   // 待下发/在制/待转运/返工 = 车间按单干活的队列（行尾一个按钮：下发/开工/验收/转运）
   // 外协是台账（要对比多列：发出日/回厂日/验收结果）
   tabs: MFG_TABS.map((t) => ({ ...t, kind: t.key === 'outsource' ? 'ledger' : 'queue' })),
-  groups: MFG_GROUPS,
+  // ⚠ 不分组：`MFG_GROUPS` 只有 2 组（在制流程 / 返工与外协）→ 平白多一行——
+  //   车间一屏已经有两行切换器（视图条「看板/制造/装配」+ 这 5 个队列），三段横条就是噪音。
+  //   5 项 ≤4 不成立 → 平铺成一行胶囊（第 2 级样式）。
 }
 
 /** 发运工作台：批次是台账（要对比多列），但"待装车/在途"是队列（这一步该动了） */

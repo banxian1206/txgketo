@@ -459,3 +459,20 @@ button.ds-seg.is-link:hover { border-color: var(--ds-accentLine); background: va
 /* 两层的流程条：组那一行与项那一行贴在一起，不要两条大横条 */
 .ds-subtabs.ds-grp { padding-bottom: 0; }
 .ds-row-expand { padding: 10px 12px 14px; background: var(--ds-bg2); border-top: 1px solid var(--ds-line); }
+
+/* ── 台内流程条（docs/15）：**一律胶囊**，层级靠尺寸；选中态必须一眼看得出 ──
+   客户实测（2026-10-05）：「采购车间、仓库现场的 tab 样式不一样」——
+   根因是台内混用了 antd 下划线 Tabs（>4 项时）与浅色按钮行（≤4 项时），
+   且"项"那一行的选中态几乎看不见。现在：第 1 级 default、第 2 级 small，选中 = 白底 + 品牌色 + 半粗。 */
+.ds-subtabs .ant-segmented,
+.ds-subtabs.is-flow .ant-segmented { background: var(--ds-surface3); padding: 2px; }
+.ds-subtabs .ant-segmented-item { color: var(--ds-ink2); }
+.ds-subtabs .ant-segmented-item-label { padding: 0 10px; }
+.ds-subtabs .ant-segmented-item-selected,
+.ds-subtabs .ant-segmented-item-selected:hover {
+  background: var(--ds-surface); color: var(--ds-acc); font-weight: 600;
+  box-shadow: 0 1px 3px rgba(16, 24, 40, 0.10);
+}
+.ds-subtabs.ds-grp { padding-top: 12px; padding-bottom: 6px; }
+.ds-subtabs.is-flow { padding-top: 12px; }
+.shop-views .hint { font-size: 12px; color: var(--ds-ink3); margin-left: 2px; }

@@ -30,6 +30,7 @@ export default function WorkbenchPage({
   actions,
   metrics,
   toolbar,
+  flowSize,
   counts,
   loading,
   children,
@@ -40,6 +41,8 @@ export default function WorkbenchPage({
   help?: string
   /** 台级动作（≤2 个） */
   actions?: ReactNode
+  /** 流程条尺寸：`small` = 页面自己还有一条更重的视图条（如车间台的「看板/制造/装配」） */
+  flowSize?: 'default' | 'small'
   /** 结论条（≤5 个） */
   metrics?: MetricItem[]
   /**
@@ -80,6 +83,8 @@ export default function WorkbenchPage({
       <Spin spinning={Boolean(loading)}>
         {/* ③ 流程条 + ④ 体 */}
         <SectionNav
+          variant="flow"
+          flowSize={flowSize}
           sections={sections}
           groups={groupsFor(board, visible.map((t) => t.key))}
           tab={def?.key ?? ''}
