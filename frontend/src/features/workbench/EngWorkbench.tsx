@@ -191,6 +191,9 @@ export default function EngWorkbench() {
             dataSource={myTasks}
             columns={taskColumns}
             pagination={false}
+            // ★ docs/15：工程台是**看板**（看进度/卡点），动手的地方是「我的任务」页 ——
+            //   点任意一行直接过去，别让人自己猜去哪儿干（这一列过去只有"设备"能点）
+            onRow={() => ({ onClick: () => go('/workbench/tasks'), style: { cursor: 'pointer' } })}
             locale={{ emptyText: <DsEmpty text="没有指派给我的任务" /> }}
           />
         </Card>
@@ -203,6 +206,7 @@ export default function EngWorkbench() {
                 dataSource={mineTickets}
                 columns={ticketColumns}
                 pagination={false}
+                onRow={() => ({ onClick: () => go('/workbench/reviews'), style: { cursor: 'pointer' } })}
               />
             </Card>
           </Col>

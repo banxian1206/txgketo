@@ -129,8 +129,9 @@ export const SHOP_BOARD: BoardDef = {
   key: 'shop',
   name: '车间工作台',
   route: '/workbench/shop',
-  // ⚠ TODO(docs/15 批 2)：待下发/在制/待转运/返工 目标是队列，现仍是表
-  tabs: MFG_TABS.map((t) => ({ ...t, kind: 'ledger' })),
+  // 待下发/在制/待转运/返工 = 车间按单干活的队列（行尾一个按钮：下发/开工/验收/转运）
+  // 外协是台账（要对比多列：发出日/回厂日/验收结果）
+  tabs: MFG_TABS.map((t) => ({ ...t, kind: t.key === 'outsource' ? 'ledger' : 'queue' })),
   groups: MFG_GROUPS,
 }
 
@@ -154,8 +155,11 @@ export const SITE_BOARD: BoardDef = {
   key: 'site',
   name: '现场工作台',
   route: '/delivery/site',
-  // ⚠ TODO(docs/15 批 2)：来货清点/现场问题 目标是队列，现仍是表
-  tabs: SITE_TABS.map((t) => ({ ...t, kind: 'ledger' })),
+  // 来货清点 / 现场问题 = 现场逐条处理的队列；勘测/日报/申请调试是记录台账
+  tabs: SITE_TABS.map((t) => ({
+    ...t,
+    kind: (['incoming', 'issues'] as string[]).includes(t.key) ? 'queue' : 'ledger',
+  })),
   groups: SITE_GROUPS,
 }
 

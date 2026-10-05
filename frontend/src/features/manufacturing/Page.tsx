@@ -9,18 +9,18 @@ import AuthedImage from '../../components/AuthedImage'
 import AuthedFileLink from '../../components/AuthedFileLink'
 import { PROD_STATUS as STATUS_COLOR, toneOf } from '../../theme/status'
 import { OUTSOURCE_STATUS as OS_COLOR } from '../../theme/status'
-import {Chip, Code, Status, Empty as DsEmpty } from '../../components/ds'
+import { Chip, Code, Status, Empty as DsEmpty } from '../../components/ds'
+import QueueBoard from '../../components/ds/QueueBoard'
+import ShopViews from '../../components/domain/ShopViews'
 import { T } from '../../theme/tokens'
 import { SHOP_BOARD } from '../../configs/boards'
 import WorkbenchPage from '../../components/domain/WorkbenchPage'
-import { useGoFrom } from '../../hooks/useFrom'
+import { Link } from 'react-router-dom'
 const TEAMS = ['下料', '机加', '焊接', '钣金', '喷涂']
 type ActionKind = 'dispatch' | 'accept' | 'transfer' | 'os-send' | 'os-accept'
 export default function Manufacturing() {
   const { message } = App.useApp()
-  // ★ docs/11：跳去别的域时带上 ?from= （来源台/来源页），回来还在原来那一层
-  const go = useGoFrom()
-  const canEdit = hasPerm('mfg:edit')
+    const canEdit = hasPerm('mfg:edit')
   // 生成排产
   const [genProject, setGenProject] = useState<string | undefined>()
   const [genEquip, setGenEquip] = useState<string | undefined>()
@@ -152,71 +152,57 @@ export default function Manufacturing() {
       message.error(errMsg(e))
     }
   }
-  const orderColumns = (kind: 'wait' | 'running' | 'transfer' | 'rework') => [
-    {
-      title: '单号',
-      dataIndex: 'order_no',
-      width: 110,
-      render: (v: string, r: ProdOrderRow) => <a onClick={() => setDetail(r)}>{v}</a>,
-    },
-    {
-      title: '项目 / 设备',
-      key: 'pe',
-      width: 150,
-      render: (_: unknown, r: ProdOrderRow) => (
-        <a onClick={() => go(`/projects/${r.project_no}`)}>
-          {r.project_no} · {r.equip_no ?? ''}
-        </a>
-      ),
-    },
-    {
-      title: '零件（图号）',
-      key: 'item',
-      render: (_: unknown, r: ProdOrderRow) => (
-        // ★ 入口（2026-10-05）：车间按图号干活 → 图号直接进件档案（看是按哪版图、料到没到）
-        <>
-          <Code to={`/items/${r.item_no}`}>{r.item_no}</Code>
-          <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-            {' '}{r.item_name ?? ''}
-          </Typography.Text>
-        </>
-      ),
-    },
-    { title: '数量', key: 'qty', width: 90, align: 'right' as const, render: (_: unknown, r: ProdOrderRow) => `${r.qty} ${r.unit}` },
-    {
-      title: '计划完成',
-      dataIndex: 'plan_end',
-      width: 120,
-      render: (v: string | null, r: ProdOrderRow) => (
-        <Space size={4}>
-          {v ?? '—'}
-          {r.overdue && <Chip tone="err">超期</Chip>}
-        </Space>
-      ),
-    },
-    {
-      title: '状态',
-      dataIndex: 'status',
-      width: 110,
-      render: (v: string) => <Status tone={toneOf(STATUS_COLOR[v])}>{v}</Status>,
-    },
-    {
-      title: '操作',
-      key: 'a',
-      width: 200,
-      render: (_: unknown, r: ProdOrderRow) => (
-        <Space size={4} wrap>
-          {kind === 'wait' && canEdit && <a onClick={() => openAction('dispatch', r)}>下发</a>}
-          {kind === 'running' && canEdit && r.status === '已派工' && <a onClick={() => void doStart(r)}>开工</a>}
-          {kind === 'running' && canEdit && <a onClick={() => openAction('accept', r)}>验收</a>}
-          {kind === 'transfer' && canEdit && <a onClick={() => openAction('transfer', r)}>转运</a>}
-          {kind === 'rework' && canEdit && <a onClick={() => openAction('dispatch', r)}>重新下发</a>}
-          <AuthedFileLink path={drawingFileUrl(r.item_no)}>看图纸</AuthedFileLink>
-          <a onClick={() => setDetail(r)}>详情</a>
-        </Space>
-      ),
-    },
-  ]
+  /**
+   * 队列行（docs/15）：车间是**按单干活**的 → 一行一个零件、行尾唯一主按钮（下发/开工/验收/转运）。
+   * 过去是 7 列表格：图号要横着找、下一步动作混在「操作」列的一堆小链接里。
+   */
+  const orderRow = (kind: 'wait' | 'running' | 'transfer' | 'rework') => (r: ProdOrderRow) => ({
+    key: r.id,
+    lead: <Code to={`/items/${r.item_no}`}>{r.item_no}</Code>,
+    title: `${r.item_name ?? ''} ${r.qty}${r.unit ?? ''}`,
+    meta: (
+      <>
+        {r.order_no} · <Link to={`/projects/${r.project_no}`}>{r.project_no}</Link> {r.equip_no ?? ''} · 计划完成{' '}
+        {r.plan_end ?? '未定'}
+      </>
+    ),
+    cells: [
+      { text: <Status tone={toneOf(STATUS_COLOR[r.status])}>{r.status}</Status>, title: '状态' },
+      r.overdue ? { text: <Chip tone="err">超期</Chip>, title: '已过计划完成日' } : { text: '—', title: '计划完成' },
+    ],
+    actions: (
+      <>
+        <AuthedFileLink path={drawingFileUrl(r.item_no)}>看图纸</AuthedFileLink>
+        <Button size="small" type="text" onClick={() => setDetail(r)}>
+          详情
+        </Button>
+      </>
+    ),
+    action: !canEdit ? undefined : kind === 'wait' ? (
+      <Button type="primary" size="small" onClick={() => openAction('dispatch', r)}>
+        下发
+      </Button>
+    ) : kind === 'running' ? (
+      r.status === '已派工' ? (
+        <Button type="primary" size="small" onClick={() => void doStart(r)}>
+          开工
+        </Button>
+      ) : (
+        <Button type="primary" size="small" onClick={() => openAction('accept', r)}>
+          验收
+        </Button>
+      )
+    ) : kind === 'transfer' ? (
+      <Button type="primary" size="small" onClick={() => openAction('transfer', r)}>
+        转运
+      </Button>
+    ) : (
+      <Button type="primary" size="small" onClick={() => openAction('dispatch', r)}>
+        重新下发
+      </Button>
+    ),
+  })
+
   const osColumns = [
     { title: '单号', dataIndex: 'outsource_no', width: 110 },
     {
@@ -265,6 +251,7 @@ export default function Manufacturing() {
   const parts: Record<string, ReactNode> = {
     wait: (
       <>
+        {/* ★ 这条队列的入口（生成排产单）必须留在这条队列里 —— 它属于"待下发"这一步 */}
       <Card size="small" title="生成排产单（按设备）" style={{ marginBottom: 12 }}>
         <Space wrap>
           <Select
@@ -293,21 +280,29 @@ export default function Manufacturing() {
           </Typography.Text>
         </Space>
       </Card>
-          <Table<ProdOrderRow> rowKey="id" size="small" loading={loading} dataSource={wb?.wait ?? []} pagination={{ pageSize: 10, showSizeChanger: false }} locale={{ emptyText: <DsEmpty text="没有待下发的排产单" /> }} columns={orderColumns('wait')} />
-          <Table<ProdOrderRow> rowKey="id" size="small" loading={loading} dataSource={wb?.wait ?? []} pagination={{ pageSize: 10, showSizeChanger: false }} locale={{ emptyText: <DsEmpty text="没有待下发的排产单" /> }} columns={orderColumns('wait')} />
+        <QueueBoard
+          emptyText="还没有待下发的排产单 —— 用上面的「生成排产单（按设备）」按已发布图纸展开。"
+          items={(wb?.wait ?? []).map(orderRow('wait'))}
+        />
       </>
     ),
     running: (
-          <Table<ProdOrderRow> rowKey="id" size="small" loading={loading} dataSource={wb?.running ?? []} pagination={{ pageSize: 10, showSizeChanger: false }} locale={{ emptyText: <DsEmpty text="没有在制的零件" /> }} columns={orderColumns('running')} />
-        
+      <QueueBoard
+        emptyText="没有在制 / 待验收的零件。"
+        items={(wb?.running ?? []).map(orderRow('running'))}
+      />
     ),
     transfer: (
-          <Table<ProdOrderRow> rowKey="id" size="small" loading={loading} dataSource={wb?.to_transfer ?? []} pagination={{ pageSize: 10, showSizeChanger: false }} locale={{ emptyText: <DsEmpty text="没有待转运的零件" /> }} columns={orderColumns('transfer')} />
-        
+      <QueueBoard
+        emptyText="没有待转运装配区的零件（验收合格后要转运，装配那边才拿得到）。"
+        items={(wb?.to_transfer ?? []).map(orderRow('transfer'))}
+      />
     ),
     rework: (
-          <Table<ProdOrderRow> rowKey="id" size="small" loading={loading} dataSource={wb?.rework ?? []} pagination={{ pageSize: 10, showSizeChanger: false }} locale={{ emptyText: <DsEmpty text="没有返工件" /> }} columns={orderColumns('rework')} />
-        
+      <QueueBoard
+        emptyText="没有返工的零件。"
+        items={(wb?.rework ?? []).map(orderRow('rework'))}
+      />
     ),
     outsource: (
           <Table<OutsourceRow> rowKey="id" size="small" loading={loading} dataSource={wb?.outsource ?? []} pagination={{ pageSize: 10, showSizeChanger: false }} locale={{ emptyText: <DsEmpty text="没有外协任务" /> }} columns={osColumns} />
@@ -327,6 +322,7 @@ export default function Manufacturing() {
             刷新
           </Button>
         }
+        toolbar={<ShopViews />}
         counts={{
           wait: (c?.wait ?? 0),
           running: (c?.running ?? 0),

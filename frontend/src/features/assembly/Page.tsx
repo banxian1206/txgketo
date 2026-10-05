@@ -8,7 +8,8 @@ import MfgPhotoPicker from '../../components/MfgPhotoPicker'
 import AppModal from '../../components/AppModal'
 import { mfgPhotoUrl } from '../../api/client'
 import { ASSEMBLY_STATUS as STATUS_COLOR, toneOf } from '../../theme/status'
-import { PageHead, Panel, Status, Chip } from '../../components/ds'
+import { Chip, Metrics, PageHead, Panel, Status } from '../../components/ds'
+import ShopViews from '../../components/domain/ShopViews'
 import { T } from '../../theme/tokens'
 import { useGoFrom } from '../../hooks/useFrom'
 const rateColor = (r: number) => (r >= 1 ? T.success : r >= 0.6 ? T.brand : T.warning)
@@ -141,6 +142,31 @@ export default function Assembly() {
         title="装配与齐套"
         sub={projectNo ? `选中的项目：${projectNo}` : '先选一个项目看齐套率'}
         help="齐套率只做展示：装配随时能开工（56%、78% 都行），系统不设 100% 门槛。齐套率 = 到位零件种数 / 全部零件种数（自制件已转运、外协合格、采购件已到/入库、库存够）。"
+      />
+      <ShopViews />
+      {/* ★ docs/15：台骨架的②结论条（装配视图也必须有 —— 三个视图一个样） */}
+      <Metrics
+        items={[
+          { key: 'equip', label: '本项目设备', value: overview?.length ?? 0, unit: '台', dimZero: true },
+          {
+            key: 'ready',
+            label: '可开装',
+            value: overview?.filter((x) => (x.kitting_rate ?? 0) >= 0.6).length ?? 0,
+            unit: '台',
+            tone: (overview?.filter((x) => (x.kitting_rate ?? 0) >= 0.6).length ?? 0) > 0 ? 'run' : undefined,
+            dimZero: true,
+          },
+          {
+            key: 'low',
+            label: '齐套偏低（<60%）',
+            value: overview?.filter((x) => (x.kitting_rate ?? 0) < 0.6).length ?? 0,
+            unit: '台',
+            tone: (overview?.filter((x) => (x.kitting_rate ?? 0) < 0.6).length ?? 0) > 0 ? 'warn' : undefined,
+            dimZero: true,
+          },
+          { key: 'asm', label: '装配中', value: records.filter((r) => r.status === '装配中').length, unit: '台', dimZero: true },
+          { key: 'dbg', label: '待厂内调试', value: records.filter((r) => r.status === '已装配').length, unit: '台', dimZero: true },
+        ]}
       />
       <Panel>
       <div className="ds-toolbar">

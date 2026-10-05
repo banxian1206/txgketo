@@ -1,28 +1,12 @@
-import { Tabs } from 'antd'
-import { Outlet, useLocation, useNavigate } from 'react-router-dom'
+import { Outlet } from 'react-router-dom'
 
 /**
- * 车间台壳（A5 · v2 §2.0.6）：台内 card 页签 = URL 子路由（看板 | 制造 | 装配）
- * 制造/装配 = 交付执行同款组件复用挂载（一期交付执行组保留，拍板③的双入口中间态）
- * 台内 card 页签与域 Tab（下划线）视觉区分 —— A6 观察项
+ * 车间台权限壳（只剩一件事：`RequirePerm(mfg:view)` 的挂载点）。
+ *
+ * ★ docs/15 §6-⑤：**三视图条已从这里移走** —— 过去它在 `<Outlet/>` **之上**用 antd card 页签渲染，
+ *   是全站唯一一个"页签条跑到标题之上"的台。现在由各视图在**自己台头之后**渲染 `ShopViews`
+ *   （位置与其它台的流程条一致）；URL 子路由语义没变。
  */
 export default function ShopShell() {
-  const loc = useLocation()
-  const nav = useNavigate()
-  const active = loc.pathname.endsWith('/mfg') ? 'mfg' : loc.pathname.endsWith('/assembly') ? 'assembly' : 'shop'
-  return (
-    <>
-      <Tabs
-        type="card"
-        activeKey={active}
-        onChange={(k) => nav(k === 'shop' ? '/workbench/shop' : `/workbench/shop/${k}`)}
-        items={[
-          { key: 'shop', label: '看板' },
-          { key: 'mfg', label: '制造' },
-          { key: 'assembly', label: '装配' },
-        ]}
-      />
-      <Outlet />
-    </>
-  )
+  return <Outlet />
 }

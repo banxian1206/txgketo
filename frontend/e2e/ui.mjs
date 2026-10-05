@@ -168,10 +168,11 @@ try {
     await page.waitForURL(/\/workbench\/shop\/mfg/, { timeout: 8000 }).catch(() => {})
     const redirected = page.url().includes('/workbench/shop/mfg')
     // 车间台内导航：看板 / 制造 / 装配（制造与装配的唯一入口，双入口已收）
-    const shopTabs = await page.locator('.domain-content .ant-tabs-tab').allInnerTexts().catch(() => [])
+    // ★ docs/15 §6-⑤：视图条是 `ShopViews` 的 Segmented（台头之后），不再是 antd card 页签
+    const shopTabs = await page.locator('.domain-content .shop-views .ant-segmented-item').allInnerTexts().catch(() => [])
     check('NAV-redirect交付', redirected && shopTabs.some((x) => x.includes('制造')) && shopTabs.some((x) => x.includes('装配')),
-      `旧 /manufacturing → ${page.url()} · 车间台导航=${JSON.stringify(shopTabs)}`)
-    const asmTab = page.locator('.domain-content .ant-tabs-tab', { hasText: '装配' }).first()
+      `旧 /manufacturing → ${page.url()} · 车间台视图=${JSON.stringify(shopTabs)}`)
+    const asmTab = page.locator('.domain-content .shop-views .ant-segmented-item', { hasText: '装配' }).first()
     if (await asmTab.count()) {
       await asmTab.click()
       await page.waitForURL(/\/workbench\/shop\/assembly/, { timeout: 6000 }).catch(() => {})
@@ -241,22 +242,24 @@ try {
   // ── A5 车间台收编：台内 card 页签（看板|制造|装配）= URL 子路由 ──
   {
     await page.goto(BASE + '/workbench/shop', { waitUntil: 'networkidle' })
-    await page.waitForSelector('.domain-content .ant-tabs', { timeout: 8000 }).catch(() => {})
+    await page.waitForSelector('.domain-content .shop-views', { timeout: 8000 }).catch(() => {})
     await page.waitForTimeout(400)
-    const inner = page.locator('.domain-content .ant-tabs')
-    const innerTabs = await inner.locator('.ant-tabs-tab').allInnerTexts().catch(() => [])
-    const mfgTab = inner.locator('.ant-tabs-tab', { hasText: '制造' }).first()
+    const inner = page.locator('.domain-content')
+    // ★ docs/15 §6-⑤：三视图条从 antd card 页签（在标题之上）改成 `ShopViews` 的 Segmented
+    //   （在每个视图自己的台头之后）；URL 仍是子路由 /workbench/shop/mfg
+    const viewTab = inner.locator('.shop-views .ant-segmented-item', { hasText: '制造' }).first()
     let urlOk = false, contentOk = false
-    if (await mfgTab.count()) {
-      await mfgTab.click()
+    if (await viewTab.count()) {
+      await viewTab.click()
       await page.waitForURL(/\/workbench\/shop\/mfg/, { timeout: 6000 }).catch(() => {})
       urlOk = page.url().includes('/workbench/shop/mfg')
       await page.waitForTimeout(700)
       const t2 = await body(page)
       contentOk = t2.includes('排产') || t2.includes('制造') || t2.includes('下发')
     }
-    check('NAV-车间台收编', innerTabs.length === 3 && urlOk && contentOk,
-      `页签=${JSON.stringify(innerTabs)} · URL=${urlOk} · 制造内容挂载=${contentOk}`)
+    const viewCount = await inner.locator('.shop-views .ant-segmented-item').count()
+    check('NAV-车间台收编', viewCount === 3 && urlOk && contentOk,
+      `视图条=${viewCount} 项 · URL=${urlOk} · 制造内容挂载=${contentOk}`)
   }
 
   // ── A4 到货跟踪（催货视图：active 页签 + 在途行/空态双分支）──
@@ -1374,7 +1377,8 @@ try {
       await page.locator('.ant-select-dropdown:visible .ant-select-item').first().click(); await page.waitForTimeout(1600);
       // ★ R3-B：来货清点 在「进场」组内（Segmented）
       await openTab(page, '来货清点');
-      const link = page.locator('a').filter({ hasText: /清点验收/ }).first();
+      // ★ docs/15：来货清点已是队列行，主按钮是 <button> 而不是 <a>（断言跟着迁移）
+      const link = page.locator('.ds-row button, a').filter({ hasText: /清点验收/ }).first();
       if (!(await link.count())) check('PREFILL-现场清点', false, '现场角色也看不到清点入口（是 bug，不是跳过）');
       else {
         await link.click(); await page.waitForTimeout(900);

@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom'
 
 import { errMsg, workbenchMe, type WorkbenchMe } from '../../api/client'
 import { Metrics, PageHead, Panel } from '../../components/ds'
+import ShopViews from '../../components/domain/ShopViews'
 
 type CountKey = keyof WorkbenchMe['counts']
 
@@ -111,6 +112,8 @@ export default function DeptWorkbench({ kind }: { kind: 'sales' | 'pm' | 'eng' |
           onClick: () => nav(t.to),
         }))}
       />
+      {/* ★ docs/15 §6-⑤：视图条在**结论条之后**（与其它台的流程条同位置） */}
+      {kind === 'shop' && <ShopViews />}
 
       <Panel title="其余看板" sub="去对应的队列按流程干活">
         <Space wrap>

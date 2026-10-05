@@ -79,7 +79,7 @@ export default function SupplierStatementModal({
           <Typography.Paragraph type="secondary" style={{ marginTop: 0 }}>
             共 {st.summary.total_orders} 张单 · 已付 {st.summary.paid_count} · 未付{' '}
             {st.summary.unpaid_count} · 累计采购 ¥{st.summary.total_amount.toLocaleString()} · 累计已付 ¥
-            {st.summary.paid_amount.toLocaleString()}
+            ¥{st.summary.paid_amount.toLocaleString()}
           </Typography.Paragraph>
           <Tabs
             items={[

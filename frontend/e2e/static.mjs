@@ -572,7 +572,7 @@ const FEATS = path.join(SRC, 'features');
 {
   // 例外必须写清为什么，且只允许这几条（新增一条就得在这儿交代）
   const EXEMPT = {
-    'features/workbench/ShopShell.tsx': '台内「看板/制造/装配」是子路由导航（URL 即状态），不是页签状态',
+    'components/domain/ShopViews.tsx': '车间三视图是**子路由导航**（URL 即状态）→ 用 Segmented 不是 Tabs；docs/15 §6-⑤ 把它的位置从页面之上挪到了台头之后',
     'features/manufacturing/MobilePage.tsx': '移动端动线页签，键与 PC 不同（os vs outsource），接入注册表见 docs/10 P2',
     'features/warehouse/MobilePage.tsx': '同上（移动端三队列）',
     'features/site/MobilePage.tsx': '同上（移动端含客户验收，PC 按拍板 D3 不做签认）',

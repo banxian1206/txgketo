@@ -1,11 +1,13 @@
 import { useSiteBoard } from './hooks'
-import {Chip, Empty as DsEmpty } from '../../components/ds'
+import { Chip, Code, Empty as DsEmpty, Status } from '../../components/ds'
+import QueueBoard from '../../components/ds/QueueBoard'
+import { Muted } from '../../components/ui/Primitives'
 import WorkbenchPage from '../../components/domain/WorkbenchPage'
 import { SITE_BOARD } from '../../configs/boards'
 import IncomingCheckFields from './components/IncomingCheckFields'
 import {
   App,
-  
+  Button,
   Form,
   Select,
   Space,
@@ -26,13 +28,12 @@ import {
   type SiteCommissionRow,
   type SiteDailyRow,
   type SiteIncomingPending,
-  type SiteIssueRow,
   type SiteSurveyRow,
 } from '../../api/client'
 import AuthedImage from '../../components/AuthedImage'
 import MfgPhotoPicker from '../../components/MfgPhotoPicker'
 import AppModal from '../../components/AppModal'
-import { SITE_ISSUE_STATUS as ISSUE_COLOR } from '../../theme/status'
+import { SITE_ISSUE_STATUS as ISSUE_COLOR, toneOf } from '../../theme/status'
 import { SITE_COMMISSION_STATUS as COMMISSION_COLOR } from '../../theme/status'
 import { useGoFrom } from '../../hooks/useFrom'
 /** 现场台（PC，S8）：给项目经理/现场负责人看整体 —— 手机端是现场的主终端。 */
@@ -77,33 +78,35 @@ export default function Site() {
   // 体：按页签 key 取（顺序 / 标题 / 徽标 / 可见性全来自注册表 SITE_BOARD）
   const partsOf: Record<string, ReactNode> = {
     incoming: (
-          <Table<SiteIncomingPending>
-            rowKey="receipt_id"
-            size="small"
-            dataSource={incoming.pending}
-            pagination={false}
-            locale={{ emptyText: <DsEmpty text="没有待清点的直发件" /> }}
-            columns={[
-              { title: '到货单', dataIndex: 'receipt_no', width: 130 },
-              { title: '物料', dataIndex: 'item_no', width: 160 },
-              { title: '数量', key: 'q', width: 100, render: (_: unknown, r) => `${r.qty} ${r.unit ?? ''}` },
-              { title: '到货日', dataIndex: 'receipt_date', width: 120 },
-              { title: '收货地点', dataIndex: 'deliver_to', width: 130 },
-              {
-                title: '操作',
-                key: 'a',
-                width: 100,
-                render: (_: unknown, r) =>
-                  canEdit ? <a onClick={() => {
-                    setPhotos([])
-                    // 预填交给 AppModal initialValues：弹窗 destroyOnHidden，先 setFieldsValue 会丢（实测「齐」预选不上）
-                    setTargetInitial({ result: '齐', shortage: [] })
-                    setTarget(r)
-                  }}>清点验收</a> : '—',
-              },
-            ]}
-          />
-        
+      <QueueBoard
+        search={
+          <Muted>
+            供应商直发到客户现场的件：货到了就逐条清点（齐 / 缺件 / 破损 → 现场签字），
+            <b>清点结果直接反推采购需求状态</b>。仓库收货的不在这里。
+          </Muted>
+        }
+        emptyText="没有待清点的直发件 —— 直发到现场的货到了会出现在这里（也可以在仓库台查）。"
+        items={incoming.pending.map((r) => ({
+          key: r.receipt_id,
+          lead: <Code>{r.receipt_no}</Code>,
+          title: `${r.item_no} ${r.qty}${r.unit ?? ''}`,
+          meta: `到货日 ${r.receipt_date ?? '—'} · 收货地点 ${r.deliver_to ?? '—'}`,
+          action: canEdit ? (
+            <Button
+              type="primary"
+              size="small"
+              onClick={() => {
+                setPhotos([])
+                // 预填交给 AppModal initialValues：弹窗 destroyOnHidden，先 setFieldsValue 会丢（实测「齐」预选不上）
+                setTargetInitial({ result: '齐', shortage: [] })
+                setTarget(r)
+              }}
+            >
+              清点验收
+            </Button>
+          ) : undefined,
+        }))}
+      />
     ),
     daily: (
           <Table<SiteDailyRow>
@@ -135,36 +138,33 @@ export default function Site() {
         
     ),
     issues: (
-          <Table<SiteIssueRow>
-            rowKey="id"
-            size="small"
-            dataSource={wb?.issues ?? []}
-            pagination={{ pageSize: 10, showSizeChanger: false }}
-            locale={{ emptyText: <DsEmpty text="没有问题" /> }}
-            columns={[
-              { title: '状态', dataIndex: 'status', width: 100, render: (v: string) => <Tag color={ISSUE_COLOR[v] ?? 'default'}>{v}</Tag> },
-              { title: '设备', dataIndex: 'equip_no', width: 80, render: (v: string | null) => v ?? '—' },
-              { title: '问题', dataIndex: 'title' },
-              { title: '说明', dataIndex: 'desc', render: (v: string | null) => v ?? '—' },
-              {
-                title: '操作',
-                key: 'a',
-                width: 160,
-                render: (_: unknown, r: SiteIssueRow) => (
-                  <Space size={4}>
-                    {canEdit && r.status === '待处理' && (
-                      <>
-                        <a onClick={() => void linkSiteIssue(r.id, { change_id: undefined }).then(() => void load(projectNo))}>转变更</a>
-                        <a onClick={() => void linkSiteIssue(r.id, { close: true }).then(() => void load(projectNo))}>闭环</a>
-                      </>
-                    )}
-                    {r.related_change_id && <a onClick={() => go('/workbench/changes')}>看变更</a>}
-                  </Space>
-                ),
-              },
-            ]}
-          />
-        
+      <QueueBoard
+        search={<Muted>现场发现的问题一律走变更：点「转变更」生成改版申请，或「闭环」说明不动设计。</Muted>}
+        emptyText="没有现场问题。"
+        items={(wb?.issues ?? []).map((r) => ({
+          key: r.id,
+          lead: <Code>{r.drawing_no ?? r.equip_no ?? '—'}</Code>,
+          title: r.title,
+          meta: `${r.equip_no ?? ''} ${r.part_name ?? ''} ${r.desc ? '· ' + r.desc : ''}`,
+          cells: [{ text: <Status tone={toneOf(ISSUE_COLOR[r.status])}>{r.status}</Status>, title: '状态' }],
+          actions: r.related_change_id ? (
+            <Button size="small" type="text" onClick={() => go('/workbench/changes')}>
+              看变更
+            </Button>
+          ) : undefined,
+          action:
+            canEdit && r.status === '待处理' ? (
+              <Button
+                type="primary"
+                size="small"
+                onClick={() => void linkSiteIssue(r.id, { change_id: undefined }).then(() => void load(projectNo))}
+              >
+                转变更
+              </Button>
+            ) : undefined,
+          onClick: undefined,
+        }))}
+      />
     ),
     commission: (
           <Table<SiteCommissionRow>

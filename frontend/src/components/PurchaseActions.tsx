@@ -238,7 +238,7 @@ export default function PurchaseActions({
                       <>
                         {'　历史区间：'}¥{priceRef.stats.min_price?.toLocaleString()} ~ ¥
                         {priceRef.stats.max_price?.toLocaleString()}　均价 ¥
-                        {priceRef.stats.avg_price?.toLocaleString()}（{priceRef.stats.deal_count} 次）
+                        ¥{priceRef.stats.avg_price?.toLocaleString()}（{priceRef.stats.deal_count} 次）
                       </>
                     )}
                   </div>
