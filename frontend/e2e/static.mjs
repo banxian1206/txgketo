@@ -72,6 +72,18 @@ function grepAll(pattern) {
       bad.push(`${rel} 有 kind:'queue' 的页签，但页面里没有队列行`)
     }
   }
+  // ★ 两个"没有流程条"的台也要守骨架前两件：我的工作台（有意不放页签，docs/10 P1）与经营驾驶舱（同屏四块）
+  for (const [rel, why] of [
+    ['features/workbench/Page.tsx', '我的工作台'],
+    ['features/dashboard/Page.tsx', '经营驾驶舱'],
+  ]) {
+    const f = path.join(SRC, rel)
+    if (!fs.existsSync(f)) { bad.push(`${rel} 不存在`); continue }
+    const src = fs.readFileSync(f, 'utf8')
+    if (!/<PageHead/.test(src)) bad.push(`${why} 少了台头（PageHead）`)
+    if (!/<Metrics/.test(src)) bad.push(`${why} 少了结论条（Metrics）—— 结论条一律 5 个数字（0 也占位）`)
+    if (/locale=\{\{\s*emptyText:\s*<Empty description/.test(src)) bad.push(`${why} 还有 antd 默认空态`)
+  }
   // 注册表内部一致性：defaultTab 必须是自己的页签之一；每个页签必须声明 kind
   const defs = [...boards.matchAll(/export const (\w+)_BOARD: BoardDef = \{([\s\S]*?)\n\}/g)]
   for (const [, name, body] of defs) {

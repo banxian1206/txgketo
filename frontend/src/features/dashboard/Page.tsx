@@ -58,7 +58,7 @@ export default function DashboardPage() {
     { key: 'risk', label: '交付风险', value: d.risks_count, unit: '个', tone: d.risks_count ? 'err' : undefined },
     { key: 'blocked', label: '卡点项目', value: d.blocked_count, unit: '个', tone: d.blocked_count ? 'warn' : undefined },
     { key: 'warranty', label: '质保 60 天内到期', value: d.after_sales.warranty_soon_count, unit: '个', tone: d.after_sales.warranty_soon_count ? 'warn' : undefined },
-    { key: 'svc', label: '未关闭工单', value: d.after_sales.open_orders_count, unit: '单', tone: d.after_sales.open_orders_count ? 'err' : undefined },
+    // ★ docs/15：结论条 **≤5 个**（"未关闭工单"归下面「售后与质保」块，不占结论条）
   ]
 
   return (
@@ -196,9 +196,10 @@ export default function DashboardPage() {
         </Panel>
       </div>
 
-      <Panel title="成本与毛利" sub="三期">
-        <Status tone="idle">{d.cost.reason}</Status>
-      </Panel>
+      {/* ★ 成本毛利在三期（未建表）→ **一行实话**，不占一个空壳面板（原来整块面板只有一行字） */}
+      <div className="ds-note">
+        <Status tone="idle">成本与毛利：{d.cost.reason}</Status>
+      </div>
     </div>
   )
 }

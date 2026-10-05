@@ -870,8 +870,17 @@ try {
           //   实测偶发假红；给到 20s + 等 URL 先到位）
           await nc.page.waitForURL(/\/equipment\//, { timeout: 8000 }).catch(() => {})
           await nc.page.waitForSelector('.ds-sec', { timeout: 20000 }).catch(() => {})
+          let bar = await nc.page.locator('.ds-sec').count()
+          if (bar === 0) {
+            // ★ 实测（2026-10-05，连跑 3 次复现）：首次点击是**懒加载页的冷 chunk** ——
+            //   Vite dev 现编译 `EquipmentPage.tsx`，页面先白几秒（模块 200 但还没执行完）。
+            //   这不是产品缺陷（生产是打包好的 chunk）；但断言不能因此假红 →
+            //   冷启动就**重载一次**再等（仍然要求真的渲染出分区，强度不降）。
+            await nc.page.reload({ waitUntil: 'networkidle' }).catch(() => {})
+            await nc.page.waitForSelector('.ds-sec', { timeout: 20000 }).catch(() => {})
+            bar = await nc.page.locator('.ds-sec').count()
+          }
           const ok = /\/equipment\/\w+\/\w+/.test(nc.page.url())
-          const bar = await nc.page.locator('.ds-sec').count()
           check('OBJ-项目详情给设备档案入口', ok && bar >= 3,
             `点设备行 → ${nc.page.url().replace(BASE, '')} · 分区 ${bar} 个`)
         }

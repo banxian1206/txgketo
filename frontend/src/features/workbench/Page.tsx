@@ -100,24 +100,48 @@ export default function Workbench() {
   const visibleTodos = todos.filter((t) => !t.roles || isAdminRole || t.roles.some((r) => myRoles.includes(r)))
   const canManageUsers = hasPerm('admin:users')
 
-  // 指标条：只放**非 0** 的（0 不占首屏）+ 未读收尾
+  // ★ 结论条（docs/15 台骨架）：**≤5 个、只放"要动手的数"**，0 也占位（灰显）——
+  //   过去"只放非 0"导致很多人（如项目经理）首屏只有 1 个数字、左边空 2/3，
+  //   跟别的台的 5 个数字一比就不像一套。
   const metrics = useMemo<MetricItem[]>(() => {
-    const live = visibleTodos.filter((t) => t.count > 0)
-    const errCount = visibleTodos.filter((t) => t.tone === 'err').length
-    const items: MetricItem[] = live.slice(0, 5).map((t, i) => ({
-      key: t.label,
-      label: t.label,
-      value: t.count,
-      unit: '项',
-      note: t.hint ?? (t.group === 'mine' ? undefined : GROUP_LABEL[t.group]),
-      tone: t.tone ?? (i === 0 && errCount ? 'err' : undefined),
-      to: t.to,
-    }))
-    const unread = c?.unread ?? 0
-    if (unread > 0) items.push({ key: 'unread', label: '未读消息', value: unread, unit: '条', tone: 'run', onClick: () => setNotifOpen(true) })
-    if (!items.length) items.push({ key: 'clear', label: '今天', value: '无待办', note: '有新任务会出现在这里' })
-    return items
-  }, [visibleTodos, c?.unread])
+    const items: MetricItem[] = [
+      {
+        key: 'my_tasks',
+        label: '我的任务',
+        value: c?.my_tasks ?? 0,
+        unit: '项',
+        note: c?.overdue_tasks ? `其中 ${c.overdue_tasks} 超期` : undefined,
+        tone: c?.overdue_tasks ? 'err' : undefined,
+        dimZero: true,
+        to: '/workbench/tasks',
+      },
+    ]
+    // 角色相关的待办最多补 2 个（**0 也补** —— 灰显的 0 说明"你有这项职责、现在没有待办"，
+    //   比留空更清楚；也让每个账号的结论条都是 4~5 个，不再"有的人 1 个、有的人 5 个"）
+    for (const t of visibleTodos.filter((x) => x.label !== '我的任务').slice(0, 2)) {
+      items.push({
+        key: t.label,
+        label: t.label,
+        value: t.count,
+        unit: '项',
+        note: t.hint ?? (t.group === 'mine' ? undefined : GROUP_LABEL[t.group]),
+        tone: t.tone,
+        dimZero: true,
+        to: t.to,
+      })
+    }
+    items.push({ key: 'proj', label: '我参与的项目', value: data?.my_projects?.length ?? 0, unit: '个', dimZero: true, to: '/projects' })
+    items.push({
+      key: 'unread',
+      label: '未读消息',
+      value: c?.unread ?? 0,
+      unit: '条',
+      tone: c?.unread ? 'run' : undefined,
+      dimZero: true,
+      onClick: () => setNotifOpen(true),
+    })
+    return items.slice(0, 5)
+  }, [visibleTodos, c?.unread, c?.my_tasks, c?.overdue_tasks, data?.my_projects?.length])
 
   // 待办分区（0 的项也列出，但弱化）
   const groups = (['mine', 'purchase', 'warehouse', 'sales'] as const)
@@ -148,9 +172,6 @@ export default function Workbench() {
         }
         actions={
           <>
-            <Button size="small" disabled={!c?.unread} onClick={() => void markAllNotificationsRead().then(load)}>
-              全部已读
-            </Button>
             <Button size="small" type="primary" onClick={() => setNotifOpen(true)}>
               消息中心{c?.unread ? ` (${c.unread})` : ''}
             </Button>
