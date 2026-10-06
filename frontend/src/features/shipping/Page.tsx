@@ -262,8 +262,9 @@ export default function Shipping() {
       <WorkbenchPage
         board={SHIPPING_BOARD}
         sub={
+          // ★ 方向 2 ①：台头只说现状 + 异常（不重复结论条）。零异常时说“有几个批次”而不是“空”
           todoRows.length
-            ? `${waitLoad.length} 个批次等装车 · ${waitDepart.length} 个已装车等发运`
+            ? `${waitLoad.length} 个批次等装车${waitDepart.length ? ` · ${waitDepart.length} 个已装车等发运` : ''}`
             : '现在没有等装车/等发运的批次'
         }
         help="必经顺序：按设备结构生成发运清单 → 逐项勾「已发」+ 拍照 → 装车（拍照）→ 发运 → 现场按同一份清单清点（到/缺/损）。★ 采购没叫车不能装车。"
@@ -280,7 +281,8 @@ export default function Shipping() {
           batches: shipments.filter((x) => !['已签收', '已取消'].includes(x.status)).length,
         }}
         metrics={[
-          { key: 'load', label: '等装车', value: waitLoad.length, unit: '批', tone: waitLoad.length ? 'warn' : undefined, dimZero: true, to: '?tab=todo' },
+          // ★ 方向 2 ② 主角指认：发运台主角 = **等装车**：采购把车叫回来了，此刻该动的是装车（再往后的等发运是它下一步）。（ds `MetricItem.lead`）
+          { key: 'load', label: '等装车', value: waitLoad.length, unit: '批', tone: waitLoad.length ? 'warn' : undefined, dimZero: true, to: '?tab=todo', lead: true },
           { key: 'depart', label: '等发运', value: waitDepart.length, unit: '批', tone: waitDepart.length ? 'warn' : undefined, dimZero: true, to: '?tab=todo' },
           { key: 'transit', label: '在途', value: shipments.filter((x) => x.status === '在途').length, unit: '批', tone: shipments.filter((x) => x.status === '在途').length ? 'warn' : undefined, dimZero: true, to: '?tab=batches' },
           { key: 'open', label: '未完成批次', value: shipments.filter((x) => !['已签收', '已取消'].includes(x.status)).length, unit: '批', dimZero: true, to: '?tab=batches' },
@@ -297,6 +299,9 @@ export default function Shipping() {
                 group: x.status === '已装车' ? '已装车，等发运' : '已叫车，等装车',
                 groupCount: x.status === '已装车' ? waitDepart.length : waitLoad.length,
                 groupTone: x.status === '已装车' ? 'warn' : undefined,
+                tone: x.status === '已装车' ? 'warn' : undefined,
+                // ★ 方向 2 ③：只给「已装车等发运」上色（车都到了、只差发出去）；
+                //   「已叫车等装车」是常态，整组同色会连成一条线 = 等于没上（同车间台的教训）。
                 lead: <Code>{x.shipment_no}</Code>,
                 title: `${x.project_no}`,
                 meta: `发货日 ${x.plan_ship_date ?? '未定'} · ${x.vehicle_count ?? 0} 车 · ${
@@ -390,7 +395,7 @@ export default function Shipping() {
             size="small"
             loading={loading}
             dataSource={shipments}
-            pagination={{ pageSize: 10, showSizeChanger: false }}
+            pagination={{ pageSize: 10, showSizeChanger: true }}
             locale={{ emptyText: <DsEmpty text="还没有发货指令" /> }}
             columns={[
               { title: '发运单号', dataIndex: 'shipment_no', width: 110, render: (v: string, r: ShipmentRow) => <a onClick={() => setDetail(r)}>{v}</a> },

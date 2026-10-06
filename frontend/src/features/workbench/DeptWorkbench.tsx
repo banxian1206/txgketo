@@ -68,7 +68,9 @@ const CONFIG: Record<string, Cfg> = {
       { label: '待转运装配区', key: 'shop_transfer', to: '/workbench/shop/mfg' },
       { label: '装配中', key: 'shop_assembling', to: '/workbench/shop/assembly' },
       { label: '待厂内调试', key: 'shop_debug', to: '/workbench/shop/assembly' },
-      { label: '待领料', key: 'issues', to: '/warehouse' },
+      // ★ 2026-10-05 走查去掉了第 6 格「待领料」：① 结论条规格是 ≤5；
+      //   ② 领料单是**仓库台**的队列（`?tab=issues`，铁律「一件事只在一个台成队列」），
+      //   车间台再摆一份 = 车间以为自己去领料（点过去还是仓库台，徒增一次点击）。
     ],
     quick: [
       { label: '制造（车间）', to: '/workbench/shop/mfg' },

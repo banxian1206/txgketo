@@ -74,11 +74,9 @@ export default function SectionNav({
   barOnly?: boolean
 }) {
   const bodyRef = useRef<HTMLDivElement>(null)
-  // ── 两层：把 sections 按 groups 折叠成"组"；组内切换走同一份 sections ──
+  // ★ 2026-10-05：页签条已**全部平铺**（组名不再当可点胶囊，也不再画小标题），
+  //   所以 `groups` 只用来决定“要不要渲染这条页签条”，不再用来算当前组。
   const grouped = groups && groups.length > 0
-  const curGroup = grouped
-    ? (groups!.find((g) => g.keys.includes(tab)) ?? groups![0])
-    : undefined
   const active = sections.find((s) => s.key === tab) ?? sections[0]
 
   // 切区：滚到内容顶部（只动内容区，不动整页）
@@ -112,37 +110,34 @@ export default function SectionNav({
   if (sections.length === 1 && !grouped) {
     return <div className="ds-sec-body">{renderBody(sections[0], emptyText)}</div>
   }
-  // 两层形态：组一行（Segmented） + 组内项一行（Segmented）
+  // 两层形态：**组行只做分段小标题（不可点）+ 全部页签平铺成一行可点的队列**
+  // ★ 2026-10-05 客户实测 bug：“点『待办』没有任何反应，但『待我审批』明明有 3 单”。
+  //   根因：组也是一排可点胶囊，点它 = “跳到组内第一个”——而人已经在那一组时
+  //   **URL 与内容都不变** = 死路，于是用户以为“没展示”。
+  //   客户要求：**“待办这里应该就是我的三条待审批的采购单”**——
+  //   即“待办”与“待我审批”在心里是同一件事，不该拆成两个名字让人选两遍。
+  //   于是：**组名降为灰色分段小标题（纯说明、不可点），所有队列平铺一行、带待办数**。
+  //   好处：① 不再有“点了没反应”的死路；② 全站只准**一行可点标签**（页签条唯一，行为统一，
+  //   符合 TAB-一屏一条页签条）；③ 不用点两遍就到队列；④ 组名仍保留分段信息。
   if (grouped) {
-    const g = curGroup!
-    const items = sections.filter((s) => g.keys.includes(s.key))
+    // ★ 数字**只拼一次**：`WorkbenchPage` 传进来的 `s.label` 已经过 `tabLabel(t, counts)` 处理
+    //   （`待我审批 (3)`）。第一版我在 `labelOf` 里又拼了一次 → 屏上出现「待我审批 (3) (3)」。
+    const labelOf = (s?: (typeof sections)[number]) => s?.label ?? ''
     return (
       <>
-        <div className="ds-subtabs ds-grp">
+        {/* ★ 页签已全部平铺（带待办数），**不再画组名**。
+            原先那个“组”是另一排可点胶囊，点它 = 跳到组内第一个 —— 人已在该组时 URL 与内容
+            都不变 = 死路（客户实测“点『待办』没反应”）。降级成小标题后它又会**随当前页签变**
+            （切到采购池就写“采购”），反而像可点、也是纯噪音 —— 所以直接去掉。
+            `groups` 仍留在注册表里：① 顺序上保证待办类在前 ② e2e 静态护栏按它核对键集合。 */}
+        <div className="ds-subtabs is-flow">
           <Segmented
-            size={flowSize === "small" ? "small" : undefined}
-            value={g.key}
-            // 点组 = 进该组第一个可见项（与 WorkbenchTabs 同口径：切组不保留另一组的项）
-            onChange={(k) => {
-              const nx = groups!.find((x) => x.key === String(k))
-              if (nx?.keys.length) go(nx.keys[0])
-            }}
-            options={groups!.map((x) => ({
-              value: x.key,
-              label: x.keys.length === 1 ? (sections.find((s) => s.key === x.keys[0])?.label ?? x.label) : x.label,
-            }))}
+            size={flowSize === 'small' ? 'small' : undefined}
+            value={active?.key}
+            onChange={(k) => go(String(k))}
+            options={sections.map((s) => ({ value: s.key, label: labelOf(s), key: s.key }))}
           />
         </div>
-        {items.length > 1 && (
-          <div className="ds-subtabs">
-            <Segmented
-              size="small"
-              value={active?.key}
-              onChange={(k) => go(String(k))}
-              options={items.map((s) => ({ value: s.key, label: s.label, key: s.key }))}
-            />
-          </div>
-        )}
         <div className="ds-sec-body" ref={bodyRef}>
           {renderBody(active, emptyText)}
         </div>
@@ -157,7 +152,7 @@ export default function SectionNav({
           size={flowSize === "small" ? "small" : undefined}
           value={active?.key}
           onChange={(k) => go(String(k))}
-          options={sections.map((x) => ({ value: x.key, label: badgeText(x.badge) ? `${x.label} (${badgeText(x.badge)})` : x.label, key: x.key }))}
+          options={sections.map((x) => ({ value: x.key, label: x.label, key: x.key /* 数字已由 WorkbenchPage 的 tabLabel(t, counts) 拼好·这里别再拼一次 */}))}
         />
       </div>
     )

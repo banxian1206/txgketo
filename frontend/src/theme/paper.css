@@ -7,16 +7,33 @@
    规矩（与 docs/13 §4 对齐）：
      · 圆角只准 12（容器）/ 8（控件）/ 6（小元素）/ 999（胶囊）
      · 间距只准 4 / 8 / 12 / 16 / 24 / 32
-     · 字号只准 theme/tokens.ts 的 FS 六档
+     · 字号只准 theme/tokens.ts 的 FS 七档（12/13/14/16/20/24/**32**，32 只给结论条主角）
      · 状态只有一种画法：圆点 + 文字（.ds-st）；只有「异常/当前」才允许色块（.ds-ch）
      · 层级靠「描边 + 背景分层」拉开，不靠阴影堆叠（阴影全站只有一档）
+
+   ★ 方向 2「结论优先」（2026-10-05 客户选定，本轮落地）：工作台“看上去不好看”实测拆开是
+     「糙 / 平 / 闷 / 散」四件事（内距 14 种、5 个数等大等权、全站唯一色彩是选中态蓝、留白失衡）。
+     四件事里**三件是版面层能一次性解决的**，且三件都**不增加页高**（页高已是客户骂过的点，
+     所以明确不做“队列行卡片化”那种每行 +14px 的做法）：
+       ① 台头给结论   → .ds-head 加主色竖条 + 长说明单行截断（全文进 ? 气泡）
+       ② 1 主 4 次    → .ds-metric.is-lead 给 32px 主色 + 浅底，其余降到 20px
+       ③ 状态可扫读   → .ds-row.is-<tone> 左侧 3px 语义色条（颜色只给“这条要不要动”）
+     第四件「散」（空台 465px 留白 / 台账页 1907px）是**内容与分页**问题，不在版面层解决。
    ══════════════════════════════════════════════════════════════════════════ */
 
 /* ── 页面骨架 ─────────────────────────────────────────────────────────── */
 .ds-page { max-width: 1400px; width: 100%; }
 .ds-head { display: flex; align-items: flex-end; gap: 16px; margin-bottom: 20px; }
+/* ★ 方向 2 ①：台头给结论。左边一道主色竖条 = “这是台，不是详情页”；同时把台名与说明拉开层次。
+   ⚠ 竖条靠 border 实现（不占布局宽度、不影响对齐），且只在台头第一层出现一次。 */
+.ds-head { border-left: 3px solid var(--ds-acc); padding-left: 14px; }
 .ds-head h1 { font-size: 20px; font-weight: 600; letter-spacing: -0.3px; color: var(--ds-ink); line-height: 1.3; margin: 0; }
-.ds-head .sub { font-size: 13px; color: var(--ds-ink3); margin-top: 4px; }
+/* 长说明（流程叙述）只留一行，其余进 ? 气泡 —— 第一屏先给结论，不是一段要读的话。
+   nowrap + 省略号是**兼底**：页面侧忘了挪进 help 的，至多一行、不会把下面的结论条顶下去。 */
+.ds-head .sub {
+  font-size: 13px; color: var(--ds-ink3); margin-top: 4px;
+  max-width: 960px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
 .ds-head .act { margin-left: auto; display: flex; gap: 8px; align-items: center; flex: none; }
 .ds-crumb { font-size: 13px; color: var(--ds-ink3); margin-bottom: 6px; }
 .ds-crumb a { color: var(--ds-ink3); text-decoration: none; }
@@ -62,6 +79,20 @@
 .ds-metric:last-child { border-right: 0; }
 button.ds-metric { cursor: pointer; }
 button.ds-metric:hover { background: var(--ds-surface2); }
+/* ★ 方向 2 ②「1 主 4 次」：等大等权的 5 个数扫不出重点（实测每页都是 5×24px）。
+   主角 = **今天最该动手的那件事**：32px 主色 + 极浅主色底；其余降到 20px（FS.xl）。
+   ⚠ 主角不是“第一个”——由页面用 `lead` 显式指认（`MetricItem.lead`），因为“最该动手”
+     是业务判断，壳不能替它决定（例：售后台主角是“待受理”，不是“备件低库存”）。 */
+.ds-metric.is-lead {
+  background: linear-gradient(180deg, var(--ds-accentSoft) 0%, var(--ds-surface) 100%);
+  box-shadow: inset 3px 0 0 var(--ds-acc);
+}
+.ds-metric.is-lead .k { color: var(--ds-ink2); font-weight: 600; }
+.ds-metric.is-lead .v { font-size: 32px; color: var(--ds-acc); letter-spacing: -0.8px; }
+.ds-metric.is-lead .v small { color: var(--ds-ink3); }
+/* 主角已经是主色，异常色让位（一个数字只能有一个语义色，否则互相削弱） */
+.ds-metric.is-lead.is-err .v, .ds-metric.is-lead.is-warn .v, .ds-metric.is-lead.is-ok .v { color: var(--ds-acc); }
+.ds-metrics:not(:has(.is-lead)) .ds-metric .v { font-size: 20px; }
 .ds-metric .k { display: block; font-size: 12px; color: var(--ds-ink3); margin-bottom: 5px; }
 .ds-metric .v { display: block; font-family: var(--ds-mono); font-size: 24px; font-weight: 600; line-height: 1.1; letter-spacing: -0.5px; color: var(--ds-ink); }
 .ds-metric .v.is-text { font-family: inherit; font-size: 16px; letter-spacing: 0; }
@@ -87,7 +118,17 @@ button.ds-metric:hover { background: var(--ds-surface2); }
 .ds-row {
   display: flex; align-items: center; gap: 16px; width: 100%; text-align: left;
   padding: 12px 16px; border: 0; border-top: 1px solid var(--ds-line); background: none; font: inherit; color: inherit;
+  /* ★ 方向 2 ③：左侧 3px 语义色条。为什么要：方案 A 把颜色收敛成“只给异常”，但**队列行
+     整条都没有颜色** → 一屏 5 行分不出哪条卡住了（实测：全站唯一色彩是选中态的蓝）。
+     色条不增页高（只占左边 3px），且只在**页面显式给了 tone** 时出现 ——
+     不传 tone 就是中性行，遵守“颜色只给要动/异常”。 */
+  border-left: 3px solid transparent; padding-left: 13px;
 }
+.ds-row.is-run  { border-left-color: var(--ds-acc); }
+.ds-row.is-ok   { border-left-color: var(--ds-ok); }
+.ds-row.is-warn { border-left-color: var(--ds-warn); }
+.ds-row.is-err  { border-left-color: var(--ds-err); }
+.ds-row.is-idle { border-left-color: var(--ds-ink4); }
 .ds-row:first-of-type { border-top: 0; }
 .ds-row.is-clickable { cursor: pointer; }
 .ds-row.is-clickable:hover { background: var(--ds-surface2); }
@@ -479,3 +520,264 @@ button.ds-seg.is-link:hover { border-color: var(--ds-accentLine); background: va
 
 /* 说明行（不进面板的一行实话，如驾驶舱的"成本毛利属三期"） */
 .ds-note { padding: 10px 2px 2px; font-size: 12.5px; color: var(--ds-ink3); }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   ★ 精调层（2026-10-05 · 方向 1「刻度收敛」落地）
+   ──────────────────────────────────────────────────────────────────────────
+   起因：客户实测「很多地方都有精调的必要，现在确实太粗糙了」。
+   先做**精细度体检**（10 页逐元素 computed style，报“哪种值 + 出自哪个选择器 + 几次”），
+   粗糙点集中在 4 类，且**大部分是版面层自己造的**（不是 20 个组件各写各的）：
+
+     ① 行高 18 种   —— 12px 有 18.86（antd 1.5714）和 13.2（我写的 1.1）**两个行高**，
+                       13px 有 20.43 和 22 两个 → 文字块上下边缘不在一条基线上（最隐蔽的“糙”）
+     ② 控件高度 4 种 —— 徽标 22 / 按钮 24 / 输入 32 / 「?」16，同一行里高低不齐
+     ③ 内距逃逸     —— 表格单元格 9px（78 次！）、`.ds-seg` 9px、`.ds-q-group` 10px 都不在 8px 刻度
+     ④ 字号/字重逃逸 —— 13.5px（我自己写的卡标题）、13.33px（antd 展开图标）、`<b>` 700
+
+   规矩（补在 §9 那四条之上）：
+     · **行高只用四档**（`--ds-lh-*`），按字号**固定**，不再用 1.5714 这种乘出来的碎值
+     · **同类控件同高**：徽标 / 按钮 / 「?」/ 展开图标 = 24；输入 / 选择器 = 32（antd controlHeight）
+     · 间距只准 4 / 8 / 10 / 12 / 16 / 20 / 24（**10 是允许的**，它比 8 更适合表格行与徽标内边距；
+       硬塞成 8 或 12 会让表格行高跳一大截 —— 精确 > 好看）
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* ── ① 行高：按字号分档，每档一个固定值 ───────────────────────────────
+   ⚠ 第一版是"全站一个 20px"，实测**12px 的辅助文字被撑松了**（装配页 +63px）——
+   12px 配 20px 行高是 1.67 倍，中文里明显发虚。所以改成**按字号配行高**：
+     12px → 18 · 13px → 20 · 14px → 22 · 16px → 24 · 20px → 26 · 大数字 → 32
+   核心不变：**同一个字号在全站只有一行高**（不再有 1.5714 乘出来的 18.8571/20.4286/25.1429），
+   于是相邻两行的基线一定对齐；而每档的行高比"乘数"更贴合中文的紧凑排版。 */
+.ds-page { --ds-lh-12: 18px; --ds-lh-13: 20px; --ds-lh-14: 22px; --ds-lh-16: 24px; --ds-lh-20: 26px; --ds-lh-32: 32px; }
+/* 12px：表头、辅助说明、分组标题、徽标、Empty */
+.ds-page small, .ds-page th, .ds-page .ant-typography, .ds-page .ds-q-group,
+.ds-page .ds-empty, .ds-page .ds-ch, .ds-page .ds-panel-h .sub,
+.ds-page .ds-metric .k, .ds-page .ds-metric .n, .ds-page .ds-note { line-height: var(--ds-lh-12); }
+/* 13px：表格正文、等宽编号、说明行 —— 表格行高 = 20 + 上下 10 = 40px（整行整齐） */
+.ds-page td, .ds-page .ds-code, .ds-page .ds-num,
+.ant-table-wrapper .ant-table-thead > tr > th,
+.ant-table-wrapper .ant-table-tbody > tr > td { line-height: var(--ds-lh-13); }
+/* 14px：正文、按钮、队列行 */
+.ds-page p, .ds-page label, .ds-page .ant-btn, .ds-page .ds-row,
+.ds-page .ds-subtabs .ant-segmented-item-label { line-height: var(--ds-lh-14); }
+/* 16px 区块标题 → 24px；20px 台头 → 26px */
+.ds-page h3, .ds-page h4, .ds-page .ds-panel-h h3 { line-height: var(--ds-lh-16); }
+.ds-page h1, .ds-page h2, .ds-page .ds-head h1 { line-height: var(--ds-lh-20); }
+/* 大数字：24/32 统一 32px 固定行高（避免 1.1 乘出 26.4/35.2 两个值） */
+.ds-metric .v, .ant-statistic .ant-statistic-content { line-height: var(--ds-lh-32); }
+
+/* ── ② 同类控件同高 ──────────────────────────────────────────────────── */
+/* 徽标 22 → 24（与按钮齐平；22 是我最不满意的一处：一行里徽标比按钮矮 2px，肉眼可见"毛"） */
+.ds-ch { height: 24px; padding: 0 8px; }
+.ant-tag:not(.ant-tag-closable) { line-height: 22px; }
+/* 「?」帮助按钮 16 → 24（点得中，且不再是小得看不见的一粒）；line-height 1 → 22（否则行高 13px，又是一个新值） */
+.ds-help { width: 24px; height: 24px; font-size: 13px; line-height: 22px; }
+/* 表格行展开图标 16 → 24（它和行高不齐会明显歪） */
+.ant-table-wrapper .ant-table-row-expand-icon { width: 24px; height: 24px; line-height: 22px; }
+.ant-table-wrapper .ant-table-row-expand-icon-collapsed > .ant-table-row-expand-icon-icon { font-size: 13px; }
+
+/* ── ③ 间距：9px/10px 全部归刻度 ─────────────────────────────────────── */
+/* 表格单元格：antd 默认 8px + 我的 9px 混着来（实测 9px 出现 78 次）→ 统一 10px
+   （行高 20 + 上下 10 = **40px 整行**，比 8px 的 36px 更容易扫读） */
+.ant-table-wrapper .ant-table-thead > tr > th { padding: 10px 12px !important; }
+.ant-table-wrapper .ant-table-tbody > tr > td { padding: 10px 12px !important; }
+.ds-seg { padding: 10px; }
+.ds-q-group { padding: 12px 16px 8px; }
+.ds-seg .ds-seg + .ds-seg, .ds-q-group { margin-top: 0; }
+
+/* ── ④ 字号 / 字重 / 字距归刻度 ──────────────────────────────────────── */
+/* 13.5px（我自己写的）→ 13px；13.33px（antd 展开图标字号）→ 13px */
+.ds-sec-body .ant-card > .ant-card-head .ant-card-head-title { font-size: 13px; }
+.ant-table-wrapper .ant-table-row-expand-icon-icon { font-size: 13px !important; }
+/* <b> 默认 700 → 600（700 太重，页面里"半粗"是标准，700 只留给真正的强调） */
+.ds-page b, .ds-page strong { font-weight: 600; }
+/* 字距从 5 档收到 2 档：标题 -0.3px，其余 -0.1px（antd 表头那个 0.2px 归零） */
+.ds-panel-h h3, .ds-head h1, .m-head-t { letter-spacing: -0.3px; }
+.ant-table-wrapper .ant-table-thead > tr > th,
+.ant-table-wrapper .ant-table-thead > tr > th .ant-table-column-title { letter-spacing: normal; }
+.ds-metric .v { letter-spacing: -0.1px; }
+.ds-metric.is-lead .v { letter-spacing: -0.3px; }
+
+/* ── ⑤ 收尾：把残留的 antd 乘数行高（1.5714 → 18.8571/20.4286/25.1429）也压到固定值 ──
+   为什么非压不可：1.5714 这个乘数会让**每个字号各有一个行高**（12→18.86、13→20.43、16→25.14），
+   于是同一段文字里相邻两行可能一个是 18.86 一个是 20.43 —— 肉眼看不到，扫读时觉得"毛"。 */
+/* 兜底：没被上面分档覆盖到的 div（antd 内部容器）也走 14px 档，不留 1.5714 的碎值 */
+.ds-page div:not([class*="ds-metric"]):not([class*="ant-segmented"]) { line-height: var(--ds-lh-14); }
+/* 标题字距统一 -0.3（不再用 1.3 乘出各自的行高） */
+.ds-page h1, .ds-page h2, .ds-page h3, .ds-page h4, .ds-page h5 { letter-spacing: -0.3px; }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   ★ 全站统一（2026-10-05 · 「都统一标准」）
+   ──────────────────────────────────────────────────────────────────────────
+   全站 23 个路由体检的结果：上面那套精调只对**台页面**生效 ——
+   因为它们都套了 `.ds-page` 根，而「我的任务 / 评审 / 改版 / 新建商机 / 用户与权限 /
+   标准库 / 编号规则 / 件档案」**没有**（它们直接挂在 `ant-layout-content` 下）。
+   于是这 8 个页面**一行精调都没吃到**：antd 的 `lineHeight: 1.5714` 把它们算成
+   18.8571 / 20.4286 / 25.1429 三种行高，另有 `ant-statistic` 内部的
+   11.9px / 3px / 2.38px 缩放值（编号规则页 20 处、件档案 1 处）。
+
+   这一段把**兜底规则提到全站**（不再限定 `.ds-page`）——
+   “都统一标准”的真正含义是：**同一种文字，不管它在哪个页面，行高/字号/字重都一样**。
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* ① 全站行高分档（与 §11 同一套；`--ds-lh-*` 在 `.ds-page` 上，这里补到 `:root`） */
+:root {
+  --ds-lh-12: 18px; --ds-lh-13: 20px; --ds-lh-14: 22px; --ds-lh-16: 24px; --ds-lh-20: 26px; --ds-lh-32: 32px;
+}
+/* antd 的 body/文字类容器：不许再出现 1.5714 乘出来的碎值 */
+small,
+.ant-typography,
+th,
+.ant-empty-description,
+.ant-form-item-label,
+.ant-form-item-extra,
+.ant-descriptions-item-label { line-height: var(--ds-lh-12); }
+td,
+.ant-table-cell,
+.ant-descriptions-item-content { line-height: var(--ds-lh-13); }
+p,
+.ant-btn,
+label,
+.ant-form-item-control,
+.ant-descriptions-item-container { line-height: var(--ds-lh-14); }
+h1, h2, h3,
+h4, h5,
+.ant-card-head-title { line-height: var(--ds-lh-16); letter-spacing: -0.3px; }
+strong, b { font-weight: 600; }
+
+/* ② antd Statistic 的内部缩放（11.9px / 3px / 2.38px）
+   那是 antd 按容器宽给数字做的 `transform: scale` 内联值 —— 屏幕上是 **20px 的 59.5%**，
+   比正文还小，比我们任何刻度都难看。直接改回刻度内的字号。 */
+.ant-statistic .ant-statistic-content,
+.ant-statistic .ant-statistic-content-value,
+.ant-statistic .ant-statistic-content-suffix { font-size: 20px !important; line-height: var(--ds-lh-20) !important; }
+.ant-statistic .ant-statistic-content-prefix { line-height: var(--ds-lh-20); }
+.ant-statistic .ant-statistic-content-value { margin-inline-end: 0 !important; }
+.ant-statistic { line-height: var(--ds-lh-20); }
+/* Progress 圆头（PM 台的齐套率进度条）也是 100px 圆角 —— 圆角只准三档 + 胶囊 */
+.ant-progress-line { border-radius: 999px; }
+.ant-progress-bg { border-radius: 999px; }
+
+/* ③ antd 徽标/标签/输入：与台页面同档（之前只有台页面被压过） */
+.ant-tag:not(.ant-tag-closable) { line-height: 22px; border-radius: 6px; }
+.ant-btn-sm { height: 24px; }
+.ant-table-wrapper .ant-table-thead > tr > th,
+.ant-table-wrapper .ant-table-tbody > tr > td { padding: 10px 12px !important; }
+.ant-table-wrapper .ant-table-thead > tr > th .ant-table-column-title { letter-spacing: normal; }
+
+/* ④ antd 给 `<code>` 的 0.85em 排版：字号 14×0.85=**11.9px**、padding 0.2em=**2.38px**、圆角 3px
+   （编号规则页 20 处、件档案 1 处）。这不是我们的刻度，也不是我们写的 —— 是 antd 组件内部。
+   盖回刻度：12px 文字 + 2/6px 内距 + 4px 圆角（等宽字体不变）。 */
+code,
+.ant-typography code {
+  font-size: 12px; line-height: var(--ds-lh-12);
+  padding: 2px 6px; border-radius: 4px;
+}
+/* 表格展开箭头：antd 用 13.33px 的字体画（1/3 分数），这里压到刻度内的 13px */
+.ant-table-wrapper button.ant-table-row-expand-icon,
+.ant-table-wrapper .ant-table-row-expand-icon > .ant-table-row-expand-icon-icon {
+  font-size: 13px !important; line-height: 22px;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   ★ 移动端精调（2026-10-05 · 方向 1 落到移动端）
+   ──────────────────────────────────────────────────────────────────────────
+   为什么单独一轮：§11 的刻度体检扫的是 **PC 10 页**（桌面壳），移动端那套
+   （`components/ds/mobile.tsx` + 本文件的 `.m-*`）是 10-04 R4 单独写的，
+   **从没被精调过** —— 逃逸值比 PC 还多：
+     字号 17 / 15 / 12.5 / 11.5px（四个都在 FS 七档之外）· 圆角 14 / 11 / 9px（不在三档里）
+     色条 3.5px（PC 是 3）· 徽标 22px（PC 已统一 24）· 行高 1.3 / 1.35 / 1.55 / 1.7 四个乘数
+     还混了一处**裸 hex** `#fff`（VIS-hex 只扫 tsx，扫不到 CSS）
+   规矩与 PC 同源，只是**触控优先**（行高 ≥56px、主按钮 ≥48px 保留不动）：
+     字号只准 FS 七档（12/13/14/16/20/24/32）· 圆角只准 12/8/6/999 · 徽标/勾选框 = 24（同 PC）
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* 头部：17 → 16px（FS.lg）；副标题 12.5 → 12px */
+.m-head-t { font-size: 16px; line-height: 24px; }
+.m-head-s { font-size: 12px; line-height: 18px; }
+.m-group-s { font-size: 12px; line-height: 18px; }
+.m-card-l { font-size: 12px; line-height: 18px; }
+.m-row-s  { font-size: 12px; line-height: 18px; }
+.m-st     { font-size: 12px; line-height: 18px; }
+.m-sec    { font-size: 12px; line-height: 18px; letter-spacing: 0; }
+
+/* 卡片标题 15 → 16px（移动端主信息，比 PC 正文更重一档才对）；卡片圆角 14 → 12px */
+.m-card-t { font-size: 16px; line-height: 24px; letter-spacing: -0.3px; }
+/* 卡片内边距 13/14/13/16 → 12px（8px 刻度）；色条 3.5 → 3px（与 PC 一致） */
+.m-card { padding: 12px; border-radius: 12px; }
+.m-card::before { width: 3px; }
+/* 卡片头（状态 + 项目号那行）：固定 18px 行高，不再用 1.35 */
+.m-card-h { font-size: 12px; line-height: 18px; margin-bottom: 8px; }
+
+/* 勾选框 26 → 24px（与 PC 徽标同档；26 是第四种控件高度） */
+.m-check { width: 24px; height: 24px; border-radius: 8px; font-size: 13px; }
+/* 行内间距 11 → 12px（行高仍 ≥56px 触控线，不动） */
+.m-row { padding: 12px 0; gap: 12px; }
+.m-row-t { line-height: 20px; }
+.m-row-r { line-height: 20px; }
+
+/* 徽标：22 → 24px 高、11.5 → 12px 字（与 PC 徽标完全同款） */
+.m-chip { height: 24px; font-size: 12px; }
+/* 视图切换胶囊：圆角 11/9 → 12/8（与 PC Segmented 同档），内边距 3 → 4px */
+.m-seg { border-radius: 12px; padding: 4px; }
+.m-seg button { border-radius: 8px; line-height: 24px; }
+
+/* 空态 13px + 行高 1.7 → 20px 固定 */
+.m-empty { font-size: 13px; line-height: 20px; }
+/* ★ 裸 hex 收口（VIS-hex 扫不到 CSS，只能靠这里自觉 + 这条注释） */
+.m-check { color: var(--ds-surface); }
+
+/* ⚠ 选择器一律**不带** `.ant-layout-content` 前缀：Modal / Drawer / Select 下拉由 antd 挂在 `body` 下，
+   绑在布局内容区上会整块漏掉（实测：件档案抽屉里的 `<code>` 仍是 11.9px）。 */
+/* ── ⑤ 全站最后一道兜底：antd 内部残留的 1.5714 乘数 ────────────────
+   实测仍剩：20.4286px（13×1.5714，Select/Input/部分 Table 内部）· 30px（antd 空态图）
+   · 28px（Segmented item）。它们都在 antd 组件里，页面代码改不到，只能在版面层压掉。 */
+.ant-select-selection-item,
+.ant-select-selection-placeholder,
+.ant-input,
+.ant-input-affix-wrapper,
+.ant-picker,
+.ant-input-number-input { line-height: var(--ds-lh-14); }
+.ant-table-cell, .ant-table-wrapper, .ant-table-tbody > tr, .ant-table-thead > tr { line-height: var(--ds-lh-13); }
+.ant-empty-description { line-height: var(--ds-lh-13); }
+.ant-segmented-item-label { line-height: var(--ds-lh-14); }
+/* Select/Input 的文字纵向居中靠 32px 容器（controlHeight）而不是行高，这里补上 */
+.ant-select-single .ant-select-selector .ant-select-selection-item { line-height: 30px; }
+.ant-input { height: 32px; }
+
+/* ── ⑥ 补最后两类（实测残留，来源已定位）─────────────────────────────────
+   ① `.ds-sec`（新建商机/立项页的分区按钮）—— 它是 ds 自己的元素却没吃到分档（写它时是默认行高）。
+   ② antd `Tabs` 与表格的**容器级**元素（tab 按钮、table/container）——
+      之前只压了 `.ant-table-cell`（单元格），容器仍是 1.5714。
+   ③ `ant-badge` 的 `sup`（12px 文字 14px 行高）—— 角标数字，行高按文字档走。 */
+.ds-sec, .ds-sec-btn, .ds-tab { line-height: var(--ds-lh-13); }
+.ant-tabs-tab, .ant-tabs-tab-btn, .ant-tabs-tab + .ant-tabs-tab { line-height: var(--ds-lh-14); }
+.ant-badge-count, .ant-badge-count sup, .ant-scroll-number { line-height: var(--ds-lh-12); }
+.ant-table, .ant-table-container, .ant-table-body, .ant-table-thead, .ant-table-tbody { line-height: var(--ds-lh-13); }
+/* antd 空态说明与按钮组 */
+.ant-empty-description, .ant-empty-img { line-height: var(--ds-lh-13); }
+.ant-btn > span, .ant-btn > .anticon + span { line-height: var(--ds-lh-14); }
+
+/* ── ⑦ Progress 的百分比文字（antd 内部 12px/12px）────────────────────
+   齐套率进度条上的那个 % —— 它是给人读的数，不该比正文还挤。 */
+.ant-progress-text { line-height: var(--ds-lh-12) !important; }
+
+/* ── ⑧ antd Card 头 / Collapse 头（16px 标题）─────────────────────────
+   实测 25.1429px = 16×1.5714（`/numbering` 5 处）。标题按 16px 档走 24px。 */
+.ant-card-head, .ant-card-head-wrapper, .ant-card-head-title,
+.ant-collapse-header, .ant-collapse-header-text, .ant-collapse-expand-icon { line-height: var(--ds-lh-16) !important; }
+
+/* ── 台内分段小标题（2026-10-05 · 方向 2 补充）──────────────────────────
+   以前“组”也是一排可点胶囊（点它 = 跳到组内第一个）——实测客户反馈
+   “点『待办』没有任何反应，但『待我审批』明明有 3 单”：人已经在那一组时
+   URL 与内容都不变 = 死路，于是以为没展示。
+   现在组名是**纯说明、不可点**，所有队列平铺成**唯一一行可点标签**（带待办数）——
+   也就是 `TAB-一屏一条页签条`：一个屏只准一条页签条，其余都是正文里的东西。 */
+.ds-subtabs.ds-grp { padding-top: 10px; padding-bottom: 2px; }
+.ds-subtabs.ds-grp .ds-grp-t {
+  font-size: 12px; font-weight: 600; color: var(--ds-ink3);
+  letter-spacing: 0; line-height: 18px;
+  display: inline-flex; align-items: center; gap: 6px;
+}
+.ds-subtabs.ds-grp .ds-grp-t::before {
+  content: ""; width: 3px; height: 10px; border-radius: 2px; background: var(--ds-line2); flex: none;
+}

@@ -120,7 +120,7 @@ txgketo/
 ./dev.sh          # 一键：数据库 → 后端 :8208 → 前端 :5207
 ./dev.sh stop     # 停后端与前端
 
-# （可选）生成演示账号（19+5 个，密码 txgk@123；管理员 admin/admin12345）
+# （可选）生成演示账号（19+5 个，密码 txgk@123；管理员 admin/txgk@123 —— 2026-10-05 起全站统一）
 (cd backend && .venv/bin/python -m scripts.seed_demo_users)
 
 # 测试脚本（都走真实 HTTP 接口）
@@ -133,7 +133,7 @@ txgketo/
 |---|---|
 | 前端 | <http://127.0.0.1:5207> |
 | 接口文档 | <http://127.0.0.1:8208/docs> |
-| 账号 | `admin` / `admin12345`（上线前必须改） |
+| 账号 | `admin` / `txgk@123`（全站统一 · 上线前必须改） |
 
 **端口**（已登记于 `../PORTS.md`）：前端 5207 · 后端 8208 · PostgreSQL 35432
 

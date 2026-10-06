@@ -220,7 +220,7 @@ deploy/          docker-compose.dev.yml
 查下来是**判据假阳性**（空库时页面就 180 字，我的 `len>200` 太严），页面本身完全正常
 （结论条 5 个 0 + 页签 + 人话空态「没有在路上、等到公司仓库的货。」）。
 
-**基线**：`pytest 250 · e2e:static 54 · e2e:ui 83 · e2e:api 24 · tsc 0 · build OK`。
+**基线**：`pytest 276（273 + 新增 test_notify_type_contract 3 条 · 4 skipped）· e2e:static 54 · e2e:ui 83 · e2e:api 24 · tsc 0 · build OK`。
 
 ### 8.2 行（2026-10-05 · 续 3）｜★★ 删除「以某人身份查看」+ 全站密码统一
 
@@ -252,7 +252,7 @@ deploy/          docker-compose.dev.yml
 - 清理 8 个脚本里 `"admin12345" if u == "admin" else "txgk@123"` 的三元判断（统一密码的红利）
 - ⚠ **上线前必须改掉**（AGENTS §5 原有约定不变）
 
-**基线**：`pytest 250 · e2e:static 54 · e2e:ui 83 · e2e:api 24 · tsc 0 · build OK`。
+**基线**：`pytest 276（273 + 新增 test_notify_type_contract 3 条 · 4 skipped）· e2e:static 54 · e2e:ui 83 · e2e:api 24 · tsc 0 · build OK`。
 
 ### 8.2 行（2026-10-05 · 续 2）｜★★ 客户实测 bug 2：点「待办」没反应
 
@@ -275,7 +275,7 @@ deploy/          docker-compose.dev.yml
 
 **护栏** `TAB2-台内只有一行可点页签条`（不许再画“组”那一排 · 分组分支不许按“当前组”过滤页签 · 数字不许拼第二次）；**两条反例注入自证能红**（把组画回来 + 又拼一次数字 → 各报一次）。
 
-**基线**：`pytest 250 · e2e:static 54 · e2e:ui 84 · tsc 0 · build OK`。
+**基线**：`pytest 276（273 + 新增 test_notify_type_contract 3 条 · 4 skipped）· e2e:static 54 · e2e:ui 84 · tsc 0 · build OK`。
 
 ### 8.2 行（2026-10-05 · 续）｜★★ 客户实测 bug：采购经理“待我审批 3 单却看不到”
 
@@ -293,7 +293,7 @@ deploy/          docker-compose.dev.yml
 **护栏** `SHELL3-台按岗位分层` 扩到**九个台逐个查**（不声明就报 —— 那正是本 bug 的根因），反例注入验过能红（把采购台的 `byPosition` 删掉 → 立刻报红）。
 **又踩一次**：给这条护栏写了“读自己注释保持说明同步”的自检 → ESM 里 `__filename` 不存在直接抛错。**已删**（护栏读自己的注释天生脆弱：改个注释就假红）。
 
-**基线**：`pytest 250 · e2e:static 53 · e2e:ui 84 · tsc 0 · build OK`。
+**基线**：`pytest 276（273 + 新增 test_notify_type_contract 3 条 · 4 skipped）· e2e:static 53 · e2e:ui 84 · tsc 0 · build OK`。
 
 ### 8.2 行（2026-10-05）｜★★ 台按岗位分层 + 「我的工作台」取消（客户三条拍板）
 
@@ -319,7 +319,7 @@ deploy/          docker-compose.dev.yml
 **护栏** `SHELL3-台按岗位分层`（壳必须用 `defaultTabFor`/`orderTabsFor`、不得直接用 `board.defaultTab` · `byPosition` 三档齐全且指向存在的页签 · 岗位档位与后端一致）；**并扩了 `SHELL-台骨架四件套`**：不再把已删除的「我的工作台」当台来断言骨架，反过来**钉住它不许长回聚合页**。
 两条反例注入自证能红（退回写死 `defaultTab` / 删掉 `director` 档）。写护栏时又踩一坑：先只剥整行注释 → **我自己写的解释文字被判成“还在用 board.defaultTab”**（要剥行尾注释/只扫代码）。
 
-**基线**：`pytest 250 · e2e:static 53 · e2e:ui 84 · e2e:api 24 · tsc 0 · build OK`。
+**基线**：`pytest 276（273 + 新增 test_notify_type_contract 3 条 · 4 skipped）· e2e:static 53 · e2e:ui 84 · e2e:api 24 · tsc 0 · build OK`。
 
 ### 8.2 行（2026-10-05）｜★ 全站同一套标准（客户要求「都统一标准」）
 
@@ -337,7 +337,7 @@ deploy/          docker-compose.dev.yml
 **护栏** `VIS4-全站同一套标准`（全站兜底段存在且不带 `.ant-layout-content` · 6 个行高档齐全 · `styles.css` 零旧主色（**剥注释后判**）· 全站分页只准 10（迷你表例外需理由注释）· 队列板默认 10），**四条反例注入自证能红**。
 写这条时踩了三个假阳性：① 剥注释只剥了整行、没剥**行尾**注释 → 我自己写的解释文字被判成“还在用旧主色”；② 例外判据去 `pageSize` **前面**找 `hideOnSinglePage`，而它写在**后面**；③ 判据用 `m[0]` 索引而实际 matchAll 的 `m.index` 才是真的。
 
-**基线**：`pytest 250 · e2e:static 52 · e2e:ui 84 · tsc 0 · build OK`。**回档**：`docs/前端UI视觉规范.md §13`。
+**基线**：`pytest 276（273 + 新增 test_notify_type_contract 3 条 · 4 skipped）· e2e:static 52 · e2e:ui 84 · tsc 0 · build OK`。**回档**：`docs/前端UI视觉规范.md §13`。
 
 ### 8.2 行（2026-10-05）｜★ 精调续：移动端 + 部门看板 + 彩色药丸收尾
 
@@ -356,7 +356,7 @@ deploy/          docker-compose.dev.yml
 **护栏** `VIS3-精调层不许出刻度` 扩到 **6 条**（加"相邻文字不许粘连"，**扫全部 tsx**），六条**全部注入反例验过能红**。本轮两次踩坑：只匹配单个数字 → 漏 `padding: 0 9px`；粘连检查只扫 5 个台页面 → 注入到 `site/Page.tsx` 的反例没被抓到。
 **★ 另记一次翻车**：批量正则替换 `<Tag color=…>` 时把 `toneOf(...)` 的右括号与 JSX 的 `}` 搞混，连错 3 次才 tsc 绿 —— **大批量 JSX 改写宁可逐处手改，也不要一条正则扫全文件**（docs/15 §9 教训 2 的又一次印证）。
 
-**基线**：`pytest 250 · e2e:static 51 · e2e:ui 84 · tsc 0 · build OK`（PC 13 页 + 移动 10 页复测零报错零 4xx）。**回档**：`docs/前端UI视觉规范.md §12`。
+**基线**：`pytest 276（273 + 新增 test_notify_type_contract 3 条 · 4 skipped）· e2e:static 51 · e2e:ui 84 · tsc 0 · build OK`（PC 13 页 + 移动 10 页复测零报错零 4xx）。**回档**：`docs/前端UI视觉规范.md §12`。
 
 ### 8.2 行（2026-10-05）｜★ 精调层（方向 1「刻度收敛」）· “太粗糙”
 
@@ -376,7 +376,7 @@ deploy/          docker-compose.dev.yml
 
 **护栏** `VIS3-精调层不许出刻度`（字号 / 内距（含多值简写）/ 行高 / 控件高度不许出刻度 · 台头不许摆纯计数 Chip）；**四条反例注入自证能红**。写这条时踩了两个正则坑：只匹配单个数字 → 漏 `padding: 0 9px`；`actions={` 跨行抓空。
 
-**回档**：`docs/前端UI视觉规范.md §11`。**基线**：`pytest 250 · e2e:static 51 · e2e:ui 84 · tsc 0 · build OK`。
+**回档**：`docs/前端UI视觉规范.md §11`。**基线**：`pytest 276（273 + 新增 test_notify_type_contract 3 条 · 4 skipped）· e2e:static 51 · e2e:ui 84 · tsc 0 · build OK`。
 
 ### 8.2 行（2026-10-05）｜★ 方向 2「结论优先」· 工作台观感改造
 
@@ -414,7 +414,7 @@ deploy/          docker-compose.dev.yml
 
 **未做（留给下轮，见报告 §4）**：台账分区分页 20 条 → 采购单 **1907px**/到货跟踪 1430/仓库流水 1262（一屏不成立，取舍待定）· 工程部台「部门看板」仍是**6 张数字卡墙 + 10 张 antd Card**（与已定壳相反）· 我的工作台 1059px · 全站还有 **23 文件 38 处** antd `Empty` · 仓库台「缺货 3 种」台头+结论条重复。
 
-**基线**：`pytest 250 · e2e:static 49 · e2e:ui 84 · e2e:api 24 · tsc 0 · build OK`（`e2e_baseline` 复位后 0/0/149）。
+**基线**：`pytest 276（273 + 新增 test_notify_type_contract 3 条 · 4 skipped）· e2e:static 49 · e2e:ui 84 · e2e:api 24 · tsc 0 · build OK`（`e2e_baseline` 复位后 0/0/149）。
 
 ### 8.2 行（2026-10-05）｜★ 工作台队列化 · 九台骨架统一
 
@@ -971,7 +971,7 @@ POST /api/v1/warehouse/inbound                    其他入库（退料回库/�
 ### 8.6 当前环境
 
 - 后端 :8208 · 前端 :5207 · PG 35432（`docker compose -f deploy/docker-compose.dev.yml up -d`，compose 顶层写死了 `name: txgketo`）
-- 测试：`.venv/bin/python -m pytest -q` → **250 passed**；e2e 基线 `.venv/bin/python -m scripts.e2e_baseline`（★ 跑前复位业务数据；只清业务表，账户/组织/编号规则不动）→ **问题 0 / 中断 0 / 通过 149**；
+- 测试：`.venv/bin/python -m pytest -q` → **276 passed, 4 skipped**；e2e 基线 `.venv/bin/python -m scripts.e2e_baseline`（★ 跑前复位业务数据；只清业务表，账户/组织/编号规则不动）→ **问题 0 / 中断 0 / 通过 149**；
   隔离探针 `scripts/probe_bom_math.py` → **8/8**、`scripts/probe_n24_n25.py` → **20/20**；前端 `e2e:static 54` / **`e2e:api 24+0skip`** / **`e2e:ui 84+0skip`**（两套都自建靶，可复位后单跑）
   ★ **UI 真实场景走查（2026-09-30）**：只用浏览器点 UI 走完 S0→S11 + 双端，报告（含逐条修复记录与 commit）在
   `docs/99-E2E测试报告-2026-09-30-UI真实场景.md`；驱动脚本在 `/tmp/txgk-ui-e2e/`（**未入库**）。

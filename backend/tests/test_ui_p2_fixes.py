@@ -59,8 +59,14 @@ def test_notification_links_carry_from():
     assert "useGoFrom" in drawer and "go(n.link)" in drawer, "消息跳转要带来源（PC）"
     # 移动端：有移动页就映射，没有就不跳（R4-01，见 docs/11 §8）
     assert "MOBILE_LINK" in drawer and "n.link.startsWith('/m')" in drawer and "电脑端处理" in drawer
+    # ★ 2026-10-05：「我的工作台」聚合页**已取消**（客户拍板：与部门台内容重叠、且不按岗位分层），
+    #   它的消息区随之删除。所以现在只有顶栏铃铛一个 PC 消息入口 —— 断言它带来源即可；
+    #   同时钉住「聚合页不许再长回来」（否则这条会变成永远的真）。
+    assert "go(n.link)" in drawer, "PC 消息跳转要带来源（顶栏铃铛是唯一的 PC 消息入口）"
     wb = _read(FE / "features" / "workbench" / "Page.tsx")
-    assert "if (n.link) go(n.link)" in wb, "我的工作台消息区也要带来源"
+    assert "HomeRedirect" in wb and "NotificationsDrawer" not in wb, (
+        "我的工作台应退化为三个落地页的宿主（消息区已删，改用顶栏铃铛）"
+    )
 
 
 # ── P2-8 没拍照就不能勾「已发」 ─────────────────────────────────────────

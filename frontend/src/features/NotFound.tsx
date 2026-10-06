@@ -23,8 +23,10 @@ export default function NotFound() {
           </>
         }
         extra={
+          // ★ 2026-10-05：「我的工作台」入口取消后，这个按钮仍跳 `/workbench`（中转站），
+          //   但文案不能再叫「我的工作台」—— 点了实际是回到**他可见的第一个台**。
           <Link to="/workbench">
-            <Button type="primary">回我的工作台</Button>
+            <Button type="primary">回我的台</Button>
           </Link>
         }
       />

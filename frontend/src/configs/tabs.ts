@@ -1,5 +1,4 @@
 import { hasPerm } from '../api/user'
-import { readSession } from '../contexts/session'
 
 /**
  * 页签注册表（重整方案 P0 · docs/10 §3.2）。
@@ -18,8 +17,6 @@ export interface TabDef {
   label: string
   /** 真实权限码，命中任一即可见（未给 = 人人可见） */
   anyOf?: string[]
-  /** 纯写动作队列：「以某人身份查看」（只读态）下隐藏，避免点进去满屏 403 */
-  writeOnly?: boolean
   /** 自定义可见性（用后端返回的能力，如 /my-scope 的 can_manage_users） */
   show?: () => boolean
   /** 角标取自哪个计数字段（>0 才显示，全站唯一口径） */
@@ -34,15 +31,9 @@ export interface TabDef {
   kind?: 'queue' | 'ledger'
 }
 
-/** 是否处于「以某人身份查看」（只读，06 卷 §4） */
-export function isImpersonating(): boolean {
-  return readSession()?.impersonateId !== undefined
-}
-
 export function tabVisible(def: TabDef): boolean {
   if (def.show && !def.show()) return false
   if (def.anyOf?.length && !def.anyOf.some((c) => hasPerm(c))) return false
-  if (def.writeOnly && isImpersonating()) return false
   return true
 }
 
@@ -60,13 +51,13 @@ export function tabLabel(def: TabDef, counts?: Record<string, number> | null): s
 
 /** 采购工作台（键与页面现状一一对应；「验收不合格 + 退换记录 → 异常处理」的内容合并留给 P2） */
 export const PURCHASE_TABS: TabDef[] = [
-  { key: 'approve', label: '待我审批', anyOf: ['purchase:edit'], writeOnly: true },
+  { key: 'approve', label: '待我审批', anyOf: ['purchase:edit'], countKey: 'approve' },
   // ★ §2.2 叫车是采购的活，而采购进不去发运台 → 必须在采购台里能干（2026-09-30 P1-1）
-  { key: 'vehicle', label: '待叫车', anyOf: ['purchase:edit'], writeOnly: true },
-  { key: 'pool', label: '采购池', anyOf: ['purchase:view', 'purchase:edit'] },
+  { key: 'vehicle', label: '待叫车', anyOf: ['purchase:edit'], countKey: 'vehicle' },
+  { key: 'pool', label: '采购池', anyOf: ['purchase:view', 'purchase:edit'], countKey: 'pool' },
   { key: 'orders', label: '采购单', anyOf: ['purchase:view', 'purchase:edit'] },
   { key: 'arrivals', label: '到货跟踪', anyOf: ['purchase:view', 'purchase:edit'] },
-  { key: 'failed', label: '验收不合格', anyOf: ['purchase:edit'], writeOnly: true },
+  { key: 'failed', label: '验收不合格', anyOf: ['purchase:edit'], countKey: 'failed' },
   { key: 'resolve', label: '退换记录', anyOf: ['purchase:edit'] },
   { key: 'storage', label: '入库记录', anyOf: ['purchase:view', 'purchase:edit'] },
   { key: 'reference', label: '价格参考', anyOf: ['purchase:price'] },
@@ -75,9 +66,9 @@ export const PURCHASE_TABS: TabDef[] = [
 
 /** 仓库工作台 —— P2 已把「待办」拆成三个队列页签（与手机端 /m/warehouse 同构） */
 export const WAREHOUSE_TABS: TabDef[] = [
-  { key: 'incoming', label: '待验收', anyOf: ['warehouse:edit'], writeOnly: true },
-  { key: 'storage', label: '待入库', anyOf: ['warehouse:edit'], writeOnly: true },
-  { key: 'issues', label: '待领料', anyOf: ['warehouse:edit'], writeOnly: true },
+  { key: 'incoming', label: '待验收', anyOf: ['warehouse:edit'], countKey: 'incoming' },
+  { key: 'storage', label: '待入库', anyOf: ['warehouse:edit'], countKey: 'storage' },
+  { key: 'issues', label: '待领料', anyOf: ['warehouse:edit'], countKey: 'issues' },
   { key: 'stock', label: '库存', anyOf: ['warehouse:view', 'warehouse:edit'] },
   { key: 'moves', label: '出入库流水', anyOf: ['warehouse:view', 'warehouse:edit'] },
   { key: 'locations', label: '库位', anyOf: ['warehouse:view', 'warehouse:edit'] },
@@ -85,7 +76,7 @@ export const WAREHOUSE_TABS: TabDef[] = [
 
 /** 车间工作台 · 制造（流程队列） */
 export const MFG_TABS: TabDef[] = [
-  { key: 'wait', label: '待下发', anyOf: ['mfg:view'] },
+  { key: 'wait', label: '待下发', anyOf: ['mfg:view'], countKey: 'wait' },
   { key: 'running', label: '在制 / 待验收', anyOf: ['mfg:view'] },
   { key: 'transfer', label: '待转运', anyOf: ['mfg:view'] },
   { key: 'rework', label: '返工', anyOf: ['mfg:view'] },
@@ -98,12 +89,12 @@ export const SITE_TABS: TabDef[] = [
   { key: 'incoming', label: '来货清点', anyOf: ['site:edit', 'project:edit'] },
   { key: 'daily', label: '每日汇报', anyOf: ['site:edit', 'project:edit'] },
   { key: 'commission', label: '申请调试', anyOf: ['site:edit', 'project:edit'] },
-  { key: 'issues', label: '现场问题', anyOf: ['site:edit', 'project:edit'] },
+  { key: 'issues', label: '现场问题', anyOf: ['site:edit', 'project:edit'], countKey: 'issues' },
 ]
 
 /** 售后工作台 */
 export const SERVICE_TABS: TabDef[] = [
-  { key: 'orders', label: '服务工单', anyOf: ['service:edit'] },
+  { key: 'orders', label: '服务工单', anyOf: ['service:edit'], countKey: 'orders' },
   { key: 'parts', label: '备件', anyOf: ['service:edit'] },
 ]
 

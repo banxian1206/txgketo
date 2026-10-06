@@ -53,6 +53,8 @@ export default function DashboardPage() {
 
   const money = (v: number | null) => (v == null ? '—' : `¥${Math.round(v).toLocaleString()}`)
   const metrics: MetricItem[] = [
+    // ★ 方向 2 ②：驾驶舱**故意不指认主角**——它是“看全局、看一眼就走”的页面（不是“今天动哪件事”），
+    //   5 个数平级才对。硬抬一个主角反而会让总经理误以为“那一个”才是风险。
     { key: 'orders', label: '在手订单', value: d.orders.total_count, unit: '个', to: '/projects' },
     { key: 'amount', label: '在手合同额', value: money(d.orders.total_amount), tone: undefined },
     { key: 'risk', label: '交付风险', value: d.risks_count, unit: '个', tone: d.risks_count ? 'err' : undefined },

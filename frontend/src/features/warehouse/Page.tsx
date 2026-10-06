@@ -387,7 +387,7 @@ export default function Warehouse() {
           </Button>
         </Space>
         <Table<StockRow>
-          rowKey="id" size="small" dataSource={stock} pagination={{ pageSize: 20, showSizeChanger: false }}
+          rowKey="id" size="small" dataSource={stock} pagination={{ pageSize: 10, showSizeChanger: true }}
           locale={{ emptyText: <DsEmpty text="还没有库存" /> }}
           columns={[
             { title: '物料', dataIndex: 'item_no', width: 140, render: (v: string) => <Code to={`/items/${v}`}>{v}</Code> },
@@ -404,7 +404,7 @@ export default function Warehouse() {
     ),
     moves: (
       <Table<MoveRow>
-        rowKey="id" size="small" dataSource={moves} pagination={{ pageSize: 20, showSizeChanger: false }}
+        rowKey="id" size="small" dataSource={moves} pagination={{ pageSize: 10, showSizeChanger: true }}
         columns={[
           { title: '类型', dataIndex: 'move_type', width: 80, render: (v: string) => <Chip tone={toneOf(v === '入库' ? 'green' : 'orange')}>{v}</Chip> },
           { title: '物料', dataIndex: 'item_no', width: 140 },
@@ -428,7 +428,7 @@ export default function Warehouse() {
           </Typography.Text>
         </Space>
         <Table<LocationRow>
-          rowKey="id" size="small" dataSource={locs} pagination={{ pageSize: 20, showSizeChanger: false }}
+          rowKey="id" size="small" dataSource={locs} pagination={{ pageSize: 10, showSizeChanger: true }}
           locale={{ emptyText: <DsEmpty text="还没有库位" /> }}
           columns={[
             { title: '仓库', dataIndex: 'warehouse', width: 130 },
@@ -454,14 +454,21 @@ export default function Warehouse() {
       <WorkbenchPage
         board={WAREHOUSE_BOARD}
         sub={
-          openCount > 0
-            ? `待办 ${openCount} 项 · 待验收 ${wb?.incoming.length ?? 0} · 待入库 ${wb?.pending_storage.length ?? 0} · 待领料 ${wb?.pending_issues.length ?? 0}`
-            : '今天没有待办的收货 / 入库 / 领料'
+          // ★ 方向 2 ①：台头只说**现状**，不把结论条那 5 个数再说一遍（同一批数说两遍 = 逼眼）。
+          //   异常优先：先报“缺货几种 / 今日有没有活”，其余交给结论条。
+          (wb?.stock.out_of_stock ?? 0) > 0
+            ? `今天有 ${openCount} 项待办 · 缺货 ${wb?.stock.out_of_stock} 种`
+            : openCount > 0
+              ? `今天有 ${openCount} 项待办（收货 / 入库 / 领料）`
+              : '今天没有待办的收货 / 入库 / 领料'
         }
         help="仓库只有两个动作：验收（合格/不合格）和入库；领料单在这里备料、车间来领走。上面的数字可点。"
         actions={
           <>
-            {(wb?.stock.out_of_stock ?? 0) > 0 && <Chip tone="err">缺货 {wb?.stock.out_of_stock} 种</Chip>}
+            {/* ★ 精调（2026-10-05）：台头 actions 只留**能按下去的动作**。
+                 原来这里摆的是“缺货 3 种 / 到货超期 N / 有风险 N”这类**纯计数**——
+                 而结论条里已经有同一个数（而且**可点**，点了直接切到那个队列）。
+                 同一批数在一个页上出现两次，是“看着毛”的头号来源（实测 5 个台都有）。 */}
             <Button size="small" onClick={() => void load()}>
               刷新
             </Button>
@@ -473,7 +480,8 @@ export default function Warehouse() {
           issues: wb?.pending_issues.length ?? 0,
         }}
         metrics={[
-          { key: 'incoming', label: '待验收', value: wb?.incoming.length ?? 0, unit: '单', tone: wb?.incoming.length ? 'warn' : undefined, dimZero: true, to: '?tab=incoming' },
+          // ★ 方向 2 ② 主角指认：仓库台主角 = **待验收**：货到了不验收就卡入库、卡领料，是仓库每一天的第一件事。（ds `MetricItem.lead`）
+          { key: 'incoming', label: '待验收', value: wb?.incoming.length ?? 0, unit: '单', tone: wb?.incoming.length ? 'warn' : undefined, dimZero: true, to: '?tab=incoming', lead: true },
           { key: 'storage', label: '待入库', value: wb?.pending_storage.length ?? 0, unit: '单', tone: wb?.pending_storage.length ? 'warn' : undefined, dimZero: true, to: '?tab=storage' },
           { key: 'issues', label: '待领料', value: wb?.pending_issues.length ?? 0, unit: '单', tone: wb?.pending_issues.length ? 'warn' : undefined, dimZero: true, to: '?tab=issues' },
           { key: 'stock', label: '缺货', value: wb?.stock.out_of_stock ?? 0, unit: '种', tone: (wb?.stock.out_of_stock ?? 0) > 0 ? 'err' : undefined, dimZero: true, to: '?tab=stock' },

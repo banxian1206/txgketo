@@ -3,20 +3,8 @@ import { Status } from '../components/ds'
 import { useCallback, useEffect, useState } from 'react'
 
 import { errMsg, listNotifications, markAllNotificationsRead, markNotificationRead, type NotificationRow } from '../api/client'
-import { NOTIF_TYPE as TYPE_COLOR, toneOf } from '../theme/status'
+import { notifTypeLabel } from '../theme/status'
 import { useGoFrom } from '../hooks/useFrom'
-
-// 通知类型中文名（P-18：不再裸露英文 type）
-const TYPE_LABEL: Record<string, string> = {
-  task: '任务',
-  review: '评审',
-  change: '改版',
-  release: '发布',
-  warehouse: '仓库',
-  purchase: '采购',
-  acceptance: '验收',
-  service: '售后',
-}
 
 // 移动端（/m）里点击消息：把 PC 路由映射到移动页
 // ★ R4-01（走查 2026-10-04）：手机端没有对应页面的（任务/评审/改版/采购/项目详情…）
@@ -132,7 +120,7 @@ export default function NotificationsDrawer({ open, onClose, onReadChange }: Pro
             <List.Item.Meta
               title={
                 <Space size={6}>
-                  <Status tone={toneOf(TYPE_COLOR[n.type])}>{TYPE_LABEL[n.type] ?? n.type}</Status>
+                  <Status>{notifTypeLabel(n.type)}</Status>
                   <span style={{ fontWeight: n.is_read ? 400 : 600 }}>{n.title}</span>
                 </Space>
               }

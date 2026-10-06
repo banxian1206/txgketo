@@ -26,7 +26,7 @@ npm run e2e:ui         # 只浏览器（冒烟 34 路由 + 交互写链）
 ## 约定
 
 - **浏览器**：`channel:'chrome'`（系统 Chrome）——不依赖 playwright 缓存，缓存被系统清掉也不影响（§9.6 教训）
-- **账号**：admin/admin12345 · wh1/txgk@123（dev 库，见 AGENTS §5）
+- **账号**：admin/txgk@123 · wh1/txgk@123（dev 库，见 AGENTS §5）
 - **写数据**：`ui.mjs` 每轮创建 1 个 `E2E回归-*` 商机（含建图/下单/验收）—— 这是护栏的正常代价；跑完可从项目列表关闭/删除
 - **SKIP 语义**：当前无数据无法验的项（如 P-08 无待发批次）标 SKIP 不算失败，有数据时自动转 PASS/FAIL
 - **加断言**：新修的 bug → 在对应层加一条 `check('P-xx', ...)`，防止回归

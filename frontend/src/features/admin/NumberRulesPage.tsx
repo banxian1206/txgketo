@@ -1,4 +1,4 @@
-import { App, Button, Card, Col, Input, Row, Space, Table, Typography } from 'antd'
+import { App, Button, Card, Col, Collapse, Input, Row, Space, Table, Typography } from 'antd'
 import { Chip } from '../../components/ds'
 import type { ColumnsType } from 'antd/es/table'
 import { useEffect, useState } from 'react'
@@ -106,7 +106,18 @@ export default function NumberRules() {
         </Typography.Paragraph>
       </Card>
 
-      <Row gutter={16} style={{ marginTop: 16 }}>
+      {/* ★ 全站统一（2026-10-05）：两个「试编号规则」的工具卡默认**收起**。
+          理由：这一页的日常动作是**看规则表**（19 条一屏看全是它的价值，所以表不分页）；
+          解析/组装是偶尔拿来验一条规则的工具，收起后首屏只剩规则表，页高 1414 → 一屏内。
+          收起状态写在标题上（「工具·点开」），不藏可发现性。 */}
+      <Collapse
+        ghost
+        style={{ marginTop: 8 }}
+        items={[{
+          key: 'tools',
+          label: '试一下：解析图号 / 现场组装图号（工具，点开用）',
+          children: (
+            <Row gutter={16}>
         {/* 图号解析 */}
         <Col xs={24} lg={12}>
           <Card size="small" title="图号解析（拆层次码 / 找父级图号）">
@@ -189,7 +200,10 @@ export default function NumberRules() {
             </Typography.Paragraph>
           </Card>
         </Col>
-      </Row>
+            </Row>
+          ),
+        }]}
+      />
     </>
   )
 }

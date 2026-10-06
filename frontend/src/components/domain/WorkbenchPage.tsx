@@ -3,9 +3,10 @@ import type { ReactNode } from 'react'
 
 import SectionNav from '../ds/SectionNav'
 import { Metrics, PageHead, type MetricItem } from '../ds'
-import { groupsFor, type BoardDef } from '../../configs/boards'
+import { groupsFor, defaultTabFor, orderTabsFor, type BoardDef } from '../../configs/boards'
 import { filterTabs, tabLabel, type TabDef } from '../../configs/tabs'
 import { useTab } from '../../hooks/useTab'
+import { readSession } from '../../contexts/session'
 
 /**
  * 台骨架壳（docs/15 · 工作台队列化）
@@ -57,12 +58,18 @@ export default function WorkbenchPage({
   /** 体：`(当前页签 key, 该页签定义) => ReactNode` */
   children: (tab: string, def: TabDef | undefined) => ReactNode
 }) {
-  const visible = filterTabs(board.tabs)
-  // ★ 默认页签由注册表决定（不取"第一个" —— 采购台第一个是「待我审批」，
+  // ★ 2026-10-05：页签**顺序与默认落点都按岗位**（客户第一、二条）。
+  //   旧行为：所有岗位都落 `board.defaultTab`（工程台='mine'）——总监和组员看到的一模一样。
+  //   `orderTabsFor` 保证页签不被增减（只换顺序），`defaultTabFor` 决定落点。
+  const session = readSession()
+  const position = session?.user?.position
+  const ordered = orderTabsFor(board, position)
+  const visible = filterTabs(ordered)
+  // ★ 默认页签由注册表/岗位决定（不取“第一个” —— 采购台第一个是「待我审批」，
   //   而每天真正用的是「采购池」，取第一个等于把主队列藏在第二下点击后面）
   const [tab, setTab] = useTab(
     visible.map((t) => t.key),
-    board.defaultTab,
+    defaultTabFor(board, position),
   )
   const def = visible.find((t) => t.key === tab) ?? visible[0]
   // 体交给 SectionNav 渲染（它统一负责 `.ds-sec-body` 这张纸、空分区文案、切区回顶部）

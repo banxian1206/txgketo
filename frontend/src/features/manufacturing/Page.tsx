@@ -10,7 +10,7 @@ import AuthedFileLink from '../../components/AuthedFileLink'
 import { PROD_STATUS as STATUS_COLOR, toneOf } from '../../theme/status'
 import { OUTSOURCE_STATUS as OS_COLOR } from '../../theme/status'
 import { Chip, Code, Status, Empty as DsEmpty } from '../../components/ds'
-import QueueBoard from '../../components/ds/QueueBoard'
+import QueueBoard, { type QItem } from '../../components/ds/QueueBoard'
 import ShopViews from '../../components/domain/ShopViews'
 import { T } from '../../theme/tokens'
 import { SHOP_BOARD } from '../../configs/boards'
@@ -156,8 +156,14 @@ export default function Manufacturing() {
    * 队列行（docs/15）：车间是**按单干活**的 → 一行一个零件、行尾唯一主按钮（下发/开工/验收/转运）。
    * 过去是 7 列表格：图号要横着找、下一步动作混在「操作」列的一堆小链接里。
    */
-  const orderRow = (kind: 'wait' | 'running' | 'transfer' | 'rework') => (r: ProdOrderRow) => ({
+  const orderRow = (kind: 'wait' | 'running' | 'transfer' | 'rework') => (r: ProdOrderRow): QItem => ({
     key: r.id,
+    // ★ 方向 2 ③：左侧 3px 语义色条 —— **只给“这条与其他不同”的行**。
+    //   实测教训（2026-10-05）：先给整个队列都上色（待下发=蓝、在制=蓝…）→ 5 行连成一条长线，
+    //   等于没上（同一个队列里每一行都“正常”就没有一条值得标）。所以：
+    //     超期 / 返工 = 红（真正卡住产线，值得从一屏里挑出来）
+    //     其余一律中性（队���位置本身已经说明了它处在哪一步）
+    tone: (r.overdue || kind === 'rework' ? 'err' : undefined) as QItem['tone'],
     lead: <Code to={`/items/${r.item_no}`}>{r.item_no}</Code>,
     title: `${r.item_name ?? ''} ${r.qty}${r.unit ?? ''}`,
     meta: (
@@ -305,7 +311,7 @@ export default function Manufacturing() {
       />
     ),
     outsource: (
-          <Table<OutsourceRow> rowKey="id" size="small" loading={loading} dataSource={wb?.outsource ?? []} pagination={{ pageSize: 10, showSizeChanger: false }} locale={{ emptyText: <DsEmpty text="没有外协任务" /> }} columns={osColumns} />
+          <Table<OutsourceRow> rowKey="id" size="small" loading={loading} dataSource={wb?.outsource ?? []} pagination={{ pageSize: 10, showSizeChanger: true }} locale={{ emptyText: <DsEmpty text="没有外协任务" /> }} columns={osColumns} />
         
     ),
   }
@@ -331,7 +337,8 @@ export default function Manufacturing() {
           rework: (c?.rework ?? 0),
         }}
         metrics={[
-          { key: 'wait', label: '待下发', value: c?.wait ?? 0, unit: '项', tone: c?.wait ? 'warn' : undefined, dimZero: true, to: '?tab=wait' },
+          // ★ 方向 2 ② 主角指认：车间台主角 = **待下发**：没下任务，后面的在制/转运/验收全是空的（“车间的头一棒”）。（ds `MetricItem.lead`）
+          { key: 'wait', label: '待下发', value: c?.wait ?? 0, unit: '项', tone: c?.wait ? 'warn' : undefined, dimZero: true, to: '?tab=wait', lead: true },
           { key: 'running', label: '在制 / 待验收', value: c?.running ?? 0, unit: '项', dimZero: true, to: '?tab=running' },
           { key: 'transfer', label: '待转运装配区', value: c?.to_transfer ?? 0, unit: '项', dimZero: true, to: '?tab=transfer' },
           { key: 'rework', label: '返工', value: c?.rework ?? 0, unit: '项', tone: c?.rework ? 'err' : undefined, dimZero: true, to: '?tab=rework' },

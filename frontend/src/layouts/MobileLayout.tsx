@@ -50,7 +50,7 @@ const ALL_TABS: { key: string; label: string; icon: ReactNode; show: () => boole
 export default function MobileLayout() {
   const loc = useLocation()
   const nav = useNavigate()
-  // 重构 1.3：用户名/登出走 AuthContext（登出顺带清伪装 —— 原实现漏清了两个 impersonate key）
+  // 重构 1.3：用户名/登出走 AuthContext（单一 session）
   const { user, logout } = useAuth()
   const name = user?.name ?? '用户'
   const [unread, setUnread] = useState(0)

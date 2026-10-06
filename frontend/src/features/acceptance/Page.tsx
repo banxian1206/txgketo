@@ -1,4 +1,4 @@
-import { App, Button, DatePicker, Empty, Form, Input, Modal, Radio, Select, Space, Table, Typography, Upload } from 'antd'
+import { App, Button, DatePicker, Form, Input, Modal, Radio, Select, Space, Table, Typography, Upload } from 'antd'
 import { UploadOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import { useCallback, useEffect, useState } from 'react'
@@ -9,7 +9,7 @@ import { CodeNo } from '../../components/ui/Primitives'
 import { acceptanceDocUrl } from '../../api/client'
 import { useUrlState } from '../../hooks/useUrlState'
 import { readSession } from '../../contexts/session'
-import { Chip, PageHead, Panel, Status } from '../../components/ds'
+import { Chip, Empty, PageHead, Panel, Status } from '../../components/ds'
 import { ACCEPTANCE_STATUS as ACC_COLOR, toneOf } from '../../theme/status'
 
 const DOC_TYPES = ['技术协议', '图纸清单', '检验报告', '调试记录', '操作手册', '备件清单', '培训记录', '验收单', '其他']
@@ -157,8 +157,8 @@ export default function AcceptancePage() {
         rowKey="id"
         size="small"
         dataSource={wb?.acceptances ?? []}
-        pagination={{ pageSize: 10, showSizeChanger: false }}
-        locale={{ emptyText: <Empty description="还没有验收单" /> }}
+        pagination={{ pageSize: 10, showSizeChanger: true }}
+        locale={{ emptyText: <Empty text="还没有验收单 —— 现场调试完成后在这里申请客户验收。" /> }}
         columns={[
           {
             title: '项目',
@@ -208,7 +208,7 @@ export default function AcceptancePage() {
         size="small"
         dataSource={wb?.warranty_watch ?? []}
         pagination={false}
-        locale={{ emptyText: <Empty description="60 天内没有到期的质保" /> }}
+        locale={{ emptyText: <Empty text="60 天内没有到期的质保。" /> }}
         columns={[
           { title: '项目', key: 'p', render: (_: unknown, r) => `${r.project_no} ${r.project_name ?? ''}` },
           { title: '质保起', dataIndex: 'warranty_start', width: 120 },
@@ -267,7 +267,7 @@ export default function AcceptancePage() {
           size="small"
           dataSource={docTarget?.documents ?? []}
           pagination={false}
-          locale={{ emptyText: <Empty description="还没上传资料" /> }}
+          locale={{ emptyText: <Empty text="还没上传资料 —— 检验报告 / 说明书 / 合格证传这里。" /> }}
           columns={[
             { title: '类型', dataIndex: 'doc_type', width: 110 },
             { title: '文件', dataIndex: 'filename', render: (v: string, r) => <a onClick={() => void openDoc(r.id, v)}>{v}</a> },

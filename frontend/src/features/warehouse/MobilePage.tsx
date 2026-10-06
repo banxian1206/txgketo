@@ -117,7 +117,7 @@ export default function WarehouseM() {
                     sub={`${rows[0].supplier_name ?? '—'} · ${rows.length} 项 · 订 ${expect} / 已到 ${arrive}`}
                     right={overdue ? <MChip tone="err">有超期</MChip> : <MChip>{rows.length} 项</MChip>}
                   />
-                  {rows.map((r) => (
+                  {rows.map((r, idx) => (
                     <MCard
                       key={r.id}
                       tone={r.overdue ? 'err' : undefined}
@@ -133,18 +133,30 @@ export default function WarehouseM() {
                       }
                       title={r.display_name}
                       lines={[
-                        <>{r.spec_text ?? ''}</>,
+                        // ★ 精调（2026-10-05）：原来这里渲染 `spec_text`，而 `display_name` 常常
+                        //   就是「品牌 + 型号 + 规格」——于是**同一行字在标题和正文里各出现一次**
+                        //   （实测仓库页 10 张卡全部重复）。规格已经含在标题里，这里只留**它没有的**信息。
+                        r.spec_text && !r.display_name?.includes(r.spec_text) ? <>{r.spec_text}</> : null,
                         // ★ 红色只表示"异常"（A 的用色规矩）：订购量不是异常，别标红；
                         //   超期由左侧色条 + 状态字承担。
                         <>
                           订 {r.qty} {r.unit ?? ''} · 已到 {r.qty_received} · 需要 {r.need_date ?? '—'}
                         </>,
-                      ]}
+                      ].filter(Boolean)}
                       photos={
-                        // ★ 移动端一个动作就够：图纸在验收页里能看（03 卷：清单+勾选+拍照）
-                        <Button type="primary" block onClick={() => nav(`/m/accept/${r.id}`)}>
-                          逐项验收（拍照 / 看图纸）
-                        </Button>
+                        // ★ 精调（2026-10-05）：原来 10 张卡**每张都是全宽 primary 蓝按钮** ——
+                        //   首屏三个同色大按钮互相抢，且“哪一条最急”看不出来（仓库一天来十几单）。
+                        //   改成分级：**只有第一条（最该动的）是实心主按钮**，其余用白底描边 ——
+                        //   符合移动端“一屏一件事”的原意（一次只推一件事），点哪张都一样能进验收页。
+                        idx === 0 ? (
+                          <Button type="primary" block onClick={() => nav(`/m/accept/${r.id}`)}>
+                            逐项验收（拍照 / 看图纸）
+                          </Button>
+                        ) : (
+                          <Button block onClick={() => nav(`/m/accept/${r.id}`)}>
+                            逐项验收
+                          </Button>
+                        )
                       }
                     />
                   ))}

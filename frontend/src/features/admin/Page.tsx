@@ -6,7 +6,6 @@ import type { ColumnsType } from 'antd/es/table'
 import IntegrationPanel from './IntegrationPanel'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
-import { useAuth } from '../../contexts/AuthContext'
 import { USERS_TABS, filterTabs, USERS_GROUPS } from '../../configs/tabs'
 import { useTab } from '../../hooks/useTab'
 import AppModal from '../../components/AppModal'
@@ -91,7 +90,6 @@ function subtreeIds(rows: OrgRow[], rootId: number): Set<number> {
 export default function Users() {
   const { message } = App.useApp()
   // 重构 1.3：伪装入口走 AuthContext
-  const { startImpersonate } = useAuth()
   const [scope, setScope] = useState<MyScope | null>(null)
   const [orgs, setOrgs] = useState<OrgRow[]>([])
   const [roles, setRoles] = useState<RoleRow[]>([])
@@ -358,11 +356,6 @@ export default function Users() {
     }
   }
 
-  const impersonate = (r: UserRow) => {
-    // 重构 1.3：伪装写入统一走 AuthContext（单一 session + 整页刷新重取数据）
-    startImpersonate(r.id, r.name)
-  }
-
   const doHandover = async () => {
     if (!handoverTarget || !handoverTo) return
     setHandoverSaving(true)
@@ -445,11 +438,6 @@ export default function Users() {
               title="离职/停用：把任务、待审、项目角色转给别人"
             >
               转交
-            </a>
-          )}
-          {scope?.is_admin && (
-            <a onClick={() => impersonate(r)} title="以他的身份查看（只读）">
-              以此人查看
             </a>
           )}
         </Space>
@@ -549,7 +537,7 @@ export default function Users() {
                   size="middle"
                   dataSource={shownUsers}
                   columns={columns}
-                  pagination={{ pageSize: 20, showSizeChanger: false }}
+                  pagination={{ pageSize: 10, showSizeChanger: true }}
                 />
                 {!scope?.is_admin && scope?.department && (
                   <Typography.Paragraph type="secondary" style={{ fontSize: 12, marginTop: 8 }}>
@@ -690,7 +678,7 @@ export default function Users() {
                   size="small"
                   loading={logsLoading}
                   dataSource={logs}
-                  pagination={{ pageSize: 20, showSizeChanger: false }}
+                  pagination={{ pageSize: 10, showSizeChanger: true }}
                   columns={[
                     {
                       title: '时间',

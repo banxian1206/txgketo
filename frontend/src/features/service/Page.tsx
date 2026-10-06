@@ -12,7 +12,6 @@ import {
   Select,
   Space,
   Table,
-  Tag,
   Typography,
 } from 'antd'
 import { useState, type ReactNode } from 'react'
@@ -47,6 +46,12 @@ export default function Service() {
   const canEdit = hasPerm('service:edit')
 
   const [moves, setMoves] = useState<Record<number, { move_type: string; qty: number; moved_at?: string | null }[]>>({})
+  /**
+   * ★ 队列只列**有下一步动作**的行（docs/15 判定法）。已关闭的工单行尾没有按钮，
+   *   混在队列里会出现「结论条 5 格全 0（今天没活）· 队列却躺着 2 条已关闭」的矛盾
+   *   （2026-10-05 逐页走查实测）。已关闭的按台账处理：默认收起，行尾给一个开关看。
+   */
+  const [showClosed, setShowClosed] = useState(false)
   // ★ 重整 P0（docs/10 §3.2/§3.3）：页签条按**真实权限码**过滤，状态写进 URL（?tab=）
 
   const [modal, setModal] = useState<{ kind: Kind; order?: ServiceOrderRow; part?: SparePartRow } | null>(null)
@@ -118,6 +123,8 @@ export default function Service() {
 
   const c = wb?.counts
   const partOptions = partsList.map((p) => ({ value: p.id, label: `${p.item_no} ${p.item_name ?? ''}（库存 ${p.qty_stock}）` }))
+  // 队列 = 未关闭（行尾有下一个动作）；开关打开才把已关闭的也列进来（当台账查）
+  const queueOrders = (wb?.orders ?? []).filter((r) => showClosed || r.status !== '已关闭')
 
   // 体：按页签 key 取（顺序 / 标题 / 徽标 / 可见性全来自注册表 SERVICE_BOARD）
   const partsOf: Record<string, ReactNode> = {
@@ -136,9 +143,23 @@ export default function Service() {
           </div>
         </div>
         <QueueBoard
-          emptyText="还没有服务工单 —— 客户报修后在这里受理、派工、处理、签字关单。"
-          items={(wb?.orders ?? []).map((r) => ({
+          emptyText={
+            (c?.closed ?? 0) > 0
+              ? `没有待处理的工单 —— ${c?.closed} 单已关闭（点右上角「已关闭」可以查）。`
+              : '还没有服务工单 —— 客户报修后在这里受理、派工、处理、签字关单。'
+          }
+          toolbar={
+            (c?.closed ?? 0) > 0 ? (
+              <Button size="small" onClick={() => setShowClosed((v) => !v)}>
+                {showClosed ? '只看未关闭' : `已关闭 ${c?.closed}`}
+              </Button>
+            ) : undefined
+          }
+          items={queueOrders.map((r) => ({
             key: r.id,
+            // ★ 方向 2 ③：色条只给**阶段差异**（同一队列里每行阶段都不同，所以这里能传）。
+            //   待受理 = 客户在等没人接（红）· 待客户签字 = 只差他一下（橙）· 其余在修（蓝）。
+            tone: r.status === '待受理' ? 'err' : r.status === '待客户签字' ? 'warn' : 'run',
             lead: <Code>{r.so_no}</Code>,
             title: r.fault ?? '（未填故障描述）',
             meta: `${r.project_no}${r.equip_no ? ` · ${r.equip_no}` : ''} · 处理人 ${r.dispatched_to ?? '待派工'}`,
@@ -185,7 +206,7 @@ export default function Service() {
           rowKey="id"
           size="small"
           dataSource={partsList}
-          pagination={{ pageSize: 10, showSizeChanger: false }}
+          pagination={{ pageSize: 10, showSizeChanger: true }}
           locale={{ emptyText: <DsEmpty text="还没有备件" /> }}
           columns={[
             { title: '物料', dataIndex: 'item_no', width: 180 },
@@ -197,7 +218,7 @@ export default function Service() {
               width: 110,
               align: 'right',
               render: (v: number, r: SparePartRow) =>
-                r.min_qty != null && v < r.min_qty ? <Tag color="red">{v}（低于 {r.min_qty}）</Tag> : v,
+                r.min_qty != null && v < r.min_qty ? <Status tone="err">{v}（低于 {r.min_qty}）</Status> : v,
             },
             { title: '装机数', dataIndex: 'qty_installed', width: 90, align: 'right' },
             {
@@ -227,11 +248,23 @@ export default function Service() {
     <>
       <WorkbenchPage
         board={SERVICE_BOARD}
-        sub={`未关闭 ${c?.open ?? 0} 单 · 待受理 ${c?.wait ?? 0} · 处理中 ${c?.in_progress ?? 0} · 待客户签字 ${c?.to_sign ?? 0}`}
+        sub={
+          // ★ 方向 2 ①：异常优先（待受理是唯一“客户在等”的），没事才报未关闭 / 备件
+          (c?.wait ?? 0) > 0
+            ? `有 ${c?.wait} 单等你受理`
+            : (c?.open ?? 0) > 0
+              ? `未关闭 ${c?.open} 单（处理中 ${c?.in_progress} · 待客户签字 ${c?.to_sign}）`
+              : (c?.low_parts ?? 0) > 0
+                ? `没有未关闭工单 · ${c?.low_parts} 种备件低库存`
+                : '没有未关闭工单'
+        }
         help="报修受理 → 派工 → 到场 → 处理（备件更换）→ 客户签字 → 关闭；报修时自动判定这台设备在保 / 过保。"
         actions={
           <>
-            {(c?.low_parts ?? 0) > 0 && <Chip tone="err">备件低库存 {c?.low_parts}</Chip>}
+            {/* ★ 精调（2026-10-05）：台头 actions 只留**能按下去的动作**。
+                 原来这里摆的是“缺货 3 种 / 到货超期 N / 有风险 N”这类**纯计数**——
+                 而结论条里已经有同一个数（而且**可点**，点了直接切到那个队列）。
+                 同一批数在一个页上出现两次，是“看着毛”的头号来源（实测 5 个台都有）。 */}
             <Button size="small" onClick={() => void load()}>
               刷新
             </Button>
@@ -239,7 +272,8 @@ export default function Service() {
         }
         counts={{ orders: wb?.orders.length ?? 0, parts: partsList.length }}
         metrics={[
-          { key: 'wait', label: '待受理', value: c?.wait ?? 0, unit: '单', tone: c?.wait ? 'err' : undefined, dimZero: true, to: '?tab=orders' },
+          // ★ 方向 2 ② 主角指认：售后台主角 = **待受理**：客户已经报修了、还没人接 —— 最该马上有人动的就是它。（ds `MetricItem.lead`）
+          { key: 'wait', label: '待受理', value: c?.wait ?? 0, unit: '单', tone: c?.wait ? 'err' : undefined, dimZero: true, to: '?tab=orders', lead: true },
           { key: 'run', label: '处理中', value: c?.in_progress ?? 0, unit: '单', dimZero: true, to: '?tab=orders' },
           { key: 'sign', label: '待客户签字', value: c?.to_sign ?? 0, unit: '单', dimZero: true, to: '?tab=orders' },
           { key: 'part', label: '备件低库存', value: c?.low_parts ?? 0, unit: '种', tone: c?.low_parts ? 'warn' : undefined, dimZero: true, to: '?tab=parts' },

@@ -109,7 +109,7 @@ export default function Changes() {
         loading={loading}
         dataSource={rows}
         columns={columns}
-        pagination={{ pageSize: 20, showSizeChanger: false }}
+        pagination={{ pageSize: 10, showSizeChanger: true }}
       />
       <Typography.Paragraph type="secondary" style={{ fontSize: 12, marginTop: 12 }}>
         冻结后要动，必须提改版申请：总监裁决（否决必须给替代方案）→ 下发改版任务 →

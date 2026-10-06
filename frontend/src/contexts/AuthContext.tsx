@@ -17,15 +17,11 @@ interface AuthValue {
   session: Session | null
   user: User | null
   token: string | null
-  impersonateName: string | null
-  isImpersonating: boolean
   /** 登录成功写入 session；失败 reject（由页面 catch 出 toast） */
   login: (username: string, password: string) => Promise<User>
   logout: () => void
   /** 拉 /auth/me 刷新用户与权限（岗位/角色变更后调它） */
   refreshMe: () => Promise<User | null>
-  startImpersonate: (id: number, name: string) => void
-  stopImpersonate: () => void
 }
 
 const AuthContext = createContext<AuthValue | null>(null)
@@ -63,30 +59,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
-  const startImpersonate = useCallback((id: number, name: string) => {
-    const next = patchSession({ impersonateId: id, impersonateName: name })
-    setSession(next)
-    // 整页刷新：让全站数据按被查看者身份重取（与原行为一致）
-    window.location.href = '/workbench'
-  }, [])
-
-  const stopImpersonate = useCallback(() => {
-    const next = patchSession({ impersonateId: undefined, impersonateName: undefined })
-    setSession(next)
-    window.location.href = '/admin/users'
-  }, [])
-
   const value: AuthValue = {
     session,
     user: session?.user ?? null,
     token: session?.token ?? null,
-    impersonateName: session?.impersonateName ?? null,
-    isImpersonating: session?.impersonateId !== undefined,
     login,
     logout,
     refreshMe,
-    startImpersonate,
-    stopImpersonate,
   }
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }

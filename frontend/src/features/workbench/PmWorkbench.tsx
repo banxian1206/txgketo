@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from 'react'
 
 import { errMsg, pmBoard, workbenchMe, type PmBoard, type PmProjectRow, type WorkbenchMe } from '../../api/client'
 import AcceptancePage from '../acceptance/Page'
-import { Chip, Panel, Status } from '../../components/ds'
+import { Chip, Empty, Panel, Status } from '../../components/ds'
 import WorkbenchPage from '../../components/domain/WorkbenchPage'
 import { PM_BOARD } from '../../configs/boards'
 import { PROJECT_STAGE as STAGE_COLOR, toneOf } from '../../theme/status'
@@ -112,12 +112,19 @@ export default function PmWorkbench() {
       {/* ★ docs/15 台骨架四件套：台头 → 结论条 → 流程条（注册表驱动）→ 体 */}
       <WorkbenchPage
         board={PM_BOARD}
-        sub={`我负责 ${s?.projects ?? 0} 个项目 · 缺料 ${s?.shortage ?? 0} 项 · 在途采购 ${s?.in_transit ?? 0} 项`}
+        sub={
+          // ★ 方向 2 ①：异常优先（风险 / 超期），没事才说“几个项目 · 缺几项料”
+          (s?.at_risk ?? 0) > 0 || (s?.overdue_tasks ?? 0) > 0
+            ? `${(s?.at_risk ?? 0) > 0 ? `${s?.at_risk} 个项目有风险` : ''}${(s?.at_risk ?? 0) > 0 && (s?.overdue_tasks ?? 0) > 0 ? ' · ' : ''}${(s?.overdue_tasks ?? 0) > 0 ? `${s?.overdue_tasks} 项任务超期` : ''}`
+            : `我负责 ${s?.projects ?? 0} 个项目 · 缺料 ${s?.shortage ?? 0} 项`
+        }
         help="这里看全链进度与风险；具体动作去对应的工作台（设计 / 采购 / 仓库 / 车间 / 发运）。"
         actions={
           <>
-            {(s?.at_risk ?? 0) > 0 && <Chip tone="err">有风险 {s?.at_risk}</Chip>}
-            {(s?.overdue_tasks ?? 0) > 0 && <Chip tone="warn">超期任务 {s?.overdue_tasks}</Chip>}
+            {/* ★ 精调（2026-10-05）：台头 actions 只留**能按下去的动作**。
+                 原来这里摆的是“缺货 3 种 / 到货超期 N / 有风险 N”这类**纯计数**——
+                 而结论条里已经有同一个数（而且**可点**，点了直接切到那个队列）。
+                 同一批数在一个页上出现两次，是“看着毛”的头号来源（实测 5 个台都有）。 */}
             <Button size="small" onClick={() => void load()}>
               刷新
             </Button>
@@ -128,9 +135,10 @@ export default function PmWorkbench() {
         }
         counts={{ board: s?.projects ?? 0 }}
         metrics={[
+          // ★ 方向 2 ② 主角指认：PM 台主角 = **缺料（待采购）**：PM 天天盯的就是“缺什么、谁在买”，它一动就卡整个交期。（ds `MetricItem.lead`）
           { key: 'r', label: '有风险项目', value: s?.at_risk ?? 0, unit: '个', tone: s?.at_risk ? 'err' : undefined, note: '交期 / 缺料 / 卡点', dimZero: true, to: '?tab=board' },
           { key: 'ot', label: '超期任务', value: s?.overdue_tasks ?? 0, unit: '项', tone: s?.overdue_tasks ? 'err' : undefined, dimZero: true, to: '?tab=board' },
-          { key: 'sh', label: '缺料（待采购）', value: s?.shortage ?? 0, unit: '项', tone: s?.shortage ? 'warn' : undefined, dimZero: true, to: '?tab=board' },
+          { key: 'sh', label: '缺料（待采购）', value: s?.shortage ?? 0, unit: '项', tone: s?.shortage ? 'warn' : undefined, dimZero: true, to: '?tab=board', lead: true },
           { key: 'it', label: '在途采购', value: s?.in_transit ?? 0, unit: '项', dimZero: true, to: '?tab=board' },
           { key: 'p', label: '我负责的项目', value: s?.projects ?? 0, unit: '个', dimZero: true, to: '?tab=board' },
         ]}
@@ -145,7 +153,10 @@ export default function PmWorkbench() {
                 size="small"
                 dataSource={data?.projects ?? []}
                 columns={columns}
-                pagination={{ pageSize: 15, showSizeChanger: false }}
+                pagination={{ pageSize: 10, showSizeChanger: true }}
+                // ★ 走查 2026-10-05：漏写 emptyText → 空时露 antd 灰插图 + 「暂无数据」
+                //   （护栏 SHELL-台骨架四件套 的「每张表都要说空话」当场抓到的）
+                locale={{ emptyText: <Empty text="我负责的项目都还没立项 —— 商机成交后会自动出现在这里。" /> }}
               />
             </Panel>
           )

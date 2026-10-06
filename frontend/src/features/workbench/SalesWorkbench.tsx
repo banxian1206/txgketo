@@ -42,7 +42,7 @@ export default function SalesWorkbench() {
             rowKey="project_no"
             size="small"
             dataSource={data?.projects ?? []}
-            pagination={{ pageSize: 15, showSizeChanger: false }}
+            pagination={{ pageSize: 10, showSizeChanger: true }}
             onRow={(r) => ({ onClick: () => go(`/projects/${r.project_no}`), style: { cursor: 'pointer' } })}
             columns={[
               { title: '项目号', dataIndex: 'project_no', width: 110 },
@@ -96,12 +96,21 @@ export default function SalesWorkbench() {
       {/* ★ docs/15 台骨架四件套：台头 → 结论条 → 流程条（注册表驱动）→ 体 */}
       <WorkbenchPage
         board={SALES_BOARD}
-        sub={`我负责 ${s?.my_leads ?? 0} 条线索 · ${s?.executing ?? 0} 个在执行 / 交付 · ${s?.payments_due ?? 0} 个待回款节点`}
+        sub={
+          // ★ 方向 2 ①：只说现状 + 异常（异常在前）。原来把结论条的 5 个数摊开成一句着不住的话。
+          (s?.payments_overdue ?? 0) > 0
+            ? `有 ${s?.payments_overdue} 个回款节点已逾期`
+            : (s?.payments_due ?? 0) > 0
+              ? `有 ${s?.payments_due} 个回款节点到期`
+              : `我负责 ${s?.my_leads ?? 0} 条线索 · ${s?.executing ?? 0} 个在执行 / 交付 · ${s?.warranty ?? 0} 个在质保`
+        }
         help="这里只看我负责的商机与回款。签约、立项、回款登记都在项目详情里做。"
         actions={
           <>
-            {(s?.payments_overdue ?? 0) > 0 && <Chip tone="err">回款逾期 {s?.payments_overdue}</Chip>}
-            {(s?.overdue_followup ?? 0) > 0 && <Chip tone="warn">跟进超期 {s?.overdue_followup}</Chip>}
+            {/* ★ 精调（2026-10-05）：台头 actions 只留**能按下去的动作**。
+                 原来这里摆的是“缺货 3 种 / 到货超期 N / 有风险 N”这类**纯计数**——
+                 而结论条里已经有同一个数（而且**可点**，点了直接切到那个队列）。
+                 同一批数在一个页上出现两次，是“看着毛”的头号来源（实测 5 个台都有）。 */}
             <Button size="small" onClick={() => void load()}>
               刷新
             </Button>
@@ -112,9 +121,10 @@ export default function SalesWorkbench() {
         }
         counts={{ projects: data?.projects?.length ?? 0, payments: data?.payments?.length ?? 0 }}
         metrics={[
+          // ★ 方向 2 ② 主角指认：商务部台主角 = **待回款节点**：回款是商务的命门，也是唯一“今天不做就往后拖”的事。（ds `MetricItem.lead`）
           { key: 'overdue', label: '回款逾期', value: s?.payments_overdue ?? 0, unit: '个', tone: s?.payments_overdue ? 'err' : undefined, dimZero: true, to: '?tab=payments' },
           { key: 'follow', label: '跟进超期', value: s?.overdue_followup ?? 0, unit: '个', tone: s?.overdue_followup ? 'warn' : undefined, dimZero: true, to: '?tab=projects' },
-          { key: 'pay', label: '待回款节点', value: s?.payments_due ?? 0, unit: '个', dimZero: true, to: '?tab=payments' },
+          { key: 'pay', label: '待回款节点', value: s?.payments_due ?? 0, unit: '个', dimZero: true, to: '?tab=payments', lead: true },
           { key: 'initiate', label: '待立项', value: s?.to_initiate ?? 0, unit: '个', dimZero: true, to: '?tab=projects' },
           { key: 'leads', label: '商机（线索）', value: s?.my_leads ?? 0, unit: '条', dimZero: true, to: '?tab=projects' },
         ]}

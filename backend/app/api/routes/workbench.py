@@ -45,9 +45,16 @@ WORKBENCHES: list[dict] = [
     #   ⚠ 原 delivery 台 route=/delivery，而 /delivery 的 index 是 Navigate to mfg ——
     #     发运角色点自己的台会落进【制造页】并吃 403（无 mfg:view）。这就是那次实测故障的根因。
     #   名字统一「XX工作台」（D）。
-    {"key": "mine", "name": "我的工作台", "route": "/workbench", "roles": None},
-    # ★ 00 卷 §2.1 对总经理的承诺：「在手订单/交付风险/项目毛利/售后质量，一屏看完」
-    #   —— 经营决策与财务可见（他俩有 project:amount / cost:view）
+    #
+    # ★★ 2026-10-05 客户拍板：**「我的工作台」这个入口取消**。
+    #   理由（客户原话，勿再翻案）：它是“按员工视角”做的一套收件箱（我的任务/待我审/待我改版…），
+    #   与各部门台**内容重叠**（实测 wh1：我的工作台「待验收 10」= 仓库台「待验收 10」），
+    #   于是同一批事有两个入口；而它**不含任何按岗位分层的视角** —— 总监进去看到的也是组员那一层。
+    #   现在改为：**每个台 = 我的任务 + 我要看到的**，按岗位分层（组员/经理/总监默认落点与页签顺序不同）。
+    #   `me_tasks` 那一批（Task.owner_id=我）随页面一起搬进工程部台（实测库里未完成任务全是工程任务，
+    #   制造/采购/仓库/现场的活不走 Task 表，所以**不丢功能**）。
+    # ⚠ 三个子页（/workbench/tasks|reviews|changes）**保留**为纯落地页（站内消息 link 都指它），
+    #   但不再出现在台条/侧栏里（见 frontend `configs/domain.tsx`）。
     {"key": "gm", "name": "经营驾驶舱", "route": "/dashboard", "roles": ("GM", "FIN")},
     {"key": "sales", "name": "商务部工作台", "route": "/workbench/sales", "roles": ("SALES", "SCHEME")},
     {"key": "pm", "name": "项目经理工作台", "route": "/workbench/pm", "roles": ("PM",)},
@@ -78,10 +85,15 @@ def _my_project_nos(session: Session, user: User) -> list[str]:
 
 
 def _visible(session: Session, user: User) -> set[str]:
+    """我该看到的台。
+
+    ★ 2026-10-05：原来无条件 `out = {"mine"}`（人人可见我的工作台）—— 那个入口已取消，
+    现在**完全由角色码决定**；一个台都不匹配的人看到空台条（而不是被塞一个不属于他的台）。
+    """
     if user.is_superuser:
         return {w["key"] for w in WORKBENCHES}
     codes = {r.code for r in user.roles}
-    out = {"mine"}
+    out: set[str] = set()
     for w in WORKBENCHES:
         if w["roles"] and codes & set(w["roles"]):
             out.add(w["key"])
@@ -290,6 +302,9 @@ def sales_board(session: Session = Depends(get_session), current: User = Depends
             "my_leads": stage_count.get("线索", 0),
             "to_initiate": stage_count.get("成交待立项", 0),
             "executing": sum(v for k, v in stage_count.items() if k in ("执行中", "交付中")),
+            # ★ 2026-10-05 走查：台头只报「线索 / 执行中 / 待回款」→ 商务部台首屏说
+            #   「0 条线索 · 0 个在执行」，下面台账里却躺着 2 个**质保中**的项目，口径对不上。
+            "warranty": sum(v for k, v in stage_count.items() if k in ("质保", "已归档")),
             "overdue_followup": sum(1 for r in rows if r["overdue_follow"]),
             "payments_due": len(payments),
             "payments_overdue": sum(1 for x in payments if x["overdue"]),

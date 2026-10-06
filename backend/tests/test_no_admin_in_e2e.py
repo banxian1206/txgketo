@@ -28,7 +28,7 @@ _TARGETS = [
 # 把 admin 当「操作人」传： "admin" / 'admin' 出现在实参位置
 _AS_ACTOR = re.compile(r"""["']admin["']""")
 # 允许：登录帮助函数里的比较 / 口令常量 / 已带标记 / CSS 选择器（input[placeholder="admin"]）
-_ALLOW = re.compile(r'''==\s*["']admin["']|admin-ok|admin12345\s*if|placeholder=''')
+_ALLOW = re.compile(r'''==\s*["']admin["']|admin-ok|txgk@123\s*if|placeholder=''')
 
 
 def test_测试脚本不得把admin当操作人():

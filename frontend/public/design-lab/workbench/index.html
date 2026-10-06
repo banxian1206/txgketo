@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<title>工作台观感 · 三个方向（2026-10-05 · 同一批真数据）</title>
+<style>
+  :root{--bg:#f5f6f8;--surface:#fff;--line:#e6e8ec;--ink:#14161a;--ink2:#575f6b;--ink3:#8a929e;--acc:#1f5fd0;--warn:#c2410c;}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font:400 14px/1.65 -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;background:var(--bg);color:var(--ink);-webkit-font-smoothing:antialiased}
+  .hero{background:linear-gradient(140deg,#0f2b52,#16375f 60%,#1a4272);color:#fff;padding:34px 40px 30px}
+  .hero .in{max-width:1280px;margin:0 auto}
+  .hero .k{font:500 11px/1 ui-monospace,monospace;letter-spacing:2px;opacity:.6;margin-bottom:10px}
+  .hero h1{font-size:25px;font-weight:600;letter-spacing:-.4px;margin-bottom:8px}
+  .hero p{font-size:14px;opacity:.8;max-width:820px}
+  .hero .warn{margin-top:12px;padding:9px 13px;background:rgba(255,180,84,.16);border:1px solid rgba(255,180,84,.4);border-radius:8px;font-size:13px;color:#ffd9a3;max-width:880px}
+  .wrap{max-width:1280px;margin:0 auto;padding:26px 40px 70px}
+  h2{font-size:17px;font-weight:600;margin:30px 0 4px;letter-spacing:-.2px}
+  h2:first-of-type{margin-top:0}
+  p.sub{font-size:13px;color:var(--ink2);margin-bottom:16px;max-width:900px}
+  table{width:100%;border-collapse:collapse;background:#fff;border:1px solid var(--line);border-radius:10px;overflow:hidden;font-size:13px}
+  th{background:#f7f8fa;text-align:left;padding:10px 12px;font-weight:500;color:#5b6472;font-size:12px;border-bottom:1px solid var(--line)}
+  td{padding:10px 12px;border-bottom:1px solid #eef0f3;vertical-align:top}
+  tr:last-child td{border-bottom:0}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+  @media(max-width:1100px){.grid{grid-template-columns:1fr}}
+  .shot{background:#fff;border:1px solid var(--line);border-radius:10px;overflow:hidden;box-shadow:0 1px 2px rgba(16,24,40,.04)}
+  .shot .cap{padding:10px 14px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:8px}
+  .shot .cap b{font-size:14px;font-weight:600}
+  .shot .cap span{font-size:12px;color:var(--ink3)}
+  .shot img{width:100%;display:block}
+  .tag{font:500 11px/1 ui-monospace,monospace;padding:3px 7px;border-radius:4px;background:#eef4ff;color:var(--acc)}
+  .tag.base{background:#f0f1f3;color:var(--ink2)}
+  ul{margin:8px 0 0 18px;font-size:13px;color:var(--ink2)} li{margin:3px 0}
+  b.k{color:var(--warn)}
+  code{font:12px ui-monospace,monospace;background:#f0f1f3;padding:1px 5px;border-radius:4px}
+</style>
+</head>
+<body>
+<div class="hero"><div class="in">
+  <div class="k">TXGK · WORKBENCH VISUAL DIRECTION · 2026-10-05</div>
+  <h1>工作台观感 · 三个方向（同一批真数据、同一页面对比）</h1>
+  <p>四个页面（仓库台 / 采购台 / 车间看板 / 我的工作台）× 四个版本（现状 + 三个方向）。<b>全部是真实运行中的系统截图</b>，不是设计稿 —— 三个方向是用样式覆盖在真页面上截的，所以密度、数据量、真空态都在。</p>
+  <div class="warn"><b>先说一个背景事实：</b>10-04 客户选定「方案 A 纸面」时，样机里只有<b>收件箱 / 项目列表 / 项目详情</b>三个页面 —— <b>9 个工作台一页都没在样机里</b>。所以 A 在工作台上从来没被验证过，这次是第一次。</div>
+  <div class="hero" style="padding:22px 40px 20px;background:linear-gradient(120deg,#0f7a52,#12905f)">
+    <div class="in"><div style="font-size:19px;font-weight:600;margin-bottom:4px">✓ 已选定：方向 2「结论优先」—— 已落地到生产代码</div>
+    <p style="opacity:.92;margin:0">已落地三条：<b>①台头只说现状</b>（长流程说明进 ? 气泡）· <b>②结论条 1 主 4 次</b>（32px 主角 + 20px 其余，页面显式指认）· <b>③队列行左侧 3px 状态色条</b>。实测<b>页高代价 0px</b>。下方 <a href="#after" style="color:#b9f2d8">「已落地实拍」</a> 链接可看真实系统里的效果。</p></div>
+  </div>
+</div></div>
+
+<div class="wrap">
+
+<h2>一、为什么"看着不舒服"——体检数据（13 页实测）</h2>
+<p class="sub">不是主观印象。把每页每个元素的 computed style 统计了一遍，跟视觉规范的刻度对账：</p>
+<table>
+<tr><th style="width:150px">维度</th><th style="width:190px">规范定的</th><th>实测</th><th style="width:230px">造成的观感</th></tr>
+<tr><td>内边距</td><td>8px 刻度</td><td><b>14 种</b>不同组合</td><td>边距对不齐 → <b>糙</b></td></tr>
+<tr><td>圆角</td><td>3 档</td><td><b>6 种</b>（含 2px / 100px / 999px 逃逸值）</td><td>圆角不统一 → <b>糙</b></td></tr>
+<tr><td>字号</td><td>6 档刻度</td><td>8 种（13.33px / 13.5px 是<b>逃逸值</b>）</td><td>字号有零头 → <b>糙</b></td></tr>
+<tr><td>字重</td><td>400 + 600</td><td><b>4 种</b>（多了 500 / 700）</td><td>主次不明 → <b>平</b></td></tr>
+<tr><td>结论条</td><td>≤5 个数</td><td>5 个数<b>全部 24px、等大等权</b></td><td>没有主角 → <b>平</b></td></tr>
+<tr><td>颜色</td><td>颜色只给异常</td><td>全站唯一的色彩是<b>选中态的蓝</b>；队列行没有状态色</td><td>扫不出状态 → <b>闷</b></td></tr>
+<tr><td>留白</td><td>一屏内</td><td>5 页底部空白 &gt;250px（车间看板 <b>465px</b>）；3 页反过来超屏 76–119px</td><td>要么空、要么挤 → <b>散</b></td></tr>
+<tr><td>台头</td><td>一句话现状</td><td>台名 + <b>一长串流程说明</b>（工程台 40 字）</td><td>第一屏没回答"今天干什么"</td></tr>
+</table>
+
+<h2>二、三个方向（点开图看）</h2>
+
+<h2>方向 1 · 刻度收敛</h2>
+<p class="sub">只把落地率拉满：内距归 4 档、圆角归 3 档、字号归刻度、字重归 2 档、字色归中性色板。<b>不动任何结构</b>。解决「糙」。</p>
+<div class="grid">
+  <div class="shot"><div class="cap"><span class="tag base">现状</span><b>仓库工作台</b><span>5 个数等大、队列行无色条、边距各写各的</span></div><img src="shots/仓库工作台-0-现状.png" alt=""></div>
+  <div class="shot"><div class="cap"><span class="tag">方向 1</span><b>仓库工作台</b><span>整齐了，但仍然"平"：5 个数还是一样大</span></div><img src="shots/仓库工作台-1-刻度收敛.png" alt=""></div>
+</div>
+<p class="sub" style="margin-top:10px"><b class="k">代价</b> 1 天，零结构风险。<b class="k">不解决</b> 「平 / 闷 / 散」—— 结构没动，主次和状态色都还在原地。适合当<strong>地基</strong>而不是终点。</p>
+
+<h2>方向 2 · 结论优先<span class="tag" style="margin-left:8px">推荐</span></h2>
+<p class="sub">改<strong>壳</strong>（9 个台共用 <code>WorkbenchPage</code> + <code>components/ds</code> 六壳，改一处 9 个台同步受益）：台头加主色竖条、长说明进 <code>?</code>；结论条改成 <b>1 主 4 次</b>（第一个 34px 主色）；队列行加 <b>3px 状态色条</b>并卡片化；面与面用底色分层（纸面 A 说"层级靠描边+背景分层"，之前没用足）。</p>
+<div class="grid">
+  <div class="shot"><div class="cap"><span class="tag base">现状</span><b>仓库工作台</b></div><img src="shots/仓库工作台-0-现状.png" alt=""></div>
+  <div class="shot"><div class="cap"><span class="tag">方向 2</span><b>仓库工作台</b><span>有主角、有状态色、块块分明</span></div><img src="shots/仓库工作台-2-结论优先.png" alt=""></div>
+  <div class="shot"><div class="cap"><span class="tag base">现状</span><b>采购工作台</b></div><img src="shots/采购工作台-0-现状.png" alt=""></div>
+  <div class="shot"><div class="cap"><span class="tag">方向 2</span><b>采购工作台</b></div><img src="shots/采购工作台-2-结论优先.png" alt=""></div>
+  <div class="shot"><div class="cap"><span class="tag base">现状</span><b>我的工作台</b></div><img src="shots/我的工作台-0-现状.png" alt=""></div>
+  <div class="shot"><div class="cap"><span class="tag">方向 2</span><b>我的工作台</b></div><img src="shots/我的工作台-2-结论优先.png" alt=""></div>
+</div>
+<p class="sub" style="margin-top:10px"><b class="k">代价</b> 约 1 周（壳为主，9 个台同步受益；工程部台「部门看板」那块旧壳要一起收）。<b class="k">风险</b> 中低 —— 不动数据结构、不动接口。<b class="k">不解决</b> 空台 465px 空白（那是内容问题，得靠"空态给下一步"，属另一轮）。</p>
+
+<h2>方向 3 · 墨蓝高对比</h2>
+<p class="sub">台头 + 结论条整块深色（样机 B「墨蓝 Console」的基因），队列行首 3px 主色条。视觉冲击最强、最"像生产系统"、扫读最快。</p>
+<div class="grid">
+  <div class="shot"><div class="cap"><span class="tag">方向 3</span><b>仓库工作台</b><span>深色块占首屏 1/3</span></div><img src="shots/仓库工作台-3-墨蓝高对比.png" alt=""></div>
+  <div class="shot"><div class="cap"><span class="tag">方向 3</span><b>我的工作台</b></div><img src="shots/我的工作台-3-墨蓝高对比.png" alt=""></div>
+</div>
+<p class="sub" style="margin-top:10px"><b class="k">代价</b> 1–2 周，且要推翻 10-04 已定的 A 方向（客户当时点的就是 A）。<b class="k">我的判断</b>：深色台头每天盯 8 小时偏压迫，且和工作台"长时间盯一片队列"的场景不太合；<strong>更适合驾驶舱/大屏那种"看一眼就走"的页面</strong> —— 建议只在那里用，不全站换。</p>
+
+<h2>三、建议</h2>
+<ul>
+  <li><b>方向 1 当地基</b>（1 天，任何方向都要做）→ <b>方向 2 为主体</b>（1 周）→ <b>方向 3 只留给驾驶舱</b>。</li>
+  <li>方向 2 需要客户点头的只有一件事：<b>台头不再放长说明流程文字</b>（挪进 <code>?</code>）—— 这是“第一屏先给结论”的代价。</li>
+  <li>这一轮只解决“<b>看得下去</b>”。“用起来顺不顺”是另一件事（页高、入口、空台留白），单列一轮做，别混在一起改。</li>
+</ul>
+
+<h2 id="after">四、已落地实拍（生产代码，2026-10-05）</h2>
+<p class="sub">下面是<b>方向 2 真的落进代码之后</b>的系统实拍，可与上方「方向 2」原型图对比。
+两处<b>有意没做原型里那版</b>：① 队列行<b>不卡片化</b>（每行 +14px，5 行 +70px，而页高已被客户骂过）；
+② <b>不给整队列上色</b>（5 行同色连成一条长线 = 等于没上）—— 只给“与其他不同”的行。</p>
+<div class="grid">
+  <div class="shot"><div class="cap"><span class="tag">已落地</span><b>仓库工作台</b><span>主角=待验收；色条只给差异行</span></div><img src="shots-after/仓库工作台-已落地.png" alt=""></div>
+  <div class="shot"><div class="cap"><span class="tag">已落地</span><b>工程部工作台</b><span>40 字流程叙述已进 ? 气泡</span></div><img src="shots-after/工程部工作台-已落地.png" alt=""></div>
+  <div class="shot"><div class="cap"><span class="tag">已落地</span><b>采购工作台</b><span>主角=待我审批</span></div><img src="shots-after/采购工作台-已落地.png" alt=""></div>
+  <div class="shot"><div class="cap"><span class="tag">已落地</span><b>售后工作台</b><span>按阶段上色：待受理=红/待签=橙/在修=蓝</span></div><img src="shots-after/售后工作台-已落地.png" alt=""></div>
+  <div class="shot"><div class="cap"><span class="tag">已落地</span><b>车间台·看板</b><span>主角=待下发</span></div><img src="shots-after/车间台·看板-已落地.png" alt=""></div>
+  <div class="shot"><div class="cap"><span class="tag">已落地</span><b>我的工作台</b><span>主角=我的任务</span></div><img src="shots-after/我的工作台-已落地.png" alt=""></div>
+</div>
+<p class="sub" style="margin-top:10px"><b>护栏</b> <code>SHELL2-方向2结论优先</code>：每个台的结论条有且只有一个 <code>lead</code> · 台头 <code>sub</code> 里不出现流程动作词 · 壳支持 <code>tone</code> 且至少两个台真在用。<b>两条反例已注入自证能红</b>（护栏写了三次才对：搜<code>→</code>假阳性 → 量字面量错 → 改成流程动作词）。</p>
+
+</div>
+</body>
+</html>

@@ -233,7 +233,7 @@ export default function PriceReferencePanel() {
               rowKey="id"
               size="small"
               dataSource={price.quotes}
-              pagination={{ pageSize: 10, showSizeChanger: false }}
+              pagination={{ pageSize: 10, showSizeChanger: true }}
               locale={{ emptyText: <Empty description="还没有报价" /> }}
               columns={[
                 { title: '日期', dataIndex: 'quote_date', width: 110, render: date },

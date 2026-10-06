@@ -122,6 +122,8 @@ export interface SalesBoard {
     my_leads: number
     to_initiate: number
     executing: number
+    /** 质保 + 已归档（台头要一并报，否则“我负责 0 个在执行”与台账里的质保项目对不上） */
+    warranty: number
     overdue_followup: number
     payments_due: number
     payments_overdue: number

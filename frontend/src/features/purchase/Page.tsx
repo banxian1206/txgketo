@@ -1,9 +1,9 @@
-import {Chip, Code, Status, Empty as DsEmpty } from '../../components/ds'
+import { Chip, Code, Status, Empty as DsEmpty } from '../../components/ds'
 import QueueBoard from '../../components/ds/QueueBoard'
 import WorkbenchPage from '../../components/domain/WorkbenchPage'
 import { PURCHASE_BOARD } from '../../configs/boards'
 import { Muted } from '../../components/ui/Primitives'
-import { App, Button, Space, Table, Tag, Typography } from 'antd'
+import { App, Button, Space, Table, Typography } from 'antd'
 import dayjs from 'dayjs'
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import SuppliersPage from './SuppliersPage'
@@ -191,37 +191,41 @@ export default function PurchaseWorkbench() {
     ),
     pool: (
       <>
-        <Typography.Paragraph type="secondary" style={{ fontSize: 12 }}>
-          <b>先查仓库 → 缺的进池 → 攒一攒合并下单</b>
-          。各设计小组下单节点不一样，但东西大差不差：勾选同类物料一起买，
-          量大了价格才好谈，供应商也愿意一次送。手工申请（车间耗品/现场缺件/辅料）免审核，提交即进池。
-        </Typography.Paragraph>
-        <Space style={{ marginBottom: 12 }} wrap>
-          <Button
-            type="primary"
-            disabled={selected.length === 0 || !canBuy}
-            title={selected.length === 0 ? '先在下面勾选要合并下单的物料行' : '把勾选的物料合并成一张采购单'}
-            onClick={() => setMergeOpen(true)}
-          >
-            合并下单
-            {selected.length > 0 ? `（${selected.length} 种 / ${selectedLines} 条）` : ''}
-          </Button>
-          {selected.length > 0 && (
-            <Button type="link" onClick={() => setSelected([])}>
-              清空选择
+        {/* ★ 精调（2026-10-05）：原来这里是一整段 60 字的采购方法论（“先查仓库 → 缺的进池 → 攒一攒
+            合并下单……”），在页面上占两行、把表格压到首屏之外。**方法论进 ? 气泡**，
+            页面上只留一句“怎么办”（能扫一眼就懂的那种）。 */}
+        {/* 精调：说明 + 批量动作收成**一条**工具条（原来散成两行、还说了两遍同一句话） */}
+        <div className="ds-q-bar">
+          <div className="l">
+            <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+              勾同类物料一起买，量大价才好谈；只有一条需求时点行尾「去下单」。
+            </Typography.Text>
+          </div>
+          <div className="r">
+            {selected.length > 0 && (
+              <Button size="small" type="text" onClick={() => setSelected([])}>
+                清空选择
+              </Button>
+            )}
+            <Button
+              type="primary"
+              size="small"
+              disabled={selected.length === 0 || !canBuy}
+              title={selected.length === 0 ? '先在下面勾选要合并下单的物料行' : '把勾选的物料合并成一张采购单'}
+              onClick={() => setMergeOpen(true)}
+            >
+              合并下单
+              {selected.length > 0 ? `（${selected.length} 种 / ${selectedLines} 条）` : ''}
             </Button>
-          )}
-          <Button onClick={() => setManualOpen(true)}>手工申请</Button>
-          <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-            单个物料只有一条需求时，点行尾「去下单」即可。
-          </Typography.Text>
-        </Space>
+            <Button size="small" onClick={() => setManualOpen(true)}>手工申请</Button>
+          </div>
+        </div>
         <Table<PurchasePoolGroup>
           rowKey="item_no"
           size="middle"
           loading={loading}
           dataSource={pool}
-          pagination={{ pageSize: 20, showSizeChanger: false }}
+          pagination={{ pageSize: 10, showSizeChanger: true }}
           scroll={{ x: 960 }}
           rowSelection={{
             selectedRowKeys: selected,
@@ -256,7 +260,7 @@ export default function PurchaseWorkbench() {
                           </div>
                         </>
                       ) : (
-                        <Tag color="blue">{r.attribution ?? '公司级'}</Tag>
+                        <Status tone="run">{r.attribution ?? '公司级'}</Status>
                       ),
                   },
                   {
@@ -290,7 +294,7 @@ export default function PurchaseWorkbench() {
                       <>
                         <Space size={4}>
                           <span>{v ?? '—'}</span>
-                          {v && v < today() && <Tag color="red">已过期</Tag>}
+                          {v && v < today() && <Status tone="err">已过期</Status>}
                         </Space>
                         <div style={{ fontSize: 12, color: T.textSecondary }}>
                           周期 {r.lead_days ? `${r.lead_days} 天` : '未配'}
@@ -307,7 +311,7 @@ export default function PurchaseWorkbench() {
                         <>
                           {/* ★ 文案取真实来源（N20：条件已泛化而文案曾写死「退货重采」，
                               会把现场缺件/破损标成仓库退货，责任方与处理动作都不同） */}
-                          <Tag color="orange">{v}</Tag>
+                          <Status tone="warn">{v}</Status>
                           {r.origin_po_no && (
                             <div style={{ fontSize: 12, color: T.textSecondary }}>
                               原 {r.origin_po_no}
@@ -316,7 +320,7 @@ export default function PurchaseWorkbench() {
                         </>
                       ) : (
                         <>
-                          <Tag>{v}</Tag>
+                          <Status>{v}</Status>
                           {r.source_release_no && (
                             <div style={{ fontSize: 12, color: T.textSecondary }}>
                               {r.source_release_no}
@@ -357,7 +361,7 @@ export default function PurchaseWorkbench() {
               render: (_: unknown, g) => (
                 <Space size={4}>
                   <span>{g.request_count} 条</span>
-                  {g.mergeable && <Tag color="gold">★可合并</Tag>}
+                  {g.mergeable && <Status tone="warn">★可合并</Status>}
                 </Space>
               ),
             },
@@ -379,7 +383,7 @@ export default function PurchaseWorkbench() {
               render: (v: string | null) => (
                 <Space size={4}>
                   <span>{v ?? '—'}</span>
-                  {v && v < today() && <Tag color="red">已过期</Tag>}
+                  {v && v < today() && <Status tone="err">已过期</Status>}
                 </Space>
               ),
             },
@@ -428,7 +432,7 @@ export default function PurchaseWorkbench() {
           size="middle"
           loading={loading}
           dataSource={orders}
-          pagination={{ pageSize: 20, showSizeChanger: false }}
+          pagination={{ pageSize: 10, showSizeChanger: true }}
           scroll={{ x: 1180 }}
           locale={{ emptyText: <DsEmpty text="还没有下过采购单" /> }}
           columns={[
@@ -459,12 +463,12 @@ export default function PurchaseWorkbench() {
               render: (_: unknown, o) => (
                 <>
                   {o.projects.map((p) => (
-                    <Tag key={p.project_no}>{p.project_no}</Tag>
+                    <Status key={p.project_no}>{p.project_no}</Status>
                   ))}
                   {o.equipments.map((e) => (
-                    <Tag key={`${e.project_no}-${e.equip_no}`} color="blue">
+                    <Status key={`${e.project_no}-${e.equip_no}`} tone="run">
                       {e.equip_no} {e.equip_name ?? ''}
-                    </Tag>
+                    </Status>
                   ))}
                   {o.equipments.length === 0 && (
                     <Typography.Text type="secondary" style={{ fontSize: 12 }}>
@@ -485,7 +489,7 @@ export default function PurchaseWorkbench() {
                   <Space size={4}>
                     <Muted>{o.expected_date ?? '—'}</Muted>
                     {o.expected_date && o.expected_date < today() && ['在途', '部分到货'].includes(o.status) && (
-                      <Tag color="orange">已超期</Tag>
+                      <Status tone="warn">已超期</Status>
                     )}
                   </Space>
                 </>
@@ -504,15 +508,15 @@ export default function PurchaseWorkbench() {
               width: 95,
               render: (v: string, o) => (
                 <>
-                  <Tag color={ORDER_STATUS_COLOR[v]}>{v}</Tag>
+                  <Status tone={toneOf(ORDER_STATUS_COLOR[v])}>{v}</Status>
                   {o.exchanged_qty > 0 && (
                     <div>
-                      <Tag color="orange">换 {o.exchanged_qty}</Tag>
+                      <Status tone="warn">换 {o.exchanged_qty}</Status>
                     </div>
                   )}
                   {o.returned_qty > 0 && (
                     <div>
-                      <Tag>退 {o.returned_qty}</Tag>
+                      <Status>退 {o.returned_qty}</Status>
                     </div>
                   )}
                 </>
@@ -538,7 +542,7 @@ export default function PurchaseWorkbench() {
       <Table<PurchaseOrderSummary>
         rowKey="key"
         dataSource={arrivals}
-        pagination={{ pageSize: 20, showSizeChanger: false }}
+        pagination={{ pageSize: 10, showSizeChanger: true }}
         locale={{
           emptyText: <DsEmpty text="当前没有在途采购单 —— 下单后到「采购单」页签盯发货，验收后自动流转" />,
         }}
@@ -556,7 +560,7 @@ export default function PurchaseWorkbench() {
             dataIndex: 'deliver_to',
             width: 140,
             render: (v: string | null) =>
-              v ? <Tag color={v.includes('直发') ? 'purple' : 'blue'}>{v}</Tag> : '—',
+              v ? <Status tone={toneOf(v.includes('直发') ? 'cyan' : 'blue')}>{v}</Status> : '—',
           },
           {
             title: '预计到货',
@@ -568,8 +572,10 @@ export default function PurchaseWorkbench() {
             render: (v: string | null) => {
               if (!v) return <Typography.Text type="secondary">未约期</Typography.Text>
               const d = dayjs(v)
-              if (d.isBefore(dayjs(), 'day')) return <span><Tag color="error">超期</Tag>{v}</span>
-              if (d.diff(dayjs(), 'day') <= 3) return <span><Tag color="warning">临期</Tag>{v}</span>
+              // ★ 精调（2026-10-05）：原来 `<Status>超期</Status>{v}` 两个元素**粘在一起**，
+              //   屏幕上读作“超期2026-09-29”。状态与日期之间必须有缝。
+              if (d.isBefore(dayjs(), 'day')) return <span><Status tone="err">超期</Status> <span className="mono">{v}</span></span>
+              if (d.diff(dayjs(), 'day') <= 3) return <span><Status tone="warn">临期</Status> <span className="mono">{v}</span></span>
               return v
             },
           },
@@ -593,7 +599,7 @@ export default function PurchaseWorkbench() {
             title: '状态',
             dataIndex: 'status',
             width: 100,
-            render: (v: string) => <Tag color={ORDER_STATUS_COLOR[v] ?? 'default'}>{v}</Tag>,
+            render: (v: string) => <Status tone={toneOf(ORDER_STATUS_COLOR[v] ?? 'default')}>{v}</Status>,
           },
         ]}
       />
@@ -639,7 +645,7 @@ export default function PurchaseWorkbench() {
       <>
         <Typography.Paragraph type="secondary" style={{ fontSize: 12 }}>
           验收不合格后采购跟供应商协商的结果都留在这里：
-          <Tag color="orange">换货</Tag>＝原供应商补发；<Tag>退货</Tag>＝需求已回采购池重采（看「后续」列）。
+          <Status tone="warn">换货</Status>＝原供应商补发；<Status>退货</Status>＝需求已回采购池重采（看「后续」列）。
           每条都带着仓库验收的不合格原因、采购的协商备注，以及验收人和处理人。
         </Typography.Paragraph>
         <Table<GoodsReceiptRow>
@@ -647,7 +653,7 @@ export default function PurchaseWorkbench() {
           size="middle"
           loading={loading}
           dataSource={resolveReceipts}
-          pagination={{ pageSize: 20, showSizeChanger: false }}
+          pagination={{ pageSize: 10, showSizeChanger: true }}
           scroll={{ x: 1640 }}
           locale={{ emptyText: <DsEmpty text="还没有换货 / 退货记录" /> }}
           columns={[
@@ -715,7 +721,7 @@ export default function PurchaseWorkbench() {
               render: (_: unknown, r) => {
                 // 主行=采购怎么处理的（换货/退货），副行=后续去向（重采单号 / 回池）
                 const tag =
-                  r.status === '已换货' ? <Tag color="orange">换货</Tag> : <Tag>退货</Tag>
+                  r.status === '已换货' ? <Status tone="warn">换货</Status> : <Status>退货</Status>
                 const rs = r.retries ?? []
                 const next =
                   r.status === '已换货' ? (
@@ -726,18 +732,18 @@ export default function PurchaseWorkbench() {
                     <span>
                       {rs.map((x) =>
                   x.po_no ? (
-                    <Tag
+                    <Chip
                       key={x.id}
-                      color="blue"
+                      tone="run"
                       style={{ cursor: 'pointer' }}
                       onClick={() => openOrder(x.po_no as string)}
                     >
                       重采 {x.po_no}
-                    </Tag>
+                    </Chip>
                   ) : (
-                      <Tag key={x.id} color="gold">
+                      <Status key={x.id} tone="warn">
                         回采购池 #{x.id}（{x.status}）
-                      </Tag>
+                      </Status>
                     ),
                   )
                     }
@@ -777,16 +783,16 @@ export default function PurchaseWorkbench() {
     storage: (
       <>
         <Typography.Paragraph type="secondary" style={{ fontSize: 12 }}>
-          <Tag color="processing">待入库</Tag>＝仓库验收合格、还没入库；
-          <Tag color="success">已入库</Tag>＝已进公司仓库（记了库位）；
-          <Tag color="purple">现场已验收</Tag>＝直发客户现场，不进公司库存。分批送的货分批入库。
+          <Status tone="run">待入库</Status>＝仓库验收合格、还没入库；
+          <Status tone="ok">已入库</Status>＝已进公司仓库（记了库位）；
+          <Status tone="run">现场已验收</Status>＝直发客户现场，不进公司库存。分批送的货分批入库。
         </Typography.Paragraph>
         <Table<GoodsReceiptRow>
           rowKey="id"
           size="middle"
           loading={loading}
           dataSource={doneReceipts}
-          pagination={{ pageSize: 20, showSizeChanger: false }}
+          pagination={{ pageSize: 10, showSizeChanger: true }}
           scroll={{ x: 1230 }}
           locale={{ emptyText: <DsEmpty text="还没有到货记录" /> }}
           columns={[
@@ -851,7 +857,7 @@ export default function PurchaseWorkbench() {
               title: '状态',
               dataIndex: 'status',
               width: 100,
-              render: (v: string) => <Tag color={RECEIPT_STATUS_COLOR[v]}>{v}</Tag>,
+              render: (v: string) => <Status tone={toneOf(RECEIPT_STATUS_COLOR[v])}>{v}</Status>,
             },
             {
               title: '库位',
@@ -877,11 +883,14 @@ export default function PurchaseWorkbench() {
       {/* ★ docs/15 台骨架四件套：台头 → 结论条 → 流程条（注册表驱动）→ 体 */}
       <WorkbenchPage
         board={PURCHASE_BOARD}
-        sub={`待办 ${openTotal} 项 · 待审批 ${toApprove.length} · 待叫车 ${toVehicle.length} · 采购池 ${poolRequests} 条需求 · 在途单 ${openOrders.length}`}
-        help="采购的活分五类：待我审批 / 待叫车 / 采购池 / 在途与到货 / 主数据。上面的数字可点，点了就切到对应队列。"
+        sub={`待办 ${openTotal} 项${toApprove.length ? ` · 其中 ${toApprove.length} 单等你审批` : ''}${overdueCount ? ` · ${overdueCount} 单到货已超期` : ''}`}
+        help="采购的活分五类：待我审批 / 待叫车 / 采购池 / 在途与到货 / 主数据。上面的数字可点，点了就切到对应队列。采购方法论：先查仓库 → 缺的进池 → 攒一攒合并下单（各设计小组下单节点不一样，但东西大差不差）；手工申请（车间耗品/现场缺件/辅料）免审核，提交即进池。"
         actions={
           <>
-            {overdueCount > 0 && <Chip tone="err">{overdueCount} 单到货已超期</Chip>}
+            {/* ★ 精调（2026-10-05）：台头 actions 只留**能按下去的动作**。
+                 原来这里摆的是“缺货 3 种 / 到货超期 N / 有风险 N”这类**纯计数**——
+                 而结论条里已经有同一个数（而且**可点**，点了直接切到那个队列）。
+                 同一批数在一个页上出现两次，是“看着毛”的头号来源（实测 5 个台都有）。 */}
             <Button size="small" onClick={() => void load()}>
               刷新
             </Button>
@@ -896,7 +905,9 @@ export default function PurchaseWorkbench() {
           failed: failedReceipts.length,
         }}
         metrics={[
-          { key: 'approve', label: '待我审批', value: toApprove.length, unit: '单', tone: toApprove.length ? 'warn' : undefined, dimZero: true, to: '?tab=approve' },
+          // ★ 方向 2 ② 主角指认（下面每处 `lead: true` 都写了“为什么是它”）——见 ds `MetricItem.lead`
+          // 采购台主角 = **待我审批**：它是唯一“轮到我、且卡着别人”的活；没得批时自然退到采购池。
+          { key: 'approve', label: '待我审批', value: toApprove.length, unit: '单', tone: toApprove.length ? 'warn' : undefined, dimZero: true, to: '?tab=approve', lead: true },
           { key: 'vehicle', label: '待叫车', value: toVehicle.length, unit: '单', tone: toVehicle.length ? 'warn' : undefined, dimZero: true, to: '?tab=vehicle' },
           { key: 'pool', label: '采购池', value: poolRequests, unit: '条需求', dimZero: true, to: '?tab=pool' },
           { key: 'orders', label: '在途单', value: openOrders.length, unit: '单', dimZero: true, to: '?tab=orders' },

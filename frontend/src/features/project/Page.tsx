@@ -178,7 +178,7 @@ export default function Projects() {
           loading={loading}
           columns={columns}
           dataSource={rows}
-          pagination={{ pageSize: 20, showSizeChanger: false }}
+          pagination={{ pageSize: 10, showSizeChanger: true }}
           scroll={{ x: 1100 }}
           locale={{ emptyText: <Empty text={filtered ? '没有符合筛选条件的项目。' : '还没有项目。'} action={<Button size="small" onClick={() => setFilters({ stage: undefined, q: undefined })}>清空筛选</Button>} /> }}
           onRow={(r) => ({ onClick: () => openDetail(r.project_no), style: { cursor: 'pointer' } })}

@@ -123,7 +123,7 @@ export default function ItemDossierPage() {
           <Table
             rowKey="id"
             size="small"
-            pagination={{ pageSize: 10, showSizeChanger: false }}
+            pagination={{ pageSize: 10, showSizeChanger: true }}
             dataSource={d.requests}
             columns={[
               { title: '状态', dataIndex: 'status', width: 100, render: (v: string) => <Status tone={toneOf(REQ_TONE[v])}>{v}</Status> },

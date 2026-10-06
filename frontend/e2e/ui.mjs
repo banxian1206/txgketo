@@ -42,15 +42,20 @@ async function openTab(page, label) {
 }
 
 /** 流程条现状（新壳）：组那一行 / 项那一行 / 单层时两者相同 */
+/**
+ * 台内页签条状态。
+ * ★ 2026-10-05：台内**只剩一行可点页签条**（组不再当可点胶囊、也不再画小标题 ——
+ *   客户实测「点『待办』没反应」：组点它=跳组内第一个，人已在该组时 URL 与内容都不变=死路）。
+ *   所以 `groupSel` 已无对应物，一律报空；`itemSel` = 当前选中的那个页签。
+ *   保留 `groupSel` 字段是为了让老断言在改写期间不报 TypeError。
+ */
 async function navState(page) {
   return page.evaluate(() => {
-    const sel = (root) =>
-      root?.querySelector('.ant-segmented-item-selected')?.textContent?.trim() ?? ''
-    const grp = document.querySelector('.ds-subtabs.ds-grp')
-    const itemRow = [...document.querySelectorAll('.ds-subtabs')].find((e) => !e.classList.contains('ds-grp'))
+    const row = document.querySelector('.ds-subtabs.is-flow') || document.querySelector('.ds-subtabs')
+    const itemSel = row?.querySelector('.ant-segmented-item-selected')?.textContent?.trim() ?? ''
     const single = document.querySelector('.ds-sec-nav button.ds-sec.on')?.textContent?.trim() ?? ''
-    const groupCount = grp ? grp.querySelectorAll('.ant-segmented-item').length : document.querySelectorAll('.ds-sec-nav button').length
-    return { groupSel: grp ? sel(grp) : single, itemSel: itemRow ? sel(itemRow) : '', groupCount }
+    const groupCount = row ? row.querySelectorAll('.ant-segmented-item').length : document.querySelectorAll('.ds-sec-nav button').length
+    return { groupSel: '', itemSel: itemSel || single, groupCount, itemCount: groupCount }
   })
 }
 
@@ -136,7 +141,7 @@ let newNo = null;
 try {
   // ★ 本段前 300 行是只读 IA 断言，其中「A3：反向裁剪（super 全卡）」**必须用超管**才能验证 ——
   //   故显式声明例外。其后的写链已按责任角色逐段重新登录（见下方 login 调用）。
-  await login(page, 'admin', 'admin12345', { system: true });   // admin-ok: 本段含「A3 反向裁剪(super 全卡)」与写链 IA 断言，须超管；写链下单已由 N21 修复后可走采购链
+  await login(page, 'admin', 'txgk@123', { system: true });   // admin-ok: 本段含「A3 反向裁剪(super 全卡)」与写链 IA 断言，须超管；写链下单已由 N21 修复后可走采购链
 
   // ── P0 全站 IA：侧栏 7 项三分类 + 一级图标 + 旧平铺收进右侧 ──
   {
@@ -201,8 +206,12 @@ try {
     await page.goto(BASE + '/workbench', { waitUntil: 'networkidle' })
     await page.waitForTimeout(900)
     const aT = await body(page)
-    check('NAV-KPI裁剪-admin', aT.includes('待我审核') && aT.includes('演示数据'),
-      `super 见全卡：待我审核=${aT.includes('待我审核')} · 管理入口卡=${aT.includes('演示数据')}`)
+    // ★ 2026-10-05：「我的工作台」入口已取消（客户拍板），超管首屏不再有那张收件箱卡。
+    //   改为断言：① 台清单里**不再有**「我的工作台」 ② 仍能看到各部门台 ③ 管理入口还在。
+    // ⚠ 「演示数据」那个管理入口在 `/users` 页（侧栏「用户与权限」），不在首屏 ——
+    //   所以这里只断言前两件：不再有「我的工作台」、能看到各部门台。管理入口由 O1-侧栏不再重名 覆盖。
+    check('NAV-KPI裁剪-admin', !aT.includes('我的工作台') && aT.includes('仓库工作台'),
+      `super：无「我的工作台」=${!aT.includes('我的工作台')} · 见各部门台=${aT.includes('仓库工作台')}`)
 
     const counts = await page.evaluate(async () => {
       try {
@@ -217,7 +226,7 @@ try {
       check('NAV-台Tab角标', false, '取不到 counts —— 台角标无法验证（先跑 e2e_baseline 造数）')
     } else {
       const probes = [
-        ['我的', counts.my_tasks + counts.to_review + counts.to_decide + counts.to_change],
+        // ★ 2026-10-05：'我的'台已取消（客户拍板），只剩各部门台的角标要核对
         ['采购', counts.to_purchase],
         ['仓库', counts.to_inspect + counts.to_store + counts.issues],
         ['车间', counts.shop_wait + counts.shop_accept + counts.shop_transfer + counts.shop_assembling + counts.shop_debug],
@@ -272,8 +281,9 @@ try {
     // ★ docs/15：台流程条统一成「组（Segmented）+ 组内项（Segmented）」；?tab=arrivals 落
     //   「到货与验收」组、组内选中「到货跟踪」（key 没改，深链照旧）
     const nav = await navState(page)
-    check('NAV-到货跟踪', /到货/.test(nav.groupSel) && /到货跟踪/.test(nav.itemSel || nav.groupSel) && nav.groupCount <= 4 && (hasRows || hasEmpty),
-      `组=「${nav.groupSel}」 · 组内选中=「${nav.itemSel}」 · 组数=${nav.groupCount}/4 · 在途行=${hasRows}${hasEmpty ? '(空态引导)' : ''}`)
+    // ★ 2026-10-05：一行页签条（无「组」层）——验「到货跟踪」在条里且被选中、条没有变两倍长
+    check('NAV-到货跟踪', /到货跟踪/.test(nav.itemSel) && nav.groupCount <= 12 && (hasRows || hasEmpty),
+      `选中=「${nav.itemSel}」 · 条内项数=${nav.groupCount}/12 · 在途行=${hasRows}${hasEmpty ? '(空态引导)' : ''}`)
   }
 
   // ── P0 修正：工作台 Tab 化（me 动态列表）+ 采购/仓库归位 + 角色裁剪 ──
@@ -297,21 +307,17 @@ try {
   // ★ 重整 P1（docs/10 §8.4）：「我的工作台」不再自带页签条 —— 原来台条→台内条→页内条→状态条
   //   四条横条叠在一屏。现在待办卡就是入口，点它直达「对应台 + 对应页签」。
   {
+    // ★ 2026-10-05：「我的工作台」聚合页已取消 → 这条断言改成验**中转站**：
+    //   `/workbench` 必须落到我可见的台（不是停在空白、也不是回聚合页），且台内只有一条页签条。
     await page.goto(BASE + '/workbench', { waitUntil: 'networkidle' })
-    await page.waitForTimeout(900)
+    await page.waitForTimeout(1200)
     const innerTabs = await page.locator('.domain-content .ant-tabs-tab').allInnerTexts().catch(() => [])
-    const taskCard = page.locator('.domain-content').getByText('我的任务', { exact: true }).first()
-    let urlOk = false, contentOk = false
-    if (await taskCard.count()) {
-      await taskCard.click()
-      await page.waitForURL(/\/workbench\/tasks/, { timeout: 6000 }).catch(() => {})
-      urlOk = page.url().includes('/workbench/tasks')
-      await page.waitForTimeout(800)
-      const t2 = await body(page)
-      contentOk = t2.includes('任务号') || t2.includes('拆分派工') || t2.includes('我的任务')
-    }
+    const urlOk = /\/(workbench\/(sales|pm|eng|shop)|purchase|warehouse|delivery\/|dashboard)/.test(new URL(page.url()).pathname)
+    const contentOk = (await body(page)).length > 200
+    // ★ 2026-10-05：车间台的卡片深链原指向 /workbench/tasks（已取消的聚合页）。
+    //   现在 /workbench 是中转站，**点它必须跳到我可见的第一个台**（不能停在空白）。
     check('NAV-台内不叠页签', innerTabs.length === 0 && urlOk && contentOk,
-      `台内页签条=${innerTabs.length}（应 0）· 卡片深链 → /workbench/tasks=${urlOk} · 内容挂载=${contentOk}`)
+      `台内页签条=${innerTabs.length}（应 0）· 卡片深链落到台=${urlOk} · 内容挂载=${contentOk}`)
   }
 
   // ── docs/12 视觉/信息架构护栏：详情页首屏必须给出结论；表格不许截断数据 ──
@@ -413,7 +419,10 @@ try {
       // （台里没项目行也必须红 —— 不许「没数据就跳过」的休眠护栏）
       check('NAV-drill-in 带来源', url.includes('from='), url ? `点项目行 → ${url.replace(BASE, '')}` : '台里没有可点的项目行')
       check('NAV-侧栏不被抢走', sideSel.includes('工作台'), `侧栏选中=「${sideSel}」（曾是「项目」）`)
-      check('NAV-台条不消失', tabsBefore >= 1 && tabsAfter === tabsBefore, `台条 ${tabsBefore} → ${tabsAfter}`)
+      // ★ 2026-10-05：sales1 只有 1 个台 → `DomainShell` 按设计**不画台条**（visible.length<=1），
+      //   所以“台条 0 → 0”是对的；真正要守住的是「多台时台条不许中途消失」。
+      check('NAV-台条不消失', tabsAfter === tabsBefore && (tabsBefore === 0 || tabsBefore >= 1),
+        `台条 ${tabsBefore} → ${tabsAfter}（单台角色按设计不显示；多台时不得中途消失）`)
       check('NAV-返回口是来源台', /返回.*(工作台|列表)/.test(backTxt) && backTxt.includes('商务部'), `返回口=「${backTxt}」`)
       check('NAV-点返回回原台', backUrl.includes('/workbench/sales'), backUrl.replace(BASE, '') || '（返回口没点动）')
     } finally {
@@ -445,41 +454,40 @@ try {
 
   // ── B1 三角色开台（拍板④）：发运/现场/售后各见自己的台 + 台Tab直达交付域 ──
   {
-    const roles = [['delivery1', '发运工作台'], ['site1', '现场工作台'], ['service1', '售后工作台']]
+    const roles = [['delivery1', '发运工作台', '/delivery/shipping'], ['site1', '现场工作台', '/delivery/site'], ['service1', '售后工作台', '/delivery/service']]
     const bad = []
     let domainOk = false
-    for (const [u, expect] of roles) {
+    for (const [u, expect, expectRoute] of roles) {
       const cr = await newCtx()
       try {
         await login(cr.page, u, 'txgk@123')
         await cr.page.goto(BASE + '/workbench', { waitUntil: 'networkidle' })
-        await cr.page.waitForSelector('.domain-tabs a', { timeout: 8000 }).catch(() => {})
-        await cr.page.waitForTimeout(400)
+        // ★ 2026-10-05：「我的工作台」取消后，这三个账号**各自只剩 1 个台**，
+        //   而 `DomainShell` 按设计在 `visible.length <= 1` 时**不画台条**
+        //   （一个台不需要导航条）。所以不能再等 `.domain-tabs a` 出现 —— 那是旧契约。
+        //   新契约：`/workbench` 中转后**落到自己那个台**，且不出现多台域条。
+        await cr.page.waitForTimeout(1200)
         const tabs = await cr.page.locator('.domain-tabs a').allInnerTexts().catch(() => [])
-        if (tabs.length !== 2 || !tabs.some((t) => t.includes(expect))) {
-          bad.push(`${u}: Tab=[${tabs.join(',')}] 应含「${expect}」且共 2`)
-        }
+        const landed = cr.page.url().includes(expectRoute)
+        if (!landed) bad.push(`${u}: /workbench 未落到「${expect}」(${cr.page.url()})`)
+        if (tabs.length > 3) bad.push(`${u}: 出现 ${tabs.length} 项台条（交付域未删净）`)
         // ★ 第八/九轮实测过的故障：发运角色点自己的台 → index redirect 落进【制造页】→ 403（无 mfg:view）
-        //   重整后台必须直达自己的页面，且不再有 6 项域条
-        if (u === 'delivery1' && !bad.length) {
-          const t0 = cr.page.locator('.domain-tabs a', { hasText: '发运工作台' }).first()
-          if (await t0.count()) {
-            await t0.click()
-            await cr.page.waitForURL(/\/delivery\/shipping/, { timeout: 8000 }).catch(() => {})
-            domainOk = cr.page.url().includes('/delivery/shipping')
-            await cr.page.waitForTimeout(700)
-            const body1 = await cr.page.locator('body').innerText().catch(() => '')
-            if (/没有权限|mfg:view/.test(body1)) bad.push('发运工作台落进了无权限页（旧故障复现）')
-            const dTabs = await cr.page.locator('.domain-tabs a').count()
-            if (dTabs > 3) bad.push(`点发运工作台后仍出现 ${dTabs} 项导航（交付域未删净）`)
-          } else bad.push('delivery1 无「发运工作台」Tab')
+        //   重整后台必须直达自己的页面，且不再有 6 项域条。
+        //   ★ 2026-10-05：delivery1 只剩 1 个台 → 台条按设计不画，所以**不能再从台条里找它再点**；
+        //   改为直接校验中转站落地页（这条故障本身就是“落点错”，从哪儿点的无关）。
+        if (u === 'delivery1') {
+          domainOk = cr.page.url().includes('/delivery/shipping')
+          const body1 = await cr.page.locator('body').innerText().catch(() => '')
+          if (/没有权限|mfg:view/.test(body1)) bad.push('发运工作台落进了无权限页（旧故障复现）')
+          const dTabs = await cr.page.locator('.domain-tabs a').count()
+          if (dTabs > 3) bad.push(`点发运工作台后仍出现 ${dTabs} 项导航（交付域未删净）`)
         }
       } finally {
         await cr.browser.close()
       }
     }
     check('NAV-B1三角色开台', bad.length === 0 && domainOk,
-      bad.length ? bad.join(' | ') : '三角色各 2 Tab 正确 · 发运工作台 → /delivery/shipping（不再落制造页）')
+      bad.length ? bad.join(' | ') : '单台角色落到自己的台（台条按设计不显示）· 发运工作台 → /delivery/shipping（不再落制造页）')
   }
 
   // A1（v2 拍板①）：供应商入采购台 —— 旧链落台内页签 + 侧栏收编
@@ -492,8 +500,8 @@ try {
     const siderHasSupplier = await page.locator('.ant-layout-sider').innerText().catch(() => '')
     const noSideEntry = !siderHasSupplier.includes('供应商')
     // ★ 供应商是「单 key 的组」→ 页签直接显示「供应商」（不造"主数据"这种听不懂的组名）
-    check('NAV-供应商入台', landed && nav.groupSel.includes('供应商') && noSideEntry && nav.groupCount <= 4,
-      `旧链→${page.url().split('?')[1] || page.url()} · active=「${nav.groupSel}」 · 组数=${nav.groupCount}/4 · 侧栏已收=${noSideEntry}`)
+    check('NAV-供应商入台', landed && nav.itemSel.includes('供应商') && noSideEntry && nav.groupCount <= 12,
+      `旧链→${page.url().split('?')[1] || page.url()} · active=「${nav.itemSel}」 · 条内项数=${nav.groupCount}/12 · 侧栏已收=${noSideEntry}`)
   }
 
   // 选中态 = 最长前缀（用户实测 bug：/workbench/eng 被错标「我的工作台」——eng/sales 两台都验）
@@ -515,14 +523,17 @@ try {
     const c2 = await newCtx(); const p2 = c2.page
     await login(p2, 'buyer1', 'txgk@123')
     await p2.goto(BASE + '/workbench', { waitUntil: 'networkidle' })
-    await p2.waitForSelector('.domain-tabs a', { timeout: 10000 }).catch(() => {})
-    await p2.waitForTimeout(500)
-    const tabs = await p2.locator('.domain-tabs a').allInnerTexts()
-    const ok = tabs.length === 2 && tabs.some((t) => t.includes('采购')) && !tabs.some((t) => t.includes('仓库'))
-    check('NAV-台角色裁剪', ok, `buyer1 台 Tab=${JSON.stringify(tabs)}（me.visible 自动裁剪）`)
-    // A3：buyer1 的 KPI 角色裁剪（无 DESIGN_AUDIT → 无待审卡；非 ADMIN → 无管理入口卡）
+    await p2.waitForTimeout(1200)
+    // ★ 2026-10-05：buyer1 只可见 1 个台（采购）→ 台条按设计不画（visible.length<=1）。
+    //   裁剪的断言改为：/workbench **落到采购台**，且页面上**看不到仓库台**。
+    const tabs = await p2.locator('.domain-tabs a').allInnerTexts().catch(() => [])
+    const t = await p2.locator('body').innerText()
+    const ok = p2.url().includes('/purchase') && !t.includes('仓库工作台')
+    check('NAV-台角色裁剪', ok, `buyer1 落点=${new URL(p2.url()).pathname} · 台条=${JSON.stringify(tabs)} · 页面无「仓库工作台」=${!t.includes('仓库工作台')}`)
+    // A3：buyer1 的角色裁剪 —— 无 DESIGN_AUDIT → 采购台里不该出现「待我审批/待我审核」这类别的台的事；
+    //   非 ADMIN → 不该有管理入口。（★ 2026-10-05：这些卡原在已删的聚合页，现在查采购台自己）
     const bT = await body(p2)
-    const buyerOk = !bT.includes('待我审核') && bT.includes('待采购') && !bT.includes('演示数据')
+    const buyerOk = !bT.includes('待我审核') && bT.includes('采购池') && !bT.includes('演示数据')
     check('NAV-KPI裁剪-buyer1', buyerOk,
       `无待我审核=${!bT.includes('待我审核')} · 有待采购=${bT.includes('待采购')} · 无管理卡=${!bT.includes('演示数据')}`)
     await c2.browser.close()
@@ -642,15 +653,30 @@ try {
   const term = firstText.replace(/^[A-Z0-9-]+\s*/, '').slice(0, 2) || firstText.slice(0, 2);
   if (term) { await page.keyboard.type(term); await page.waitForTimeout(700); }
   await page.locator('.ant-select-dropdown:visible .ant-select-item').first().click();
+  // ★ 2026-10-05：记下**刚选的物料名**，后面按它定位池里那一条。
+  //   旧代码硬编「方通」（`hasText: '方通'`）—— 采购池空/主数据被复位后就永远勾不到行，
+  //   于是 P-21 报“勾选后仍禁用”、写链在下一步 click 超时（实测本轮踩到）。
+  const pickedName = firstText.replace(/^[A-Z0-9-]+\s*/, '').trim();
   await mm.locator('.ant-form-item').filter({ hasText: '数量' }).locator('input').fill('3');
   await mm.getByRole('button', { name: /提\s*交\s*进\s*池/ }).click();
   await page.waitForTimeout(1600);
   // ★ 选「刚申请的那一条」（按物料名定位）而不是表格第一行：
   //   池里可能有别的历史待采购需求，
   //   而 merge-order 会拒绝非「待采购/部分下单/审批中」的行 → 400 “不能合并下单”（探针旧假设=空池）
-  const poolRow = page.locator('.ant-table-row', { hasText: '方通' }).first();
-  const rowCb = (await poolRow.count() ? poolRow : page.locator('.ant-table-row').first())
-    .locator('.ant-checkbox-input');
+  // 池子可能分页：先在**可见页**找刚申请的那一条，找不到就翻到能看见它为止（最多 3 页）
+  let rowCb = null
+  for (let pg = 0; pg < 3 && !rowCb; pg++) {
+    if (pg > 0) {
+      const next = page.locator('.ant-pagination-item-2, .ant-pagination-next').first()
+      if (!(await next.count())) break
+      await next.click().catch(() => {})
+      await page.waitForTimeout(700)
+    }
+    const hit = page.locator('.ant-table-row').filter({ hasText: pickedName.slice(0, 4) })
+    const row = (await hit.count()) ? hit.first() : page.locator('.ant-table-row').first()
+    const cb = row.locator('.ant-checkbox-input')
+    if (await cb.count()) rowCb = cb
+  }
   if (await rowCb.count()) await rowCb.check().catch(() => {});
   await page.waitForTimeout(400);
   const mergeBtn = page.getByRole('button', { name: /合\s*并\s*下\s*单/ }).first();
@@ -1104,27 +1130,21 @@ try {
     check('OFFLINE-恢复消失', off, off ? '联网后横幅消失' : '横幅未消失');
   }
 
-  // —— 1.3 Auth：伪装进入 → 横幅 → 退出查看（本步改造的功能面）——
+  // —— 1.3 Auth：**「以某人身份查看」已于 2026-10-05 删除**（客户拍板）——
+  //   它只能看、永远测不了写操作（审批/下单/验收都是写），而它的用途本就是测试/排查；
+  //   客户原话：「如果测试不了的话，我觉得这个功能就没有必要存在了，那我直接单独去登录
+  //   对应的账号测试就可以了」。同时**全站密码统一为一个**，直接登录任何账号都行。
+  //   所以这条断言反向守：**入口必须消失**（免得以后被“好心”加回来 —— 它天然会漂：
+  //   只读态藏页签但没藏结论条，实测出现过“数字 3 单、入口没有”的矛盾）。
   await page.goto(BASE + '/users', { waitUntil: 'networkidle' });
   await page.waitForTimeout(900);
-  const impLink = page.locator('a[title="以他的身份查看（只读）"]').first();
-  if (await impLink.count()) {
-    await impLink.click();
-    await page.waitForURL(/\/workbench/, { timeout: 8000 }).catch(() => {});
-    await page.waitForTimeout(1200);
-    const banner = await body(page);
-    const on = banner.includes('正在以「') && banner.includes('只读');
-    check('AUTH-伪装进入', on, on ? '橙色横幅出现' : '未见伪装横幅: ' + banner.slice(0, 80).replace(/\n/g, '|'));
-    const stop = page.getByText('退出查看').first();
-    if (await stop.count()) {
-      await stop.click();
-      await page.waitForURL(/\/users/, { timeout: 8000 }).catch(() => {});
-      await page.waitForTimeout(1000);
-      const t = await body(page);
-      const off = !t.includes('正在以「');
-      check('AUTH-退出查看', off, off ? '横幅消失，回到 /users' : '横幅仍在');
-    } else check('AUTH-退出查看', false, '无「退出查看」入口');
-  } else check('AUTH-伪装进入', false, 'Users 页无伪装入口（权限？admin 应可见）');
+  {
+    const impLink = await page.locator('a[title="以他的身份查看（只读）"]').count();
+    const t = await body(page)
+    const noBanner = !t.includes('正在以「')
+    check('AUTH-伪装入口已删除', impLink === 0 && noBanner,
+      impLink === 0 && noBanner ? 'Users 页无伪装入口、无横幅（2026-10-05 已删；改用直接登录）' : `仍见伪装入口 ${impLink} 个 / 横幅残留=${!noBanner}`)
+  }
 
   // —— 2.5 品牌位：侧栏字标真实加载（naturalWidth>0 = 非裂图非404）——
   //  ★ 2026-10-04 方案 A「纸面」：侧栏由深色改浅色，字标随之由**反白版**换成**正色版**
@@ -1163,7 +1183,7 @@ try {
   {
     // ① 勾选记住并登录
     await page.fill('input[placeholder="admin"]', 'admin')
-    await page.fill('input[type="password"]', 'admin12345')
+    await page.fill('input[type="password"]', 'txgk@123')
     const rememberBox = page.locator('.login-remember input[type=checkbox]')
     if (await rememberBox.count()) await rememberBox.check()
     await page.getByRole('button', { name: /登\s*录/ }).click()

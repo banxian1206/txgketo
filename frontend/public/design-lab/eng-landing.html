@@ -1,0 +1,319 @@
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8">
+<title>工程部工作台 · 落地页样机 v5（责任人 + 结构 · 2026-10-05）</title>
+<style>
+:root{--bg:#f6f7f9;--sf:#fff;--sf2:#fbfcfd;--sf3:#f2f4f7;--ln:#e7e9ee;--ln2:#d8dce3;--ink:#14161a;--ink2:#59616e;--ink3:#8b93a1;--ink4:#b8bfc9;--acc:#1f5fd0;--accS:#eef4ff;--accL:#c9dcf8;--ok:#0f9d63;--warn:#c4761a;--err:#d23b3b;--mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font:400 14px/22px -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;background:var(--bg);color:var(--ink);font-variant-numeric:tabular-nums}
+.wrap{max-width:1400px;margin:0 auto;padding:20px 24px 60px}
+.hd{border-left:3px solid var(--acc);padding-left:14px;margin-bottom:18px}
+.hd h1{font-size:20px;font-weight:600;letter-spacing:-.3px;line-height:26px}
+.hd .sub{font-size:13px;color:var(--ink3);margin-top:4px}
+.metrics{display:flex;background:var(--sf);border:1px solid var(--ln);border-radius:12px;overflow:hidden;margin-bottom:16px}
+.m{flex:1;padding:14px 16px;border-right:1px solid var(--ln)} .m:last-child{border-right:0}
+.m.is-lead{background:linear-gradient(180deg,var(--accS),var(--sf));box-shadow:inset 3px 0 0 var(--acc)}
+.m .k{display:block;font-size:12px;color:var(--ink3);line-height:18px} .m.is-lead .k{color:var(--ink2);font-weight:600}
+.m .v{display:block;font-family:var(--mono);font-size:20px;font-weight:600;line-height:32px}
+.m.is-lead .v{font-size:32px;color:var(--acc);letter-spacing:-.3px;line-height:36px}
+.m .v small{font-family:inherit;font-size:12px;font-weight:400;color:var(--ink3)}
+.m.is-err .v{color:var(--err)} .m.is-warn .v{color:var(--warn)}
+.sec{font-size:13px;font-weight:600;color:var(--ink3);margin:16px 0 8px}
+.pgroup{background:var(--sf);border:1px solid var(--ln);border-radius:12px;box-shadow:0 1px 2px rgba(16,24,40,.05);margin-bottom:12px;overflow:hidden}
+.phead{display:grid;grid-template-columns:auto 1fr auto 200px auto;gap:12px;align-items:center;padding:12px 16px;background:var(--sf2);border-bottom:1px solid var(--ln)}
+.phead code{font-family:var(--mono);font-size:13px;color:var(--acc);font-weight:600}
+.phead .pname{font-size:13px;color:var(--ink2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.phead .pstat{font-size:12px;color:var(--ink3);font-family:var(--mono)}
+.pavg{font-family:var(--mono);font-size:13px;font-weight:600;color:var(--ink2)}
+.pbar{height:6px;border-radius:999px;background:var(--sf3);overflow:hidden;border:1px solid var(--ln)} .pbar i{display:block;height:100%;background:var(--acc)} .pbar.big{height:8px}
+.dev{padding:12px 16px;border-bottom:1px solid var(--ln);display:grid;grid-template-columns:220px 170px 1fr;gap:6px 16px;align-items:center}
+.dev:last-of-type{border-bottom:0} .dev.ready{background:#fcfefd}
+.dev-id{display:flex;align-items:center;gap:7px;font-size:14px;font-weight:600}
+.dev-id b{font-family:var(--mono);font-size:13px;color:var(--acc)}
+.badge{font-style:normal;font-size:12px;font-weight:500;padding:1px 7px;border-radius:6px;line-height:18px;background:#e8f7f0;color:var(--ok)}
+.pct{display:flex;align-items:center;gap:8px} .pct .pbar{flex:1} .pct em{font-style:normal;font-family:var(--mono);font-size:13px;font-weight:600;width:42px;text-align:right;color:var(--ink2)}
+.profs{display:flex;flex-wrap:wrap;gap:4px 14px}
+.pr{display:inline-flex;align-items:center;gap:5px;font-size:12px;line-height:18px;color:var(--ink3)}
+.pr i{width:6px;height:6px;border-radius:999px;background:var(--ink4);flex:none} .pr b{font-weight:500;color:var(--ink2)}
+.st-ok i{background:var(--ok)} .st-ok b{color:var(--ok)} .st-run i{background:var(--acc)} .st-run b{color:var(--acc)} .st-err i{background:var(--err)} .st-err b{color:var(--err)}
+.own,.dev-num,.gaps{grid-column:1/-1;font-size:12px;line-height:18px;color:var(--ink3)}
+.own-k{display:inline-block;min-width:44px;color:var(--ink4)} .own b{color:var(--ink2);font-weight:500}
+.dev-num{font-family:var(--mono)}
+.gaps{color:var(--err)} .gaps .ok{color:var(--ok)}
+/* 展开的设备结构 */
+.expand{margin-top:8px}
+.eqhead{display:flex;align-items:center;gap:10px;font-size:14px;font-weight:600;padding:10px 0 6px}
+.eqhead b{font-family:var(--mono);font-size:13px;color:var(--acc)}
+.eqown{display:flex;gap:16px;flex-wrap:wrap;font-size:12px;color:var(--ink3);padding:0 0 10px;border-bottom:1px solid var(--ln)}
+.eqown b{color:var(--ink2);font-weight:500}
+.tnode{padding:7px 0 7px 0;border-bottom:1px dashed var(--ln)}
+.tnode:last-child{border-bottom:0}
+.tnode-h{display:flex;align-items:center;gap:9px;flex-wrap:wrap;font-size:13px}
+.tdot{width:6px;height:6px;border-radius:999px;background:var(--ink4);flex:none}
+.tdot.ok{background:var(--ok)} .tdot.idle{background:var(--ink4)}
+.tnode-h code{font-family:var(--mono);font-size:12px;color:var(--ink3)}
+.tname{font-weight:600;color:var(--ink)}
+.tkind{font-size:12px;color:var(--ink3);background:var(--sf3);border-radius:4px;padding:0 6px;line-height:18px}
+.tsrc{font-size:12px;border-radius:4px;padding:0 6px;line-height:18px}
+.s-run{background:var(--accS);color:var(--acc)} .s-warn{background:#fdf3e6;color:var(--warn)} .s-idle{background:var(--sf3);color:var(--ink3)}
+.town{font-size:12px;color:var(--ink2);font-weight:500}
+.tst{font-size:12px} .tst.st-ok{color:var(--ok)} .tst.st-run{color:var(--acc)} .tst.st-idle{color:var(--ink4)}
+.mats{display:flex;gap:10px;flex-wrap:wrap;margin:4px 0 0 15px}
+.mat{font-size:12px;color:var(--ink2);background:var(--sf2);border:1px solid var(--ln);border-radius:6px;padding:1px 8px;line-height:20px}
+.mat i{font-style:normal;color:var(--ink4);margin-right:5px} .mat b{font-family:var(--mono);color:var(--ink)}
+details summary{cursor:pointer;font-size:13px;color:var(--ink3);padding:8px 2px}
+.note{font-size:12px;color:var(--ink3);line-height:19px;padding:14px 16px;background:var(--sf2);border:1px solid var(--ln);border-radius:10px;margin-top:14px}
+.note b{color:var(--ink2)}
+</style></head><body><div class="wrap">
+<div class="hd"><h1>工程部工作台</h1>
+<div class="sub">在手的活：24 个项目 / 24 台设备 · 结构已定死 2 台</div></div>
+<div class="metrics">
+  <div class="m is-lead"><span class="k">结构未定死的设备</span><span class="v">22<small> 台</small></span></div>
+  <div class="m"><span class="k">结构已定死</span><span class="v">2<small> 台</small></span></div>
+  <div class="m is-err"><span class="k">自制件缺材料</span><span class="v">21<small> 台</small></span></div>
+  <div class="m is-warn"><span class="k">图纸未发布</span><span class="v">22<small> 台</small></span></div>
+  <div class="m"><span class="k">待我终审 / 裁决</span><span class="v">0<small> / 1 张</small></span></div>
+</div>
+
+<div class="sec">点开一台设备 → 看到它的结构（组件 / 负责人 / 实现方式 / 材料）</div>
+<div class="pgroup">
+  <div class="phead"><code>TX26002</code><span class="pname">65寸电视后壳自动锁附线</span>
+    <span class="pstat">1/1 台已定死</span><div class="pbar big"><i style="width:55%"></i></div><em class="pavg">55%</em></div>
+  <div class="dev ready">
+  <div class="dev-id"><b>01A</b><span>OC 贴合机</span><i class="badge ok">已定死</i></div>
+  <div class="pct"><div class="pbar"><i style="width:55%"></i></div><em>55%</em></div>
+  <div class="profs"><span class="pr st-ok"><i></i>机械 <b>已发布</b></span><span class="pr st-idle"><i></i>电气 <b>待开始</b></span><span class="pr st-idle"><i></i>程序 <b>待开始</b></span><span class="pr st-ok"><i></i>工艺 <b>已发布</b></span></div>
+  <div class="own"><span class="own-k">负责人</span><b>机械经理</b> · <b>电气经理</b> · <b>程序经理</b> · <b>工艺经理</b></div>
+  <div class="dev-num">图纸4 · 组件1 · 零件2 · 自制1 · 外协1 · 标准件1 · 原材料1</div>
+  <div class="gaps"><span class="ok">✓ 结构无缺口</span></div>
+</div>
+  <div class="expand" style="padding:0 16px 14px">
+    <div class="eqhead"><b>01A</b><span>OC 贴合机</span><span style="font-size:12px;color:var(--ink3);font-weight:400">结构 · 设计BOM（4 个节点）</span></div>
+    <div class="eqown">设备负责人：<b>机械经理</b> · <b>电气经理</b> · <b>程序经理</b> · <b>工艺经理</b></div>
+    <div style="padding-top:6px"><div class="tnode" style="margin-left:0px">
+  <div class="tnode-h">
+    <span class="tdot ok"></span>
+    <code>TX26002-01A-00-00-00-00</code>
+    <span class="tname">OC 贴合机总装图</span>
+    <span class="tkind">机械</span>
+    <span class="tsrc s-run">自制件</span>
+    <span class="town">项目经理</span>
+    <span class="tst st-ok">已发布</span>
+  </div>
+  
+</div><div class="tnode" style="margin-left:22px">
+  <div class="tnode-h">
+    <span class="tdot ok"></span>
+    <code>TX26002-01A-01-00-00-00</code>
+    <span class="tname">主体组件</span>
+    <span class="tkind">机械</span>
+    <span class="tsrc s-run">自制件</span>
+    <span class="town">机械经理</span>
+    <span class="tst st-ok">已发布</span>
+  </div>
+  
+</div><div class="tnode" style="margin-left:44px">
+  <div class="tnode-h">
+    <span class="tdot ok"></span>
+    <code>TX26002-01A-01-01-00-00</code>
+    <span class="tname">机架</span>
+    <span class="tkind">机械</span>
+    <span class="tsrc s-run">自制件</span>
+    <span class="town">机械经理</span>
+    <span class="tst st-ok">已发布</span>
+  </div>
+  <div class="mats"><span class="mat"><i>标准件</i>DQ-PLC-0001 <b>×4套</b></span><span class="mat"><i>原材料</i>BZ-DJ-0001 <b>×2台</b></span></div>
+</div><div class="tnode" style="margin-left:22px">
+  <div class="tnode-h">
+    <span class="tdot ok"></span>
+    <code>TX26002-01A-02-00-00-00</code>
+    <span class="tname">防护罩</span>
+    <span class="tkind">机械</span>
+    <span class="tsrc s-warn">外协件</span>
+    <span class="town">机械经理</span>
+    <span class="tst st-ok">已发布</span>
+  </div>
+  
+</div></div>
+  </div>
+</div>
+
+<div class="sec">真实项目（1 个）· 库里每个项目目前只有 1 台设备</div>
+<div class="pgroup"><div class="phead"><code>TX26002</code><span class="pname">65寸电视后壳自动锁附线</span><span class="pstat">1/1 台已定死</span><div class="pbar big"><i style="width:55%"></i></div><em class="pavg">55%</em></div><div class="dev ready">
+  <div class="dev-id"><b>01A</b><span>OC 贴合机</span><i class="badge ok">已定死</i></div>
+  <div class="pct"><div class="pbar"><i style="width:55%"></i></div><em>55%</em></div>
+  <div class="profs"><span class="pr st-ok"><i></i>机械 <b>已发布</b></span><span class="pr st-idle"><i></i>电气 <b>待开始</b></span><span class="pr st-idle"><i></i>程序 <b>待开始</b></span><span class="pr st-ok"><i></i>工艺 <b>已发布</b></span></div>
+  <div class="own"><span class="own-k">负责人</span><b>机械经理</b> · <b>电气经理</b> · <b>程序经理</b> · <b>工艺经理</b></div>
+  <div class="dev-num">图纸4 · 组件1 · 零件2 · 自制1 · 外协1 · 标准件1 · 原材料1</div>
+  <div class="gaps"><span class="ok">✓ 结构无缺口</span></div>
+</div></div>
+
+<details><summary>展开 E2E 测试项目（23 个 · 看样机时可忽略）</summary>
+<div class="pgroup"><div class="phead"><code>TX26001</code><span class="pname">E2E审计-整线</span><span class="pstat">0/1 台已定死</span><div class="pbar big"><i style="width:78%"></i></div><em class="pavg">78%</em></div><div class="dev ready">
+  <div class="dev-id"><b>01A</b><span>贴胶机</span><i class="badge ok">已定死</i></div>
+  <div class="pct"><div class="pbar"><i style="width:78%"></i></div><em>78%</em></div>
+  <div class="profs"><span class="pr st-ok"><i></i>机械 <b>已发布</b></span><span class="pr st-idle"><i></i>电气 <b>待开始</b></span><span class="pr st-ok"><i></i>程序 <b>已发布</b></span><span class="pr st-ok"><i></i>工艺 <b>已发布</b></span></div>
+  <div class="own"><span class="own-k">负责人</span><b>机械经理</b> · <b>电气经理</b> · <b>程序经理</b> · <b>工艺经理</b></div>
+  <div class="dev-num">图纸4 · 组件1 · 零件2 · 自制0 · 外协1 · 标准件2 · 原材料1</div>
+  <div class="gaps"><span class="ok">✓ 结构无缺口</span></div>
+</div></div><div class="pgroup"><div class="phead"><code>TX26003</code><span class="pname">E2E回归-1005T1124</span><span class="pstat">0/1 台已定死</span><div class="pbar big"><i style="width:0%"></i></div><em class="pavg">0%</em></div><div class="dev ">
+  <div class="dev-id"><b>01A</b><span>回归升降机</span></div>
+  <div class="pct"><div class="pbar"><i style="width:0%"></i></div><em>0%</em></div>
+  <div class="profs"><span class="pr st-idle"><i></i>机械 <b>未派</b></span><span class="pr st-idle"><i></i>电气 <b>未派</b></span><span class="pr st-idle"><i></i>程序 <b>未派</b></span><span class="pr st-idle"><i></i>工艺 <b>未派</b></span></div>
+  <div class="own"><span class="own-k">负责人</span><b>机械经理</b> · <b>电气经理</b> · <b>程序经理</b> · <b>工艺经理</b></div>
+  <div class="dev-num">图纸2 · 组件0 · 零件1 · 自制1 · 外协0 · 标准件0 · 原材料0</div>
+  <div class="gaps">⛔ 自制件缺材料 1 项 · 图纸未发布 2 张</div>
+</div></div><div class="pgroup"><div class="phead"><code>TX26007</code><span class="pname">E2E回归-1005T1158</span><span class="pstat">0/1 台已定死</span><div class="pbar big"><i style="width:0%"></i></div><em class="pavg">0%</em></div><div class="dev ">
+  <div class="dev-id"><b>01A</b><span>回归升降机</span></div>
+  <div class="pct"><div class="pbar"><i style="width:0%"></i></div><em>0%</em></div>
+  <div class="profs"><span class="pr st-idle"><i></i>机械 <b>未派</b></span><span class="pr st-idle"><i></i>电气 <b>未派</b></span><span class="pr st-idle"><i></i>程序 <b>未派</b></span><span class="pr st-idle"><i></i>工艺 <b>未派</b></span></div>
+  <div class="own"><span class="own-k">负责人</span><b>机械经理</b> · <b>电气经理</b> · <b>程序经理</b> · <b>工艺经理</b></div>
+  <div class="dev-num">图纸2 · 组件0 · 零件1 · 自制1 · 外协0 · 标准件0 · 原材料0</div>
+  <div class="gaps">⛔ 自制件缺材料 1 项 · 图纸未发布 2 张</div>
+</div></div><div class="pgroup"><div class="phead"><code>TX26008</code><span class="pname">E2E回归-1005T1220</span><span class="pstat">0/1 台已定死</span><div class="pbar big"><i style="width:0%"></i></div><em class="pavg">0%</em></div><div class="dev ">
+  <div class="dev-id"><b>01A</b><span>回归升降机</span></div>
+  <div class="pct"><div class="pbar"><i style="width:0%"></i></div><em>0%</em></div>
+  <div class="profs"><span class="pr st-idle"><i></i>机械 <b>未派</b></span><span class="pr st-idle"><i></i>电气 <b>未派</b></span><span class="pr st-idle"><i></i>程序 <b>未派</b></span><span class="pr st-idle"><i></i>工艺 <b>未派</b></span></div>
+  <div class="own"><span class="own-k">负责人</span><b>机械经理</b> · <b>电气经理</b> · <b>程序经理</b> · <b>工艺经理</b></div>
+  <div class="dev-num">图纸2 · 组件0 · 零件1 · 自制1 · 外协0 · 标准件0 · 原材料0</div>
+  <div class="gaps">⛔ 自制件缺材料 1 项 · 图纸未发布 2 张</div>
+</div></div><div class="pgroup"><div class="phead"><code>TX26009</code><span class="pname">E2E回归-1005T1224</span><span class="pstat">0/1 台已定死</span><div class="pbar big"><i style="width:0%"></i></div><em class="pavg">0%</em></div><div class="dev ">
+  <div class="dev-id"><b>01A</b><span>回归升降机</span></div>
+  <div class="pct"><div class="pbar"><i style="width:0%"></i></div><em>0%</em></div>
+  <div class="profs"><span class="pr st-idle"><i></i>机械 <b>未派</b></span><span class="pr st-idle"><i></i>电气 <b>未派</b></span><span class="pr st-idle"><i></i>程序 <b>未派</b></span><span class="pr st-idle"><i></i>工艺 <b>未派</b></span></div>
+  <div class="own"><span class="own-k">负责人</span><b>机械经理</b> · <b>电气经理</b> · <b>程序经理</b> · <b>工艺经理</b></div>
+  <div class="dev-num">图纸2 · 组件0 · 零件1 · 自制1 · 外协0 · 标准件0 · 原材料0</div>
+  <div class="gaps">⛔ 自制件缺材料 1 项 · 图纸未发布 2 张</div>
+</div></div><div class="pgroup"><div class="phead"><code>TX26010</code><span class="pname">E2E回归-1005T1229</span><span class="pstat">0/1 台已定死</span><div class="pbar big"><i style="width:0%"></i></div><em class="pavg">0%</em></div><div class="dev ">
+  <div class="dev-id"><b>01A</b><span>回归升降机</span></div>
+  <div class="pct"><div class="pbar"><i style="width:0%"></i></div><em>0%</em></div>
+  <div class="profs"><span class="pr st-idle"><i></i>机械 <b>未派</b></span><span class="pr st-idle"><i></i>电气 <b>未派</b></span><span class="pr st-idle"><i></i>程序 <b>未派</b></span><span class="pr st-idle"><i></i>工艺 <b>未派</b></span></div>
+  <div class="own"><span class="own-k">负责人</span><b>机械经理</b> · <b>电气经理</b> · <b>程序经理</b> · <b>工艺经理</b></div>
+  <div class="dev-num">图纸2 · 组件0 · 零件1 · 自制1 · 外协0 · 标准件0 · 原材料0</div>
+  <div class="gaps">⛔ 自制件缺材料 1 项 · 图纸未发布 2 张</div>
+</div></div><div class="pgroup"><div class="phead"><code>TX26011</code><span class="pname">E2E回归-1005T1239</span><span class="pstat">0/1 台已定死</span><div class="pbar big"><i style="width:0%"></i></div><em class="pavg">0%</em></div><div class="dev ">
+  <div class="dev-id"><b>01A</b><span>回归升降机</span></div>
+  <div class="pct"><div class="pbar"><i style="width:0%"></i></div><em>0%</em></div>
+  <div class="profs"><span class="pr st-idle"><i></i>机械 <b>未派</b></span><span class="pr st-idle"><i></i>电气 <b>未派</b></span><span class="pr st-idle"><i></i>程序 <b>未派</b></span><span class="pr st-idle"><i></i>工艺 <b>未派</b></span></div>
+  <div class="own"><span class="own-k">负责人</span><b>机械经理</b> · <b>电气经理</b> · <b>程序经理</b> · <b>工艺经理</b></div>
+  <div class="dev-num">图纸2 · 组件0 · 零件1 · 自制1 · 外协0 · 标准件0 · 原材料0</div>
+  <div class="gaps">⛔ 自制件缺材料 1 项 · 图纸未发布 2 张</div>
+</div></div><div class="pgroup"><div class="phead"><code>TX26012</code><span class="pname">E2E回归-1005T1247</span><span class="pstat">0/1 台已定死</span><div class="pbar big"><i style="width:0%"></i></div><em class="pavg">0%</em></div><div class="dev ">
+  <div class="dev-id"><b>01A</b><span>回归升降机</span></div>
+  <div class="pct"><div class="pbar"><i style="width:0%"></i></div><em>0%</em></div>
+  <div class="profs"><span class="pr st-idle"><i></i>机械 <b>未派</b></span><span class="pr st-idle"><i></i>电气 <b>未派</b></span><span class="pr st-idle"><i></i>程序 <b>未派</b></span><span class="pr st-idle"><i></i>工艺 <b>未派</b></span></div>
+  <div class="own"><span class="own-k">负责人</span><b>机械经理</b> · <b>电气经理</b> · <b>程序经理</b> · <b>工艺经理</b></div>
+  <div class="dev-num">图纸2 · 组件0 · 零件1 · 自制1 · 外协0 · 标准件0 · 原材料0</div>
+  <div class="gaps">⛔ 自制件缺材料 1 项 · 图纸未发布 2 张</div>
+</div></div><div class="pgroup"><div class="phead"><code>TX26013</code><span class="pname">E2E回归-1005T1439</span><span class="pstat">0/1 台已定死</span><div class="pbar big"><i style="width:0%"></i></div><em class="pavg">0%</em></div><div class="dev ">
+  <div class="dev-id"><b>01A</b><span>回归升降机</span></div>
+  <div class="pct"><div class="pbar"><i style="width:0%"></i></div><em>0%</em></div>
+  <div class="profs"><span class="pr st-idle"><i></i>机械 <b>未派</b></span><span class="pr st-idle"><i></i>电气 <b>未派</b></span><span class="pr st-idle"><i></i>程序 <b>未派</b></span><span class="pr st-idle"><i></i>工艺 <b>未派</b></span></div>
+  <div class="own"><span class="own-k">负责人</span><b>机械经理</b> · <b>电气经理</b> · <b>程序经理</b> · <b>工艺经理</b></div>
+  <div class="dev-num">图纸2 · 组件0 · 零件1 · 自制1 · 外协0 · 标准件0 · 原材料0</div>
+  <div class="gaps">⛔ 自制件缺材料 1 项 · 图纸未发布 2 张</div>
+</div></div><div class="pgroup"><div class="phead"><code>TX26014</code><span class="pname">E2E回归-1005T1448</span><span class="pstat">0/1 台已定死</span><div class="pbar big"><i style="width:0%"></i></div><em class="pavg">0%</em></div><div class="dev ">
+  <div class="dev-id"><b>01A</b><span>回归升降机</span></div>
+  <div class="pct"><div class="pbar"><i style="width:0%"></i></div><em>0%</em></div>
+  <div class="profs"><span class="pr st-idle"><i></i>机械 <b>未派</b></span><span class="pr st-idle"><i></i>电气 <b>未派</b></span><span class="pr st-idle"><i></i>程序 <b>未派</b></span><span class="pr st-idle"><i></i>工艺 <b>未派</b></span></div>
+  <div class="own"><span class="own-k">负责人</span><b>机械经理</b> · <b>电气经理</b> · <b>程序经理</b> · <b>工艺经理</b></div>
+  <div class="dev-num">图纸2 · 组件0 · 零件1 · 自制1 · 外协0 · 标准件0 · 原材料0</div>
+  <div class="gaps">⛔ 自制件缺材料 1 项 · 图纸未发布 2 张</div>
+</div></div><div class="pgroup"><div class="phead"><code>TX26015</code><span class="pname">E2E回归-1006T0010</span><span class="pstat">0/1 台已定死</span><div class="pbar big"><i style="width:0%"></i></div><em class="pavg">0%</em></div><div class="dev ">
+  <div class="dev-id"><b>01A</b><span>回归升降机</span></div>
+  <div class="pct"><div class="pbar"><i style="width:0%"></i></div><em>0%</em></div>
+  <div class="profs"><span class="pr st-idle"><i></i>机械 <b>未派</b></span><span class="pr st-idle"><i></i>电气 <b>未派</b></span><span class="pr st-idle"><i></i>程序 <b>未派</b></span><span class="pr st-idle"><i></i>工艺 <b>未派</b></span></div>
+  <div class="own"><span class="own-k">负责人</span><b>机械经理</b> · <b>电气经理</b> · <b>程序经理</b> · <b>工艺经理</b></div>
+  <div class="dev-num">图纸2 · 组件0 · 零件1 · 自制1 · 外协0 · 标准件0 · 原材料0</div>
+  <div class="gaps">⛔ 自制件缺材料 1 项 · 图纸未发布 2 张</div>
+</div></div><div class="pgroup"><div class="phead"><code>TX26019</code><span class="pname">E2E回归-1006T0150</span><span class="pstat">0/1 台已定死</span><div class="pbar big"><i style="width:0%"></i></div><em class="pavg">0%</em></div><div class="dev ">
+  <div class="dev-id"><b>01A</b><span>回归升降机</span></div>
+  <div class="pct"><div class="pbar"><i style="width:0%"></i></div><em>0%</em></div>
+  <div class="profs"><span class="pr st-idle"><i></i>机械 <b>未派</b></span><span class="pr st-idle"><i></i>电气 <b>未派</b></span><span class="pr st-idle"><i></i>程序 <b>未派</b></span><span class="pr st-idle"><i></i>工艺 <b>未派</b></span></div>
+  <div class="own"><span class="own-k">负责人</span><b>机械经理</b> · <b>电气经理</b> · <b>程序经理</b> · <b>工艺经理</b></div>
+  <div class="dev-num">图纸2 · 组件0 · 零件1 · 自制1 · 外协0 · 标准件0 · 原材料0</div>
+  <div class="gaps">⛔ 自制件缺材料 1 项 · 图纸未发布 2 张</div>
+</div></div><div class="pgroup"><div class="phead"><code>TX26020</code><span class="pname">E2E回归-1006T0157</span><span class="pstat">0/1 台已定死</span><div class="pbar big"><i style="width:0%"></i></div><em class="pavg">0%</em></div><div class="dev ">
+  <div class="dev-id"><b>01A</b><span>回归升降机</span></div>
+  <div class="pct"><div class="pbar"><i style="width:0%"></i></div><em>0%</em></div>
+  <div class="profs"><span class="pr st-idle"><i></i>机械 <b>未派</b></span><span class="pr st-idle"><i></i>电气 <b>未派</b></span><span class="pr st-idle"><i></i>程序 <b>未派</b></span><span class="pr st-idle"><i></i>工艺 <b>未派</b></span></div>
+  <div class="own"><span class="own-k">负责人</span><b>机械经理</b> · <b>电气经理</b> · <b>程序经理</b> · <b>工艺经理</b></div>
+  <div class="dev-num">图纸2 · 组件0 · 零件1 · 自制1 · 外协0 · 标准件0 · 原材料0</div>
+  <div class="gaps">⛔ 自制件缺材料 1 项 · 图纸未发布 2 张</div>
+</div></div><div class="pgroup"><div class="phead"><code>TX26021</code><span class="pname">E2E回归-1006T0204</span><span class="pstat">0/1 台已定死</span><div class="pbar big"><i style="width:0%"></i></div><em class="pavg">0%</em></div><div class="dev ">
+  <div class="dev-id"><b>01A</b><span>回归升降机</span></div>
+  <div class="pct"><div class="pbar"><i style="width:0%"></i></div><em>0%</em></div>
+  <div class="profs"><span class="pr st-idle"><i></i>机械 <b>未派</b></span><span class="pr st-idle"><i></i>电气 <b>未派</b></span><span class="pr st-idle"><i></i>程序 <b>未派</b></span><span class="pr st-idle"><i></i>工艺 <b>未派</b></span></div>
+  <div class="own"><span class="own-k">负责人</span><b>机械经理</b> · <b>电气经理</b> · <b>程序经理</b> · <b>工艺经理</b></div>
+  <div class="dev-num">图纸2 · 组件0 · 零件1 · 自制1 · 外协0 · 标准件0 · 原材料0</div>
+  <div class="gaps">⛔ 自制件缺材料 1 项 · 图纸未发布 2 张</div>
+</div></div><div class="pgroup"><div class="phead"><code>TX26022</code><span class="pname">E2E回归-1006T0210</span><span class="pstat">0/1 台已定死</span><div class="pbar big"><i style="width:0%"></i></div><em class="pavg">0%</em></div><div class="dev ">
+  <div class="dev-id"><b>01A</b><span>回归升降机</span></div>
+  <div class="pct"><div class="pbar"><i style="width:0%"></i></div><em>0%</em></div>
+  <div class="profs"><span class="pr st-idle"><i></i>机械 <b>未派</b></span><span class="pr st-idle"><i></i>电气 <b>未派</b></span><span class="pr st-idle"><i></i>程序 <b>未派</b></span><span class="pr st-idle"><i></i>工艺 <b>未派</b></span></div>
+  <div class="own"><span class="own-k">负责人</span><b>机械经理</b> · <b>电气经理</b> · <b>程序经理</b> · <b>工艺经理</b></div>
+  <div class="dev-num">图纸2 · 组件0 · 零件1 · 自制1 · 外协0 · 标准件0 · 原材料0</div>
+  <div class="gaps">⛔ 自制件缺材料 1 项 · 图纸未发布 2 张</div>
+</div></div><div class="pgroup"><div class="phead"><code>TX26026</code><span class="pname">E2E回归-1006T0234</span><span class="pstat">0/1 台已定死</span><div class="pbar big"><i style="width:0%"></i></div><em class="pavg">0%</em></div><div class="dev ">
+  <div class="dev-id"><b>01A</b><span>回归升降机</span></div>
+  <div class="pct"><div class="pbar"><i style="width:0%"></i></div><em>0%</em></div>
+  <div class="profs"><span class="pr st-idle"><i></i>机械 <b>未派</b></span><span class="pr st-idle"><i></i>电气 <b>未派</b></span><span class="pr st-idle"><i></i>程序 <b>未派</b></span><span class="pr st-idle"><i></i>工艺 <b>未派</b></span></div>
+  <div class="own"><span class="own-k">负责人</span><b>机械经理</b> · <b>电气经理</b> · <b>程序经理</b> · <b>工艺经理</b></div>
+  <div class="dev-num">图纸2 · 组件0 · 零件1 · 自制1 · 外协0 · 标准件0 · 原材料0</div>
+  <div class="gaps">⛔ 自制件缺材料 1 项 · 图纸未发布 2 张</div>
+</div></div><div class="pgroup"><div class="phead"><code>TX26027</code><span class="pname">E2E回归-1006T0241</span><span class="pstat">0/1 台已定死</span><div class="pbar big"><i style="width:0%"></i></div><em class="pavg">0%</em></div><div class="dev ">
+  <div class="dev-id"><b>01A</b><span>回归升降机</span></div>
+  <div class="pct"><div class="pbar"><i style="width:0%"></i></div><em>0%</em></div>
+  <div class="profs"><span class="pr st-idle"><i></i>机械 <b>未派</b></span><span class="pr st-idle"><i></i>电气 <b>未派</b></span><span class="pr st-idle"><i></i>程序 <b>未派</b></span><span class="pr st-idle"><i></i>工艺 <b>未派</b></span></div>
+  <div class="own"><span class="own-k">负责人</span><b>机械经理</b> · <b>电气经理</b> · <b>程序经理</b> · <b>工艺经理</b></div>
+  <div class="dev-num">图纸2 · 组件0 · 零件1 · 自制1 · 外协0 · 标准件0 · 原材料0</div>
+  <div class="gaps">⛔ 自制件缺材料 1 项 · 图纸未发布 2 张</div>
+</div></div><div class="pgroup"><div class="phead"><code>TX26028</code><span class="pname">E2E回归-1006T0248</span><span class="pstat">0/1 台已定死</span><div class="pbar big"><i style="width:0%"></i></div><em class="pavg">0%</em></div><div class="dev ">
+  <div class="dev-id"><b>01A</b><span>回归升降机</span></div>
+  <div class="pct"><div class="pbar"><i style="width:0%"></i></div><em>0%</em></div>
+  <div class="profs"><span class="pr st-idle"><i></i>机械 <b>未派</b></span><span class="pr st-idle"><i></i>电气 <b>未派</b></span><span class="pr st-idle"><i></i>程序 <b>未派</b></span><span class="pr st-idle"><i></i>工艺 <b>未派</b></span></div>
+  <div class="own"><span class="own-k">负责人</span><b>机械经理</b> · <b>电气经理</b> · <b>程序经理</b> · <b>工艺经理</b></div>
+  <div class="dev-num">图纸2 · 组件0 · 零件1 · 自制1 · 外协0 · 标准件0 · 原材料0</div>
+  <div class="gaps">⛔ 自制件缺材料 1 项 · 图纸未发布 2 张</div>
+</div></div><div class="pgroup"><div class="phead"><code>TX26029</code><span class="pname">E2E回归-1006T0310</span><span class="pstat">0/1 台已定死</span><div class="pbar big"><i style="width:0%"></i></div><em class="pavg">0%</em></div><div class="dev ">
+  <div class="dev-id"><b>01A</b><span>回归升降机</span></div>
+  <div class="pct"><div class="pbar"><i style="width:0%"></i></div><em>0%</em></div>
+  <div class="profs"><span class="pr st-idle"><i></i>机械 <b>未派</b></span><span class="pr st-idle"><i></i>电气 <b>未派</b></span><span class="pr st-idle"><i></i>程序 <b>未派</b></span><span class="pr st-idle"><i></i>工艺 <b>未派</b></span></div>
+  <div class="own"><span class="own-k">负责人</span><b>机械经理</b> · <b>电气经理</b> · <b>程序经理</b> · <b>工艺经理</b></div>
+  <div class="dev-num">图纸2 · 组件0 · 零件1 · 自制1 · 外协0 · 标准件0 · 原材料0</div>
+  <div class="gaps">⛔ 自制件缺材料 1 项 · 图纸未发布 2 张</div>
+</div></div><div class="pgroup"><div class="phead"><code>TX26030</code><span class="pname">E2E回归-1006T0318</span><span class="pstat">0/1 台已定死</span><div class="pbar big"><i style="width:0%"></i></div><em class="pavg">0%</em></div><div class="dev ">
+  <div class="dev-id"><b>01A</b><span>回归升降机</span></div>
+  <div class="pct"><div class="pbar"><i style="width:0%"></i></div><em>0%</em></div>
+  <div class="profs"><span class="pr st-idle"><i></i>机械 <b>未派</b></span><span class="pr st-idle"><i></i>电气 <b>未派</b></span><span class="pr st-idle"><i></i>程序 <b>未派</b></span><span class="pr st-idle"><i></i>工艺 <b>未派</b></span></div>
+  <div class="own"><span class="own-k">负责人</span><b>机械经理</b> · <b>电气经理</b> · <b>程序经理</b> · <b>工艺经理</b></div>
+  <div class="dev-num">图纸2 · 组件0 · 零件1 · 自制1 · 外协0 · 标准件0 · 原材料0</div>
+  <div class="gaps">⛔ 自制件缺材料 1 项 · 图纸未发布 2 张</div>
+</div></div><div class="pgroup"><div class="phead"><code>TX26031</code><span class="pname">E2E回归-1006T0353</span><span class="pstat">0/1 台已定死</span><div class="pbar big"><i style="width:0%"></i></div><em class="pavg">0%</em></div><div class="dev ">
+  <div class="dev-id"><b>01A</b><span>回归升降机</span></div>
+  <div class="pct"><div class="pbar"><i style="width:0%"></i></div><em>0%</em></div>
+  <div class="profs"><span class="pr st-idle"><i></i>机械 <b>未派</b></span><span class="pr st-idle"><i></i>电气 <b>未派</b></span><span class="pr st-idle"><i></i>程序 <b>未派</b></span><span class="pr st-idle"><i></i>工艺 <b>未派</b></span></div>
+  <div class="own"><span class="own-k">负责人</span><b>机械经理</b> · <b>电气经理</b> · <b>程序经理</b> · <b>工艺经理</b></div>
+  <div class="dev-num">图纸2 · 组件0 · 零件1 · 自制1 · 外协0 · 标准件0 · 原材料0</div>
+  <div class="gaps">⛔ 自制件缺材料 1 项 · 图纸未发布 2 张</div>
+</div></div><div class="pgroup"><div class="phead"><code>TX26032</code><span class="pname">E2E回归-1006T0400</span><span class="pstat">0/1 台已定死</span><div class="pbar big"><i style="width:0%"></i></div><em class="pavg">0%</em></div><div class="dev ">
+  <div class="dev-id"><b>01A</b><span>回归升降机</span></div>
+  <div class="pct"><div class="pbar"><i style="width:0%"></i></div><em>0%</em></div>
+  <div class="profs"><span class="pr st-idle"><i></i>机械 <b>未派</b></span><span class="pr st-idle"><i></i>电气 <b>未派</b></span><span class="pr st-idle"><i></i>程序 <b>未派</b></span><span class="pr st-idle"><i></i>工艺 <b>未派</b></span></div>
+  <div class="own"><span class="own-k">负责人</span><b>机械经理</b> · <b>电气经理</b> · <b>程序经理</b> · <b>工艺经理</b></div>
+  <div class="dev-num">图纸2 · 组件0 · 零件1 · 自制1 · 外协0 · 标准件0 · 原材料0</div>
+  <div class="gaps">⛔ 自制件缺材料 1 项 · 图纸未发布 2 张</div>
+</div></div><div class="pgroup"><div class="phead"><code>TX26034</code><span class="pname">E2E护栏-付款变更-7043</span><span class="pstat">0/1 台已定死</span><div class="pbar big"><i style="width:0%"></i></div><em class="pavg">0%</em></div><div class="dev ">
+  <div class="dev-id"><b>01A</b><span>升降机</span></div>
+  <div class="pct"><div class="pbar"><i style="width:0%"></i></div><em>0%</em></div>
+  <div class="profs"><span class="pr st-idle"><i></i>机械 <b>未派</b></span><span class="pr st-idle"><i></i>电气 <b>未派</b></span><span class="pr st-idle"><i></i>程序 <b>未派</b></span><span class="pr st-idle"><i></i>工艺 <b>未派</b></span></div>
+  <div class="own"><span class="own-k">负责人</span><b>机械经理</b> · <b>电气经理</b> · <b>程序经理</b> · <b>工艺经理</b></div>
+  <div class="dev-num">图纸3 · 组件1 · 零件1 · 自制0 · 外协1 · 标准件1 · 原材料0</div>
+  <div class="gaps">⛔ 图纸未发布 3 张</div>
+</div></div></details>
+
+<div class="note"><b>样机 v5 · 数据全部真实</b>（结构树取自 TX26002/01A 的设计BOM）。<br>
+你上一轮说的逻辑，我理解成：<b>设备 → 负责人（可多个）→ 结构（组件）→ 每个组件的负责人 + 图纸状态 + 工艺判定的实现方式 + 自制要的原材料</b>。样机里都摆出来了：<br>
+· 设备行加了<b>「负责人」</b>一行（机械经理/电气经理/程序经理/工艺经理）<br>
+· 点开设备 → 结构树：<b>主体组件(机械·机械经理·自制件·已发布)</b> → 机架 → 挂着的材料（电机台达×2、PLC汇川×4）<br>
+· <b>防护罩</b>那条标着「外协件」= 工艺判定"不自己做，发出去"<br>
+<b>要你确认：</b>① 责任人显示到「图纸/组件」级对不对（系统里已有 <code>drawing.owner_id</code>，不用新开发）？② 设备级的"负责人"要单列一行汇总（现在这样），还是就按四专业看？③ 完成度口径还没定（四专业平均 vs 结构完备度）。</div>
+</div></body></html>

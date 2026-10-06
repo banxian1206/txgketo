@@ -38,6 +38,7 @@ const ShippingM = lazy(() => import('./features/shipping/MobilePage'))
 const SiteM = lazy(() => import('./features/site/MobilePage'))
 const ServiceM = lazy(() => import('./features/service/MobilePage'))
 const Workbench = lazy(() => import('./features/workbench/Page'))
+const HomeRedirect = lazy(() => import('./components/domain/HomeRedirect'))
 const Dashboard = lazy(() => import('./features/dashboard/Page'))
 import ShopShell from './features/workbench/ShopShell'
 const DeptWorkbench = lazy(() => import('./features/workbench/DeptWorkbench'))
@@ -67,12 +68,12 @@ function RequireAuth({ children }: { children: JSX.Element }) {
  * 为什么必须有：页签过滤只管“看得见”，管不了有人**直接敲 URL**。
  * 实测过一次真回归：eng_director 打开 /purchase?tab=suppliers —— 他没有任何 purchase:* 码，
  * 页签被过滤成 0 项 → 整页空白，比“看得见但 403”更难自查。
- * 现在：无权限 → 回「我的工作台」（那里人人可进），不渲染空页。
+ * 现在：无权限 → 回 `/workbench` 中转站（自动跳到该账号可见的第一个台），不渲染空页。
  */
 function RequirePerm({ anyOf, children }: { anyOf: string[]; children: JSX.Element }) {
   const loc = useLocation()
   if (!anyOf.some((c) => hasPerm(c))) {
-    // ★ docs/11：带着 ?from= 进来却没权限 → 送回他来的那个台（比一律丢去「我的工作台」更近）
+    // ★ docs/11：带着 ?from= 进来却没权限 → 送回他来的那个台（比一律丢回默认更近）
     const from = new URLSearchParams(loc.search).get('from')
     return <Navigate to={from ? decodeURIComponent(from) : '/workbench'} replace />
   }
@@ -112,9 +113,13 @@ export default function App() {
         }
       >
         <Route index element={<Workbench />} />
+        {/* ★ 2026-10-05：「我的工作台」入口取消（客户拍板）。/workbench 变成
+            “跳到我可见的第一个台”的中转站 —— 侧栏/登录/无权限回退等 9 处引用不用改。
+            ⚠ 必须在 WorkbenchShell **之外**（下面那个 pathless Route 会把 /workbench 也包进去），
+            否则中转站自己就成了台里的一页。 */}
+        <Route path="workbench" element={<HomeRedirect />} />
         {/* P0 修正：工作台域 = 角色台 Tab 化（me 动态列表；采购台/仓库台归位） */}
         <Route element={<WorkbenchShell />}>
-        <Route path="workbench" element={<Workbench />} />
         <Route path="workbench/sales" element={<SalesWorkbench />} />
         <Route path="workbench/pm" element={<PmWorkbench />} />
         <Route path="workbench/eng" element={<EngWorkbench />} />

@@ -1,5 +1,5 @@
 import { App, Button, Card, Table, Tooltip, Typography } from 'antd'
-import { Status } from '../../components/ds'
+import { Status, Empty } from '../../components/ds'
 import type { ColumnsType } from 'antd/es/table'
 import { useCallback, useEffect, useState } from 'react'
 
@@ -140,7 +140,8 @@ export default function Reviews() {
         loading={loading}
         dataSource={rows}
         columns={columns}
-        pagination={{ pageSize: 20, showSizeChanger: false }}
+        pagination={{ pageSize: 10, showSizeChanger: true }}
+        locale={{ emptyText: <Empty text="没有评审单 —— 设计师提交后会出现在这里。" /> }}
       />
       <ReviewDetailModal
         ticketId={ticketId}

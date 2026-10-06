@@ -134,7 +134,7 @@ export default function Suppliers() {
           size="middle"
           loading={loading}
           dataSource={rows}
-          pagination={{ pageSize: 20, showSizeChanger: false }}
+          pagination={{ pageSize: 10, showSizeChanger: true }}
           locale={{ emptyText: <Empty description="还没有供应商" /> }}
           columns={[
             {
@@ -419,7 +419,7 @@ export default function Suppliers() {
         <Table<QuoteRow>
           rowKey="id"
           size="small"
-          pagination={{ pageSize: 15, showSizeChanger: false }}
+          pagination={{ pageSize: 10, showSizeChanger: true }}
           dataSource={quotes}
           locale={{ emptyText: <Empty description="还没有价格记录" /> }}
           columns={[

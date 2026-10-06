@@ -19,7 +19,7 @@ body {
   background: #eaf3ff !important;
 }
 .project-row-hover .row-title {
-  color: #1f6feb;
+  color: var(--ds-acc);
   text-decoration: underline;
 }
 
@@ -51,11 +51,11 @@ body {
   white-space: nowrap;
 }
 .anchor-bar a:hover {
-  background: #eaf3ff;
-  color: #1f6feb;
+  background: var(--ds-accentSoft);
+  color: var(--ds-acc);
 }
 .anchor-bar a.active {
-  background: #1f6feb;
+  background: var(--ds-acc);
   color: #fff;
 }
 
@@ -101,7 +101,7 @@ body {
   flex: none;
   opacity: 0;
   cursor: pointer;
-  color: #1f6feb;
+  color: var(--ds-acc);
   font-size: 13px;
   transition: opacity 0.15s;
 }
@@ -123,16 +123,20 @@ body {
   border-top: 1px solid #f0f0f0;
 }
 
-/* 标准库左侧品类导航 */
+/* 标准库左侧品类导航
+   ★ 全站统一（2026-10-05）：这里原来写死了**旧主色** `#1f6feb` —— 那是方案 A 已经换掉的
+   值（现主色 `#1f5fd0`，§9.1 ），也就是**同一个界面里两种蓝**；`VIS-hex` 扫不到 `styles.css`
+   （只扫 tsx），所以一直没被抓到。现在一律走 var(--ds-*)。 */
 .lib-class {
   display: block;
   padding: 4px 8px;
   border-radius: 6px;
   font-size: 13px;
-  color: #595959;
+  line-height: 20px;
+  color: var(--ds-ink2);
 }
-.lib-class:hover { background: #f0f5ff; color: #1f6feb; }
-.lib-class.active { background: #e6f0ff; color: #1f6feb; font-weight: 600; }
+.lib-class:hover { background: var(--ds-accentSoft); color: var(--ds-acc); }
+.lib-class.active { background: var(--ds-accentSoft); color: var(--ds-acc); font-weight: 600; }
 
 /* 设计工作面：还没创建的总装图（虚根） */
 .virtual-root-row > td {
@@ -318,7 +322,7 @@ body {
 }
 
 .login-switch:hover {
-  color: #1f6feb;
+  color: var(--ds-acc);
 }
 
 /* 超矮窗口：页脚回流为常规流，避免盖住表单 */
@@ -368,13 +372,13 @@ body {
 }
 
 .domain-tabs a:hover {
-  color: #1f6feb;
+  color: var(--ds-acc);
 }
 
 .domain-tabs a.active {
-  color: #1f6feb;
+  color: var(--ds-acc);
   font-weight: 500;
-  border-bottom-color: #1f6feb;
+  border-bottom-color: var(--ds-acc);
 }
 
 .domain-content {

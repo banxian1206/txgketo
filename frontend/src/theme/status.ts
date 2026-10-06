@@ -51,9 +51,39 @@ export const WH_ISSUE_STATUS: Record<string, string> = { 已备料: 'processing'
 
 export const ENG_BOARD_STATE: Record<string, string> = { 审核中: 'processing', 已发布: 'success', 已退回: 'error', 待开始: 'default', 未派: 'default', 进行中: 'blue' }
 
-export const NOTIF_TYPE: Record<string, string> = {  }
+/**
+ * ★ 通知类型 → 中文名（**唯一出口**，2026-10-05 逐页走查加）
+ *
+ * 之前这张表在 `NotificationsDrawer` 里，前端另一处（我的工作台的消息区）**根本没翻**，
+ * 直接渲染 `n.type` → 首屏上出现 `service` / `acceptance` / `site` 三个英文标签；
+ * 抽屉那张又漏了 `site`（库里最高频，65 条）和 `ship` → `?? n.type` 兜底照样露英文。
+ *
+ * 规矩：
+ *   ① 键必须**覆盖后端 `NOTIF_TYPES` 全集**（backend/app/models/notify.py）——
+ *      前后端对账由 `e2e:static` 的 `NOTIF-消息类型不许裸露英文` 钉着（那条能红才算数）。
+ *   ② 谁都不许再直接渲染 `notification.type` 裸值。
+ * ⚠ 颜色**故意不给**（方案 A：颜色只给异常，类型靠文字区分）——原先那张空的
+ *   `NOTIF_TYPE`/`WB_TYPE`（`{}`）是「彩色 Tag 收敛」时留下的死代码，已删。
+ */
+export const NOTIF_TYPE_LABEL: Record<string, string> = {
+  task: '任务',
+  review: '评审',
+  change: '改版',
+  release: '发布',
+  warehouse: '仓库',
+  purchase: '采购',
+  acceptance: '验收',
+  service: '售后',
+  site: '现场',
+  ship: '发运',
+  mfg: '制造',
+  payment: '回款',
+}
 
-export const WB_TYPE: Record<string, string> = {  }
+/** 取中文名；**没有兜底成裸 key**（漏翻要在护栏里红，不许悄悄显示英文） */
+export function notifTypeLabel(type: string): string {
+  return NOTIF_TYPE_LABEL[type] ?? String(type)
+}
 
 // OCR 外部集成的配置状态（第十轮 R-1/§3：`available` 只说明"配没配"，徽标要按 state 说实话）
 export const OCR_STATE: Record<string, string> = { unconfigured: 'default', unverified: 'warning', verified: 'success', failed: 'error' }

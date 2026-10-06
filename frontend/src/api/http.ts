@@ -9,7 +9,6 @@ export const api = axios.create({ baseURL: '/api/v1', timeout: 20000 })
 api.interceptors.request.use((config) => {
   const s = readSession()
   if (s?.token) config.headers.Authorization = `Bearer ${s.token}`
-  if (s?.impersonateId) config.headers['X-Impersonate'] = String(s.impersonateId)
   return config
 })
 

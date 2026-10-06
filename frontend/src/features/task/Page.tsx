@@ -1,4 +1,4 @@
-import { App, Button, Card, Empty, Modal, Segmented, Select, Space, Table, Tooltip, Typography } from 'antd'
+import { App, Button, Card, Modal, Segmented, Select, Space, Table, Tooltip, Typography } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import { useCallback, useEffect, useState } from 'react'
 import PurchaseActions from '../../components/PurchaseActions'
@@ -10,7 +10,7 @@ import { TASK_TABS, TASK_GROUPS } from '../../configs/tabs'
 import { useTab } from '../../hooks/useTab'
 import WorkbenchTabs from '../../components/ds/WorkbenchTabs'
 import { useGoFrom } from '../../hooks/useFrom'
-import { Status, Chip } from '../../components/ds'
+import { Status, Chip, Empty } from '../../components/ds'
 /** 我的任务（工作台）：我的任务 / 我组任务（经理，05 卷 §2.2） */
 export default function MyTasks() {
   const { message } = App.useApp()
@@ -288,8 +288,8 @@ export default function MyTasks() {
         size="middle"
         loading={loading}
         dataSource={filtered}
-        pagination={{ pageSize: 20, showSizeChanger: false }}
-        locale={{ emptyText: <Empty description={scope === 'team' ? '本组没有任务' : '没有指派给你的任务'} /> }}
+        pagination={{ pageSize: 10, showSizeChanger: true }}
+        locale={{ emptyText: <Empty text={scope === 'team' ? '本组没有任务' : '没有指派给你的任务'} /> }}
         columns={columns}
       />
       <Modal

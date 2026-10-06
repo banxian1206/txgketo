@@ -37,6 +37,11 @@ export interface QItem {
   onClick?: () => void
   muted?: boolean
   /**
+   * ★ 方向 2 ③：整行语义色（左侧 3px 色条）—— “这条要不要动 / 卡在哪”。
+   * 不给就是中性行（守住“颜色只给异常”）。见 `QueueRow` 的 `tone`。
+   */
+  tone?: Tone
+  /**
    * 行内明细（可展开）：有些队列**必须**看明细才能动手 —— 例如仓库的领料单要按材料逐条备料。
    * 给 `expand` 就自动出现「明细」开关；**默认不展开**（首屏只保留"要不要动这一条"）。
    */
@@ -49,7 +54,7 @@ export default function QueueBoard({
   search,
   emptyText = '这里没有要处理的。',
   emptyAction,
-  pageSize = 20,
+  pageSize = 10,   // ★ 全站统一：队列一页 10 条（10×56px ≈ 一屏内）
   loading,
 }: {
   items: QItem[]
@@ -122,6 +127,7 @@ export default function QueueBoard({
               }
               onClick={it.onClick}
               muted={it.muted}
+              tone={it.tone}
             />
             {it.expand && open[it.key] && <div className="ds-row-expand">{it.expand}</div>}
           </div>

@@ -1,6 +1,6 @@
 import { useUrlState } from '../../hooks/useUrlState'
 import { useAsmBoard } from '../../hooks/useAsmBoard'
-import { App, Button, Card, Col, Empty, Form, Input, InputNumber, Progress, Radio, Row, Select, Space, Table, Typography } from 'antd'
+import { App, Button, Card, Col, Form, Input, InputNumber, Progress, Radio, Row, Select, Space, Table, Typography } from 'antd'
 import { useEffect, useMemo, useState } from 'react'
 import { debugAssembly, errMsg, finishAssembly, getKitting, hasPerm, FUNNEL_ORDER, kittingFunnel, kittingProjects, listProjects, startAssembly, type AssemblyRecordRow, type KittingFunnel, type KittingLine, type KittingResult, type ProjectFunnelRow } from '../../api/client'
 import AuthedImage from '../../components/AuthedImage'
@@ -8,7 +8,7 @@ import MfgPhotoPicker from '../../components/MfgPhotoPicker'
 import AppModal from '../../components/AppModal'
 import { mfgPhotoUrl } from '../../api/client'
 import { ASSEMBLY_STATUS as STATUS_COLOR, toneOf } from '../../theme/status'
-import { Chip, Metrics, PageHead, Panel, Status } from '../../components/ds'
+import { Chip, Empty, Metrics, PageHead, Panel, Status } from '../../components/ds'
 import ShopViews from '../../components/domain/ShopViews'
 import { T } from '../../theme/tokens'
 import { useGoFrom } from '../../hooks/useFrom'
@@ -180,7 +180,10 @@ export default function Assembly() {
           options={projects.map((p) => ({ value: p.project_no, label: `${p.project_no} ${p.project_name}` }))}
         />
       </div>
-      {!projectNo && <Empty description="先选一个项目" />}
+      {/* ★ 走查 2026-10-05：原来用 antd <Empty>（默认灰插图 + 「先选一个项目」）——
+          docs/15 定了「antd 默认空态 0 处」，改 ds <Empty>：说人话 + 给下一步（选项目本身就是下一步，
+          所以只给一句话，不硬塞按钮）。ds 版也更矮，页高从 1020 降下来。 */}
+      {!projectNo && <Empty text="先在上面选一个项目 —— 齐套率、装配、厂内调试都是按项目看的。" />}
       {/* ★ G5 项目视角（主）：整个项目要的东西现在分布在哪一格 */}
       {projectNo && funnel && funnel.total > 0 && (
         <Card
@@ -235,7 +238,7 @@ export default function Assembly() {
       )}
       {projectNo && (
         <Row gutter={12} style={{ marginBottom: 16 }}>
-          {overview.length === 0 && <Empty description="这个项目还没有设备" />}
+          {overview.length === 0 && <Empty text="这个项目还没有设备 —— 立项时建的设备会出现在这里。" />}
           {overview.map((o) => (
             <Col span={8} key={o.equip_no} style={{ marginBottom: 12 }}>
               <Card
@@ -308,8 +311,8 @@ export default function Assembly() {
         size="small"
         loading={loading}
         dataSource={records}
-        pagination={{ pageSize: 10, showSizeChanger: false }}
-        locale={{ emptyText: <Empty description="还没有装配记录" /> }}
+        pagination={{ pageSize: 10, showSizeChanger: true }}
+        locale={{ emptyText: <Empty text="还没有装配记录 —— 齐套后点「开始装配」就在这里留痕。" /> }}
         columns={[
           {
             title: '项目 / 设备',

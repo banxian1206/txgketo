@@ -12,7 +12,6 @@ import {
   Select,
   Space,
   Table,
-  Tag,
 } from 'antd'
 import { useState, type ReactNode } from 'react'
 import {
@@ -113,11 +112,11 @@ export default function Site() {
             rowKey="id"
             size="small"
             dataSource={wb?.dailies ?? []}
-            pagination={{ pageSize: 10, showSizeChanger: false }}
+            pagination={{ pageSize: 10, showSizeChanger: true }}
             locale={{ emptyText: <DsEmpty text="还没有汇报" /> }}
             columns={[
               { title: '日期', dataIndex: 'report_date', width: 110 },
-              { title: '阶段', dataIndex: 'stage', width: 100, render: (v: string) => <Tag color="processing">{v}</Tag> },
+              { title: '阶段', dataIndex: 'stage', width: 100, render: (v: string) => <Status tone="run">{v}</Status> },
               { title: '设备', dataIndex: 'equip_no', width: 80, render: (v: string | null) => v ?? '—' },
               { title: '人数', dataIndex: 'people', width: 70, render: (v: number | null) => v ?? '—' },
               { title: '完成了', dataIndex: 'done_items', render: (v: string[]) => v.join('；') },
@@ -174,7 +173,7 @@ export default function Site() {
             pagination={false}
             locale={{ emptyText: <DsEmpty text="还没申请调试" /> }}
             columns={[
-              { title: '状态', dataIndex: 'status', width: 110, render: (v: string) => <Tag color={COMMISSION_COLOR[v] ?? 'default'}>{v}</Tag> },
+              { title: '状态', dataIndex: 'status', width: 110, render: (v: string) => <Status tone={toneOf(COMMISSION_COLOR[v] ?? 'default')}>{v}</Status> },
               { title: '申请时间', dataIndex: 'request_at', width: 150, render: (v: string | null) => v?.slice(0, 16).replace('T', ' ') ?? '—' },
               { title: '派谁去', dataIndex: 'dispatch_to', width: 140, render: (v: string | null) => v ?? '—' },
               { title: '计划到场', dataIndex: 'plan_date', width: 110, render: (v: string | null) => v ?? '—' },
@@ -251,8 +250,9 @@ export default function Site() {
           issues: wb?.issues.length ?? 0,
         }}
         metrics={[
+          // ★ 方向 2 ② 主角指认：现场台主角 = **现场问题待处理**：异常优先于日常（清点/汇报是常规节奏，问题是不等人）。（ds `MetricItem.lead`）
           { key: 'incoming', label: '待清点来货', value: incoming.pending.length, unit: '单', tone: incoming.pending.length ? 'warn' : undefined, dimZero: true, to: '?tab=incoming' },
-          { key: 'issues', label: '现场问题待处理', value: wb?.issues.filter((x) => x.status === '待处理').length ?? 0, unit: '个', tone: (wb?.issues.filter((x) => x.status === '待处理').length ?? 0) > 0 ? 'err' : undefined, dimZero: true, to: '?tab=issues' },
+          { key: 'issues', label: '现场问题待处理', value: wb?.issues.filter((x) => x.status === '待处理').length ?? 0, unit: '个', tone: (wb?.issues.filter((x) => x.status === '待处理').length ?? 0) > 0 ? 'err' : undefined, dimZero: true, to: '?tab=issues', lead: true },
           { key: 'commission', label: '申请调试', value: wb?.commissions.length ?? 0, unit: '单', dimZero: true, to: '?tab=commission' },
           { key: 'daily', label: '今日汇报', value: c?.daily_today ?? 0, unit: '条', tone: c?.daily_today ? 'ok' : undefined, dimZero: true, to: '?tab=daily' },
           { key: 'survey', label: '勘测记录', value: wb?.surveys.length ?? 0, unit: '条', dimZero: true, to: '?tab=survey' },

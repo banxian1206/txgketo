@@ -9,6 +9,7 @@ import { fileURLToPath } from 'node:url';
 import { check, summary, exitWith, results } from './lib.mjs';
 
 const SRC = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../src');
+const BACKEND = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../backend/app');
 
 function grepAll(pattern) {
   const hits = [];
@@ -59,9 +60,29 @@ function grepAll(pattern) {
     const src = fs.readFileSync(f, 'utf8')
     if (!/<WorkbenchPage/.test(src)) bad.push(`${rel} 没用 <WorkbenchPage>（台骨架未统一）`)
     if (/<WorkbenchTabs/.test(src)) bad.push(`${rel} 还在用旧的 <WorkbenchTabs>（两套框架并行）`)
-    if (/locale=\{\{\s*emptyText:\s*<Empty description/.test(src)) {
+    // ⚠ 两条正则都要（2026-10-05 走查补的盲区）：
+    //   ① 只查 `locale={{ emptyText: <Empty description` → 漏掉**直接写** `<Empty description="…"/>` 的；
+    //   ② 只查台页面本身 → 漏掉台页面**内嵌的子页面**（PM 台内嵌验收页、车间台内嵌装配页），
+    //      而那些子页的空态一样会出现在台屏上（实测：PM 台「验收与质保」分区露出 antd 灰插图）。
+    if (/locale=\{\{\s*emptyText:\s*<Empty description/.test(src) || /<Empty\s+description=/.test(src)) {
       bad.push(`${rel} 还有 antd 默认空态（应换成 ds <Empty text=… action=…>，说人话 + 下一步）`)
     }
+    // 台页面 import 的业务子页（相对路径 import）也纳入扫描 —— 台屏上看得到的空态得一视同仁
+    for (const m of src.matchAll(/from\s+'(\.\.[^']+)'\s*$/gm)) {
+      const sub = path.resolve(path.dirname(f), m[1])
+      for (const cand of [`${sub}.tsx`, path.join(sub, 'Page.tsx')]) {
+        if (!fs.existsSync(cand) || !/features\//.test(cand)) continue
+        const s2 = fs.readFileSync(cand, 'utf8')
+        if (/<Empty\s+description=/.test(s2) || /locale=\{\{\s*emptyText:\s*<Empty description/.test(s2)) {
+          bad.push(`${cand.replace(SRC, 'src')}（${rel} 内嵌的子页）还有 antd 默认空态`)
+        }
+        break
+      }
+    }
+    // 每张 <Table 都要说自己空的时候说什么（漏写 = 空的时候露出 antd 灰插图 + 「暂无数据」）
+    const tCount = (src.match(/<Table[\s>]/g) || []).length
+    const eCount = (src.match(/emptyText/g) || []).length
+    if (tCount > eCount) bad.push(`${rel} 有 ${tCount} 张 <Table 但只写了 ${eCount} 处 emptyText（漏写的空态会露 antd 灰插图）`)
     // 声明 queue 的页签 → 页面里必须有队列行
     const re = new RegExp(`key: '${key}'[\\s\\S]{0,4000}?defaultTab|defaultTab`)
     if (!re.test(boards)) bad.push(`BOARDS.${key} 没声明 defaultTab`)
@@ -72,17 +93,30 @@ function grepAll(pattern) {
       bad.push(`${rel} 有 kind:'queue' 的页签，但页面里没有队列行`)
     }
   }
-  // ★ 两个"没有流程条"的台也要守骨架前两件：我的工作台（有意不放页签，docs/10 P1）与经营驾驶舱（同屏四块）
-  for (const [rel, why] of [
-    ['features/workbench/Page.tsx', '我的工作台'],
-    ['features/dashboard/Page.tsx', '经营驾驶舱'],
-  ]) {
+  // ★ 经营驾驶舱也要守骨架前两件（它是“有台头+结论条、但没有流程条”的那一类：同屏四块）
+  //   ⚠ 2026-10-05：原来这里还列着「我的工作台」—— 那个入口**已取消**（客户拍板：与部门台内容重叠
+  //   且不按岗位分层），所以它不该再被当“一个台”来断言骨架（否则会一直报红，提醒人去改一个
+  //   已经不存在的页面）。改为断言它**确实不再是聚合页**（`features/workbench/Page.tsx` 现在
+  //   只是三个落地页的宿主）。
+  for (const [rel, why] of [['features/dashboard/Page.tsx', '经营驾驶舱']]) {
     const f = path.join(SRC, rel)
     if (!fs.existsSync(f)) { bad.push(`${rel} 不存在`); continue }
     const src = fs.readFileSync(f, 'utf8')
     if (!/<PageHead/.test(src)) bad.push(`${why} 少了台头（PageHead）`)
     if (!/<Metrics/.test(src)) bad.push(`${why} 少了结论条（Metrics）—— 结论条一律 5 个数字（0 也占位）`)
     if (/locale=\{\{\s*emptyText:\s*<Empty description/.test(src)) bad.push(`${why} 还有 antd 默认空态`)
+  }
+  // 「我的工作台」已取消：它现在只能是三个落地页的宿主，不得再长出聚合页
+  {
+    const f = path.join(SRC, 'features/workbench/Page.tsx')
+    const src = fs.existsSync(f) ? fs.readFileSync(f, 'utf8') : ''
+    if (/<Metrics|<QueueBoard|const todos: TodoRow/.test(src)) {
+      bad.push('features/workbench/Page.tsx 又长出了「我的工作台」聚合页（客户 2026-10-05 已取消该入口）')
+    }
+    // 台清单里也不能再有 mine
+    if (/key:\s*['"]mine['"]/.test(fs.readFileSync(path.join(SRC, 'configs/boards.ts'), 'utf8'))) {
+      bad.push('configs/boards.ts 里还有 mine 台（已取消）')
+    }
   }
   // 注册表内部一致性：defaultTab 必须是自己的页签之一；每个页签必须声明 kind
   const defs = [...boards.matchAll(/export const (\w+)_BOARD: BoardDef = \{([\s\S]*?)\n\}/g)]
@@ -581,6 +615,29 @@ const FEATS = path.join(SRC, 'features');
     bad.length ? `同一页面又叠了多条页签条（第二层改用 Segmented/筛选，跨页改用子路由）: ${bad.join('; ')}`
       : 'features/ 下每个页面最多 1 条 <Tabs>')
 }
+
+// TAB2-台内只有一行可点页签条（2026-10-05 客户实测 bug）
+//   现象：采购经理点「待办」组**没有任何反应**，而「待我审批」明明有 3 单。
+//   根因：台内当时是**两排可点的 Segmented**（组 + 组内页签）。点组 = “跳到组内第一个”，
+//        而人已经在那一组时 **URL 与内容都不变** = 死路 → 用户以为“没展示”。
+//        客户要求：“待办这里应该就是我的三条待审批的采购单”——
+//        即“待办”与“待我审批”本是一件事，不该让人选两遍；且“所有标签都是统一的”。
+//   现在：组不再当可点胶囊、也不再画小标题，**所有队列平铺成唯一一行**（带待办数）。
+//   这条护栏钉住：① 台内只有一条 `.ds-subtabs.is-flow` ② 不许再出现“组”那一排 ③ 数字只拼一次。
+{
+  const bad = []
+  const nav = fs.readFileSync(path.join(SRC, 'components/ds/SectionNav.tsx'), 'utf8')
+  if (/ds-subtabs ds-grp/.test(nav)) bad.push('SectionNav 又画了“组”那一排（点它=跳组内第一个，人在该组时点了没反应=死路）')
+  const grouped = nav.match(/if \(grouped\) \{[\s\S]*?\n  \}/)
+  if (grouped && /sections\.filter\(\(s\) => g\.keys\.includes/.test(grouped[0])) {
+    bad.push('SectionNav 的分组分支还在按“当前组”过滤页签（应全部平铺）')
+  }
+  if (grouped && /badgeText\(s\.badge\)/.test(grouped[0])) {
+    bad.push('SectionNav 又在拼一次待办数（label 已由 tabLabel(t, counts) 拼好，会出现“(3) (3)”）')
+  }
+  check('TAB2-台内只有一行可点页签条', bad.length === 0,
+    bad.length ? bad.slice(0, 3).join(' | ') : '组不“可点”（无死路）· 队列平铺一行 · 数字只拼一次')
+}
 {
   // 例外必须写清为什么，且只允许这几条（新增一条就得在这儿交代）
   const EXEMPT = {
@@ -894,6 +951,314 @@ function topItems(block) {
   const miss = need.filter((x) => !s.includes(x))
   check('MOBILE-消息深链不落PC', miss.length === 0 && /电脑端处理/.test(s),
     miss.length ? `移动映射缺: ${miss.join(', ')}` : '有移动映射 + PC-only 兜底（不会在手机里长出桌面壳）')
+}
+
+// NOTIF-消息类型不许裸露英文（2026-10-05 逐页走查）
+//   实测：我的工作台消息区直接渲染 `n.type` → 首屏出现 service / acceptance / site 三个英文标签；
+//        顶栏抽屉虽有中文表，却漏了 site（库里最高频 65 条）与 ship，`?? n.type` 兜底照样露英文。
+//   两件事一起钉：① 前端中文表**覆盖**后端 NOTIF_TYPES 全集（两边对账）
+//              ② 任何地方都不许直接把通知的 type 裸值渲染出来（必须过 notifTypeLabel()）
+{
+  const statusTs = fs.readFileSync(path.join(SRC, 'theme', 'status.ts'), 'utf8')
+  const notifyPy = path.join(BACKEND, 'models', 'notify.py')
+  const bad = []
+
+  // ① 前后端词表对账
+  const be = fs.existsSync(notifyPy) ? fs.readFileSync(notifyPy, 'utf8') : ''
+  const beTypes = [...(be.match(/NOTIF_TYPES[^=]*=\s*\(([\s\S]*?)\)/) || [, ''])[1].matchAll(/"([a-z_]+)"/g)].map((m) => m[1])
+  const feTypes = [...(statusTs.match(/NOTIF_TYPE_LABEL[^=]*=\s*\{([\s\S]*?)\n\}/) || [, ''])[1].matchAll(/([a-z_]+)\s*:/g)].map((m) => m[1])
+  if (!beTypes.length) bad.push('后端 NOTIF_TYPES 没读到（models/notify.py 结构变了？）')
+  if (!feTypes.length) bad.push('前端 NOTIF_TYPE_LABEL 没读到（theme/status.ts 结构变了？）')
+  for (const t of beTypes) if (!feTypes.includes(t)) bad.push(`后端发的 "${t}" 没有中文名`)
+  for (const t of feTypes) if (!beTypes.includes(t)) bad.push(`前端有 "${t}" 但后端不发（词表漂了）`)
+
+  // ② 不许裸渲染通知类型
+  const walk = dir => {
+    for (const f of fs.readdirSync(dir)) {
+      const p = path.join(dir, f)
+      if (fs.statSync(p).isDirectory()) { walk(p); continue }
+      if (!/\.(ts|tsx)$/.test(f)) continue
+      const code = fs.readFileSync(p, 'utf8')
+      code.split('\n').forEach((l, i) => {
+        const t = l.trim()
+        if (t.startsWith('//') || t.startsWith('*')) return
+        // 渲染通知的 type 裸值：<X>{n.type}</X> / {n.type} 直接出现在 JSX 里
+        if (/>\{[^}]*\.(type)\}<\//.test(t) || /\{(n|msg|it|row|notif)\.type\}/.test(t)) {
+          if (!/notifTypeLabel/.test(t)) bad.push(`${p.replace(SRC, 'src')}:${i + 1} 裸渲染通知类型（要过 notifTypeLabel()）`)
+        }
+      })
+    }
+  }
+  walk(SRC)
+  check('NOTIF-消息类型不许裸露英文', bad.length === 0,
+    bad.length ? bad.slice(0, 4).join(' | ') : `前后端 ${beTypes.length} 个通知类型全部有中文名，且无裸渲染`)
+}
+
+// SHELL2-方向2「结论优先」（2026-10-05 客户选定 · docs/99-逐页走查报告 + design-lab/workbench）
+//   起因：客户实测“工作台看上去不好看”。体检发现不是审美问题而是四个可测的病：
+//     糙（内距 14 种/圆角 6 种）· 平（5 个数等大等权）· 闷（队列行无色、全站唯一色彩是选中态）
+//     · 散（空台 465px 留白 / 台账页 1907px）。
+//   方向 2 只动三件**零页高代价**的事（明确不做“队列行卡片化”——每行 +14px，5 行就 +70px，
+//   而页高已经是客户骂过的点）：① 台头给结论 ② 1 主 4 次 ③ 队列行状态色条。
+//   三条都要钉住，否则一周就漂回去（“平”和“闷”都是**看不到的回归”）。
+{
+  const bad = []
+
+  // ② 结论条必须有主角（且最多一个）：11 个台里 10 个指认了（驾驶舱故意不指认——“看全局”不是“动手”）
+  const BOARDS2 = {
+    sales: 'features/workbench/SalesWorkbench.tsx',
+    pm: 'features/workbench/PmWorkbench.tsx',
+    eng: 'features/workbench/EngWorkbench.tsx',
+    purchase: 'features/purchase/Page.tsx',
+    warehouse: 'features/warehouse/Page.tsx',
+    shop: 'features/manufacturing/Page.tsx',
+    shipping: 'features/shipping/Page.tsx',
+    site: 'features/site/Page.tsx',
+    service: 'features/service/Page.tsx',
+  }
+  for (const [key, rel] of Object.entries(BOARDS2)) {
+    const src = fs.readFileSync(path.join(SRC, rel), 'utf8')
+    const block = (src.match(/metrics=\{\[[\s\S]*?\n\s*\]\}/) || [''])[0]
+    if (!block) { bad.push(`${rel} 读不到 metrics`); continue }
+    // ⚠ 计数前先剥掉注释行：注释里写「下面每处 `lead: true`」会把计数变成 2（第一版假阳性·已修）
+    const codeOnly = block.split('\n').filter((l) => !l.trim().startsWith('//')).join('\n')
+    const leads = (codeOnly.match(/\blead: true\b/g) || []).length
+    if (leads === 0) bad.push(`${rel} 结论条没指认主角（5 个数等大等权 = 看不出该动哪个）`)
+    if (leads > 1) bad.push(`${rel} 结论条指了 ${leads} 个主角（最多一个）`)
+  }
+  // 台头不再摆长流程说明（方向 2 ①）：**只看 sub，不看 help**（help 本来就是放流程的地方）。
+  // ⚠ 两次踩坑后的结论：**静态量不准**。
+  //   ① 搜整页“→” → 把 help 也报红（假阳性）；
+  //   ② 量字面量长度 → 匹配到的是条件分支里的短句（87/106/89 全是假阳性），而真正该抓的
+  //      “台头长句”往往是模板拼出来的，字面量并不长。
+  //   判据换成**可判定的结构信号**：sub 里不许再出现**流程动词**（勾/拍照/装车/清点到缺损…）——
+  //   那是“怎么做”（属 help）。
+  //   ⚠ 第三次修正：第一版把“验收/入库/领料”也当流程动词 → 仓库台假阳性。但那些是**业务名词**
+  //     （“今天有 4 项待办（收货/入库/领料）”是**现状**，合法）。所以只留真正的**动作词**。
+  const FLOW_WORDS = /(逐项勾|勾「已发」|拍照后|装车拍照|清点到|按同一份清单|冻结|自动触发采购|不能私下改图)/
+  for (const [key, rel] of Object.entries(BOARDS2)) {
+    const src = fs.readFileSync(path.join(SRC, rel), 'utf8')
+    const m = src.match(/\n\s*sub=(\{[\s\S]{0,600}?\n\s{4,}\}|"[^"]*")/)
+    if (!m) continue
+    // ⚠ 块里含注释行（“验收 / 入库 / 领料”写在注释里也会命中·已修）——先剥注释再看
+    const bag = m[1].split('\n').filter((l) => !l.trim().startsWith('//')).join('\n')
+    // 只看**中文字面量**（反引号/引号里的中文片段）
+    const lits = [...bag.matchAll(/[`']([^`']*[\u4e00-\u9fa5][^`']*)[`']/g)]
+      .map((x) => x[1])
+      .join(' ')
+    if (FLOW_WORDS.test(lits)) bad.push(`${rel} 台头 sub 出现流程动词（“怎么做”属 help 气泡，不是台头该说的话）`)
+  }
+
+  // ③ 队列行语义色条：壳必须支持（否则页面传了也白传）；且至少两个台真的在用（不然就是没落地）
+  const dsIdx = fs.readFileSync(path.join(SRC, 'components/ds/index.tsx'), 'utf8')
+  if (!/is-\$\{tone\}/.test(dsIdx)) bad.push('QueueRow 不支持 tone（左侧状态色条）')
+  if (!/\.ds-row\.is-err/.test(fs.readFileSync(path.join(SRC, 'theme/paper.css'), 'utf8'))) {
+    bad.push('paper.css 没有 .ds-row 语义色条样式')
+  }
+  // 只认“传给 <QueueBoard> 的那一段”（split 之前的是别处的 tone，别混进来）
+  const toneUsers = Object.entries(BOARDS2).filter(([, rel]) => {
+    const s = fs.readFileSync(path.join(SRC, rel), 'utf8')
+    const i = s.indexOf('<QueueBoard')
+    return i > 0 && /tone:\s*(?:[^,\n]*\?|')/.test(s.slice(i, i + 4000))
+  })
+  if (toneUsers.length < 2) bad.push(`只有 ${toneUsers.length} 个台在给队列行上色（方向 2 ③ 没落地）`)
+
+  // ② 字号：主角那档 32 必须进 FS 刻度（护栏 VIS-字号在刻度内 同步加了它）
+  const tk = fs.readFileSync(path.join(SRC, 'theme/tokens.ts'), 'utf8')
+  if (!/hero:\s*32/.test(tk)) bad.push('FS 刻度里没有 hero: 32（结论条主角那档）')
+
+  check('SHELL2-方向2结论优先', bad.length === 0,
+    bad.length ? bad.slice(0, 4).join(' | ') : '①台头给结论 ②1主4次 ③队列行状态色条（零页高代价）')
+}
+
+// VIS3-精调层不许出刻度（2026-10-05「很多地方都有精调的必要」）
+//   起因：客户第二次实测反馈“太粗糙”。精细度体检（10 页逐元素 computed style，
+//   报“哪种值 + 出自哪个选择器 + 几次”）把粗糙点定位到 4 类，且**大部分是版面层自己造的**：
+//     行高 18 种（12px 同时有 18.86 和 13.2 两个行高！——最隐蔽的“毛”）
+//     控件高度 4 种（徽标 22 / 按钮 24 / 「?」16 / 输入 32）
+//     表格单元格 9px（78 次）、`.ds-seg` 9px、`.ds-q-group` 10px 不在刻度
+//     字号 13.5px（我自己写的卡标题）、13.33px（antd 展开图标）、`<b>` 700
+//   精调全部在 paper.css 一处落地（改完：行高 3 档、字距 2 档、控件 2–3 种、字号/字重全合规）。
+//   这条护栏扫**版面层与 token**（逃逸值只可能出在“唯一来源”里；业务文件另有 VIS-hex / VIS-字号在刻度内）。
+{
+  const bad = []
+  const css = fs.readFileSync(path.join(SRC, 'theme/paper.css'), 'utf8')
+  // 精调层**之后**的代码才生效，所以只看精调层区块（它会覆盖前面的旧值）
+  const fine = css.slice(css.indexOf('★ 精调层'))
+  const code = fine.split('\n').filter((l) => !l.trim().startsWith('*') && !l.trim().startsWith('/*')).join('\n')
+
+  // ① 字号：只准 FS 七档（0.5 分数是 antd 用 1/3 画展开箭头留下的）
+  for (const m of code.matchAll(/font-size:\s*([\d.]+)px/g)) {
+    if (!['12', '13', '14', '16', '20', '24', '32'].includes(m[1])) bad.push(`精调层 font-size ${m[1]}px 不在 FS 刻度`)
+  }
+  // ② 内距：只准刻度（含 10 —— 精确 > 好看，硬塞 8/12 会让表格行高跳一大截）
+  //    ⚠ 正则要能吃**多值简写**（`padding: 0 9px`）——第一版只匹配单个数字，漏掉了简写里的 9px
+  const SP = new Set(['0', '2', '4', '6', '8', '10', '12', '16', '20', '24', '32'])
+  for (const m of code.matchAll(/padding(?:-top|-left|-right|-bottom)?:\s*([^;]+);/g)) {
+    for (const v of m[1].matchAll(/([\d.]+)px/g)) {
+      if (!SP.has(v[1])) bad.push(`精调层 内距 ${v[1]}px 不在 8px 刻度（${m[0].slice(0, 30)}）`)
+    }
+  }
+  // ④ 控件高度：同类同高 —— 允许 {22,24,32}（22=控件内文字居中，24=徽标/按钮/图标钮，32=输入）
+  //    ⚠ 但 `height` 也可能是**文字行高**（移动端 `.m-st`/`.m-row-t` 写 `height` 是不存在的）——
+  //    实际抓到的是 18/20px 这种**行高值**。所以只对**明确是控件**的选择器查高度。
+  const CTRL_SEL = /(\.m-check|\.m-chip|\.ds-ch|\.ant-btn|\.ds-help|input|select)/i
+  for (const m of code.matchAll(/height:\s*(\d+)px/g)) {
+    if (!CTRL_SEL.test(m[0])) continue          // 不是控件选择器 → 放过（多半是行高）
+    // 控件高度允许 {22,24,32} + **30**（Select 单选：32px 容器里上下各 1px 边框，字在 30px 行内居中）
+    if (!['22', '24', '30', '32'].includes(m[1])) bad.push(`精调层 控件 height ${m[1]}px 不在控件档 {22,24,30,32}（${m[0].slice(0, 40)}）`)
+  }
+  // 行高另有固定档：18/20/22/24/26/32 + 28/30（Segmented 胶囊、Select 单选居中）
+  for (const m of code.matchAll(/line-height:\s*([\d.]+)(px|)\s*;/g)) {
+    if (!['18', '20', '22', '24', '26', '28', '30', '32'].includes(m[1])) bad.push(`精调层 行高 ${m[1]}${m[2]} 不在固定档 {18,20,22,24,26,28,30,32}`)
+  }
+  // ⑤ 台头 actions 里不许再摆“纯计数 Chip”（它和结论条里同一个数重复出现两次）
+  //    ⚠ 正则要跨行：源码是 `actions={` 换行 + `<>` + 内容（第一版只吃到 `{` 就停，act 为空）
+  const files = ['features/workbench/SalesWorkbench.tsx', 'features/workbench/PmWorkbench.tsx',
+    'features/purchase/Page.tsx', 'features/warehouse/Page.tsx', 'features/service/Page.tsx']
+  for (const [key, rel] of Object.entries(Object.fromEntries(files.map((f) => [f.split('/').pop(), f])))) {
+    const src = fs.readFileSync(path.join(SRC, rel), 'utf8')
+    const i = src.indexOf('actions={')
+    const act = i < 0 ? '' : src.slice(i, i + 400)
+    if (/<Chip[^>]*>\s*\{?\s*[\w?.]*\s*(逾期|超期|缺货|风险|低库存)/.test(act)) {
+      bad.push(`${rel} 台头 actions 又摆了一个纯计数 Chip（结论条已有同一个数且可点）`)
+    }
+  }
+  // ⑥ **相邻文字元素不许粘连**：`</Status>{...}` 屏上读作“超期2026-09-29”（实测精调后才发现）
+  //    扫**全部 tsx**（第一版只扫 5 个台页面 → 注入到 site 页的反例没被抓到·已修）
+  //    例外：可点 / 带 style 的那一处（它靠 marginLeft 隔开，是有意为之）
+  const walkTsx = (d, acc = []) => {
+    for (const f of fs.readdirSync(d)) {
+      const p = path.join(d, f)
+      if (fs.statSync(p).isDirectory()) walkTsx(p, acc)
+      else if (/\.tsx$/.test(f)) acc.push(p)
+    }
+    return acc
+  }
+  for (const p of walkTsx(SRC)) {
+    fs.readFileSync(p, 'utf8').split('\n').forEach((l, i) => {
+      const t = l.trim()
+      if (t.startsWith('//') || t.startsWith('*') || t.startsWith('{/*')) return
+      if (/<\/Status>\{/.test(t) && !/className=|style=/.test(t)) {
+        bad.push(`${p.replace(SRC, 'src')}:${i + 1} 状态与后面文字粘连（加空格或包一层）`)
+      }
+    })
+  }
+  check('VIS3-精调层不许出刻度', bad.length === 0,
+    bad.length ? [...new Set(bad)].slice(0, 4).join(' | ') : '字号/内距/行高/控件高度全在刻度 · 台头不摆重复计数 · 无粘连文字')
+}
+
+// VIS4-全站同一套标准（2026-10-05「都统一标准」）
+//   前身：§11 的精调只对**台页面**生效（它们套 `.ds-page`），而“我的任务/评审/改版/新建商机/
+//   用户与权限/标准库/编号规则/件档案”直接挂在 `ant-layout-content` 下 → **一行精调都没吃到**
+//   （实测：antd 的 1.5714 把它们算成 18.8571/20.4286/25.1429 三种行高，`<code>` 还是 11.9px）。
+//   这一条盯的是**“全站口径不许分叉”**，不是某页面的具体值。
+{
+  const bad = []
+  const css = fs.readFileSync(path.join(SRC, 'theme/paper.css'), 'utf8')
+  const styles = fs.readFileSync(path.join(SRC, 'styles.css'), 'utf8')
+
+  // ① 全站兜底段必须存在且**不带** `.ant-layout-content` 前缀
+  //    （Modal/Drawer/Select 下拉由 antd 挂在 body 下，绑在布局区上会整块漏掉 —— 实测过）
+  const uni = css.slice(css.indexOf('★ 全站统一'))
+  if (!uni) bad.push('paper.css 缺「全站统一」段')
+  else {
+    if (/\.ant-layout-content\s+(code|small|td|th|p,)/.test(uni)) bad.push('全站统一段的选择器还绑在 .ant-layout-content 上（Modal/Drawer 挂在 body 下，会漏）')
+    for (const need of ['--ds-lh-12', '--ds-lh-13', '--ds-lh-14', '--ds-lh-16', '--ds-lh-20', '--ds-lh-32']) {
+      if (!uni.includes(need)) bad.push(`全站统一段缺行高档 ${need}`)
+    }
+  }
+  // ② 旧样式文件里不许再出现**已废弃的旧主色** #1f6feb（方案 A 已换成 #1f5fd0）
+  //    —— `VIS-hex` 只扫 tsx，扫不到 css，所以曾经“同一界面两种蓝”很久没人发现
+  //    ⚠ 要先剥掉注释（注释里可以**提到**旧值，那是在解释历史）。
+  //       ⚠ 剥注释要连**行尾注释**一起剥（`/* … */` 写在代码行尾），第一版只剥了整行注释，
+  //          于是我自己在 §11 写的那段解释文字被判成了“还在用旧主色”（假阳性·已修）。
+  const stylesCode = styles
+    .replace(/\/\*[\s\S]*?\*\//g, '')   // 块注释（含行尾的）
+    .replace(/^\s*\/\/.*$/gm, '')      // 行注释
+  if (/#1f6feb/i.test(stylesCode)) bad.push('styles.css 还用着已废弃的旧主色 #1f6feb（现 #1f5fd0）')
+
+  // ③ 分页统一：pageSize 只准 10（**列表/台账页**）；
+  //    弹窗与卡片内的**迷你表**允许更小（例：项目详情的联系人卡封顶 5 行 + hideOnSinglePage，
+  //    是为了不让一个 26 行的客户把泳道撑到 2180px —— 有注释写明理由，属有意例外）
+  const walkTsx2 = (d, acc = []) => {
+    for (const f of fs.readdirSync(d)) {
+      const p = path.join(d, f)
+      if (fs.statSync(p).isDirectory()) walkTsx2(p, acc)
+      else if (/\.tsx$/.test(f)) acc.push(p)
+    }
+    return acc
+  }
+  for (const p of walkTsx2(SRC)) {
+    const code = fs.readFileSync(p, 'utf8')
+    for (const m of code.matchAll(/pagination=\{\{([^}]*)\}\}/g)) {
+      const ps = m[1].match(/pageSize:\s*(\d+)/)
+      if (!ps || ps[1] === '10') continue
+      // 迷你表例外：同一个 pagination 对象里带 hideOnSinglePage（弹窗/卡片内的局部列表）
+      // + 上方 400 字内有写明理由的注释（第一版去 m[0] **前面**找 hideOnSinglePage，
+      //   而它写在 pageSize **后面** → 例外没被认出来·已修）
+      const isMini = /hideOnSinglePage/.test(m[1])
+      const before = code.slice(Math.max(0, m.index - 400), m.index)
+      const hasWhy = /封顶|不超|有意|例外|上限|不许.*平铺|撑到/.test(before)
+      if (!(isMini && hasWhy)) {
+        bad.push(`${p.replace(SRC, 'src')} 分页 ${ps[1]} ≠ 10（要更小必须带 hideOnSinglePage + 理由注释）`)
+      }
+    }
+  }
+  const qb = fs.readFileSync(path.join(SRC, 'components/ds/QueueBoard.tsx'), 'utf8')
+  if (!/pageSize = 10/.test(qb)) bad.push('QueueBoard 默认分页不是 10（全站统一）')
+
+  check('VIS4-全站同一套标准', bad.length === 0,
+    bad.length ? [...new Set(bad)].slice(0, 4).join(' | ') : '23 个路由同一套行高/圆角/分页/色板（含 Modal 与旧 css）')
+}
+
+// SHELL3-台按岗位分层（2026-10-05 客户拍板第一、二条）
+//   起因：工程部台注释写着“组员/经理/总监三视角”，实测**三种岗位看到的一模一样、都落「我的」**——
+//   总监第一眼是组员那一层，还给他看「我提交的评审单」（他根本不提交）。客户原话：「我总监进来
+//   之后应该到顶层了呀」。根因：`defaultTab` 写死在注册表里，壳不看 `position`。
+//   两条规矩钉死：① 壳**必须**按岗位取默认落点与页签顺序（单一出口 `defaultTabFor`/`orderTabsFor`）
+//   ② 页签**始终三个、不按岗位增减**（客户第二条：增减会让用户“我今天怎么少一个页签”）
+{
+  const bad = []
+  const shell = fs.readFileSync(path.join(SRC, 'components/domain/WorkbenchPage.tsx'), 'utf8')
+  if (!/defaultTabFor\(board,\s*position\)/.test(shell)) bad.push('WorkbenchPage 没用 defaultTabFor（默认落点不再按岗位）')
+  if (!/orderTabsFor\(board,\s*position\)/.test(shell)) bad.push('WorkbenchPage 没用 orderTabsFor（页签顺序不再按岗位）')
+  // ⚠ 匹配**代码**而不是注释（注释里为了解释历史会提到 `board.defaultTab`）
+  const shellCode = shell.split('\n').filter((l) => !l.trim().startsWith('//') && !l.trim().startsWith('*') && !l.trim().startsWith('{/*')).join('\n')
+  if (/\bboard\.defaultTab\b/.test(shellCode)) bad.push('WorkbenchPage 还在直接用 board.defaultTab（绕过了岗位分层）')
+  if (!/readSession\(\)/.test(shell)) bad.push('WorkbenchPage 没读 session（拿不到 position 就分不了层）')
+
+  const boardsSrc = fs.readFileSync(path.join(SRC, 'configs/boards.ts'), 'utf8')
+  // 声明了分层的台：三档必须齐、且每档的 tab 必须是自己的页签
+  for (const m of boardsSrc.matchAll(/byPosition:\s*\{([\s\S]*?)\n\s*\},/g)) {
+    const body = m[1]
+    for (const tier of ['member', 'lead', 'director']) {
+      if (!new RegExp(`${tier}:\\s*\\{`).test(body)) bad.push(`byPosition 缺 ${tier} 档（三档必须齐，否则某岗位落回第一个页签）`)
+    }
+    // 页签 key 定义在 tabs.ts（boards.ts 只是引用 ENG_TABS 等），所以要在两个文件里找
+    const tabsSrc = fs.readFileSync(path.join(SRC, 'configs/tabs.ts'), 'utf8')
+    const allKeys = boardsSrc + tabsSrc
+    for (const t of [...body.matchAll(/tab:\s*'([^']+)'/g)].map((x) => x[1])) {
+      if (!new RegExp(`key:\\s*'${t}'`).test(allKeys)) bad.push(`byPosition 指向不存在的页签 '${t}'`)
+    }
+  }
+  if (!/byPosition/.test(boardsSrc)) bad.push('没有任何台声明 byPosition（岗位分层形同虚设）')
+  // ★ 覆盖率：客户实测 bug “采购经理看到「待我审批 3 单」却落在一张空采购池上” ——
+  //   根因：只有工程部台声明了分层，其余台落 `defaultTab`（写死成台账）。
+  //   所以现在**每个台都必须声明三档**（内容可以三档相同，但不能不声明 —— 不声明就会退回旧坑）。
+  const BOARDS = ['SALES', 'PM', 'ENG', 'PURCHASE', 'WAREHOUSE', 'SHOP', 'SHIPPING', 'SITE', 'SERVICE']
+  for (const b of BOARDS) {
+    const seg2 = boardsSrc.split(`export const ${b}_BOARD`)[1]?.split('\n}')[0] ?? ''
+    if (!/byPosition/.test(seg2)) bad.push(`${b}_BOARD 没声明 byPosition（会落回写死的 defaultTab，正是“经理落进空台账”的坑）`)
+  }
+  // ⚠ 不做“护栏读自己注释”的自检：ESM 里 `__filename` 不可用，且那种断言改个注释就假红（本轮踩过）
+  // 岗位档位定义要与后端一致
+  const sess = fs.readFileSync(path.join(SRC, 'contexts/session.ts'), 'utf8')
+  for (const w of ['组员', '经理', '总监']) {
+    if (!sess.includes(`'${w}'`)) bad.push(`session.ts 的岗位档位缺「${w}」（与后端 POSITION_* 不一致）`)
+  }
+  check('SHELL3-台按岗位分层', bad.length === 0,
+    bad.length ? bad.slice(0, 4).join(' | ') : '九个台都声明三档：组员/经理/总监各落“轮到我处理”的那一项（页签不增减）')
 }
 
 const fails = summary('静态回归');

@@ -1,17 +1,25 @@
 import type { User } from '../api/user'
 
+/** 岗位三级（与后端 `app/models/platform.py` 的 POSITION_* 一一对应，别再各写一份字符串） */
+export const POSITION = { member: '组员', lead: '经理', director: '总监' } as const
+export type PositionKey = keyof typeof POSITION
+
+/** 把后端下发的 `user.position` 归成三档（认不出来 = 组员，保守：只看到自己那一层） */
+export function positionTier(p?: string | null): PositionKey {
+  if (p === POSITION.director) return 'director'
+  if (p === POSITION.lead) return 'lead'
+  return 'member'
+}
+
 /**
  * 登录态唯一存储实现（重构 1.3：原 5 个 localStorage key → 1 个 `txgk_session`）
  * - 全站只有本文件可以直接碰 localStorage 的登录相关 key（e2e static 有断言盯着）
- * - 自动迁移旧 key（txgk_token/user/name/impersonate×2），迁移后即清理
+ * - 自动迁移旧 key（txgk_token/user/name），迁移后即清理（impersonate 已废弃，旧 key 顺手清掉）
  */
 
 export interface Session {
   token: string
   user: User
-  /** 「以某人身份查看」（06 卷 §4，只读；缺省 = 本人） */
-  impersonateId?: number
-  impersonateName?: string
 }
 
 const KEY = 'txgk_session'
@@ -33,14 +41,7 @@ export function readSession(): Session | null {
     if (!token) return null
     const user = JSON.parse(localStorage.getItem('txgk_user') ?? 'null') as User | null
     if (!user) return null
-    const imp = localStorage.getItem('txgk_impersonate')
-    const migrated: Session = {
-      token,
-      user,
-      ...(imp
-        ? { impersonateId: Number(imp), impersonateName: localStorage.getItem('txgk_impersonate_name') ?? undefined }
-        : {}),
-    }
+    const migrated: Session = { token, user }
     writeSession(migrated)
     return migrated
   } catch {
@@ -53,17 +54,11 @@ export function writeSession(s: Session): void {
   legacyCleanup()
 }
 
-/** 局部更新（登录刷新用户/切换伪装）；impersonateId 置 undefined 时成对清除 */
+/** 局部更新（登录后刷新用户信息） */
 export function patchSession(p: Partial<Session>): Session | null {
   const s = readSession()
   if (!s) return null
   const next: Session = { ...s, ...p }
-  if (!p.impersonateId) {
-    if ('impersonateId' in p || 'impersonateName' in p) {
-      delete next.impersonateId
-      delete next.impersonateName
-    }
-  }
   writeSession(next)
   return next
 }

@@ -92,7 +92,7 @@ export default function SupplierStatementModal({
                     size="small"
                     dataSource={st.unpaid}
                     columns={cols(false)}
-                    pagination={{ pageSize: 10, showSizeChanger: false }}
+                    pagination={{ pageSize: 10, showSizeChanger: true }}
                     locale={{ emptyText: '没有未付款的单' }}
                   />
                 ),
@@ -106,7 +106,7 @@ export default function SupplierStatementModal({
                     size="small"
                     dataSource={st.paid}
                     columns={cols(true)}
-                    pagination={{ pageSize: 10, showSizeChanger: false }}
+                    pagination={{ pageSize: 10, showSizeChanger: true }}
                     locale={{ emptyText: '没有已付款的单' }}
                   />
                 ),

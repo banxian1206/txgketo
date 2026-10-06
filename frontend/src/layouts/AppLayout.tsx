@@ -32,7 +32,6 @@ const CRUMB_MAP: [string, string][] = [
   ['/workbench/shop/mfg', '车间工作台 / 制造'],
   ['/workbench/shop/assembly', '车间工作台 / 装配'],
   ['/workbench/shop', '车间工作台'],
-  ['/workbench', '我的工作台'],
   ['/dashboard', '经营驾驶舱'],
   ['/purchase', '采购工作台'],
   ['/warehouse', '仓库工作台'],
@@ -82,7 +81,7 @@ function crumbs(pathname: string): ReactNode {
 export default function AppLayout() {
   const loc = useLocation()
   // 重构 1.3：登录态/用户名/伪装横幅全部来自 AuthContext（单一 session，不再散读 localStorage）
-  const { user: profile, impersonateName, logout, refreshMe, stopImpersonate } = useAuth()
+  const { user: profile, logout, refreshMe } = useAuth()
   const name = profile?.name ?? '用户'
   // ★ 重整 P3（docs/10 §8.1 拍板#4/#5）：可见性来源 = **后端下发的能力位**。
   const canManageUsers = hasPerm('admin:users')
@@ -175,24 +174,6 @@ export default function AppLayout() {
       </Sider>
       <Layout>
         <OfflineBanner />
-        {impersonateName && (
-          <div
-            style={{
-              background: PAPER.warnSoft,
-              color: PAPER.warn,
-              borderBottom: `1px solid ${PAPER.warnLine}`,
-              padding: '6px 24px',
-              fontSize: FS.sm,
-              display: 'flex',
-              justifyContent: 'space-between',
-            }}
-          >
-            <span>正在以「{impersonateName}」身份查看（只读，不能提交/审批/下单）</span>
-            <a style={{ color: PAPER.warn, textDecoration: 'underline' }} onClick={() => stopImpersonate()}>
-              退出查看
-            </a>
-          </div>
-        )}
         <Header className="app-header">
           <span className="ds-crumb" style={{ marginBottom: 0 }}>
             {crumbs(loc.pathname)}

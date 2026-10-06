@@ -168,11 +168,24 @@ export interface MetricItem {
   dimZero?: boolean
   /** 值是文字（如客户名）而不是数字 —— 换字号/字体，别用 24px 等宽 */
   text?: boolean
+  /**
+   * ★ 方向 2 ②（2026-10-05）：把这一格标成结论条的**主角**（32px 主色 + 浅底，其余降到 20px）。
+   *
+   * 为什么要显式指认而不是“取第一个 / 取最大的”：结论条一直是 5 个数**等大等权**，
+   * 扫一眼分不出“今天最该动的那件事是几”。而**哪个最该动是业务判断** ——
+   * 例：售后台该突出「待受理」（要去派工），不是「备件低库存」（0 时也占位）；
+   * 仓库台该突出「待验收」而不是「领料单未结」（那是另一个台的事）。
+   * 一条结论条**最多一个**主角；不指认就退回 5 个一样大（不猜）。
+   */
+  lead?: boolean
 }
 
 /** 指标条：一行账目（替代「数字卡墙」——0 的项默认不进来） */
 export function Metrics({ items }: { items: MetricItem[] }) {
   if (!items.length) return null
+  // ★ 方向 2 ②：结论条最多一个主角。页面没指认时**不猜**——宁可 5 个一样大，
+  //   也不让壳替业务决定“哪个最重要”（“最该动手”是业务判断，见 MetricItem.lead）。
+  const leadKey = items.find((m) => m.lead)?.key
   return (
     <div className={`ds-metrics${items.length <= 3 ? ' is-short' : ''}`}>
       {items.map((m) => {
@@ -187,7 +200,7 @@ export function Metrics({ items }: { items: MetricItem[] }) {
             {m.note && <span className="n">{m.note}</span>}
           </>
         )
-        const cls = toneCls('ds-metric', tone)
+        const cls = `${toneCls('ds-metric', tone)}${m.key === leadKey ? ' is-lead' : ''}`
         // ★ `to` 必须**真的跳**：之前只渲染 button 且只调 onClick → 传了 `to` 是死按钮
         //   （2026-10-05 发现）。结论条数字一律用 `to="?tab=xxx"` 深链，可分享、可回原队列。
         if (m.to) {
@@ -248,6 +261,7 @@ export function QueueRow({
   actions,
   onClick,
   muted,
+  tone,
 }: {
   lead?: ReactNode
   title?: ReactNode
@@ -256,6 +270,13 @@ export function QueueRow({
   actions?: ReactNode
   onClick?: () => void
   muted?: boolean
+  /**
+   * ★ 方向 2 ③（2026-10-05）：整行的语义色（左侧 3px 色条）。
+   * 什么时候给：**这条要不要动 / 卡在哪** —— `err` 超期·不合格·卡住，`warn` 要留意，
+   * `run` 进行中·今天到期，`ok` 已完成。**不给就是中性行**（守住“颜色只给异常”）。
+   * ⚠ 队列的“分组色条”是另一回事（`QueueGroup` 的 `groupTone`），别混用。
+   */
+  tone?: Tone
 }) {
   const body = (
     <>
@@ -276,7 +297,7 @@ export function QueueRow({
   )
   // ★ 行**不能**用 <button>：行内还会放 antd <Button>（动作），button 套 button 是非法 DOM
   //   （实测 console：validateDOMNesting）。所以用 div + role=button + 键盘可达。
-  const cls = `ds-row${muted ? ' is-muted' : ''}${onClick ? ' is-clickable' : ''}`
+  const cls = `ds-row${muted ? ' is-muted' : ''}${onClick ? ' is-clickable' : ''}${tone ? ` is-${tone}` : ''}`
   if (onClick) {
     return (
       <div

@@ -25,16 +25,8 @@ def get_current_user(
     user = session.scalar(select(User).where(User.username == payload["sub"]))
     if user is None or not user.is_active:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "用户不存在或已停用")
-
-    # ★ 管理员「以某人身份查看」（06 卷 §4）：只对 GET 生效（写操作被中间件拦截）
-    impersonate = request.headers.get("x-impersonate")
-    if impersonate and user.is_superuser:
-        try:
-            target = session.get(User, int(impersonate))
-        except ValueError:
-            target = None
-        if target is not None and target.is_active:
-            return target
+    # ★ 2026-10-05：「以某人身份查看」（X-Impersonate）已删除（客户拍板 —— 它只能看、
+    #   永远测不了写操作，而它的用途本就是测试/排查；要测某个人看到什么，直接用他的账号登录）。
     return user
 
 

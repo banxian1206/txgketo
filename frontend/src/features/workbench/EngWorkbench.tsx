@@ -1,9 +1,8 @@
-import { App, Button, Card, Col, Row, Space, Spin, Table, Tag, Typography } from 'antd'
+import { App, Button, Card, Col, Row, Space, Spin, Table, Typography } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import { useCallback, useEffect, useState, type ReactNode } from 'react'
-import { useNavigate } from 'react-router-dom'
 
-import { Empty as DsEmpty } from '../../components/ds'
+import { Empty as DsEmpty, Metrics, Panel, Status } from '../../components/ds'
 
 import {
   engBoard,
@@ -19,9 +18,8 @@ import {
   type TaskItem,
   type WorkbenchMe,
 } from '../../api/client'
-import { ENG_BOARD_STATE as STATE_COLOR } from '../../theme/status'
+import { ENG_BOARD_STATE as STATE_COLOR, toneOf } from '../../theme/status'
 import { TASK_STATUS as TASK_STATUS_COLOR } from '../../theme/status'
-import { T } from '../../theme/tokens'
 import { useGoFrom } from '../../hooks/useFrom'
 
 const PROFS = ['机械', '电气', '程序', '工艺']
@@ -32,7 +30,6 @@ import { ENG_BOARD } from '../../configs/boards'
 /** 工程部工作台（06 卷 §3）：组员 / 经理 / 总监 三视角 */
 export default function EngWorkbench() {
   const { message } = App.useApp()
-  const nav = useNavigate()
   // ★ docs/11：跳去别的域时带上 ?from= （来源台/来源页），回来还在原来那一层
   const go = useGoFrom()
   const [, setMe] = useState<WorkbenchMe | null>(null)
@@ -103,8 +100,8 @@ export default function EngWorkbench() {
       width: 110,
       render: (v: string, r) => (
         <Space size={4}>
-          <Tag color={TASK_STATUS_COLOR[v] ?? 'default'}>{v}</Tag>
-          {r.blocked && <Tag color="orange">等前置</Tag>}
+          <Status tone={toneOf(TASK_STATUS_COLOR[v])}>{v}</Status>
+          {r.blocked && <Status tone="warn">等前置</Status>}
         </Space>
       ),
     },
@@ -129,7 +126,7 @@ export default function EngWorkbench() {
     { title: '专业', dataIndex: 'profession', width: 70, render: (v: string | null) => v ?? '—' },
     { title: '提交人', dataIndex: 'submitter_name', width: 90, render: (v: string | null) => v ?? '—' },
     { title: '轮次', dataIndex: 'current_round', width: 70, render: (v: number) => `第 ${v} 轮` },
-    { title: '状态', dataIndex: 'status', width: 100, render: (v: string) => <Tag>{v}</Tag> },
+    { title: '状态', dataIndex: 'status', width: 100, render: (v: string) => <Status>{v}</Status> },
     {
       title: '操作',
       key: 'action',
@@ -152,12 +149,15 @@ export default function EngWorkbench() {
     ...PROFS.map((prof) => ({
       title: prof,
       key: prof,
-      width: 110,
+      width: 130,
       render: (_: unknown, r: EngEquipment) => {
         const c = r.professions[prof]
         return (
           <Space size={2} direction="vertical">
-            <Tag color={STATE_COLOR[c?.state] ?? 'default'}>{c?.state ?? '—'}</Tag>
+            {/* ★ 精调（2026-10-05）：原来是 `<Tag color>` 彩色药丸 —— 全站“彩色 Tag 收敛”那轮
+                （docs/14 R5）漏了这个文件。规范只认一种画法：**圆点 + 文字**（ds.Status），
+                彩色只留给「异常/当前」。一屏 4 个专业 × N 台设备 = 一片药丸 → 处处最高权重 = 没有权重。 */}
+            <Status tone={toneOf(STATE_COLOR[c?.state])}>{c?.state ?? '—'}</Status>
             <Typography.Text type="secondary" style={{ fontSize: 12 }}>
               {c?.owner ?? ''} {c?.overdue ? '·超期' : ''}
             </Typography.Text>
@@ -206,6 +206,9 @@ export default function EngWorkbench() {
                 dataSource={mineTickets}
                 columns={ticketColumns}
                 pagination={false}
+                // ★ 走查 2026-10-05：这张表**漏了 emptyText** → 空的时候露出 antd 默认灰插图 +
+                //   「暂无数据」，而右邻「待我改版」是人话 → 同一屏两种语言（docs/15：antd 默认空态 0 处）
+                locale={{ emptyText: <DsEmpty text="没有我提交的评审单 —— 提交后会出现在这里。" /> }}
                 onRow={() => ({ onClick: () => go('/workbench/reviews'), style: { cursor: 'pointer' } })}
               />
             </Card>
@@ -221,7 +224,7 @@ export default function EngWorkbench() {
                 columns={[
                   { title: '申请号', dataIndex: 'cr_no', width: 100 },
                   { title: '对象', dataIndex: 'target_title' },
-                  { title: '状态', dataIndex: 'status', width: 90, render: (v: string) => <Tag>{v}</Tag> },
+                  { title: '状态', dataIndex: 'status', width: 90, render: (v: string) => <Status>{v}</Status> },
                 ]}
               />
             </Card>
@@ -248,7 +251,8 @@ export default function EngWorkbench() {
                   size="small"
                   dataSource={teamTasks}
                   columns={taskColumns}
-                  pagination={{ pageSize: 20, showSizeChanger: false }}
+                  pagination={{ pageSize: 10, showSizeChanger: true }}
+                  locale={{ emptyText: <DsEmpty text="组员还没有任务。" /> }}
                 />
               </Card>
             </>
@@ -256,44 +260,48 @@ export default function EngWorkbench() {
     ),
     board: (
             <>
-              <Row gutter={[12, 12]} style={{ marginBottom: 12 }}>
-                {[
-                  { label: '设备总数', value: board?.summary.equipments ?? 0 },
-                  { label: '全部专业已发布', value: board?.summary.all_released ?? 0 },
-                  { label: '卡住设备', value: board?.summary.blocked ?? 0 },
-                  { label: '待我终审', value: board?.summary.pending_reviews ?? 0, to: '/workbench/reviews' },
-                  { label: '待我裁决改版', value: board?.summary.pending_changes ?? 0, to: '/workbench/changes' },
-                  { label: '超期任务', value: board?.summary.overdue_tasks ?? 0 },
-                ].map((s) => (
-                  <Col xs={12} sm={8} md={4} key={s.label}>
-                    <Card
-                      size="small"
-                      hoverable={!!s.to}
-                      onClick={() => s.to && nav(s.to)}
-                      style={{ textAlign: 'center' }}
-                    >
-                      <div style={{ fontSize: 12, color: T.textSecondary }}>{s.label}</div>
-                      <div style={{ fontSize: 20, fontWeight: 600, color: s.value ? T.brand : T.textDisabled }}>
-                        {s.value}
-                      </div>
-                    </Card>
-                  </Col>
-                ))}
-              </Row>
+              {/* ★ 精调（2026-10-05）：这里原来是一堵 **6 张数字卡墙**（Card + 12px 标签 + 20px 数字）。
+                  两个问题：① **数字卡墙**这个形制在方案 A 里已经被“一行指标条”取代（docs/14 R0）；
+                  ② 其中 4 个数（卡住设备 / 待我终审 / 待我裁决改版 / 超期任务）**台头结论条里已经有了**，
+                  在同一个台里再摆一遍 = 同一批数说两遍。
+                  所以只留“部门看板自己才有的”两个进度数，交给 `Metrics`（带发布率进度）。 */}
+              <Metrics
+                items={[
+                  {
+                    key: 'released',
+                    label: '四专业全部已发布',
+                    value: board?.summary.all_released ?? 0,
+                    unit: `台 / 共 ${board?.summary.equipments ?? 0} 台`,
+                    note: '发完才算能采购 / 能排产',
+                    dimZero: true,
+                    lead: true,
+                  },
+                  {
+                    key: 'blocked',
+                    label: '卡住设备',
+                    value: board?.summary.blocked ?? 0,
+                    unit: '台',
+                    note: '有专业没发布 / 有任务超期',
+                    tone: (board?.summary.blocked ?? 0) > 0 ? 'err' : undefined,
+                    dimZero: true,
+                  },
+                ]}
+              />
 
-              <Card size="small" title="设备设计进度（机械 / 电气 / 程序 / 工艺）" style={{ marginBottom: 12 }}>
+              <Panel title="设备设计进度（机械 / 电气 / 程序 / 工艺）">
                 <Table
                   rowKey={(r) => `${r.project_no}-${r.equip_no}`}
                   size="small"
                   dataSource={board?.equipments ?? []}
                   columns={equipColumns}
-                  pagination={{ pageSize: 20, showSizeChanger: false }}
+                  pagination={{ pageSize: 10, showSizeChanger: true }}
+                  locale={{ emptyText: <DsEmpty text="还没有设备 —— 立项时建了设备才会出现在这里。" /> }}
                 />
-              </Card>
+              </Panel>
 
               <Row gutter={12}>
                 <Col xs={24} lg={12}>
-                  <Card size="small" title="待我终审" style={{ marginBottom: 12 }}>
+                  <Panel title="待我终审">
                     <Table
                       rowKey="id"
                       size="small"
@@ -311,10 +319,10 @@ export default function EngWorkbench() {
                         { title: '提交人', dataIndex: 'submitter' },
                       ]}
                     />
-                  </Card>
+                  </Panel>
                 </Col>
                 <Col xs={24} lg={12}>
-                  <Card size="small" title="待我裁决的改版" style={{ marginBottom: 12 }}>
+                  <Panel title="待我裁决的改版">
                     <Table
                       rowKey="id"
                       size="small"
@@ -332,11 +340,11 @@ export default function EngWorkbench() {
                         { title: '问题', dataIndex: 'reason', ellipsis: true },
                       ]}
                     />
-                  </Card>
+                  </Panel>
                 </Col>
               </Row>
 
-              <Card size="small" title="超期任务">
+              <Panel title="超期任务">
                 <Table
                   rowKey="id"
                   size="small"
@@ -344,15 +352,18 @@ export default function EngWorkbench() {
                   pagination={false}
                   locale={{ emptyText: <DsEmpty text="没有超期任务" /> }}
                   columns={[
-                    { title: '任务号', dataIndex: 'task_no', width: 100 },
-                    { title: '任务', dataIndex: 'title' },
-                    { title: '专业', dataIndex: 'profession', width: 70 },
-                    { title: '负责人', dataIndex: 'owner', width: 90 },
-                    { title: '计划完成', dataIndex: 'plan_end', width: 110 },
-                    { title: '状态', dataIndex: 'status', width: 90, render: (v: string) => <Tag>{v}</Tag> },
+                    // ★ 精调（2026-10-05）：原来只有首列和尾列有 width，中间“任务”列自适应 →
+                    //   antd 把剩余宽度全给它，而任务文字很短 → **中间裂开一大片空白**（“毛”）。
+                    //   给每列都定宽，空白就只会留在末尾（那是正常的右留白）。
+                    { title: '任务号', dataIndex: 'task_no', width: 110 },
+                    { title: '任务', dataIndex: 'title', width: 320 },
+                    { title: '专业', dataIndex: 'profession', width: 80 },
+                    { title: '负责人', dataIndex: 'owner', width: 100 },
+                    { title: '计划完成', dataIndex: 'plan_end', width: 120 },
+                    { title: '状态', dataIndex: 'status', width: 100, render: (v: string) => <Status>{v}</Status> },
                   ]}
                 />
-              </Card>
+              </Panel>
             </>
           
     ),
@@ -364,8 +375,16 @@ export default function EngWorkbench() {
       {/* ★ docs/15 台骨架四件套：台头 → 结论条 → 流程条（注册表驱动）→ 体 */}
       <WorkbenchPage
         board={ENG_BOARD}
-        sub="设计任务 → 提交评审 → 经理一级审 → 总监二级审 → 发布（冻结，自动触发采购）；改版走 ECN，不能私下改图"
-        help="上面的数字可点，点了切到对应队列。"
+        sub={
+          // ★ 方向 2 ①：原来 sub 写的是 40 字的流程叙述（“设计任务 → 提交评审 → 经理一级审 → …”），
+          //   第一屏就是一段要读的话；现在 sub 只报现状 + 异常，全文进 ? 气泡。
+          (board?.summary.pending_reviews ?? 0) > 0 || (board?.summary.pending_changes ?? 0) > 0
+            ? `待审 ${board?.summary.pending_reviews ?? 0} 张${(board?.summary.pending_changes ?? 0) > 0 ? ` · 待裁决改版 ${board?.summary.pending_changes} 张` : ''}`
+            : (board?.summary.blocked ?? 0) > 0
+              ? `没有等你审的单 · ${board?.summary.blocked} 台设备卡住`
+              : `本部门 ${board?.summary.equipments ?? 0} 台设备 · 没有等你审的单`
+        }
+        help="设计任务 → 提交评审 → 经理一级审 → 总监二级审 → 发布（冻结，自动触发采购）；改版走 ECN，不能私下改图。上面的数字可点，点了切到对应队列。"
         actions={
           <Button size="small" onClick={() => void load()}>
             刷新
@@ -377,9 +396,10 @@ export default function EngWorkbench() {
           board: board?.summary.blocked ?? 0,
         }}
         metrics={[
+          // ★ 方向 2 ② 主角指认：工程台主角 = **待我审 / 待终审**：审一张单会解开一串任务，而自己的任务是并行的一堆。（ds `MetricItem.lead`）
           { key: 'mine', label: '我的任务', value: myTasks.length, unit: '项', tone: myTasks.length ? 'warn' : undefined, dimZero: true, to: '?tab=mine' },
           { key: 'blocked', label: '卡住的任务', value: myTasks.filter((t) => t.blocked).length, unit: '项', tone: 'err', dimZero: true, to: '?tab=mine' },
-          { key: 'review', label: '待我审 / 待终审', value: board?.summary.pending_reviews ?? 0, unit: '张', tone: (board?.summary.pending_reviews ?? 0) > 0 ? 'warn' : undefined, dimZero: true, to: '?tab=team' },
+          { key: 'review', label: '待我审 / 待终审', value: board?.summary.pending_reviews ?? 0, unit: '张', tone: (board?.summary.pending_reviews ?? 0) > 0 ? 'warn' : undefined, dimZero: true, to: '?tab=team', lead: true },
           { key: 'change', label: '待我裁决改版', value: board?.summary.pending_changes ?? 0, unit: '张', tone: (board?.summary.pending_changes ?? 0) > 0 ? 'warn' : undefined, dimZero: true, to: '?tab=team' },
           { key: 'equip', label: '卡住设备', value: board?.summary.blocked ?? 0, unit: '台', tone: (board?.summary.blocked ?? 0) > 0 ? 'err' : undefined, dimZero: true, to: '?tab=board' },
         ]}
