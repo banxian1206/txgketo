@@ -36,6 +36,7 @@ export default function SelectStdItem({ placeholder = '搜标准库（如：焊�
       filterOption={false}
       onSearch={(q) => search(q)}
       placeholder={placeholder}
+      aria-label="搜索标准库物料"
       loading={loading}
       options={rows.map((i) => ({ value: i.item_no, label: `${i.item_no} ${i.display_name}` }))}
       notFoundContent={

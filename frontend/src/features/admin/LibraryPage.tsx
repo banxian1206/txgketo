@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from 'react'
 
 import { createStdItem, errMsg, getStdItem, listLibraryCategories, listStdItems, updateStdItem, type SpecFieldDef, type StdCategoryInfo, type StdClassInfo, type StdItem } from '../../api/client'
 import AppModal from '../../components/AppModal'
-import { T } from '../../theme/tokens'
+import { PAPER } from '../../theme/tokens'
 
 /**
  * 标准库（01 卷 §5）：三层 → 类别 → 品类 → 型号
@@ -168,7 +168,10 @@ export default function Library() {
                     onClick={() => setActiveClass(k)}
                   >
                     {k.name}
-                    <span style={{ color: T.textDisabled, marginLeft: 6 }}>{k.item_count ?? 0}</span>
+                    {/* ★ 2026-10-06 无障碍体检：这个数是**有意义的数据**（用来判断哪个品类有料），
+                        原来用 T.textDisabled 标它 —— 语义错（把数据标成「禁用」）+ 对比度仅 1.84:1。
+                        改用 PAPER.ink3（「辅助说明」角色）。 */}
+                    <span style={{ color: PAPER.ink3, marginLeft: 6 }}>{k.item_count ?? 0}</span>
                   </a>
                 ))}
               </div>

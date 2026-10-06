@@ -93,6 +93,7 @@ export function TeamEditor({ projectNo, users, onChanged }: Props) {
           render: (v: number, r: ProjectMember & { project_role: string }) => (
             <Select
               size="small"
+              aria-label="任命项目成员"
               style={{ width: 180 }}
               allowClear
               showSearch
@@ -773,6 +774,7 @@ function StdItemSelect({
       allowClear
       value={value}
       placeholder={placeholder}
+      aria-label={placeholder ?? '搜索标准库物料'}
       loading={loading}
       optionFilterProp="label"
       filterOption={false}

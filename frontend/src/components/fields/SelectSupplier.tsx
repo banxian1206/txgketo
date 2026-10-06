@@ -18,6 +18,7 @@ export default function SelectSupplier({ placeholder = '从供应商里选', ...
       showSearch
       optionFilterProp="label"
       placeholder={placeholder}
+      aria-label="选择供应商"
       options={rows.map((s) => ({ value: s.id, label: `${s.name}${s.kind ? ` · ${s.kind}` : ''}` }))}
       notFoundContent={rows.length ? undefined : '供应商加载中…'}
       {...rest}

@@ -306,6 +306,7 @@ export default function MyTasks() {
         </Typography.Paragraph>
         <Select
           mode="multiple"
+          aria-label="选择组员"
           style={{ width: '100%' }}
           placeholder={
             members.length ? '选择组员' : '本专业还没有组员 —— 先到「用户与权限」配人'

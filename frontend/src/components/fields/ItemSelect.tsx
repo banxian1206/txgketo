@@ -52,6 +52,7 @@ export default function ItemSelect({
       allowClear
       value={value}
       placeholder={placeholder}
+      aria-label={placeholder}
       loading={loading}
       optionFilterProp="label"
       filterOption={false}

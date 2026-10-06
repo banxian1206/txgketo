@@ -67,6 +67,12 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
         //   页面里不许再各写各的字号（e2e:static「VIS-字号在刻度内」+「VIS-inline 棘轮」盯着）
         token: {
           colorPrimary: T.brand,
+          // ★ 2026-10-06 无障碍体检（axe）：antd 的 colorLink 派生自 `seed.colorLink || seed.colorInfo`，
+          //   而这里一直只设了 colorPrimary —— 于是全站 <a> 落到 antd 默认蓝 #1677ff：
+          //   既与品牌 #1f5fd0 同屏两种蓝，对比度也只有 4.1:1（AA 要 4.5）。
+          //   ★ 与「旧主色 #1f6feb 躲在 styles.css」同一类盲区 —— 躲在第三方默认值里，VIS-hex 扫不到。
+          colorLink: T.brand,
+          colorInfo: T.brand,
           colorSuccess: PAPER.ok,
           colorWarning: PAPER.warn,
           colorError: PAPER.err,

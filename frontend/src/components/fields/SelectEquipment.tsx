@@ -25,6 +25,7 @@ export default function SelectProjectEquip({ projectNo, placeholder, ...rest }: 
       showSearch
       optionFilterProp="label"
       placeholder={placeholder ?? (projectNo ? '选设备' : '先选项目')}
+      aria-label="选择设备"
       disabled={!projectNo && !rest.value}
       options={rows.map((e) => ({ value: e.equip_no, label: `${e.equip_no} ${e.equip_name}` }))}
       {...rest}

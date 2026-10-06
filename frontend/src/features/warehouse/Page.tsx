@@ -283,6 +283,7 @@ export default function Warehouse() {
             <Select
               showSearch
               optionFilterProp="label"
+              aria-label="项目"
               style={{ width: 260 }}
               placeholder="项目"
               value={genProject}
@@ -295,6 +296,7 @@ export default function Warehouse() {
             <Select
               showSearch
               optionFilterProp="label"
+              aria-label="设备"
               style={{ width: 220 }}
               placeholder="设备"
               value={genEquip}

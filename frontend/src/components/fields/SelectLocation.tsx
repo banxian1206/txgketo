@@ -71,6 +71,7 @@ export default function SelectLocation({ valueMode = 'text', activeOnly = true, 
         showSearch
         optionFilterProp="label"
         placeholder={placeholder ?? '选库位（没有就先到「库位」页签新建）'}
+        aria-label="选择库位"
         options={rows.map((l) => ({ value: val(l), label: text(l) }))}
         notFoundContent={rows.length ? undefined : '库位加载中…'}
         onChange={onChange}

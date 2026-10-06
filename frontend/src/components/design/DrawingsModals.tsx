@@ -213,6 +213,7 @@ addForm: FormInstance;
                   <Select
                     showSearch
                     optionFilterProp="label"
+                    aria-label="搜索物料/标准件"
                     placeholder="输入编码 / 品名 / 规格 / 品牌搜索"
                     onSearch={(q) => void searchItems(q)}
                     options={items.map((i) => ({

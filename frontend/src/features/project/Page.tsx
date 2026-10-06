@@ -151,6 +151,7 @@ export default function Projects() {
             <Select
               allowClear
               size="small"
+              aria-label="按阶段筛选"
               placeholder="阶段：全部"
               style={{ width: 132 }}
               value={filters.stage}

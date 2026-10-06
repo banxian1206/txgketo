@@ -263,6 +263,7 @@ export default function Manufacturing() {
           <Select
             showSearch
             optionFilterProp="label"
+            aria-label="项目"
             style={{ width: 240 }}
             placeholder="项目"
             value={genProject}
@@ -272,6 +273,7 @@ export default function Manufacturing() {
           <Select
             showSearch
             optionFilterProp="label"
+            aria-label="设备"
             style={{ width: 200 }}
             placeholder="设备"
             value={genEquip}

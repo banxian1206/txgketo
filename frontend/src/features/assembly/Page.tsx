@@ -173,6 +173,7 @@ export default function Assembly() {
         <Select
           showSearch
           optionFilterProp="label"
+          aria-label="项目"
           style={{ width: 300 }}
           placeholder="选项目看齐套率"
           value={projectNo}
@@ -264,6 +265,7 @@ export default function Assembly() {
                 }
               >
                 <Progress
+                  aria-label="齐套率"
                   percent={Math.round((o.kitting_rate ?? 0) * 100)}
                   strokeColor={rateColor(o.kitting_rate ?? 0)}
                   format={(p) => `${p}%`}

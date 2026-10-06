@@ -173,7 +173,7 @@ export default function SiteM() {
   return (
     <>
       <Select
-        showSearch optionFilterProp="label" style={{ width: '100%', marginBottom: 12 }} placeholder="选项目"
+        showSearch optionFilterProp="label" aria-label="项目" style={{ width: '100%', marginBottom: 12 }} placeholder="选项目"
         value={projectNo} onChange={(v: string | undefined) => pick(v)}
         options={projects.map((p) => ({ value: p.project_no, label: `${p.project_no} ${p.project_name}` }))}
       />

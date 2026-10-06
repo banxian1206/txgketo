@@ -200,6 +200,7 @@ export default function ChangeDetailModal({ crId, open, onClose, onChanged }: Pr
               )}
               {canDispatch && (
                 <Select
+                  aria-label="下发给哪位设计师"
                   style={{ width: '100%', marginBottom: 8 }}
                   placeholder={`下发给「${cr.profession}」专业的设计师`}
                   value={assignee}

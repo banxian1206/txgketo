@@ -22,6 +22,7 @@ export default function SelectProject({ placeholder = '选项目', ...rest }: Pr
       showSearch
       optionFilterProp="label"
       placeholder={placeholder}
+      aria-label="选择项目"
       options={rows.map((p) => ({ value: p.project_no, label: `${p.project_no} ${p.project_name}` }))}
       notFoundContent={rows.length ? undefined : '项目加载中…'}
       {...rest}

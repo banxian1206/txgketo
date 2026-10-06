@@ -325,6 +325,7 @@ export default function Shipping() {
         <Select
           showSearch
           optionFilterProp="label"
+          aria-label="项目"
           style={{ width: 300 }}
           placeholder="选项目"
           value={projectNo}

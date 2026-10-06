@@ -51,6 +51,7 @@ export default function EquipmentsCard({
                       width: 280,
                       render: (_: unknown, r: KittingOverviewRow) => (
                         <Progress
+                          aria-label="齐套率"
                           size="small"
                           percent={Math.round((r.kitting_rate ?? 0) * 100)}
                           strokeColor={r.kitting_rate >= 1 ? T.success : r.kitting_rate >= 0.6 ? T.brand : T.warning}

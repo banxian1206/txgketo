@@ -256,6 +256,7 @@ export default function AcceptM() {
             <Space>
               <span>这批货是哪张采购单的</span>
               <Select
+                aria-label="指明这批量是哪张采购单"
                 style={{ minWidth: 220 }}
                 placeholder="请指明哪张单"
                 value={poLineId ?? undefined}

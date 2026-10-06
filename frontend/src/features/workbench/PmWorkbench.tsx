@@ -66,6 +66,7 @@ export default function PmWorkbench() {
       render: (_: unknown, r: PmProjectRow) => (
         <Space size={8}>
           <Progress
+            aria-label="设计进度"
             style={{ width: 90 }}
             percent={r.design_total ? Math.round((r.design_done / r.design_total) * 100) : 0}
             size="small"

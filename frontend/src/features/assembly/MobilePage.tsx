@@ -98,6 +98,7 @@ export default function AssemblyM() {
       <Select
         showSearch
         optionFilterProp="label"
+        aria-label="项目"
         style={{ width: '100%', marginBottom: 12 }}
         placeholder="选项目看齐套率"
         value={projectNo}

@@ -509,6 +509,112 @@ check('SUBMIT-无裸validate', bareValidate.length === 0,
     bad.length ? `图标-only 按钮缺 aria-label/title: ${bad.slice(0, 3).join(' | ')}` : '图标-only 按钮全部带可访问名');
 }
 
+// ★ A11Y-不禁用缩放（WCAG 1.4.4）—— 现场/仓库在户外强光下看手机，不给捏合放大是真问题。
+{
+  const html = fs.readFileSync(path.resolve(SRC, '../index.html'), 'utf8');
+  const vp = html.match(/<meta name="viewport"[^>]*>/)?.[0] || '';
+  const ok = vp.length > 0 && !/maximum-scale|user-scalable\s*=\s*["']?no/i.test(vp);
+  check('A11Y-不禁用缩放', ok, ok ? 'viewport 允许缩放（无 maximum-scale / user-scalable=no）' : `viewport 禁止缩放: ${vp}`);
+}
+
+// ★ A11Y-链接跟随品牌色 —— antd 的 colorLink 派生自 `seed.colorLink || seed.colorInfo`（genColorMapToken.js），
+//   只设 colorPrimary 时全站 <a> 会落到 antd 默认蓝 #1677ff：同屏两种蓝 + 对比度 4.1:1 不达 AA。
+//   与「旧主色 #1f6feb 躲在 styles.css」同一类盲区 —— 躲在第三方默认值里。
+{
+  const main = fs.readFileSync(path.join(SRC, 'main.tsx'), 'utf8');
+  const ok = /colorLink\s*:/.test(main);
+  check('A11Y-链接跟随品牌色', ok, ok ? 'main.tsx 已显式声明 colorLink（不再落回 antd 默认蓝）' : 'main.tsx 缺 colorLink —— 链接会落回 antd 默认蓝 #1677ff');
+}
+
+// ★ VIS-外壳色跟随品牌（2026-10-06 a11y 体检顺手发现）——
+//   index.html 的 theme-color 还是旧主色 #1f6feb。旧主色这是**第三次**躲过扫描：
+//   ① styles.css（VIS-hex 只扫 tsx）② antd 默认 colorInfo（colorLink 的兜底）③ 应用外壳 index.html。
+//   所以这里不再只盯某个文件，而是直接拿 tokens.ts 的 brand 当唯一事实源对账。
+{
+  const tk = fs.readFileSync(path.join(SRC, 'theme/tokens.ts'), 'utf8');
+  const brand = tk.match(/brand:\s*'(#[0-9a-fA-F]{6})'/)?.[1];
+  const html = fs.readFileSync(path.resolve(SRC, '../index.html'), 'utf8');
+  const themeColor = html.match(/<meta\s+name="theme-color"\s+content="([^"]*)"/)?.[1];
+  const bad = [];
+  if (!brand) bad.push('tokens.ts 读不到 T.brand');
+  if (!themeColor) bad.push('index.html 缺 theme-color');
+  else if (brand && themeColor.toLowerCase() !== brand.toLowerCase()) bad.push(`theme-color=${themeColor} ≠ 品牌色 ${brand}`);
+  if (/#1f6feb/i.test(html)) bad.push('index.html 还用着旧主色 #1f6feb');
+  check('VIS-外壳色跟随品牌', bad.length === 0,
+    bad.length ? bad.join(' | ') : `theme-color=${themeColor} 跟随 T.brand=${brand}`);
+}
+
+// ── 公用：JSX 开标签边界 / tsx 遍历（下面两条 A11Y 护栏共用）──
+//   '>' 必须跳过 {} 与引号里的 —— 否则 `format={(p) => ...}` 里的 `=>` 会被当成标签结束。
+const jsxTagEnd = (src, from) => {
+  let depth = 0, q = null;
+  for (let i = from; i < src.length; i++) {
+    const ch = src[i];
+    if (q) { if (ch === q) q = null; continue; }
+    if (ch === '"' || ch === "'" || ch === '`') { q = ch; continue; }
+    if (ch === '{') depth++;
+    else if (ch === '}') depth--;
+    else if (ch === '>' && depth === 0) return i;
+  }
+  return -1;
+};
+const eachTsx = (dir, fn) => {
+  for (const f of fs.readdirSync(dir)) {
+    const p = path.join(dir, f);
+    if (fs.statSync(p).isDirectory()) { eachTsx(p, fn); continue; }
+    if (/\.tsx$/.test(f)) fn(fs.readFileSync(p, 'utf8'), p);
+  }
+};
+
+// ★ A11Y-Select有可访问名（axe 体检 2026-10-06，critical×12）——
+//   页面级筛选 <Select> 内部是 role="combobox" 的 <input>，不写 aria-label 读取器只会念「组合框」。
+//   带 aria-label 即可：rc-select 的 SingleSelector 用 pickAttrs(props,true) 把 aria-* 转到那个 input
+//   （node_modules/rc-select/es/Selector/SingleSelector.js，已核）；Form.Item 包裹的不用写 —— antd 会给 label+htmlFor。
+{
+  const bad = [];
+  const scan = (src, p) => {
+    const lines = src.split('\n');
+    const re = /<(Select|TreeSelect|SelectProject|SelectEquipment)\b/g;
+    let m;
+    while ((m = re.exec(src))) {
+      const end = jsxTagEnd(src, m.index + m[0].length);
+      if (end < 0) continue;
+      const tag = src.slice(m.index, end + 1);
+      if (!/placeholder=/.test(tag)) continue;   // 只顾带占位符的；其余都在 Form.Item 内
+      if (/aria-label=/.test(tag)) continue;
+      const line = src.slice(0, m.index).split('\n').length;
+      const up = lines.slice(Math.max(0, line - 7), line - 1).join('\n');
+      if (/<Form\.Item/.test(up)) continue;      // antd label + htmlFor 已经给了名字
+      bad.push(`${p.replace(SRC, 'src')}:${line}`);
+    }
+  };
+  eachTsx(path.join(SRC, 'features'), scan);
+  eachTsx(path.join(SRC, 'components'), scan);
+  check('A11Y-Select有可访问名', bad.length === 0,
+    bad.length ? `页面级 Select 缺 aria-label: ${bad.slice(0, 5).join(' | ')}` : '页面级筛选 Select 全部带 aria-label（Form.Item 内的由 antd label 兜底）');
+}
+
+// ★ A11Y-Progress有可访问名（axe 体检 2026-10-06，serious）——
+//   antd <Progress> 渲染 role="progressbar"，无名字读取器只念「进度条 0%」。antd 会把 restProps
+//   转发到那个 div（antd/es/progress/progress.js 的 omit(...) 不含 aria-*），所以传 aria-label 即生效。
+{
+  const bad = [];
+  const scan = (src, p) => {
+    const re = /<Progress\b/g;
+    let m;
+    while ((m = re.exec(src))) {
+      const end = jsxTagEnd(src, m.index + m[0].length);
+      if (end < 0) continue;
+      if (/aria-label=/.test(src.slice(m.index, end + 1))) continue;
+      bad.push(`${p.replace(SRC, 'src')}:${src.slice(0, m.index).split('\n').length}`);
+    }
+  };
+  eachTsx(path.join(SRC, 'features'), scan);
+  eachTsx(path.join(SRC, 'components'), scan);
+  check('A11Y-Progress有可访问名', bad.length === 0,
+    bad.length ? `Progress 缺 aria-label: ${bad.slice(0, 5).join(' | ')}` : '全部 Progress 带 aria-label');
+}
+
 // ══ 双端一致性护栏（本轮起：PC 与移动端不再各改各的）══════════════════
 const FEATS = path.join(SRC, 'features');
 

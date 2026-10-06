@@ -142,6 +142,7 @@ export default function AcceptancePage() {
         <SelectProject
           allowClear
           className="w-full"
+          aria-label="按项目筛选"
           placeholder="按项目筛选（默认全部项目）"
           value={filterNo || undefined}
           onChange={(v: string | undefined) => setQ({ project: v || undefined })}

@@ -478,6 +478,7 @@ export default function Users() {
                 <Space wrap style={{ marginBottom: 12 }}>
                   <TreeSelect
                     allowClear
+                    aria-label="部门/组"
                     style={{ width: 200 }}
                     placeholder="部门/组"
                     value={fOrg}
@@ -494,6 +495,7 @@ export default function Users() {
                     allowClear
                     showSearch
                     optionFilterProp="label"
+                    aria-label="角色"
                     style={{ width: 170 }}
                     placeholder="角色"
                     value={fRole}
@@ -502,6 +504,7 @@ export default function Users() {
                   />
                   <Select
                     allowClear
+                    aria-label="状态"
                     style={{ width: 110 }}
                     placeholder="状态"
                     value={fActive}
@@ -785,6 +788,7 @@ export default function Users() {
         </Typography.Paragraph>
         <Space direction="vertical" style={{ width: '100%' }} size={12}>
           <Select
+            aria-label="转交给谁"
             style={{ width: '100%' }}
             placeholder="转交给谁"
             value={handoverTo}

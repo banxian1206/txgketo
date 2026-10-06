@@ -143,6 +143,7 @@ export default function PriceReferencePanel() {
         <Select
           showSearch
           filterOption={false}
+          aria-label="搜索物料"
           style={{ width: 420 }}
           placeholder="输编码 / 品名 / 规格 / 品牌 搜物料"
           value={itemNo}
