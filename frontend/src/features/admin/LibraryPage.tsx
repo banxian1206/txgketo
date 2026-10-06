@@ -29,7 +29,11 @@ export default function Library() {
     try {
       const data = await listLibraryCategories()
       setCats(data)
-      const first = data.find((c) => c.classes.length)?.classes[0] ?? null
+      // ★ 默认落到「有物料的第一个品类」：否则会停在空种子品类（如 直线导轨）上，看着像「标准库是空的」
+      const first =
+        data.flatMap((c) => c.classes).find((k) => (k.item_count ?? 0) > 0) ??
+        data.find((c) => c.classes.length)?.classes[0] ??
+        null
       setActiveClass((prev) => prev ?? first)
     } catch (e) {
       message.error(errMsg(e))
@@ -202,7 +206,7 @@ export default function Library() {
             size="small"
             loading={loading}
             dataSource={items}
-            pagination={{ pageSize: 20, showSizeChanger: false }}
+            pagination={{ pageSize: 10, showSizeChanger: true }}
             locale={{ emptyText: <Empty description="这个品类下还没有物料" /> }}
             columns={[
               {

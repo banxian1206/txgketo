@@ -66,6 +66,9 @@ class Item(Base, TimestampMixin):
     brand: Mapped[str | None] = mapped_column(String(64))
     mfr_model: Mapped[str | None] = mapped_column(String(128))
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
+    # ★ 内部来源编号（ERP 等外部系统物料编码）：只用于**重复导入幂等**与交叉核对，
+    #   **不出现在任何接口/页面/搜索**（docs/16「只搬数据、不搬编码规则」）。
+    legacy_code: Mapped[str | None] = mapped_column(String(64), unique=True)
 
     __table_args__ = (
         # ★ 归属闸门：非标件必带项目号，标准件必须不带 —— 一条约束同时解决串项与跨项目复用

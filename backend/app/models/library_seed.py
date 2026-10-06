@@ -45,6 +45,10 @@ MATERIALS = [
     "优力胶",
 ]
 
+# ★ 品类树以 ERP 为准（docs/16 §11，客户 2026-10-06）：
+#   下面清单里 FT/BT/CG/BC/YG/LC/DG/SG/DJ/JSJ/JQR/PLC/CAM 和类别 BZ 已**废弃**，
+#   `scripts/seed.py::RETIRED_STD_CLASSES` 不再创建它们（已存在的会清理）。
+#   保留的只有带规格模板且被 ERP 复用的：SF / QG / LS / ZCT。
 CLASSES: list[dict] = [
     # ---------------- 原材料 ----------------
     {

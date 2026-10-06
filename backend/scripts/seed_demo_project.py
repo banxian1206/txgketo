@@ -39,17 +39,17 @@ def price_of(item_no: str) -> float:
         return 45.0
     if item_no.startswith("QD"):
         return 120.0
-    if item_no.startswith("BZ-DJ"):
+    if item_no.startswith("DL-DLD"):
         return 1800.0
-    if item_no.startswith("BZ-JSJ"):
+    if item_no.startswith("DL-DLJ"):
         return 3200.0
-    if item_no.startswith("DQ-PLC"):
+    if item_no.startswith("DQ-CPU"):
         return 2600.0
     if item_no.startswith("DQ-SF"):
         return 1500.0
-    if item_no.startswith("YL-FT"):
+    if item_no.startswith("YL-GC"):
         return 35.0
-    if item_no.startswith("YL-BC"):
+    if item_no.startswith("YL-YLLC"):
         return 210.0
     return 500.0
 
@@ -93,7 +93,7 @@ def main() -> None:
         print("=" * 60)
 
         # ---------- 用户 id ----------
-        admin = login("admin", "admin12345")
+        admin = login("admin", "txgk@123")
         users = {u["username"]: u["id"] for u in c.get("/api/v1/users", headers=admin).json()}
         print(f"✅ 演示账号 {len(users)} 个")
 

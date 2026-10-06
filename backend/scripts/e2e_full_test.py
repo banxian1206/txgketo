@@ -48,7 +48,7 @@ def main() -> None:
 
     def login(u: str) -> dict:
         if u not in tokens:
-            pwd = "admin12345" if u == "admin" else "txgk@123"
+            pwd = "txgk@123"   # ★ 2026-10-05 全站统一密码
             r = c.post("/api/v1/auth/login", json={"username": u, "password": pwd})
             assert r.status_code == 200, (u, r.text)
             tokens[u] = {"Authorization": f"Bearer {r.json()['access_token']}"}
@@ -66,17 +66,20 @@ def main() -> None:
         return [x["token"] for x in req("post", f"/api/v1/{area}/photos", who, (201,),
                                         params={"project_no": pno, "ref": ref}, files=files)]
 
-    users = {u["username"]: u["id"] for u in req("get", "/api/v1/users", "admin")  # admin-ok: 读用户列表（仅 system:admin/总监）}
+    users = {
+        u["username"]: u["id"]
+        for u in req("get", "/api/v1/users", "admin")  # admin-ok: 读用户列表（仅 system:admin/总监）
+    }
 
     # ================= 基础数据：标准库物料（接口建，重复容错） =================
     stage("准备：标准库物料（admin 通过接口建档）")
     ITEMS = [
-        ("DJ", {"brand": "台达", "model": "ECMA-C21310", "power": "1kW", "voltage": "220V"}, "台"),
-        ("JSJ", {"brand": "纽氏达特", "model": "PLE60-10", "ratio": "1:10"}, "台"),
+        ("DLD", {"brand": "台达", "model": "ECMA-C21310", "power": "1kW", "voltage": "220V"}, "台"),
+        ("DLJ", {"brand": "纽氏达特", "model": "PLE60-10", "ratio": "1:10"}, "台"),
         ("QG", {"brand": "SMC", "model": "CDQ2B32-100", "bore": "32", "stroke": "100"}, "只"),
-        ("FT", {"material": "Q235", "w": "40", "h": "40", "t": "2.0", "len": "6000"}, "米"),
-        ("BC", {"material": "Q235", "t": "2.0", "size": "1220x2440"}, "张"),
-        ("PLC", {"brand": "汇川", "series": "AM401", "model": "AM401-CPU1602", "io": "32点"}, "套"),
+        ("GC", {"material": "Q235", "w": "40", "h": "40", "t": "2.0", "len": "6000"}, "米"),
+        ("YLLC", {"material": "Q235", "t": "2.0", "size": "1220x2440"}, "张"),
+        ("CPU", {"brand": "汇川", "series": "AM401", "model": "AM401-CPU1602", "io": "32点"}, "套"),
         ("SF", {"brand": "台达", "model": "ASDA-B3", "power": "750W"}, "台"),
         ("ZCT", {"brand": "NSK", "model": "6204DDU"}, "个"),
     ]
@@ -130,7 +133,10 @@ def main() -> None:
 
     # ================= S1 立项 =================
     stage("S1 立项（pm1）")
-    users = {u["username"]: u["id"] for u in req("get", "/api/v1/users", "admin")  # admin-ok: 读用户列表（仅 system:admin/总监）}
+    users = {
+        u["username"]: u["id"]
+        for u in req("get", "/api/v1/users", "admin")  # admin-ok: 读用户列表（仅 system:admin/总监）
+    }
     for u, role in [("pm1", "项目经理"), ("mech_manager", "机械负责人"), ("elec_manager", "电气负责人"),
                     ("prog_manager", "程序负责人"), ("craft_manager", "工艺负责人"), ("buyer1", "采购负责人"),
                     ("shop1", "生产负责人"), ("assy1", "装配负责人"), ("site1", "现场负责人"),

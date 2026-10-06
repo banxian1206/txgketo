@@ -93,7 +93,7 @@ class Api:
         with self.lock:
             if u in self.tokens:
                 return self.tokens[u]
-        pwd = "admin12345" if u == "admin" else "txgk@123"
+        pwd = "txgk@123"   # ★ 2026-10-05 全站统一密码
         r = self.client.post("/auth/login", json={"username": u, "password": pwd})
         if r.status_code != 200:
             raise ApiError("POST", "/auth/login", u, r.status_code, r.text)
@@ -164,12 +164,12 @@ def reset_db() -> None:
 
 
 LIB_SEED = [
-    ("DJ", {"brand": "台达", "model": "ECMA-C21310", "power": "1kW", "voltage": "220V"}, "台"),
-    ("JSJ", {"brand": "纽氏达特", "model": "PLE60-10", "ratio": "1:10"}, "台"),
+    ("DLD", {"brand": "台达", "model": "ECMA-C21310", "power": "1kW", "voltage": "220V"}, "台"),
+    ("DLJ", {"brand": "纽氏达特", "model": "PLE60-10", "ratio": "1:10"}, "台"),
     ("QG", {"brand": "SMC", "model": "CDQ2B32-100", "bore": "32", "stroke": "100"}, "只"),
-    ("FT", {"material": "Q235", "w": "40", "h": "40", "t": "2.0", "len": "6000"}, "米"),
-    ("BC", {"material": "Q235", "t": "2.0", "size": "1220x2440"}, "张"),
-    ("PLC", {"brand": "汇川", "series": "AM401", "model": "AM401-CPU1602", "io": "32点"}, "套"),
+    ("GC", {"material": "Q235", "w": "40", "h": "40", "t": "2.0", "len": "6000"}, "米"),
+    ("YLLC", {"material": "Q235", "t": "2.0", "size": "1220x2440"}, "张"),
+    ("CPU", {"brand": "汇川", "series": "AM401", "model": "AM401-CPU1602", "io": "32点"}, "套"),
     ("SF", {"brand": "台达", "model": "ASDA-B3", "power": "750W"}, "台"),
     ("ZCT", {"brand": "NSK", "model": "6204DDU"}, "个"),
 ]
@@ -179,8 +179,8 @@ def seed_library() -> None:
     for cls, spec, unit in LIB_SEED:
         api.req("post", "/library/items", "admin", (201,),
                 json={"std_class_code": cls, "spec": spec, "unit": unit})
-    for key, q in [("zct", "轴承"), ("qg", "气缸"), ("dj", "电机"), ("ft", "方通"),
-                   ("bc", "板材"), ("plc", "PLC"), ("sf", "伺服"), ("jsj", "减速机")]:
+    for key, q in [("zct", "轴承"), ("qg", "气缸"), ("dj", "电机"), ("ft", "钢材"),
+                   ("bc", "铝材"), ("plc", "CPU"), ("sf", "伺服"), ("jsj", "减速机")]:
         rows = api.req("get", "/library/items", "admin", params={"q": q})
         assert rows, f"标准库找不到 {q}"
         LIB[key] = rows[0]
@@ -193,17 +193,17 @@ def price_of(item_no: str) -> float:
         return 45.0
     if item_no.startswith("QD"):
         return 120.0
-    if item_no.startswith("BZ-DJ"):
+    if item_no.startswith("DL-DLD"):
         return 1800.0
-    if item_no.startswith("BZ-JSJ"):
+    if item_no.startswith("DL-DLJ"):
         return 3200.0
-    if item_no.startswith("DQ-PLC"):
+    if item_no.startswith("DQ-CPU"):
         return 2600.0
     if item_no.startswith("DQ-SF"):
         return 1500.0
-    if item_no.startswith("YL-FT"):
+    if item_no.startswith("YL-GC"):
         return 35.0
-    if item_no.startswith("YL-BC"):
+    if item_no.startswith("YL-YLLC"):
         return 210.0
     return 500.0  # 图号类（外协/定制）
 
@@ -1260,16 +1260,15 @@ def deep_coverage(pjs: list[dict]) -> None:
         probe("消息标记已读", "post", f"/notifications/{note_items[0]['id']}/read", "mech_manager")
     probe("全部已读", "post", "/notifications/read-all", "mech_manager")
 
-    # ---- 组织 / 权限 / 代登录 ----
+    # ---- 组织 / 权限 ----
     probe("我的管理范围", "get", "/my-scope", "mech_manager")
     probe("组织列表", "get", "/orgs", "admin")
     probe("角色列表", "get", "/roles", "admin")
     probe("用户筛选", "get", "/users", "admin", params={"q": "mech"})
-    probe("代登录(只读GET)", "get", "/workbench/me", "admin",
-          headers={"X-Impersonate": str(USERS["site1"])})
-    probe("代登录(写操作应403)", "post", "/site/issues", "admin", (403,),
-          headers={"X-Impersonate": str(USERS["site1"])},
-          json={"project_no": p, "title": "越权测试"})
+    # ★ 2026-10-05：「以某人身份查看」（X-Impersonate）**已删除**（客户拍板）。
+    #   原来这里有两条探针：代登录 GET（应 200）与代登录写操作（应 403）——
+    #   现在那个头**完全被忽略**，探针会变成“带了个废头仍 200”的**假绿**（若照旧传 403 还会变假红）。
+    #   删掉后改验**真正的替代路径**：直接登录该账号。
 
     # ---- 变更：列表 / 详情 / 影响面 / BOM 行改版 ----
     probe("改版申请列表", "get", "/change-requests", "eng_director", params={"scope": "all"})
@@ -1316,7 +1315,7 @@ def deep_coverage2(pjs: list[dict]) -> None:
 
     # ---- 标准库：防重码 / 详情 / 类目 ----
     probe("物料类目", "get", "/library/categories", "admin")
-    probe("物料品类", "get", "/library/classes/FT", "admin")
+    probe("物料品类", "get", "/library/classes/GC", "admin")
     probe("物料详情", "get", f"/library/items/{LIB['zct']['item_no']}", "admin")
     code, _ = probe("防重码（同品类+同规格重复建档应拦）", "post", "/library/items", "admin", (400, 409),
                     json={"std_class_code": "ZCT", "spec": {"brand": "NSK", "model": "6204DDU"}, "unit": "个"})

@@ -58,7 +58,7 @@ def issues() -> list[dict]:
 def main() -> None:
     proj = q("select project_no from project order by project_no limit 1")[0]["project_no"]
     eq = q("select equip_no from equipment where project_no=:p limit 1", p=proj)[0]["equip_no"]
-    it = q("select item_no from item where item_no like 'YL-FT%' limit 1")[0]["item_no"]
+    it = q("select item_no from item where item_no like 'YL-GC%' limit 1")[0]["item_no"]
     loc = q("select id from warehouse_location limit 1")
     if not loc:
         C.post("/warehouse/locations", headers=dict(login("wh1")),

@@ -10,11 +10,11 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from sqlalchemy import select  # noqa: E402
+from sqlalchemy import func, select  # noqa: E402
 
 from app.core.db import SessionLocal  # noqa: E402
 from app.core.security import hash_password  # noqa: E402
-from app.models.library import StdCategory, StdClass  # noqa: E402
+from app.models.library import Item, StdCategory, StdClass  # noqa: E402
 from app.models.library_seed import (  # noqa: E402
     CATEGORIES,
     CHANGE_REQUEST_RULE,
@@ -31,7 +31,19 @@ from app.models.library_seed import (  # noqa: E402
 )
 from app.models.numbering import NumberRule  # noqa: E402
 from app.models.platform import Org, Permission, Role, User  # noqa: E402
+from app.services.erp_legacy_map import CATEGORY_MAP as ERP_CATEGORY_MAP  # noqa: E402
+from app.services.erp_legacy_map import CLASS_MAP as ERP_CLASS_MAP  # noqa: E402
 from app.services.numbering import DEFAULT_RULES  # noqa: E402
+
+# ★ 以 ERP 为准（docs/16，客户 2026-10-06）：下面这些「本地设的种子品类」不再建；
+#   若库里已存在且没被物料引用，seed 时顺手清掉。
+#   保留的 4 个（SF 伺服 / QG 气缸 / LS 螺丝 / ZCT 轴承）带规格模板，仍由 library_seed 建。
+RETIRED_STD_CATEGORIES = {"BZ"}  # 外购标准件（ERP 无此类别）
+RETIRED_STD_CLASSES = {
+    "FT", "BT", "CG", "BC", "YG", "LC",  # 原材料细类 → ERP 统归「钢材/铁材/铝材…」
+    "DG", "SG", "DJ", "JSJ", "JQR",       # → ERP「导轨类 / 动力类」
+    "PLC", "CAM",                            # ERP 无对应物料
+}
 
 # 组织（部门 → 小组用 parent_code 表达；05 卷 §2.1 工程部 → 四个专业组）
 ORGS: list[tuple[str, str, str, str | None]] = [
@@ -109,7 +121,13 @@ ROLES: list[tuple[str, str, list[str]]] = [
 ]
 
 ADMIN_USERNAME = "admin"
-ADMIN_PASSWORD = "admin12345"
+# ★ 2026-10-05 客户拍板：**全站账号统一一个密码**（方便登录/测试）。
+#   原来 admin 是 `admin12345`、25 个演示账号是 `txgk@123` 两套，
+#   导致“以某人身份查看”被当成必需（因为它能免密看别人视角）。那个功能已删，
+#   改为：要测谁就用谁的账号直接登录 —— 前提是密码统一且所有人都知道。
+#   ⚠ **上线前必须改掉**（演示阶段才允许弱密码；且与 `services/demo.py` 的 DEMO_PASSWORD 保持一致，
+#     否则又会变成两套）。
+ADMIN_PASSWORD = "txgk@123"
 
 
 def main() -> None:
@@ -155,10 +173,14 @@ def main() -> None:
 
         # 标准库：类别 + 品类（含规格模板）
         for c in CATEGORIES:
+            if c["code"] in RETIRED_STD_CATEGORIES:
+                continue
             if not session.get(StdCategory, c["code"]):
                 session.add(StdCategory(**c))
         session.flush()
         for k in CLASSES:
+            if k["code"] in RETIRED_STD_CLASSES:
+                continue
             row = session.get(StdClass, k["code"])
             if row is None:
                 session.add(StdClass(**k))
@@ -168,6 +190,46 @@ def main() -> None:
                 row.spec_template = k["spec_template"]
                 row.seq = k["seq"]
         session.flush()
+
+        # ★ 品类树以 ERP 为准：把 ERP 映射表也落库（只跑 seed 不跑 ERP 导入的开发库也有完整品类树）
+        erp_cat_names: dict[str, str] = {}
+        for _erp, (code, name) in ERP_CATEGORY_MAP.items():
+            erp_cat_names[code] = name
+        cat_seq = 100
+        for code, name in erp_cat_names.items():
+            if not session.get(StdCategory, code):
+                session.add(StdCategory(code=code, name=name, seq=cat_seq))
+                cat_seq += 1
+        session.flush()
+        cls_seq: dict[str, int] = {}
+        for (_erp, _cls), (cat, cls, cls_name) in ERP_CLASS_MAP.items():
+            if session.get(StdClass, cls) is None:
+                cls_seq[cat] = cls_seq.get(cat, 100)
+                session.add(StdClass(code=cls, name=cls_name, category_code=cat,
+                                     spec_template=None, seq=cls_seq[cat]))
+                cls_seq[cat] += 1
+        session.flush()
+
+        # ★ 清掉已废弃的本地种子品类（仅当没有任何物料引用它）
+        retired = 0
+        for code in RETIRED_STD_CLASSES:
+            row = session.get(StdClass, code)
+            if row is not None and not session.scalar(
+                select(func.count()).select_from(Item).where(Item.std_class_code == code)
+            ):
+                session.delete(row)
+                retired += 1
+        session.flush()  # 先让品类删除落库，否则下面数类别下还剩几个品类会数到未删的
+        for code in RETIRED_STD_CATEGORIES:
+            row = session.get(StdCategory, code)
+            if row is not None and not session.scalar(
+                select(func.count()).select_from(StdClass).where(StdClass.category_code == code)
+            ):
+                session.delete(row)
+                retired += 1
+        session.flush()
+        if retired:
+            print(f"已按 ERP 为准清掉废弃种子品类 {retired} 个")
 
         # 编号规则
         for rule in [

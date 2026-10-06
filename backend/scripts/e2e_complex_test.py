@@ -48,7 +48,7 @@ def main() -> None:
 
     def login(u: str) -> dict:
         if u not in tokens:
-            pwd = "admin12345" if u == "admin" else "txgk@123"
+            pwd = "txgk@123"   # ★ 2026-10-05 全站统一密码
             r = c.post("/api/v1/auth/login", json={"username": u, "password": pwd})
             assert r.status_code == 200, (u, r.text)
             tokens[u] = {"Authorization": f"Bearer {r.json()['access_token']}"}
@@ -75,16 +75,19 @@ def main() -> None:
             req("post", f"/api/v1/programs/{ref}/draft", who, (200,),
                 data={"change_reason": "初稿"}, files={"file": ("p.st", b"LD M0\n", "text/plain")})
 
-    users = {u["username"]: u["id"] for u in req("get", "/api/v1/users", "admin")  # admin-ok: 读用户列表（仅 system:admin/总监）}
+    users = {
+        u["username"]: u["id"]
+        for u in req("get", "/api/v1/users", "admin")  # admin-ok: 读用户列表（仅 system:admin/总监）
+    }
 
     # 标准库物料（接口建档，重复容错）
     ITEMS = [
-        ("DJ", {"brand": "台达", "model": "ECMA-C21310", "power": "1kW", "voltage": "220V"}, "台"),
-        ("JSJ", {"brand": "纽氏达特", "model": "PLE60-10", "ratio": "1:10"}, "台"),
+        ("DLD", {"brand": "台达", "model": "ECMA-C21310", "power": "1kW", "voltage": "220V"}, "台"),
+        ("DLJ", {"brand": "纽氏达特", "model": "PLE60-10", "ratio": "1:10"}, "台"),
         ("QG", {"brand": "SMC", "model": "CDQ2B32-100", "bore": "32", "stroke": "100"}, "只"),
-        ("FT", {"material": "Q235", "w": "40", "h": "40", "t": "2.0", "len": "6000"}, "米"),
-        ("BC", {"material": "Q235", "t": "2.0", "size": "1220x2440"}, "张"),
-        ("PLC", {"brand": "汇川", "series": "AM401", "model": "AM401-CPU1602", "io": "32点"}, "套"),
+        ("GC", {"material": "Q235", "w": "40", "h": "40", "t": "2.0", "len": "6000"}, "米"),
+        ("YLLC", {"material": "Q235", "t": "2.0", "size": "1220x2440"}, "张"),
+        ("CPU", {"brand": "汇川", "series": "AM401", "model": "AM401-CPU1602", "io": "32点"}, "套"),
         ("SF", {"brand": "台达", "model": "ASDA-B3", "power": "750W"}, "台"),
         ("ZCT", {"brand": "NSK", "model": "6204DDU"}, "个"),
     ]
@@ -149,7 +152,7 @@ def main() -> None:
         json={"item_no": lib["减速机"], "qty": 4, "lead_days": 60, "need_date": d(120),
               "ordered_at": d(0), "supplier_name": "华信传动", "equip_no": "01A"})
     req("post", f"/api/v1/projects/{p}/purchase-requests", "pm1", (201,),
-        json={"item_no": lib["PLC"], "qty": 2, "lead_days": 45, "need_date": d(100),
+        json={"item_no": lib["CPU"], "qty": 2, "lead_days": 45, "need_date": d(100),
               "ordered_at": d(0), "supplier_name": "华信传动", "equip_no": "02A"})
     req("post", f"/api/v1/projects/{p}/generate-tasks", "pm1",
         json={"professions": ["机械", "电气", "程序", "工艺"], "with_purchase": True})

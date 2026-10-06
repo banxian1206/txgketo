@@ -32,12 +32,12 @@ TABLES = [
 ]
 
 ITEMS = [
-    ("DJ", {"brand": "台达", "model": "ECMA-C21310", "power": "1kW", "voltage": "220V"}, "台"),
-    ("JSJ", {"brand": "纽氏达特", "model": "PLE60-10", "ratio": "1:10"}, "台"),
+    ("DLD", {"brand": "台达", "model": "ECMA-C21310", "power": "1kW", "voltage": "220V"}, "台"),
+    ("DLJ", {"brand": "纽氏达特", "model": "PLE60-10", "ratio": "1:10"}, "台"),
     ("QG", {"brand": "SMC", "model": "CDQ2B32-100", "bore": "32", "stroke": "100"}, "只"),
-    ("FT", {"material": "Q235", "w": "40", "h": "40", "t": "2.0", "len": "6000"}, "米"),
-    ("BC", {"material": "Q235", "t": "2.0", "size": "1220x2440"}, "张"),
-    ("PLC", {"brand": "汇川", "series": "AM401", "model": "AM401-CPU1602", "io": "32点"}, "套"),
+    ("GC", {"material": "Q235", "w": "40", "h": "40", "t": "2.0", "len": "6000"}, "米"),
+    ("YLLC", {"material": "Q235", "t": "2.0", "size": "1220x2440"}, "张"),
+    ("CPU", {"brand": "汇川", "series": "AM401", "model": "AM401-CPU1602", "io": "32点"}, "套"),
     ("SF", {"brand": "台达", "model": "ASDA-B3", "power": "750W"}, "台"),
     ("ZCT", {"brand": "NSK", "model": "6204DDU"}, "个"),
 ]
@@ -59,7 +59,7 @@ def main() -> None:
 
     with TestClient(app) as c:
         def login(u):
-            pwd = "admin12345" if u == "admin" else "txgk@123"
+            pwd = "txgk@123"   # ★ 2026-10-05 全站统一密码
             r = c.post("/api/v1/auth/login", json={"username": u, "password": pwd})
             assert r.status_code == 200, (u, r.text)
             return {"Authorization": f"Bearer {r.json()['access_token']}"}

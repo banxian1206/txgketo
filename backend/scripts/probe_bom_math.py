@@ -36,7 +36,7 @@ TOK: dict[str, dict] = {}
 
 def login(u):
     if u in TOK: return TOK[u]
-    pwd = "admin12345" if u == "admin" else "txgk@123"
+    pwd = "txgk@123"   # ★ 2026-10-05 全站统一密码
     r = C.post("/auth/login", json={"username": u, "password": pwd})
     r.raise_for_status()
     TOK[u] = {"Authorization": f"Bearer {r.json()['access_token']}"}
@@ -214,8 +214,8 @@ BUSINESS_TABLES = [
 ]
 
 LIB_SEED = [("ZCT", {"brand": "NSK", "model": "6204DDU"}, "个"),
-            ("BC", {"material": "Q235", "t": "2.0", "size": "1220x2440"}, "张"),
-            ("FT", {"material": "Q235", "w": "40", "h": "40", "t": "2.0", "len": "6000"}, "米")]
+            ("YLLC", {"material": "Q235", "t": "2.0", "size": "1220x2440"}, "张"),
+            ("GC", {"material": "Q235", "w": "40", "h": "40", "t": "2.0", "len": "6000"}, "米")]
 
 
 def main():
@@ -297,7 +297,7 @@ def main():
 
     # ---------------- ISO-C 已入库 + 已领走出库 ----------------
     print("\n--- ISO-C 标准件「已入库 + 已领走出库」后手动补跑 ---")
-    bc = q("select item_no from item where item_no like 'YL-BC%' limit 1")[0]["item_no"]
+    bc = q("select item_no from item where item_no like 'YL-YLLC%' limit 1")[0]["item_no"]
     c = build_project("C", "bc", bc, 5.0, parent_qty=2.0)
     base = pool_of(c["p"])
     print(f"  项目 {c['p']}；板材 {bc} BOM qty=5，父组件 qty=2 → 真实需求 10")

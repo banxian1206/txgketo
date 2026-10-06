@@ -101,7 +101,7 @@ class Api:
     def login(self, u: str) -> dict:
         if u in self.tokens:
             return self.tokens[u]
-        pwd = "admin12345" if u == "admin" else "txgk@123"
+        pwd = "txgk@123"   # ★ 2026-10-05 全站统一密码
         r = self.c.post("/auth/login", json={"username": u, "password": pwd})
         if r.status_code != 200:
             raise ApiError("POST", "/auth/login", u, r.status_code, r.text)
@@ -194,10 +194,10 @@ def setup_users() -> None:
 
 LIB_SEED = [
     ("ZCT", {"brand": "NSK", "model": "6204DDU"}, "个"),
-    ("FT", {"material": "Q235", "w": "40", "h": "40", "t": "2.0", "len": "6000"}, "米"),
-    ("BC", {"material": "Q235", "t": "2.0", "size": "1220x2440"}, "张"),
-    ("DJ", {"brand": "台达", "model": "ECMA-C21310", "power": "1kW", "voltage": "220V"}, "台"),
-    ("PLC", {"brand": "汇川", "series": "AM401", "model": "AM401-CPU1602", "io": "32点"}, "套"),
+    ("GC", {"material": "Q235", "w": "40", "h": "40", "t": "2.0", "len": "6000"}, "米"),
+    ("YLLC", {"material": "Q235", "t": "2.0", "size": "1220x2440"}, "张"),
+    ("DLD", {"brand": "台达", "model": "ECMA-C21310", "power": "1kW", "voltage": "220V"}, "台"),
+    ("CPU", {"brand": "汇川", "series": "AM401", "model": "AM401-CPU1602", "io": "32点"}, "套"),
 ]
 
 
@@ -205,7 +205,7 @@ def setup_library() -> None:
     for cls, spec, unit in LIB_SEED:
         api.req("post", "/library/items", "craft1", (201,),   # craft1=工艺(std:edit)，不需要超管
                 json={"std_class_code": cls, "spec": spec, "unit": unit})
-    for key, kw in [("zct", "轴承"), ("ft", "方通"), ("bc", "板材"), ("dj", "电机"), ("plc", "PLC")]:
+    for key, kw in [("zct", "轴承"), ("ft", "钢材"), ("bc", "铝材"), ("dj", "电机"), ("plc", "CPU")]:
         rows = api.req("get", "/library/items", "craft1", params={"q": kw})
         LIB[key] = rows[0]
     note("标准库：" + ", ".join(f"{k}={v['item_no']}" for k, v in LIB.items()))
@@ -222,7 +222,7 @@ def setup_suppliers() -> None:
                 "payment_terms": "月结30天", "tax_rate": 13.0})
     # 供应商品类声明（推荐供应商用）
     for sup in ("甲钢材", "乙标准件"):
-        for cls in ("FT", "BC", "ZCT"):
+        for cls in ("GC", "YLLC", "ZCT"):
             api.try_("post", f"/suppliers/{SUP[sup]['id']}/catalog", "buyer1",
                      json={"supplier_id": SUP[sup]["id"], "std_class_code": cls,
                            "price": 10.0, "lead_days": 10})
@@ -1121,7 +1121,7 @@ def b_site_shortage() -> None:
            "order by id desc limit 1", i=rid)[0]["id"]
     sc, _ = api.try_("post", f"/site/incoming/{gr}/accept", "site1",
                      json={"result": "缺件",
-                           "shortage_detail": [{"item": "YL-FT-0001", "qty": 15, "reason": "少发15"}],
+                           "shortage_detail": [{"item": "YL-GC-0001", "qty": 15, "reason": "少发15"}],
                            "photos": ["probe.png"], "remark": "实到25缺15"})
     rec(sc == 200, f"现场清点缺件 → 200，实际={sc}")
     row = q("select qty_ok, qty_rejected from goods_receipt where id=:i", i=gr)[0]
@@ -1141,7 +1141,7 @@ def b_site_shortage() -> None:
              "order by id desc limit 1", i=rid_b)[0]["id"]
     api.req("post", f"/site/incoming/{gr_b}/accept", "site1", (200,),
             json={"result": "破损",
-                  "shortage_detail": [{"item": "YL-FT-0001", "qty": 8, "reason": "外壳压瘪"}],
+                  "shortage_detail": [{"item": "YL-GC-0001", "qty": 8, "reason": "外壳压瘪"}],
                   "photos": ["probe.png"], "remark": "破损8"})
     rb = q("select source from purchase_request where origin_request_id=:i", i=rid_b)
     rec(len(rb) == 1 and rb[0]["source"] == "现场破损",
