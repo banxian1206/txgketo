@@ -1,6 +1,7 @@
 """采购单实体化：建单 + 需求状态同步（《08 采购域重构方案》§3/§4 · 一期）。
 
-一期不建审批：PO 建出来直接「已批准」（二期再插两级审批）。
+★ 一套状态机（2026-10-07 客户口径）：草稿 → 待经理审 → 待总监审 → 在途 → 部分到货 → 已完成。
+  单行在审批阶段跟单头一致（不再一建单就是「在途」），审批通过 → 在途，入库 → 已入库。
 
 **关键变化**：下单**不再改写 `purchase_request.qty`**（那是需求数量，上游定的），
 改为累加 `qty_ordered`；一条需求可拆到多张单的多行（客户口径 #1）。
@@ -20,14 +21,20 @@ from app.models.purchase_order import (
     APPR_LEVEL_DIRECTOR,
     APPR_LEVEL_LEAD,
     PAY_UNPAID,
-    PO_APPROVED,
+    PO_APPROVAL_STATUS,
+    PO_CANCELLED,
+    PO_CLOSED,
     PO_DONE,
     PO_DRAFT,
-    PO_EXECUTING,
-    PO_LINE_OPEN,
+    PO_IN_TRANSIT,
+    PO_PARTIAL,
     PO_PENDING_DIRECTOR,
     PO_PENDING_LEAD,
     PO_RETURNED,
+    PO_RETURNED_GOODS,
+    PO_SITE_ACCEPTED,
+    PO_STORED,
+    PO_VOIDED,
     PurchaseApproval,
     PurchaseOrder,
     PurchaseOrderLine,
@@ -41,8 +48,8 @@ class PurchaseOrderError(ValueError):
     """采购单业务规则错误（路由转 400）。"""
 
 
-# 已生效（供应商即接单）
-PO_LIVE_STATUS = (PO_APPROVED, PO_EXECUTING, PO_DONE)
+# 已生效（审批通过、供应商即接单）
+PO_LIVE_STATUS = (PO_IN_TRANSIT, PO_PARTIAL, PO_DONE)
 
 
 def _now() -> datetime:
@@ -93,6 +100,27 @@ def sync_request_order_state(session: Session, row: PurchaseRequest) -> float:
         else:
             row.status = "待采购"  # 全是草稿
     return ordered
+
+
+def _po_lines(session: Session, po_id: int) -> list[PurchaseOrderLine]:
+    return list(
+        session.scalars(
+            select(PurchaseOrderLine).where(PurchaseOrderLine.po_id == po_id).order_by(PurchaseOrderLine.id)
+        ).all()
+    )
+
+
+def sync_po_lines_status(session: Session, po: PurchaseOrder) -> None:
+    """★ 审批阶段：单行状态跟单头一致（客户口径 2026-10-07）。
+
+    「单头是唯一口径」—— 建单/提交/通过/退回/撤回时，还处在审批阶段或「在途」的行
+    统一改成单头状态；**已到货/待入库/已入库/不合格/退货/取消的行不动**。
+    这样就不会再出现「单头待经理审、单行却在途」这种打架。
+    """
+    for ln in _po_lines(session, po.id):
+        if ln.status in (*PO_APPROVAL_STATUS, PO_IN_TRANSIT):
+            ln.status = po.status
+    session.flush()
 
 
 def _sync_po_requests(session: Session, po: PurchaseOrder) -> None:
@@ -153,6 +181,7 @@ def submit_order(session: Session, po: PurchaseOrder, submitter: User) -> str:
     else:
         po.status = PO_PENDING_LEAD
     session.flush()
+    sync_po_lines_status(session, po)
     _sync_po_requests(session, po)
     return po.status
 
@@ -183,7 +212,7 @@ def approve_order(
     note: str | None,
     price_snapshot: dict | None = None,
 ) -> str:
-    """两级审批：通过 / 退回（退回必填说明，round+1，全部留档）。审批通过 → 已批准。"""
+    """两级审批：通过 / 退回（退回必填说明，round+1，全部留档）。总监通过 → 在途。"""
     submitter = session.get(User, po.created_by) if po.created_by else None
     if po.status == PO_PENDING_LEAD:
         lead, _ = resolve_po_chain(session, submitter) if submitter else (None, None)
@@ -209,7 +238,7 @@ def approve_order(
         po.status = PO_RETURNED
         po.round = record_round + 1  # ★ 下一轮的编号；本次留档仍记当前轮（N11）
     elif action == "通过":
-        po.status = PO_APPROVED if level == APPR_LEVEL_DIRECTOR else PO_PENDING_DIRECTOR
+        po.status = PO_IN_TRANSIT if level == APPR_LEVEL_DIRECTOR else PO_PENDING_DIRECTOR
     else:
         raise PurchaseOrderError("审批动作只能是 通过 / 退回")
     session.add(
@@ -224,6 +253,7 @@ def approve_order(
             acted_at=_now(),
         )
     )
+    sync_po_lines_status(session, po)
     _sync_po_requests(session, po)
     return po.status
 
@@ -245,6 +275,7 @@ def withdraw_order(session: Session, po: PurchaseOrder, user: User) -> str:
             acted_at=_now(),
         )
     )
+    sync_po_lines_status(session, po)
     _sync_po_requests(session, po)
     return po.status
 
@@ -278,7 +309,7 @@ def create_order(
     tax_rate: float | None = None,
     freight: float | None = None,
     discount: float | None = None,
-    status: str = PO_APPROVED,
+    status: str = PO_DRAFT,
     remark: str | None = None,
 ) -> PurchaseOrder:
     """建一张采购单（单头 + 多行）并同步各需求的下单状态。
@@ -342,7 +373,9 @@ def create_order(
                 amount_tax_incl=amount_incl,
                 amount_tax_excl=amount_excl,
                 expect_date=ln.get("expect_date") or expect_date,
-                status=PO_LINE_OPEN,
+                # ★ 单行跟单头：建单那一刻单行 = `status`（草稿），审批通过后由
+                #   `sync_po_lines_status` 一起转「在途」——不再一建单就是「在途」
+                status=status,
             )
         )
         if amount_incl is not None:
@@ -410,17 +443,24 @@ def recalc_order_total(session: Session, po: PurchaseOrder) -> None:
 
 
 def recalc_order_status(session: Session, po: PurchaseOrder) -> None:
-    """按单行状态重算单头状态（已作废/已关闭 不动）。"""
-    if po.status in ("已作废", "已关闭"):
+    """★ 单头聚合：按单行状态重算单头（**单头是唯一口径**，客户口径 2026-10-07）。
+
+    规则：
+      · 审批阶段（草稿/待经理审/待总监审/已退回）与 已作废/已关闭：不动；
+      · 所有行都已入库/已退货/已取消 → 已完成；
+      · 有任何行已不在「在途」→ 部分到货；
+      · 否则 → 在途。
+    """
+    if po.status in (*PO_APPROVAL_STATUS, PO_VOIDED, PO_CLOSED):
         return
-    lines = session.scalars(
-        select(PurchaseOrderLine).where(PurchaseOrderLine.po_id == po.id)
-    ).all()
+    lines = _po_lines(session, po.id)
     st = {x.status for x in lines}
-    if st and st <= {"已入库", "已退货", "已取消"}:
-        po.status = "已完成"
-    elif any(float(x.received_qty or 0) > 0 for x in lines) or "不合格" in st:
-        po.status = "执行中"
+    if st and st <= {PO_STORED, PO_SITE_ACCEPTED, PO_RETURNED_GOODS, PO_CANCELLED}:
+        po.status = PO_DONE
+    elif st - {PO_IN_TRANSIT}:
+        po.status = PO_PARTIAL
+    else:
+        po.status = PO_IN_TRANSIT
 
 
 def sync_request_snapshot(session: Session, row: PurchaseRequest) -> None:

@@ -8,7 +8,8 @@
 ★ **一条需求可以拆到多张单的多行**（客户口径 #1：很有可能会拆给多个供应商），
 所以 `purchase_request.qty` **不再被下单动作改写**，改为记 `qty_ordered`（已下单量）。
 
-审批（`purchase_approval`）属**二期**，本期 PO 建出来直接 `已批准`。
+审批（`purchase_approval`）：两级（采购经理 → 采购总监），通过后单头/单行都转「在途」。
+★ 单头与单行**共用同一套状态词表**，单头是唯一口径（2026-10-07 客户口径）。
 """
 
 from __future__ import annotations
@@ -30,46 +31,68 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base, TimestampMixin
 
-# ── 单头状态（08 §4.1）──────────────────────────────────────────────
-# 二期会用到 待经理审/待总监审/已退回；一期直接 草稿 → 已批准。
+# ── ★ 采购状态机：单头与单行共用**同一套词表**（客户口径 2026-10-07）──────
+#   原则：**单头是唯一口径**；审批阶段单行状态必须跟单头一致（不能审批前就显示「在途」）；
+#   审批通过 → 在途；验收入库 → 已入库。不再有「已批准 / 执行中」这两个只在内部用的影子状态。
 PO_DRAFT = "草稿"
 PO_PENDING_LEAD = "待经理审"
 PO_PENDING_DIRECTOR = "待总监审"
 PO_RETURNED = "已退回"
-PO_APPROVED = "已批准"
-PO_EXECUTING = "执行中"
-PO_DONE = "已完成"
+PO_IN_TRANSIT = "在途"  # ★ 审批通过后（单头/单行共用；旧「已批准」「在途」归并到这里）
+PO_PARTIAL = "部分到货"
+PO_PENDING_STORE = "待入库"  # 单行：验收合格、还没入库
+PO_STORED = "已入库"  # 单行：真的入库了（仓库）
+PO_SITE_ACCEPTED = "现场已验收"  # 单行：直发客户现场、现场清点完成（不进仓库）
+PO_FAILED = "不合格"
+PO_RETURNED_GOODS = "已退货"
+PO_CANCELLED = "已取消"
+PO_DONE = "已完成"  # 单头聚合：所有行都已入库/已退货/已取消
 PO_VOIDED = "已作废"
 PO_CLOSED = "已关闭"
+
+# 单头状态（单头是唯一口径；不再有「已批准/执行中」）
 PO_STATUS = (
     PO_DRAFT,
     PO_PENDING_LEAD,
     PO_PENDING_DIRECTOR,
     PO_RETURNED,
-    PO_APPROVED,
-    PO_EXECUTING,
+    PO_IN_TRANSIT,
+    PO_PARTIAL,
     PO_DONE,
     PO_VOIDED,
     PO_CLOSED,
 )
-# 已批准之后：供应商/收货地/交期不可改（要改走「更改供应商」或作废重下）—— 08 §4.1 清单锁死线
-PO_LOCKED_STATUS = (PO_APPROVED, PO_EXECUTING, PO_DONE)
+# 在途之后：供应商/收货地/交期不可改（要改走「更改供应商」或作废重下）—— 08 §4.1 清单锁死线
+PO_LOCKED_STATUS = (PO_IN_TRANSIT, PO_PARTIAL, PO_DONE)
 
-# ── 单行状态（08 §3.2）──────────────────────────────────────────────
-PO_LINE_OPEN = "在途"
-PO_LINE_PARTIAL = "部分到货"
-PO_LINE_STORED = "已入库"
-PO_LINE_FAILED = "不合格"
-PO_LINE_RETURNED = "已退货"
-PO_LINE_CANCELLED = "已取消"
+# 单行状态（与单头同词表；多出到货/入库/协商的终态）
 PO_LINE_STATUS = (
-    PO_LINE_OPEN,
-    PO_LINE_PARTIAL,
-    PO_LINE_STORED,
-    PO_LINE_FAILED,
-    PO_LINE_RETURNED,
-    PO_LINE_CANCELLED,
+    PO_DRAFT,
+    PO_PENDING_LEAD,
+    PO_PENDING_DIRECTOR,
+    PO_RETURNED,
+    PO_IN_TRANSIT,
+    PO_PARTIAL,
+    PO_PENDING_STORE,
+    PO_STORED,
+    PO_SITE_ACCEPTED,
+    PO_FAILED,
+    PO_RETURNED_GOODS,
+    PO_CANCELLED,
 )
+# 审批阶段的状态：这期间单行状态必须跟单头一致
+PO_APPROVAL_STATUS = (PO_DRAFT, PO_PENDING_LEAD, PO_PENDING_DIRECTOR, PO_RETURNED)
+
+# ── 兼容旧名（值已归并到新口径；新代码不要再引用）────────────────────
+PO_APPROVED = PO_IN_TRANSIT
+PO_EXECUTING = PO_PARTIAL
+PO_LINE_OPEN = PO_IN_TRANSIT
+PO_LINE_PARTIAL = PO_PARTIAL
+PO_LINE_STORED = PO_STORED
+PO_LINE_SITE_ACCEPTED = PO_SITE_ACCEPTED
+PO_LINE_FAILED = PO_FAILED
+PO_LINE_RETURNED = PO_RETURNED_GOODS
+PO_LINE_CANCELLED = PO_CANCELLED
 
 # ── 付款（08 §6；三期才会真正用）────────────────────────────────────
 PAY_UNPAID = "未付款"

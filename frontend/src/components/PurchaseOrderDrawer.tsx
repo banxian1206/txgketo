@@ -25,9 +25,9 @@ const RECEIPT_LABEL: Record<string, string> = {
 }
 
 /** 还能取消的行（没落地）；待入库/已入库要走入库，不合格要走换货/退货 */
-const CANCELABLE = ['待采购', '在途', '已下单', '部分到货']
+const CANCELABLE = ['在途', '部分到货']
 /** 还能更改供应商的行（还没到货） */
-const SUPPLIER_CHANGEABLE = ['在途', '已下单']
+const SUPPLIER_CHANGEABLE = ['在途']
 
 /**
  * 采购单详情：一张合并单 + 每行需求的归属（项目/设备/物料/价格/到货单）。
@@ -260,19 +260,19 @@ export default function PurchaseOrderDrawer({
           </Button>
           <Popconfirm
             title="作废整单？需求全部回采购池，可重新下单"
-            disabled={!o || ['执行中', '已完成', '已作废', '已关闭'].includes(o.po_status ?? '')}
+            disabled={!o || ['部分到货', '已完成', '已作废', '已关闭'].includes(o.po_status ?? '')}
             onConfirm={() => void doVoid()}
           >
-            <Button disabled={!o || ['执行中', '已完成', '已作废', '已关闭'].includes(o.po_status ?? '')}>
+            <Button disabled={!o || ['部分到货', '已完成', '已作废', '已关闭'].includes(o.po_status ?? '')}>
               作废整单
             </Button>
           </Popconfirm>
           <Popconfirm
             title="整批退货关闭？到货单全转已退货，需求回池重采"
-            disabled={!o || !['已批准', '执行中'].includes(o.po_status ?? '')}
+            disabled={!o || !['在途', '部分到货'].includes(o.po_status ?? '')}
             onConfirm={() => void doCloseReturn()}
           >
-            <Button disabled={!o || !['已批准', '执行中'].includes(o.po_status ?? '')}>
+            <Button disabled={!o || !['在途', '部分到货'].includes(o.po_status ?? '')}>
               整批退货关闭
             </Button>
           </Popconfirm>

@@ -149,7 +149,7 @@ def gen_purchase(p: str, eq: str) -> dict:
 
 
 def approve_po(po_no: str) -> str:
-    """★ 重构后下单即提交审批：把单推到「已批准」（激活后需求才转在途、才能验收）。
+    """★ 重构后下单即提交审批：把单推到「在途」（激活后需求才转在途、才能验收）。
 
     审批链按岗位找：组员提交 → 经理审 → 总监审；经理空缺会自动跳级给总监。
     """
@@ -158,7 +158,7 @@ def approve_po(po_no: str) -> str:
         if not po:
             raise RuntimeError(f"采购单 {po_no} 不在列表里")
         st = po[0].get("po_status") or po[0]["status"]   # ★ po_status 是真单头状态；status 是派生展示口径
-        if st in ("已批准", "执行中", "已完成"):
+        if st in ("在途", "部分到货", "已完成"):
             return st
         if st == "待经理审":
             call("post", f"/purchase/orders/{po_no}/approve", "purchase_manager", (200,),
@@ -186,7 +186,7 @@ def order_and_receive(p: str, item_no: str, *, deliver_to="公司仓库", store=
         "lines": [{"request_id": r["id"], "tax_incl": True, "unit_price": 100.0} for r in rows]})
     st = approve_po(mo["po_no"])
     print(f"     [下单 {mo['po_no']} → 审批后 {st}]")
-    if st not in ("已批准", "执行中", "已完成"):
+    if st not in ("在途", "部分到货", "已完成"):
         raise RuntimeError(f"{mo['po_no']} 审批未通过（{st}），无法验收")
     out = []
     for r in rows:

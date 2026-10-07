@@ -97,7 +97,7 @@ const wh1 = await apiLogin('wh1', 'txgk@123');
         deliver_to: '公司仓库',
         lines: [{ request_id: mr.id, tax_incl: true, unit_price: 1 }] }),
     })).json();
-    // 推到已批准 → 需求才转「在途」、仓库才看得到这条待验收
+    // 推到在途 → 需求才转「在途」、仓库才看得到这条待验收
     let st = po.status;
     const approverOf = { 待经理审: 'purchase_manager', 待总监审: 'purchase_director' };
     for (let k = 0; k < 3 && approverOf[st]; k++) {
@@ -411,7 +411,7 @@ const wh1 = await apiLogin('wh1', 'txgk@123');
   const terms = det.payment_terms ?? [];
   const paidKept = terms.find((t) => t.seq === 1);
   check('PC-01-提交与审批链',
-    ok.code < 300 && notBoss.code === 400 && passed.j?.status === '已批准',
+    ok.code < 300 && notBoss.code === 400 && passed.j?.status === '在途',
     `提交→${ok.code} · 非总监→${notBoss.code}「${String(notBoss.j?.detail ?? '').slice(0, 18)}」 · 总监→${passed.j?.status}`);
   check('PC-01-只改未收节点',
     terms.length === 3 && Number(paidKept?.received_amount ?? 0) === 900_000 &&

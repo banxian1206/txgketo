@@ -384,17 +384,31 @@ def accept_incoming(
             actor_id=actor_id,
         )
     # ★ 交期留痕（08 §7）：现场清点完成 = 实际到货
-    from app.models.purchase_order import PurchaseOrderLine
-    from app.services.purchase_order import recalc_delivery
+    from app.models.purchase_order import (
+        PO_PARTIAL,
+        PO_SITE_ACCEPTED,
+        PurchaseOrder,
+        PurchaseOrderLine,
+    )
+    from app.services.purchase_order import recalc_delivery, recalc_order_status
 
-    po_id = receipt.po_id
-    if po_id is None and receipt.request_id:
+    line = None
+    if receipt.po_line_id:
+        line = session.get(PurchaseOrderLine, receipt.po_line_id)
+    elif receipt.request_id:
         line = session.scalar(
             select(PurchaseOrderLine)
             .where(PurchaseOrderLine.request_id == receipt.request_id)
             .order_by(PurchaseOrderLine.id.desc())
         )
-        po_id = line.po_id if line else None
+    po_id = receipt.po_id or (line.po_id if line else None)
+    if line is not None:
+        # ★ 直发件不进仓库：现场清点齐 = 这行的终态「现场已验收」；缺件/破损 = 部分到货
+        line.status = PO_SITE_ACCEPTED if result == SITE_RECEIPT_OK else PO_PARTIAL
+        if line.po_id:
+            po = session.get(PurchaseOrder, line.po_id)
+            if po is not None:
+                recalc_order_status(session, po)
     if po_id is not None:
         recalc_delivery(session, po_id)
     session.flush()

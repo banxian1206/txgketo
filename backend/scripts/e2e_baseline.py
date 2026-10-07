@@ -960,7 +960,7 @@ def b_approval_chain() -> None:
     rec(od["order"]["po_status"] == "待总监审", f"经理通过后应 待总监审，实际={od['order']['po_status']}")
     api.req("post", f"/purchase/orders/{po}/approve", "purchase_director", (200,), json={"action": "通过"})
     od = api.req("get", f"/purchase/orders/{po}", "buyer1")
-    rec(od["order"]["po_status"] == "已批准", f"通过后应 已批准，实际={od['order']['po_status']}")
+    rec(od["order"]["po_status"] == "在途", f"通过后应 在途，实际={od['order']['po_status']}")
     ap = api.req("get", f"/purchase/orders/{po}/approvals", "buyer1")
     levels = {x["level"] for x in ap}
     acts = [x["action"] for x in ap]

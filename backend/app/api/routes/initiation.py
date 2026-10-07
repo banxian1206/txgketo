@@ -8,7 +8,7 @@ from pathlib import Path
 from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile, status
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
-from sqlalchemy import delete, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
 from app.api.deps import (
@@ -1295,7 +1295,13 @@ def _recalc_po_delivery(session: Session, po_id: int) -> None:
 def _bump_line_on_receipt(
     session: Session, line: PurchaseOrderLine | None, *, ok: float, rejected: float
 ) -> None:
-    """到货验收后同步**指定**采购单行的已收/不合格与状态（不再猜行）。"""
+    """到货验收后同步**指定**采购单行的已收/不合格与状态（不再猜行）。
+
+    ★ 验收合格 = 「待入库」，**不是**「已入库」——「已入库」只有真入库（store）才给
+      （客户口径 2026-10-07：入库了才算已入库）。
+    """
+    from app.services import purchase_order as po_svc
+
     if line is None:
         return
     line.received_qty = float(line.received_qty or 0) + float(ok)
@@ -1303,12 +1309,12 @@ def _bump_line_on_receipt(
     if rejected > 0:
         line.status = "不合格"
     elif line.received_qty + 1e-9 >= float(line.qty or 0):
-        line.status = "已入库"
+        line.status = "待入库"
     elif line.received_qty > 0:
         line.status = "部分到货"
     po = session.get(PurchaseOrder, line.po_id)
-    if po is not None and po.status in ("已批准",):
-        po.status = "执行中"
+    if po is not None:
+        po_svc.recalc_order_status(session, po)  # ★ 单头跟着行走（已批准在途 → 部分到货 → 已完成）
     _recalc_po_delivery(session, line.po_id)
 
 
@@ -1561,6 +1567,7 @@ def store_receipt(
 ):
     """入库：验收合格（待入库）的货 → 选库位入库，记库存与流水。分批入库就一批一批来。"""
     from app.models.warehouse import MOVE_IN, StockItem, StockMove
+    from app.services import purchase_order as po_svc
 
     gr = session.get(GoodsReceipt, receipt_id)
     if gr is None:
@@ -1597,6 +1604,27 @@ def store_receipt(
             remark=body.note or "验收合格入库",
         )
     )
+
+    # ★ 单行：**真入库**才算「已入库」（客户口径 2026-10-07）——不再验收合格就标已入库
+    if gr.po_line_id:
+        line = session.get(PurchaseOrderLine, gr.po_line_id)
+        if line is not None:
+            session.flush()
+            stored = session.scalar(
+                select(func.coalesce(func.sum(GoodsReceipt.qty), 0)).where(
+                    GoodsReceipt.po_line_id == line.id,
+                    GoodsReceipt.status == "已入库",
+                )
+            )
+            if float(stored or 0) + 1e-9 >= float(line.qty or 0):
+                line.status = "已入库"
+            elif float(stored or 0) > 0:
+                line.status = "部分到货"
+            else:
+                line.status = "待入库"
+            po = session.get(PurchaseOrder, line.po_id) if line.po_id else None
+            if po is not None:
+                po_svc.recalc_order_status(session, po)  # 全部行到齐 → 已完成
 
     row = session.get(PurchaseRequest, gr.request_id) if gr.request_id else None
     if row is not None:
@@ -2319,7 +2347,7 @@ def _activate_order(session: Session, po: PurchaseOrder, actor: User) -> None:
                     recorded_by=actor.id,
                 )
             )
-        _sync_purchase_task(session, row, "进行中", f"已批准 {po.po_no}（{po.supplier_name or '—'}），等货")
+        _sync_purchase_task(session, row, "进行中", f"审批通过 {po.po_no}（{po.supplier_name or '—'}），等货")
     session.flush()
 
 
@@ -2390,7 +2418,7 @@ def approve_purchase_order(
     session: Session = Depends(get_session),
     current: User = Depends(require_permission("purchase:edit")),
 ):
-    """两级审批：通过 / 退回（退回必填说明）。总监通过 → 已批准 → ★ 激活（三件事才发生）。"""
+    """两级审批：通过 / 退回（退回必填说明）。总监通过 → 在途 → ★ 激活（三件事才发生）。"""
     from app.services import purchase_order as po_svc
 
     po = session.scalar(select(PurchaseOrder).where(PurchaseOrder.po_no == key))
@@ -2403,7 +2431,7 @@ def approve_purchase_order(
         )
     except po_svc.PurchaseOrderError as exc:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
-    if new_status == "已批准":
+    if new_status == "在途":
         _activate_order(session, po, current)
     audit.log(
         session,
@@ -2730,26 +2758,6 @@ def _po_lines(session: Session, po_id: int) -> list[PurchaseOrderLine]:
     )
 
 
-def _po_display_status(po: PurchaseOrder, lines: list[PurchaseOrderLine]) -> str:
-    """单头状态的**展示口径**：审批中的单展示真实审批态，别伪装成「在途」（08 §4.2）。"""
-    if po.status in ("已作废",):
-        return "已取消"
-    # 还没批准的单：显示真实状态（草稿/待经理审/待总监审/已退回），不要落到「在途」
-    if po.status in ("草稿", "待经理审", "待总监审", "已退回"):
-        return po.status
-    active = [ln for ln in lines if ln.status != "已取消"] or lines
-    st = {ln.status for ln in active}
-    if "不合格" in st:
-        return "不合格"
-    if st and st <= {"已入库"}:
-        return "已完成"
-    if st & {"已入库", "部分到货"}:
-        return "部分到货"
-    if st and st <= {"已退货"}:
-        return "已退货"
-    return "在途"
-
-
 def _po_order_summary(
     po: PurchaseOrder,
     lines: list[PurchaseOrderLine],
@@ -2784,7 +2792,8 @@ def _po_order_summary(
         "expected_date": po.expect_date,
         "deliver_to": po.deliver_to,
         "deliver_address": po.deliver_address,
-        "status": _po_display_status(po, lines),
+        # ★ 单头是唯一口径（客户口径 2026-10-07）：不再有「展示口径」与真值两套
+        "status": po.status,
         "po_status": po.status,
         # ★ 当前这一级是不是**我**能批（后端单一口径，前端不再按 position 猜 —— P2-1）
         "can_approve": can_approve,
@@ -3093,7 +3102,7 @@ def void_purchase_order(
     po = session.scalar(select(PurchaseOrder).where(PurchaseOrder.po_no == key))
     if po is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "采购单不存在")
-    if po.status in ("执行中", "已完成", "已作废", "已关闭"):
+    if po.status in ("在途", "部分到货", "已完成", "已作废", "已关闭"):
         raise HTTPException(
             status.HTTP_400_BAD_REQUEST,
             f"当前状态是「{po.status}」，不能作废（已有到货的请走「整批退货关闭」）",
