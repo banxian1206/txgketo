@@ -166,6 +166,7 @@ export default function PaymentChangeCard({
         比例合计（已收 + 新计划）必须是 100%，金额不得超合同额；由**商务部总监**审批。
       </Muted>
       <Table<PayChangeRow>
+        scroll={{ x: 950 }}
         rowKey="id"
         size="small"
         pagination={false}
@@ -211,6 +212,7 @@ export default function PaymentChangeCard({
 
       {/* 发起变更：只填「还没收的节点」*/}
       <AppModal
+        className="engineering-modal"
         title={`发起付款计划变更 · ${projectNo}`}
         open={open}
         onClose={() => setOpen(false)}
@@ -236,38 +238,38 @@ export default function PaymentChangeCard({
               <div className="form-dense">
                 {fields.map((f) => (
                   <Row key={f.key} gutter={8} align="middle">
-                    <Col span={5}>
-                      <Form.Item name={[f.name, 'node_name']} rules={[{ required: true, message: '节点名' }]}>
+                    <Col xs={24} sm={5}>
+                      <Form.Item label="节点名称" name={[f.name, 'node_name']} rules={[{ required: true, message: '节点名' }]}>
                         <Input placeholder="节点名，如 发货款" />
                       </Form.Item>
                     </Col>
-                    <Col span={3}>
-                      <Form.Item name={[f.name, 'percent']}>
+                    <Col xs={24} sm={3}>
+                      <Form.Item label="比例" name={[f.name, 'percent']}>
                         <InputNumber className="w-full" min={0} max={100} suffix="%" />
                       </Form.Item>
                     </Col>
-                    <Col span={4}>
-                      <Form.Item name={[f.name, 'amount']} tooltip="不填则按合同额 × 比例折算">
+                    <Col xs={24} sm={4}>
+                      <Form.Item label="金额" name={[f.name, 'amount']} tooltip="不填则按合同额 × 比例折算">
                         <InputNumber className="w-full" min={0} placeholder="金额" />
                       </Form.Item>
                     </Col>
-                    <Col span={3}>
-                      <Form.Item name={[f.name, 'trigger_node']}>
+                    <Col xs={24} sm={3}>
+                      <Form.Item label="对齐节点" name={[f.name, 'trigger_node']}>
                         <Select allowClear placeholder="对齐节点" options={TRIGGERS.map((t) => ({ value: t, label: t }))} />
                       </Form.Item>
                     </Col>
-                    <Col span={4}>
-                      <Form.Item name={[f.name, 'expect_date']}>
+                    <Col xs={24} sm={4}>
+                      <Form.Item label="预计收款" name={[f.name, 'expect_date']}>
                         <DatePicker className="w-full" placeholder="预计收款" />
                       </Form.Item>
                     </Col>
-                    <Col span={4}>
-                      <Form.Item name={[f.name, 'condition']}>
+                    <Col xs={24} sm={4}>
+                      <Form.Item label="触发条件" name={[f.name, 'condition']}>
                         <Input placeholder="触发条件" />
                       </Form.Item>
                     </Col>
-                    <Col span={1}>
-                      <a onClick={() => remove(f.name)}>删</a>
+                    <Col xs={24} sm={1}>
+                      <Button type="text" danger aria-label="删除未收节点" onClick={() => remove(f.name)}>删</Button>
                     </Col>
                   </Row>
                 ))}
@@ -287,6 +289,7 @@ export default function PaymentChangeCard({
 
       {/* 变更前/后对照（留痕：批准后旧行会被替换，这份快照是唯一证据）*/}
       <Modal
+        className="engineering-modal"
         title={`付款计划变更 ${detailFor?.change_no ?? ''}（${detailFor?.status ?? ''}）`}
         open={!!detailFor}
         onCancel={() => setDetailFor(null)}
@@ -317,6 +320,7 @@ export default function PaymentChangeCard({
 
       {/* 审批（商务总监）*/}
       <AppModal
+        className="engineering-modal"
         title={`审批付款计划变更 · ${decideFor?.change_no ?? ''}`}
         open={!!decideFor}
         onClose={() => setDecideFor(null)}

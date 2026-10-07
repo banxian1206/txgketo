@@ -1,12 +1,14 @@
-import WorkbenchTabs from '../../components/ds/WorkbenchTabs'
+import OrganizationManager from '../../components/domain/OrganizationManager'
+import ManagementSections from '../../components/domain/ManagementSections'
 import { Chip } from '../../components/ds'
+import { useNavigate } from 'react-router-dom'
 import { useUrlState } from '../../hooks/useUrlState'
-import { App, Button, Card, Form, Input, Modal, Popconfirm, Select, Space, Switch, Table, Tree, TreeSelect, Typography, Tooltip } from 'antd'
+import { App, Button, Card, Form, Input, Modal, Popconfirm, Select, Space, Switch, Table, TreeSelect, Typography, Tooltip } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import IntegrationPanel from './IntegrationPanel'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
-import { USERS_TABS, filterTabs, USERS_GROUPS } from '../../configs/tabs'
+import { USERS_TABS, filterTabs } from '../../configs/tabs'
 import { useTab } from '../../hooks/useTab'
 import AppModal from '../../components/AppModal'
 
@@ -89,6 +91,7 @@ function subtreeIds(rows: OrgRow[], rootId: number): Set<number> {
 /** 用户与权限（06 卷）：组织维护 + 用户管理（管理员 / 总监管本部门）+ 角色说明 */
 export default function Users() {
   const { message } = App.useApp()
+  const navigate = useNavigate()
   // 重构 1.3：伪装入口走 AuthContext
   const [scope, setScope] = useState<MyScope | null>(null)
   const [orgs, setOrgs] = useState<OrgRow[]>([])
@@ -188,7 +191,6 @@ export default function Users() {
     return orgs.filter((o) => ids.has(o.id))
   }, [orgs, scope])
 
-  const treeData = useMemo(() => buildOrgTree(visibleOrgs), [visibleOrgs])
   const orgOptions = useMemo(
     () =>
       visibleOrgs.map((o) => ({
@@ -285,12 +287,12 @@ export default function Users() {
 
   const openCreateOrg = (admin: boolean) => {
     setOrgEditing(null)
-    setOrgInitial({ parent_id: admin ? undefined : (scope?.department?.id ?? undefined) })
+    setOrgInitial({ parent_id: admin ? undefined : (selectedOrg ?? visibleOrgs[0]?.id ?? scope?.department?.id ?? undefined) })
     setOrgOpen(true)
   }
 
   const openEditOrg = () => {
-    const org = visibleOrgs.find((o) => o.id === selectedOrg)
+    const org = visibleOrgs.find((o) => o.id === selectedOrg) ?? visibleOrgs[0]
     if (!org) {
       message.warning('先在左边选一个部门/组')
       return
@@ -445,28 +447,11 @@ export default function Users() {
     },
   ]
 
-  const orgColumns: ColumnsType<OrgRow> = [
-    { title: '名称', dataIndex: 'name' },
-    { title: '代码', dataIndex: 'code', width: 100 },
-    { title: '类型', dataIndex: 'kind', width: 90, render: (v: string | null) => v ?? '—' },
-    {
-      title: '人数',
-      dataIndex: 'user_count',
-      width: 70,
-      render: (v: number | undefined) => v ?? 0,
-    },
-    {
-      title: '状态',
-      dataIndex: 'is_active',
-      width: 80,
-      render: (v: boolean | undefined) => (v ? <Chip tone="ok">启用</Chip> : <Chip>停用</Chip>),
-    },
-  ]
 
   return (
-    <Card title="用户与权限" loading={loading}>
-      <WorkbenchTabs
-        groups={USERS_GROUPS}
+    <Card className="management-page" loading={loading}>
+      <header className="management-page-head"><h1>用户与权限</h1><p>管理账号、组织与角色，查看系统配置和操作记录。</p></header>
+      <ManagementSections
         tab={tab}
         onTab={setTab}
         items={[
@@ -536,6 +521,7 @@ export default function Users() {
                   )}
                 </Space>
                 <Table<UserRow>
+                  scroll={{ x: 1150 }}
                   rowKey="id"
                   size="middle"
                   dataSource={shownUsers}
@@ -556,61 +542,11 @@ export default function Users() {
                   key: 'org',
                   label: '组织架构',
                   children: (
-                    <>
-                      <Space style={{ marginBottom: 12 }}>
-                        {scope.is_admin && (
-                          <Button type="primary" onClick={() => openCreateOrg(true)}>
-                            新增部门
-                          </Button>
-                        )}
-                        <Button onClick={() => openCreateOrg(false)}>在所选下新增组</Button>
-                        <Button onClick={openEditOrg}>改名 / 调整上级</Button>
-                      </Space>
-                      <Tree
-                        treeData={treeData.map(function conv(n): {
-                          key: number
-                          title: string
-                          children: ReturnType<typeof conv>[]
-                        } {
-                          return { key: n.key, title: n.title, children: n.children.map(conv) }
-                        })}
-                        defaultExpandAll
-                        selectedKeys={selectedOrg ? [selectedOrg] : []}
-                        onSelect={(keys) => setSelectedOrg(keys[0] as number | undefined)}
-                      />
-                      {selectedOrg && (
-                        <Space style={{ marginTop: 12 }}>
-                          {(() => {
-                            const org = visibleOrgs.find((o) => o.id === selectedOrg)
-                            if (!org) return null
-                            return (
-                              <>
-                                <Chip>{org.code}</Chip>
-                                <Popconfirm
-                                  title={org.is_active ? '停用这个组织？（保留历史）' : '重新启用？'}
-                                  onConfirm={() => void toggleOrg(org)}
-                                >
-                                  <a>{org.is_active ? '停用' : '启用'}</a>
-                                </Popconfirm>
-                              </>
-                            )
-                          })()}
-                        </Space>
-                      )}
-                      <div style={{ marginTop: 16 }}>
-                        <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-                          部门/组的改名、新增、停用都在这里；停用不删，历史单据不受影响。
-                        </Typography.Text>
-                      </div>
-                      <Table<OrgRow>
-                        style={{ marginTop: 12 }}
-                        rowKey="id"
-                        size="small"
-                        dataSource={visibleOrgs}
-                        columns={orgColumns}
-                        pagination={false}
-                      />
-                    </>
+                    <OrganizationManager rows={visibleOrgs} selectedId={selectedOrg} onSelect={setSelectedOrg}
+                      canCreateDepartment={scope.is_admin}
+                      onCreateDepartment={() => openCreateOrg(true)} onCreateGroup={() => openCreateOrg(false)}
+                      onEdit={openEditOrg} onToggle={(org) => void toggleOrg(org)}
+                      onMembers={(id) => navigate(`/admin/users?org=${id}&active=1`)} />
                   ),
                 },
               ]
@@ -625,6 +561,7 @@ export default function Users() {
             children: (
               <>
                 <Table<RoleRow>
+                  scroll={{ x: 900 }}
                   rowKey="code"
                   size="small"
                   dataSource={roles}
@@ -658,7 +595,7 @@ export default function Users() {
             label: '操作日志',
             children: (
               <>
-                <Space style={{ marginBottom: 12 }}>
+                <Space wrap style={{ marginBottom: 12 }}>
                   <Button
                     size="small"
                     loading={logsLoading}
@@ -677,6 +614,7 @@ export default function Users() {
                   </Typography.Text>
                 </Space>
                 <Table<AuditLog>
+                  scroll={{ x: 1200 }}
                   rowKey="id"
                   size="small"
                   loading={logsLoading}
@@ -703,6 +641,7 @@ export default function Users() {
 
       {/* 用户编辑 */}
       <AppModal
+        className="engineering-modal"
         open={userOpen}
         title={editUser ? `编辑用户：${editUser.name}` : '新建用户'}
         onClose={() => setUserOpen(false)}
@@ -743,7 +682,7 @@ export default function Users() {
               })}
             />
           </Form.Item>
-          <Space size="middle" style={{ display: 'flex' }}>
+          <Space wrap size="middle" style={{ display: 'flex' }}>
             <Form.Item name="position" label="岗位" style={{ flex: 1 }}>
               <Select options={assignablePositions.map((p) => ({ value: p, label: p }))} />
             </Form.Item>
@@ -773,6 +712,7 @@ export default function Users() {
 
       {/* 转交 */}
       <Modal
+        className="engineering-modal"
         title={`转交：${handoverTarget?.name ?? ''}`}
         open={!!handoverTarget}
         onCancel={() => setHandoverTarget(null)}
@@ -808,6 +748,7 @@ export default function Users() {
 
       {/* 演示账号清单 */}
       <Modal
+        className="engineering-modal"
         open={demoOpen}
         title={`演示账号（密码统一 ${demoPassword}）`}
         width={760}
@@ -820,6 +761,7 @@ export default function Users() {
           上线前请「停用演示账号」或改密。
         </Typography.Paragraph>
         <Table<DemoUserRow>
+                  scroll={{ x: 850 }}
           rowKey="username"
           size="small"
           dataSource={demoUsers}
@@ -840,8 +782,9 @@ export default function Users() {
 
       {/* 组织编辑 */}
       <AppModal
+        className="engineering-modal"
         open={orgOpen}
-        title={orgEditing ? `编辑组织：${orgEditing.name}` : '新增组织'}
+        title={orgEditing ? `编辑：${orgEditing.name}` : orgInitial.parent_id ? `新增小组 · ${visibleOrgs.find((org) => org.id === orgInitial.parent_id)?.name ?? ''}` : '新增公司部门'}
         onClose={() => setOrgOpen(false)}
         onOk={() => void saveOrg()}
         loading={saving}

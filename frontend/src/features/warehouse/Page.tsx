@@ -344,6 +344,7 @@ export default function Warehouse() {
             ],
             expand: (
               <Table
+                scroll={{ x: 850 }}
                 rowKey="id"
                 size="small"
                 pagination={false}
@@ -383,12 +384,13 @@ export default function Warehouse() {
     ),
     stock: (
       <>
-        <Space style={{ marginBottom: 12 }}>
+        <Space wrap style={{ marginBottom: 12 }}>
           <Button disabled={!canStore} onClick={() => setInboundOpen(true)}>
             其他入库（退料回库 / 盘盈）
           </Button>
         </Space>
         <Table<StockRow>
+          scroll={{ x: 1000 }}
           rowKey="id" size="small" dataSource={stock} pagination={{ pageSize: 10, showSizeChanger: true }}
           locale={{ emptyText: <DsEmpty text="还没有库存" /> }}
           columns={[
@@ -406,6 +408,7 @@ export default function Warehouse() {
     ),
     moves: (
       <Table<MoveRow>
+          scroll={{ x: 1000 }}
         rowKey="id" size="small" dataSource={moves} pagination={{ pageSize: 10, showSizeChanger: true }}
         columns={[
           { title: '类型', dataIndex: 'move_type', width: 80, render: (v: string) => <Chip tone={toneOf(v === '入库' ? 'green' : 'orange')}>{v}</Chip> },
@@ -421,7 +424,7 @@ export default function Warehouse() {
     ),
     locations: (
       <>
-        <Space style={{ marginBottom: 12 }}>
+        <Space wrap style={{ marginBottom: 12 }}>
           <Button type="primary" disabled={!canStore} onClick={() => setLocOpen(true)}>
             新建库位
           </Button>
@@ -430,6 +433,7 @@ export default function Warehouse() {
           </Typography.Text>
         </Space>
         <Table<LocationRow>
+          scroll={{ x: 720 }}
           rowKey="id" size="small" dataSource={locs} pagination={{ pageSize: 10, showSizeChanger: true }}
           locale={{ emptyText: <DsEmpty text="还没有库位" /> }}
           columns={[
@@ -494,6 +498,7 @@ export default function Warehouse() {
       </WorkbenchPage>
       {/* 其他入库 */}
       <Modal
+        className="engineering-modal"
         title="其他入库（退料回库 / 盘盈）"
         open={inboundOpen}
         onCancel={() => setInboundOpen(false)}
@@ -544,6 +549,7 @@ export default function Warehouse() {
       </Modal>
       {/* 新建库位 */}
       <Modal
+        className="engineering-modal"
         title="新建库位"
         open={locOpen}
         onCancel={() => setLocOpen(false)}
@@ -692,6 +698,7 @@ export default function Warehouse() {
       </AppModal>
       {/* 车间领走：录领料人（P-12） */}
       <Modal
+        className="engineering-modal"
         title="车间领走"
         open={handOverId !== null}
         onCancel={() => setHandOverId(null)}

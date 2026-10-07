@@ -341,6 +341,7 @@ export default function Shipping() {
         <>
           <Card size="small" title="待发设备（本次要发哪几台）" style={{ marginBottom: 12 }}>
             <Table<ToShipRow>
+          scroll={{ x: 1050 }}
               rowKey="equip_no"
               size="small"
               loading={loading}
@@ -392,6 +393,7 @@ export default function Shipping() {
 
           <Typography.Title level={5}>发运批次</Typography.Title>
           <Table<ShipmentRow>
+          scroll={{ x: 1050 }}
             rowKey="id"
             size="small"
             loading={loading}
@@ -451,6 +453,7 @@ export default function Shipping() {
 
       {/* 发运清单勾选 */}
       <Modal
+        className="engineering-modal"
         open={!!itemsShip}
         title={`发运清单 · ${itemsShip?.shipment_no ?? ''}（${itemsShip?.lines.map((l) => l.equip_no).join('、') ?? ''}）`}
         onCancel={() => setItemsShip(null)}
@@ -509,6 +512,7 @@ export default function Shipping() {
 
       {/* ★ §2.2 下达发货指令：一条指令指挥两个部门，**发货日是必填项** */}
       <Modal
+        className="engineering-modal"
         open={instructOpen}
         title={`下达发货指令 · ${selectedEquips.length} 台`}
         onCancel={() => setInstructOpen(false)}
@@ -545,6 +549,7 @@ export default function Shipping() {
 
       {/* 装车 */}
       <Modal
+        className="engineering-modal"
         open={!!loadTarget}
         title={`装车 · ${loadTarget?.shipment_no ?? ''}`}
         onCancel={() => setLoadTarget(null)}
@@ -589,6 +594,7 @@ export default function Shipping() {
 
       {/* 现场清点 */}
       <Modal
+        className="engineering-modal"
         open={!!receiptTarget}
         title={`现场清点 · ${receiptTarget?.shipment_no ?? ''}`}
         onCancel={() => setReceiptTarget(null)}
@@ -654,7 +660,7 @@ export default function Shipping() {
       </Modal>
 
       {/* 详情 */}
-      <Drawer width={560} open={!!detail} onClose={() => setDetail(null)} title={detail?.shipment_no ?? ''}>
+      <Drawer rootClassName="review-detail-drawer" width={560} open={!!detail} onClose={() => setDetail(null)} title={detail?.shipment_no ?? ''}>
         {detail && (
           <>
             <Descriptions size="small" column={1} bordered>
@@ -724,6 +730,7 @@ export default function Shipping() {
 
       {/* 摆放位置照片（散件不装箱：登记每件放在车上的位置） */}
       <Modal
+        className="engineering-modal"
         title={`摆放位置照片 · ${placeItem?.ref ?? ''}`}
         open={!!placeItem}
         onCancel={() => setPlaceItem(null)}

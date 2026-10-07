@@ -22,11 +22,13 @@ export default function StdCategoryNav({
   categoryCode,
   onPick,
   width = 232,
+  categorySelectsItems = true,
 }: {
   cats: StdCategoryInfo[]
   classCode?: string
   categoryCode?: string
   onPick: (classCode?: string, categoryCode?: string) => void
+  categorySelectsItems?: boolean
   width?: number
 }) {
   const [kw, setKw] = useState('')
@@ -69,6 +71,7 @@ export default function StdCategoryNav({
           onChange={(e) => setKw(e.target.value)}
           aria-label="搜索品类"
         />
+        <div className="std-nav-guide">数字：物料数 / 有历史价的物料数</div>
         {/* 「全部物料」— 跨品类浏览（搜索范围显式化的另一半） */}
         <button
           type="button"
@@ -97,7 +100,7 @@ export default function StdCategoryNav({
                 <button
                   type="button"
                   className={`std-nav-catname${catOn ? ' on' : ''}`}
-                  onClick={() => onPick(undefined, catOn ? undefined : c.code)}
+                  onClick={() => categorySelectsItems ? onPick(undefined, catOn ? undefined : c.code) : setOpen((p) => p.includes(c.code) ? p.filter((x) => x !== c.code) : [...p, c.code])}
                   title={`${c.name}（${c.classes.length} 个品类）`}
                 >
                   {c.name}

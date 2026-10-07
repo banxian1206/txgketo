@@ -826,7 +826,7 @@ try {
   await page.waitForTimeout(2200);
   const after = await poSet();
   const poNo = [...after].find(n => !poBefore.has(n)) ?? ((await body(page)).match(/PO\d{5}/g) || [])[0];
-  // ★ 08 §4.2：审批通过后需求才转「在途」，仓库才会出验收按钮 —— 探针必须先把单推到已批准
+  // ★ 08 §4.2：审批通过后需求才转「在途」，仓库才会出验收按钮 —— 探针必须先把单推到在途
   {
     const stOf = async () =>
       ((await (await apiGet('/purchase/orders', buyerTok)).json()) ?? []).find(o => o.po_no === poNo)?.po_status;
@@ -1540,12 +1540,53 @@ try {
   }
 }
 
+// 标准库布局/分类只读回归：不新建、编辑或清理物料。
+{
+  const c = await newCtx(); const { page } = c;
+  try {
+    await login(page, 'eng_director', 'txgk@123');
+    await page.setViewportSize({ width: 1024, height: 900 });
+    await page.goto(BASE + '/library', { waitUntil: 'networkidle' });
+    await page.locator('.std-nav-item').first().waitFor();
+    const aligned = await page.evaluate(() => Math.abs(document.querySelector('.library-category').getBoundingClientRect().top - document.querySelector('.library-items').getBoundingClientRect().top) < 2);
+    check('LIB-桌面分类与清单不掉行', aligned, '1024px分类和物料清单顶部对齐');
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.getByRole('button', { name: /^选择分类/ }).click();
+    const drawer = page.getByRole('dialog', { name: '选择物料分类' });
+    await drawer.locator('.std-nav-item').nth(1).click();
+    await drawer.waitFor({ state: 'hidden' });
+    const chosen = new URL(page.url()).searchParams.get('class');
+    const title = await page.locator('.library-items .ant-card-head-title').innerText();
+    await page.reload({ waitUntil: 'networkidle' });
+    await page.locator('.library-items .ant-card-head-title').filter({ hasText: title }).waitFor();
+    const fits = await page.evaluate(() => document.documentElement.scrollWidth === window.innerWidth);
+    check('LIB-窄屏分类抽屉与刷新保留', !!chosen && fits && await page.getByRole('button', { name: /^选择分类/ }).isVisible(), '390px选择后抽屉关闭、网址和标题保留、页面无横溢');
+  } catch(e) { check('LIB-分类布局与刷新', false, String(e).slice(0,160)); }
+  finally { await c.browser.close(); }
+}
+
 // ═════════ Part 4 · 本轮客户口径的 UI 断言（O1 重名 / R4-01 移动隐卡）═════════
 {
   const c = await newCtx(); const { page } = c;
   try {
     await login(page, 'eng_director', 'txgk@123');
     await page.goto(BASE + '/admin/users', { waitUntil: 'networkidle' }); await page.waitForTimeout(1500);
+    const managementNav = page.getByRole('navigation', { name: '管理分区' });
+    await managementNav.getByRole('button', { name: '角色说明 查看职责与权限范围', exact: true }).click();
+    await page.getByRole('region', { name: '角色说明', exact: true }).waitFor();
+    const roleUrl = new URL(page.url()).searchParams.get('tab') === 'roles';
+    await page.reload({ waitUntil: 'networkidle' });
+    check('ADMIN-分区导航保留URL与刷新', roleUrl && await page.getByRole('region', { name: '角色说明', exact: true }).isVisible(), '角色说明以管理分区进入，刷新保留');
+    await managementNav.getByRole('button', { name: '组织架构 管理部门与下属小组', exact: true }).click();
+    await page.getByRole('complementary', { name: '部门与小组列表' }).getByRole('button', { name: /^机械组 / }).click();
+    await page.getByRole('button', { name: '在「机械组」下新增小组', exact: true }).click();
+    const orgDialog = page.getByRole('dialog', { name: '新增小组 · 机械组' });
+    await orgDialog.waitFor();
+    check('ADMIN-新增小组按所选组织预填上级', await orgDialog.getByText('机械组（ENG_MECH）', { exact: true }).isVisible(), '选择机械组后，上级预填机械组；不提交');
+    await orgDialog.getByRole('button', { name: '取 消' }).click();
+    await page.getByRole('button', { name: /^查看启用成员/ }).click();
+    await page.getByRole('region', { name: '用户', exact: true }).waitFor();
+    check('ADMIN-组织成员直达过滤名单', !!new URL(page.url()).searchParams.get('org') && !new URL(page.url()).searchParams.get('tab'), '成员按钮进入用户分区且保留组织过滤');
     const dup = await page.locator('.ant-layout-sider').getByText('系统管理', { exact: true }).count();
     const item = await page.locator('.ant-layout-sider').getByText('用户与权限', { exact: true }).count();
     check('O1-侧栏不再重名', dup === 1 && item > 0, `侧栏内「系统管理」=${dup} 次（应仅剩组标题）·「用户与权限」=${item} 个`);

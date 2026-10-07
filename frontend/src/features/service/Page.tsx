@@ -203,6 +203,7 @@ export default function Service() {
           <Typography.Text type="secondary" style={{ fontSize: 12 }}>领出可关联服务工单；低于安全库存会标红。</Typography.Text>
         </Space>
         <Table<SparePartRow>
+          scroll={{ x: 850 }}
           rowKey="id"
           size="small"
           dataSource={partsList}
@@ -284,6 +285,7 @@ export default function Service() {
       </WorkbenchPage>
 
       <AppModal
+        className="engineering-modal"
         open={!!modal}
         title={
           modal?.kind === 'create' ? '报修（新建服务工单）'

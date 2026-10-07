@@ -114,9 +114,10 @@ export default function Suppliers() {
   return (
     <>
       <Card
+        className="engineering-list"
         title="供应商"
         extra={
-          <Space>
+          <Space wrap>
             <Input.Search
               allowClear
               placeholder="搜名称 / 编号 / 联系人"
@@ -130,6 +131,7 @@ export default function Suppliers() {
         }
       >
         <Table<SupplierRow>
+          scroll={{ x: 1050 }}
           rowKey="id"
           size="middle"
           loading={loading}
@@ -189,6 +191,7 @@ export default function Suppliers() {
 
       {/* 新增/编辑供应商 */}
       <AppModal
+        className="engineering-modal"
         title={editing ? `编辑供应商 · ${editing.name}` : '新增供应商'}
         open={open}
         width={680}
@@ -199,7 +202,7 @@ export default function Suppliers() {
         form={form}
         initialValues={initial}
       >
-          <Space style={{ display: 'flex' }} size="middle">
+          <Space wrap style={{ display: 'flex' }} size="middle">
             <Form.Item name="name" label="名称" rules={[{ required: true, message: '请填名称' }]} style={{ minWidth: 300 }}>
               <Input placeholder="如：ABB（上海）" />
             </Form.Item>
@@ -207,7 +210,7 @@ export default function Suppliers() {
               <Select allowClear options={KINDS.map((k) => ({ value: k, label: k }))} />
             </Form.Item>
           </Space>
-          <Space style={{ display: 'flex' }} size="middle">
+          <Space wrap style={{ display: 'flex' }} size="middle">
             <Form.Item name="contact_name" label="联系人" style={{ minWidth: 140 }}>
               <Input />
             </Form.Item>
@@ -218,7 +221,7 @@ export default function Suppliers() {
               <Input />
             </Form.Item>
           </Space>
-          <Space style={{ display: 'flex' }} size="middle">
+          <Space wrap style={{ display: 'flex' }} size="middle">
             <Form.Item name="payment_terms" label="账期" style={{ minWidth: 160 }}>
               <Input placeholder="如：月结 30 天" />
             </Form.Item>
@@ -239,6 +242,7 @@ export default function Suppliers() {
 
       {/* 报价抽屉 */}
       <Drawer
+        rootClassName="review-detail-drawer"
         title={quoteFor ? `价格记录 · ${quoteFor.name}` : '价格记录'}
         width={860}
         open={!!quoteFor}
@@ -304,6 +308,7 @@ export default function Suppliers() {
             </Button>
           </Form>
           <Table<CatalogRow>
+            scroll={{ x: 720 }}
             rowKey="id"
             size="small"
             pagination={false}
@@ -417,6 +422,7 @@ export default function Suppliers() {
         </Card>
 
         <Table<QuoteRow>
+          scroll={{ x: 950 }}
           rowKey="id"
           size="small"
           pagination={{ pageSize: 10, showSizeChanger: true }}

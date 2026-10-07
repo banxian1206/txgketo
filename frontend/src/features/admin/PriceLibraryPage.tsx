@@ -214,7 +214,7 @@ export default function PriceLibraryPage() {
 
       <Metrics items={metrics} />
 
-      <Space align="start" size={12} style={{ display: 'flex', marginBottom: 12 }}>
+      <Space className="price-library-layout" align="start" size={12} style={{ display: 'flex', marginBottom: 12 }}>
         {/* ★ 2026-10-07「两页统一标准」：左栏换成与标准库**共用**的 StdCategoryNav
             —— 以前这里又手写了一棵 139 品类的树，跟标准库那棵长得一样却各改各的。 */}
         <StdCategoryNav cats={cats} classCode={classCode} categoryCode={catCode} onPick={(c, k) => { setClassCode(c); setCatCode(k); setPage(1) }} />
@@ -264,7 +264,7 @@ export default function PriceLibraryPage() {
           <Panel
             title="价格台账（按物料聚合）"
             extra={
-              <Space>
+              <Space wrap>
                 <Input.Search
                   allowClear
                   placeholder="搜编码 / 品名 / 规格 / 品牌"
@@ -279,6 +279,7 @@ export default function PriceLibraryPage() {
             }
           >
             <Table<PriceLibraryItem>
+              scroll={{ x: 1100 }}
               rowKey="item_no"
               size="small"
               loading={loading}

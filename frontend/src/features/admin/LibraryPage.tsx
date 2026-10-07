@@ -1,8 +1,8 @@
 import { useUrlState } from '../../hooks/useUrlState'
-import { App, Button, Card, Col, Empty, Form, Input, InputNumber, Row, Segmented, Select, Space, Table, Tooltip, Typography } from 'antd'
-import { useCallback, useEffect, useState } from 'react'
+import { App, Button, Card, Col, Drawer, Empty, Form, Grid, Input, InputNumber, Row, Segmented, Select, Space, Table, Tooltip, Typography } from 'antd'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 
-import { createStdItem, errMsg, getStdItem, listLibraryCategories, listStdItemsPaged, updateStdItem, type SpecFieldDef, type StdCategoryInfo, type StdClassInfo, type StdItem, type StdItemPaged } from '../../api/client'
+import { createStdItem, errMsg, getStdItem, listLibraryCategories, listStdItemsPaged, updateStdItem, type SpecFieldDef, type StdCategoryInfo, type StdItem, type StdItemPaged } from '../../api/client'
 import AppModal from '../../components/AppModal'
 import StdCategoryNav from '../../components/library/StdCategoryNav'
 
@@ -14,15 +14,21 @@ const PAGE = 20
 
 export default function Library() {
   const { message } = App.useApp()
+  const screens = Grid.useBreakpoint()
+  const [categoryOpen, setCategoryOpen] = useState(false)
   const [cats, setCats] = useState<StdCategoryInfo[]>([])
-  const [activeClass, setActiveClass] = useState<StdClassInfo | null>(null)
   const [items, setItems] = useState<StdItemPaged[]>([])
   // ★ P3：搜索词进 URL（/library?q=方通 可分享、刷新不丢）
   // ★ 2026-10-07「两页统一标准」：搜索词、分页、搜索范围全进 URL（可分享/刷新不丢）
-  const [libState, setLibState] = useUrlState({ q: undefined, page: undefined, scope: undefined })
+  const [libState, setLibState] = useUrlState({ q: undefined, page: undefined, scope: undefined, class: undefined })
   const q = libState.q ?? ''
   const page = Number(libState.page ?? 1) || 1
   const allClasses = libState.scope === 'all'
+  const activeClass = useMemo(() => {
+    const classes = cats.flatMap((c) => c.classes)
+    if (libState.class === 'all') return null
+    return classes.find((k) => k.code === libState.class) ?? classes.find((k) => (k.item_count ?? 0) > 0) ?? classes[0] ?? null
+  }, [cats, libState.class])
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(false)
   const [open, setOpen] = useState(false)
@@ -35,12 +41,6 @@ export default function Library() {
     try {
       const data = await listLibraryCategories()
       setCats(data)
-      // ★ 默认落到「有物料的第一个品类」：否则会停在空种子品类（如 直线导轨）上，看着像「标准库是空的」
-      const first =
-        data.flatMap((c) => c.classes).find((k) => (k.item_count ?? 0) > 0) ??
-        data.find((c) => c.classes.length)?.classes[0] ??
-        null
-      setActiveClass((prev) => prev ?? first)
     } catch (e) {
       message.error(errMsg(e))
     }
@@ -163,33 +163,34 @@ export default function Library() {
     )
   }
 
-  return (
-    <Row gutter={16}>
-      {/* 左侧：类别 → 品类（与价格库**共用**同一组件，2026-10-07「两页统一标准」） */}
-      <Col flex="232px">
+  const categoryNav = (
         <StdCategoryNav
           cats={cats}
+          categorySelectsItems={false}
           classCode={activeClass?.code}
-          onPick={(_c, k) => {
-            if (k) {
-              const hit = cats.flatMap((x) => x.classes).find((x) => x.code === k)
-              if (hit) setActiveClass(hit)
-            } else setActiveClass(null)
+          onPick={(k) => {
+            setLibState({ class: k ?? 'all', scope: undefined, page: undefined })
+            setCategoryOpen(false)
           }}
         />
+  )
+  return (
+    <div className="library-page">
+      {/* 左侧：类别 → 品类（与价格库**共用**同一组件，2026-10-07「两页统一标准」） */}
+      <Col className="library-category" >
+        {screens.lg ? categoryNav : <Button onClick={() => setCategoryOpen(true)}>选择分类 · {activeClass?.name ?? '全部物料'}</Button>}
       </Col>
 
       {/* 右侧：该品类下的型号 */}
-      <Col flex="auto" style={{ minWidth: 0 }}>
+      <Col className="library-items" >
         <Card
+          className="engineering-list"
           size="small"
-          title={
-            activeClass
-              ? `${activeClass.name}（${activeClass.code}）· ${activeClass.category_name ?? ''}`
-              : '物料'
-          }
-          extra={
-            <Space>
+          title={allClasses || !activeClass ? '全部物料' : `${activeClass.name} · 物料清单`}
+        >
+          <p className="library-intro">先选择分类，再按物料名称、规格或编码查找；跨分类查找请选择“全库”。</p>
+          <div className="library-toolbar">
+            <Space wrap>
               {/* ★ 搜索范围显式化（docs/17 第 4 条）：切到「钢材」后搜「电机」没结果时，
                   人要能看出「这是当前品类内没有」，而不是以为全库没有。 */}
               <Segmented
@@ -214,9 +215,9 @@ export default function Library() {
                 新建物料
               </Button>
             </Space>
-          }
-        >
+          </div>
           <Table<StdItem>
+            scroll={{ x: 1000 }}
             rowKey="item_no"
             size="small"
             loading={loading}
@@ -301,7 +302,7 @@ export default function Library() {
                 title: '操作',
                 key: 'a',
                 width: 80,
-                render: (_: unknown, r: StdItem) => <a onClick={() => void openEdit(r)}>编辑</a>,
+                render: (_: unknown, r: StdItem) => <button type="button" className="project-entry" onClick={() => void openEdit(r)}>编辑</button>,
               },
             ]}
           />
@@ -311,6 +312,7 @@ export default function Library() {
 
       {/* 新建物料：按品类规格模板动态生成表单 */}
       <AppModal
+        className="engineering-modal"
         title={editing ? `编辑物料 · ${editing.item_no}` : `新建物料 · ${activeClass?.name ?? ''}`}
         open={open}
         width={720}
@@ -330,11 +332,11 @@ export default function Library() {
       >
           <Row gutter={12}>
             {(activeClass?.spec_template ?? []).map((f) => (
-              <Col span={f.type === 'text' ? 12 : 8} key={f.code}>
+              <Col xs={24} sm={f.type === 'text' ? 12 : 8} key={f.code}>
                 {renderField(f)}
               </Col>
             ))}
-            <Col span={8}>
+            <Col xs={24} sm={8}>
               <Form.Item name="unit" label="单位" rules={[{ required: true, message: '请填单位' }]}>
                 <Input placeholder="根 / 台 / 件 / 米" />
               </Form.Item>
@@ -344,6 +346,7 @@ export default function Library() {
             <Empty description="这个品类还没配规格模板" />
           )}
       </AppModal>
-    </Row>
+      <Drawer title="选择物料分类" open={categoryOpen} onClose={() => setCategoryOpen(false)} width={320}>{categoryNav}</Drawer>
+    </div>
   )
 }

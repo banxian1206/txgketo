@@ -370,6 +370,7 @@ export default function ShippingM() {
 
       {/* 发运清单：逐项勾「已发」+ 拍照（03 卷：手机端也是勾选+拍照，不扫码） */}
       <Modal
+        className="engineering-modal"
         open={!!tickTarget}
         title={`发运清单 · ${tickTarget?.shipment_no ?? ''}`}
         onCancel={() => setTickTarget(null)}
@@ -412,7 +413,7 @@ export default function ShippingM() {
       </Modal>
 
       {/* 装车 */}
-      <Modal open={!!loadTarget} title={`装车 · ${loadTarget?.shipment_no ?? ''}`} onCancel={() => setLoadTarget(null)} onOk={() => {
+      <Modal className="engineering-modal" open={!!loadTarget} title={`装车 · ${loadTarget?.shipment_no ?? ''}`} onCancel={() => setLoadTarget(null)} onOk={() => {
         if (!loadTarget) return
         if (!loadPhotos.length) { message.warning('装车要拍照'); return }
         setSaving(true)
@@ -430,6 +431,7 @@ export default function ShippingM() {
 
       {/* 现场清点 */}
       <Modal
+        className="engineering-modal"
         open={!!receiptTarget}
         title={`现场清点 · ${receiptTarget?.shipment_no ?? ''}`}
         onCancel={() => setReceiptTarget(null)}
@@ -472,6 +474,7 @@ export default function ShippingM() {
 
       {/* ★ 下达发货指令（§2.2）：发货日必填 —— 采购按这天叫车、装货的人按这天知道几车 */}
       <Modal
+        className="engineering-modal"
         open={instructOpen}
         title={`下达发货指令 · ${selected.length} 台`}
         onCancel={() => setInstructOpen(false)}

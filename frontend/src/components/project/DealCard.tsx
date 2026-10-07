@@ -142,6 +142,7 @@ export default function DealCard({
                   付款方式（回款跟踪）
                 </Divider>
                 <Table
+                  scroll={{ x: 1000 }}
                   rowKey="seq"
                   size="small"
                   pagination={false}
@@ -191,7 +192,7 @@ export default function DealCard({
                           return <Chip>未录金额</Chip>
                         }
                         return unpaid > 0 ? (
-                          <a onClick={() => openReceive(t)}>登记回款</a>
+                          <button type="button" className="project-entry" onClick={() => openReceive(t)}>登记回款</button>
                         ) : (
                           <Chip tone="ok">已收齐</Chip>
                         )
@@ -201,6 +202,7 @@ export default function DealCard({
                 />
 
                 <AppModal
+                  className="engineering-modal"
                   open={!!receiveTarget}
                   title={`登记回款：${receiveTarget?.node_name ?? ''}`}
                   subtitle={

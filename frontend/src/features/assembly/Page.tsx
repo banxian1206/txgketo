@@ -220,6 +220,7 @@ export default function Assembly() {
       {crossRows.length > 1 && (
         <Card size="small" style={{ marginBottom: 16 }} title="跨项目齐套汇总（多项目并行）">
           <Table
+            scroll={{ x: 900 }}
             size="small"
             rowKey="project_no"
             pagination={false}
@@ -251,7 +252,7 @@ export default function Assembly() {
                 }
                 extra={
                   <Space size={4}>
-                    <a onClick={() => void openDetail(o.equip_no)}>明细</a>
+                    <button type="button" className="project-entry" onClick={() => void openDetail(o.equip_no)}>明细</button>
                     {canEdit && (
                       WHOLE_DONE.includes(wholeState[o.equip_no] ?? '') ? (
                         <Chip tone="ok">{wholeState[o.equip_no]}</Chip>
@@ -283,9 +284,10 @@ export default function Assembly() {
           size="small"
           style={{ marginBottom: 16 }}
           title={`${detail.data.project_no} / ${detail.data.equip_no} 齐套明细 —— ${Math.round(detail.data.kitting_rate * 100)}%（到位 ${detail.data.arrived}/${detail.data.total} 种）`}
-          extra={<a onClick={() => setDetail(null)}>收起</a>}
+          extra={<button type="button" className="project-entry" onClick={() => setDetail(null)}>收起</button>}
         >
           <Table<KittingLine>
+            scroll={{ x: 900 }}
             rowKey="ref"
             size="small"
             pagination={false}
@@ -309,6 +311,7 @@ export default function Assembly() {
       )}
       <Typography.Title level={5}>装配 / 厂内调试记录</Typography.Title>
       <Table<AssemblyRecordRow>
+        scroll={{ x: 1000 }}
         rowKey="id"
         size="small"
         loading={loading}
@@ -367,7 +370,7 @@ export default function Assembly() {
                   <a onClick={() => { setFinishInitial({ unassembled: [] }); setFinishTarget(r) }}>装配完成</a>
                 )}
                 {canEdit && (r.status === '已装配' || r.status === '调试中') && (
-                  <a onClick={() => openDebug(r)}>厂内调试</a>
+                  <button type="button" className="project-entry" onClick={() => openDebug(r)}>厂内调试</button>
                 )}
               </Space>
             ),
@@ -376,6 +379,7 @@ export default function Assembly() {
       />
       {/* ★ §2.1 装配完成 + 未装清单（客户：一个设备 100 个零件只装了 80 → 发「1 组装体 + 20 零件」） */}
       <AppModal
+        className="engineering-modal"
         open={!!finishTarget}
         title={`装配完成 · ${finishTarget?.equip_no ?? ''}`}
         onClose={() => setFinishTarget(null)}
@@ -425,6 +429,7 @@ export default function Assembly() {
       </AppModal>
       {/* 开始装配 */}
       <AppModal
+        className="engineering-modal"
         open={!!startTarget}
         title={`开始装配 · ${startTarget?.equip_no ?? ''}`}
         onClose={() => setStartTarget(null)}
@@ -461,6 +466,7 @@ export default function Assembly() {
       </AppModal>
       {/* 厂内调试 */}
       <AppModal
+        className="engineering-modal"
         open={!!debugTarget}
         title={`厂内调试 · ${debugTarget?.project_no ?? ''} / ${debugTarget?.equip_no ?? ''}`}
         onClose={() => setDebugTarget(null)}

@@ -438,6 +438,7 @@ export default function SiteM() {
       )}
 
       <AppModal
+        className="engineering-modal"
         open={!!modal}
         title={modal?.kind === 'survey' ? '现场勘测' : modal?.kind === 'daily' ? '每日汇报' : modal?.kind === 'issue' ? '上报现场问题' : modal?.kind === 'commission' ? '申请调试' : modal?.kind === 'acc-apply' ? '申请客户验收' : modal?.kind === 'acc-confirm' ? '客户确认验收' : `来货清点 · ${modal?.target?.item_no ?? ''}`}
         onClose={() => setModal(null)}
@@ -464,7 +465,7 @@ export default function SiteM() {
 
           {modal?.kind === 'daily' && (
             <>
-              <Space>
+              <Space wrap>
                 <Form.Item name="stage" label="阶段" rules={[{ required: true }]}>
                   <Select style={{ width: 130 }} options={['安装', '单机调试', '联调'].map((s) => ({ value: s, label: s }))} />
                 </Form.Item>
@@ -477,9 +478,9 @@ export default function SiteM() {
                   {(fields, { add, remove }) => (
                     <>
                       {fields.map((f) => (
-                        <Space key={f.key} style={{ marginBottom: 6 }}>
+                        <Space wrap key={f.key} style={{ marginBottom: 6 }}>
                           <Form.Item name={[f.name, 'text']} style={{ marginBottom: 0 }}><Input placeholder="如 框架就位" style={{ width: 240 }} /></Form.Item>
-                          <MinusCircleOutlined onClick={() => remove(f.name)} />
+                          <Button type="text" aria-label="删除完成事项" icon={<MinusCircleOutlined />} onClick={() => remove(f.name)} />
                         </Space>
                       ))}
                       <Button type="dashed" block onClick={() => add({ text: '' })} icon={<PlusOutlined />}>加一项</Button>

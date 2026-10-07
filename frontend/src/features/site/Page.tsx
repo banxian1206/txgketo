@@ -109,6 +109,7 @@ export default function Site() {
     ),
     daily: (
           <Table<SiteDailyRow>
+          scroll={{ x: 950 }}
             rowKey="id"
             size="small"
             dataSource={wb?.dailies ?? []}
@@ -167,6 +168,7 @@ export default function Site() {
     ),
     commission: (
           <Table<SiteCommissionRow>
+          scroll={{ x: 950 }}
             rowKey="id"
             size="small"
             dataSource={wb?.commissions ?? []}
@@ -196,6 +198,7 @@ export default function Site() {
     ),
     survey: (
           <Table<SiteSurveyRow>
+          scroll={{ x: 950 }}
             rowKey="id"
             size="small"
             dataSource={wb?.surveys ?? []}
@@ -262,6 +265,7 @@ export default function Site() {
         {(t) => partsOf[t]}
       </WorkbenchPage>
       <AppModal
+        className="engineering-modal"
         open={!!target}
         title={`现场清点 · ${target?.item_no ?? ''}`}
         onClose={() => setTarget(null)}

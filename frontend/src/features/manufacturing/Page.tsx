@@ -245,9 +245,9 @@ export default function Manufacturing() {
       width: 160,
       render: (_: unknown, r: OutsourceRow) => (
         <Space size={4}>
-          {canEdit && r.status === '待发出' && <a onClick={() => openAction('os-send', undefined, r)}>发出</a>}
-          {canEdit && r.status === '外协中' && <a onClick={() => void doReturn(r)}>回厂</a>}
-          {canEdit && r.status === '回厂待检' && <a onClick={() => openAction('os-accept', undefined, r)}>验收</a>}
+          {canEdit && r.status === '待发出' && <button type="button" className="project-entry" onClick={() => openAction('os-send', undefined, r)}>发出</button>}
+          {canEdit && r.status === '外协中' && <button type="button" className="project-entry" onClick={() => void doReturn(r)}>回厂</button>}
+          {canEdit && r.status === '回厂待检' && <button type="button" className="project-entry" onClick={() => openAction('os-accept', undefined, r)}>验收</button>}
         </Space>
       ),
     },
@@ -313,7 +313,7 @@ export default function Manufacturing() {
       />
     ),
     outsource: (
-          <Table<OutsourceRow> rowKey="id" size="small" loading={loading} dataSource={wb?.outsource ?? []} pagination={{ pageSize: 10, showSizeChanger: true }} locale={{ emptyText: <DsEmpty text="没有外协任务" /> }} columns={osColumns} />
+          <Table<OutsourceRow> scroll={{ x: 1000 }} rowKey="id" size="small" loading={loading} dataSource={wb?.outsource ?? []} pagination={{ pageSize: 10, showSizeChanger: true }} locale={{ emptyText: <DsEmpty text="没有外协任务" /> }} columns={osColumns} />
         
     ),
   }
@@ -351,6 +351,7 @@ export default function Manufacturing() {
       </WorkbenchPage>
       {/* 动作弹窗 */}
       <AppModal
+        className="engineering-modal"
         open={!!action}
         title={
           action?.kind === 'dispatch'
@@ -375,7 +376,7 @@ export default function Manufacturing() {
               <Typography.Paragraph type="secondary" style={{ fontSize: 12 }}>
                 下发内容：**原材料 + 图纸**（图纸版本以发布版为准），拍照确认已交到工序。
               </Typography.Paragraph>
-              <Space style={{ display: 'flex' }} size="middle" align="start">
+              <Space wrap style={{ display: 'flex' }} size="middle" align="start">
                 <Form.Item name="step_name" label="第一道工序" rules={[{ required: true }]}>
                   <Select style={{ width: 160 }} options={TEAMS.map((t) => ({ value: t, label: t }))} />
                 </Form.Item>
@@ -383,7 +384,7 @@ export default function Manufacturing() {
                   <Input style={{ width: 160 }} placeholder="如 下料班" />
                 </Form.Item>
               </Space>
-              <Space style={{ display: 'flex' }} size="middle" align="start">
+              <Space wrap style={{ display: 'flex' }} size="middle" align="start">
                 <Form.Item name="material_item_no" label="原材料（型号级）">
                   <Input style={{ width: 220 }} placeholder="如 YL-FT-0001" />
                 </Form.Item>
@@ -414,7 +415,7 @@ export default function Manufacturing() {
           )}
           {action?.kind === 'os-send' && (
             <>
-              <Space style={{ display: 'flex' }} size="middle" align="start">
+              <Space wrap style={{ display: 'flex' }} size="middle" align="start">
                 <Form.Item name="supplier_name" label="外协供应商">
                   <Input style={{ width: 200 }} placeholder="供应商名" />
                 </Form.Item>
@@ -425,7 +426,7 @@ export default function Manufacturing() {
                   </Radio.Group>
                 </Form.Item>
               </Space>
-              <Space style={{ display: 'flex' }} size="middle" align="start">
+              <Space wrap style={{ display: 'flex' }} size="middle" align="start">
                 <Form.Item name="sent_at" label="发出日期">
                   <DatePicker style={{ width: 160 }} />
                 </Form.Item>
@@ -461,6 +462,7 @@ export default function Manufacturing() {
       </AppModal>
       {/* 详情 */}
       <Drawer
+        rootClassName="review-detail-drawer"
         width={560}
         open={!!detail}
         onClose={() => setDetail(null)}

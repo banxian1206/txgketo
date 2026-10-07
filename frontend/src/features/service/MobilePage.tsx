@@ -149,6 +149,7 @@ export default function ServiceM() {
       {wb?.orders.map(orderCard)}
 
       <Modal
+        className="engineering-modal"
         open={!!modal}
         title={modal?.kind === 'create' ? '报修' : modal?.kind === 'dispatch' ? '派工' : modal?.kind === 'fix' ? '处理完成' : '客户签字'}
         onCancel={() => setModal(null)}

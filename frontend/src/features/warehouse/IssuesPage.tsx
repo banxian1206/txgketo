@@ -190,6 +190,7 @@ export default function IssuesM() {
       </Spin>
 
       <Modal
+        className="engineering-modal"
         title="车间领走"
         open={handOverId !== null}
         onCancel={() => setHandOverId(null)}

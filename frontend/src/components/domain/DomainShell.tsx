@@ -41,12 +41,16 @@ export default function DomainShell({ tabs, children }: { tabs: TabItem[]; child
       </div>
     )
   }
+  const isBase = tabs.some((t) => t.path === '/library')
+  const notes: Record<string, string> = { '/library': '分类查找与维护物料', '/library/prices': '查看历史采购价与供应商', '/numbering': '查看编号规则与编码结构' }
   return (
-    <div className="domain-shell">
+    <div className={isBase ? 'domain-shell base-data-shell' : 'domain-shell'}>
+      {isBase && <header className="base-data-head"><h1>基础数据</h1><p>统一管理物料与历史价格，查看公司的编码规则。</p></header>}
       <nav className="domain-tabs" aria-label="模块切换">
         {visible.map((t) => (
-          <Link key={t.path} to={t.path} className={active === t.path ? 'active' : undefined}>
-            {t.label}
+          <Link key={t.path} to={t.path} className={active === t.path ? 'active' : undefined} aria-current={active === t.path ? 'page' : undefined}>
+            <strong>{t.label}</strong>
+            {isBase && <span>{notes[t.path]}</span>}
           </Link>
         ))}
       </nav>
