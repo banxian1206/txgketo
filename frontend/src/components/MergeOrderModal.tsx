@@ -408,14 +408,21 @@ export default function MergeOrderModal({
                     prefix="¥" // ★ F14：antd 5.29 起 addonBefore 废弃（换 prefix），消除 console 警告
                     onChange={(x) => setLine(l.request_id, { unit_price: x == null ? null : Number(x) })}
                   />
-                  {st && st.deal_count > 0 && (
+                  {st && st.deal_count > 0 ? (
                     <div>
                       <Muted>
                         上次 {st.last_price != null ? `¥${st.last_price}` : '—'} · 均价{' '}
                         {st.avg_price != null ? `¥${st.avg_price}` : '—'}（{st.deal_count} 次）
                       </Muted>
                     </div>
-                  )}
+                  ) : st ? (
+                    /* ★ 2026-10-07 客户实测「去下单看不到推荐价和供应商」：
+                       以前没数据就**什么都不渲染** —— 看着像「系统没这功能」。
+                       现在明说「这个料还没历史价」，并给下一步。 */
+                    <div>
+                      <Muted>暂无历史价（价格库里还没有这个料的记录）</Muted>
+                    </div>
+                  ) : null}
                 </>
               )
             },
@@ -455,7 +462,7 @@ export default function MergeOrderModal({
         </Typography.Text>
       </Space>
 
-      {recos.length > 0 && (
+      {recos.length > 0 ? (
         <div style={{ marginTop: 16 }}>
           <Typography.Text type="secondary" style={{ fontSize: 12 }}>
             推荐供应商（按选中的物料分别推荐；点「选用」自动带出参考价，不会覆盖你填过的单价）
@@ -530,6 +537,24 @@ export default function MergeOrderModal({
             </Typography.Text>
           )}
         </div>
+      ) : (
+        /* ★ 2026-10-07 客户实测「去下单看不到推荐供应商」：
+           0 推荐时以前整块不渲染 → 看着像没这功能。现在明说原因 + 给下一步。
+           真实情况很常见：ERP 导入的价格库覆盖的是**标准库**的料，
+           而采购池里等着的多是**长周期件 / 自建件（图号）**，价格库里本来就没有。 */
+        <Alert
+          type="info"
+          showIcon
+          style={{ marginTop: 16 }}
+          message="这些物料还没有历史价，给不出推荐供应商"
+          description={
+            <div style={{ fontSize: 12, lineHeight: '18px' }}>
+              价格库（基础数据 → 价格库）里没有它们的成交记录，所以没有参考价、也没有可推荐的供应商。
+              下单前请：① 向供应商询价后手填；或
+              ② 让采购经理到「基础数据 → 价格库」补录历史成交价，以后下单就能自动带出参考价。
+            </div>
+          }
+        />
       )}
 
       <Form form={form} layout="vertical" style={{ marginTop: 16 }}>
