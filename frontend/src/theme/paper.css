@@ -232,6 +232,10 @@ button.ds-metric:hover { background: var(--ds-surface2); }
 
 /* 侧栏（A：浅色、分组标题、无右边框线由容器管） */
 .app-sider { border-right: 1px solid var(--ds-line); }
+/* 品牌位（2026-10-07 客户口径）：只留字标、**居中**；下面那行「项目管理系统」已删 ——
+   字标自带「同兴高科」，再叠一行小字是重复。 */
+.app-brand { padding: 16px 20px 12px; display: flex; justify-content: center; flex-shrink: 0; }
+.app-brand-logo { height: 26px; display: block; }
 .app-sider .ant-menu { background: transparent; border-inline-end: 0 !important; }
 .app-sider .ant-menu-item { font-size: 13px; }
 .app-sider .ant-menu-item-selected { font-weight: 500; }

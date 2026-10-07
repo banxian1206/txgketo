@@ -162,10 +162,11 @@ export default function AppLayout() {
       {/* ★ A 纸面：侧栏由深色改浅色 —— 与主区同为"纸面"，靠发丝线分界，不再有两套底色打架 */}
       <Sider theme="light" className="app-sider" width={232} breakpoint="lg" collapsedWidth={0}>
         <div style={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
-          <div style={{ padding: '16px 20px 12px', flexShrink: 0 }}>
-            {/* 品牌位（视觉规范 §6）：浅底用正色字标；字标自带「同兴高科」，不叠文字避免重复 */}
-            <img src="/brand/logo.png" alt="同兴高科 TXGK" style={{ height: 26, display: 'block', marginBottom: 6 }} />
-            <div style={{ fontSize: FS.xs, color: PAPER.ink3 }}>项目管理系统</div>
+          {/* 品牌位（视觉规范 §6）：浅底用正色字标。
+              2026-10-07 客户口径：删掉下面那行「项目管理系统」、字标居中 ——
+              字标自带「同兴高科」，再叠一行小字是重复。 */}
+          <div className="app-brand">
+            <img src="/brand/logo.png" alt="同兴高科 TXGK" className="app-brand-logo" />
           </div>
           <div style={{ flex: 1, overflowY: 'auto' }}>
             <Menu mode="inline" selectedKeys={[selected]} items={sidebarItems} />
