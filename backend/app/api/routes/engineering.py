@@ -47,7 +47,11 @@ from app.services.numbering import (
 
 router = APIRouter(tags=["工程设计"])
 
-SOURCE_KINDS = ("自制件", "外协件", "外购件")
+# ★ 建图只允许「自制件」（客户口径 2026-10-07）：
+#   机械只决定「外购 / 自制」——外购标品（电机/机器人…）从标准库挂设计 BOM，**不出图**；
+#   自制件出图后，**是否需外协由工艺在评审里改判**（source_tag: 外协件/定制件）。
+#   所以机械不再能直接建「外协件 / 外购件」的图。
+SOURCE_KINDS = ("自制件",)
 
 
 def split_components_parts(
@@ -305,7 +309,8 @@ class DrawingIn(BaseModel):
     qty: float = Field(default=1, gt=0)
     unit: str = "件"
     source_type: str = Field(
-        default="自制件", description="类型：自制件 / 外协件 / 外购件（标准件不走这里，从标准库选）"
+        default="自制件",
+        description="只允许「自制件」：外购标品走标准库，外协/定制由工艺评审改判（2026-10-07）",
     )
     kind: str = "机械"
 
@@ -327,7 +332,11 @@ def add_drawing(
     if equip is None:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, f"项目下没有设备 {equip_no}")
     if body.source_type not in SOURCE_KINDS:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, f"来源类型只能是：{'/'.join(SOURCE_KINDS)}")
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            "新建图纸只能是「自制件」——外购标品（电机/机器人…）去标准库挂标准件、不出图；"
+            "外协/定制由工艺在评审里改判（机械不直接定外协）。",
+        )
 
     existing = session.scalars(
         select(Drawing).where(Drawing.project_no == project_no, Drawing.equip_no == equip_no)

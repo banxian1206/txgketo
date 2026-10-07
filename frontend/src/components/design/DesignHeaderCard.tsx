@@ -1,6 +1,5 @@
 import { Link } from 'react-router-dom'
 import { Chip } from '../../components/ds'
-import type { FormInstance } from 'antd'
 // components/design/DesignHeaderCard.tsx —— 由 EquipmentDesign 拆出（重构 1.6 · 只拆不改）
 import { Button, Card, Col, Row, Space, Typography } from 'antd'
 import { useBack } from '../../hooks/useFrom'
@@ -15,19 +14,13 @@ data,
   equipNo,
   nav,
   projectNo,
-  purchaseForm,
   root,
-  setPurchaseOpen,
-  setPurchaseResult
 }: {
 data: DesignTree | null;
   equipNo: string;
   nav: any;
   projectNo: string;
-  purchaseForm: FormInstance;
   root: DesignRoot | undefined;
-  setPurchaseOpen: (...args: any[]) => any;
-  setPurchaseResult: (...args: any[]) => any;
 }) {
   // ★ docs/11：从台里点进来的，返回口回**那个台**（含原页签）；无来源时保持「← 返回项目」
   const back = useBack(`/projects/${projectNo}`, '← 返回项目')
@@ -59,19 +52,9 @@ data: DesignTree | null;
             <Col className="design-header-actions">
               {/* ★ R2：设备档案 = 这台设备的一生（只读汇总 + 跳各台干活）；
                   设计面只负责"设计"这一环，别互相抄 */}
-              <Link to={`/equipment/${projectNo}/${equipNo}`} style={{ marginRight: 8 }}>
+              <Link to={`/equipment/${projectNo}/${equipNo}`}>
                 <Button>设备档案</Button>
               </Link>
-              <Button
-                type="primary"
-                onClick={() => {
-                  purchaseForm.resetFields()
-                  setPurchaseResult(null)
-                  setPurchaseOpen(true)
-                }}
-              >
-                生成采购需求（进池）
-              </Button>
             </Col>
           </Row>
         </Card>

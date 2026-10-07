@@ -150,13 +150,13 @@ def main() -> None:
         call("post", f"/api/v1/projects/{p}/equipment", who="pm1", ok=(201,),
              label="设备清单：01A OC 贴合机", json={"equip_name": "OC 贴合机", "kind": "单机"})
         call("post", f"/api/v1/projects/{p}/milestones/generate", who="pm1", ok=(200,), label="生成标准节点")
-        # 长周期件：立项即下单
+        # 长周期件：立项时登记（★ 2026-10-07 起进采购池，S3 由采购下单）
         items = c.get("/api/v1/library/items", headers=login("admin"), params={"limit": 5}).json()
         it1, it2 = items[0], items[1]
         call("post", f"/api/v1/projects/{p}/purchase-requests", who="pm1", ok=(201,),
-             label=f"长周期件 {it1['item_no']}（60 天，立项即下单）",
+             label=f"长周期件 {it1['item_no']}（60 天，进池待下单）",
              json={"item_no": it1["item_no"], "qty": 2, "lead_days": 60, "need_date": d(90),
-                   "ordered_at": d(0), "supplier_name": "华信传动", "unit_price": price_of(it1["item_no"]), "equip_no": "01A"})
+                   "supplier_name": "华信传动", "unit_price": price_of(it1["item_no"]), "equip_no": "01A"})
         call("post", f"/api/v1/projects/{p}/generate-tasks", who="pm1", ok=(200,),
              label="生成任务：01A × 机械/电气/程序/工艺 + 采购",
              json={"professions": ["机械", "电气", "程序", "工艺"], "with_purchase": True})

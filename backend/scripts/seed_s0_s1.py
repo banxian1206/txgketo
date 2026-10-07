@@ -107,9 +107,9 @@ def main() -> None:
         call("post", f"/api/v1/projects/{p}/milestones/generate", "pm1", "⑤ 标准节点", ok=(200,))
         it = c.get("/api/v1/library/items", headers=login("pm1"), params={"q": "减速机"}).json()[0]
         call("post", f"/api/v1/projects/{p}/purchase-requests", "pm1",
-             f"⑥ 长周期件 {it['item_no']} ×2（立项即下单）", ok=(201,),
+             f"⑥ 长周期件 {it['item_no']} ×2（登记进采购池待下单）", ok=(201,),
              json={"item_no": it["item_no"], "qty": 2, "lead_days": 60, "need_date": d(90),
-                   "ordered_at": d(0), "supplier_name": "华信传动", "equip_no": "01A"})
+                   "supplier_name": "华信传动", "equip_no": "01A"})
         call("post", f"/api/v1/projects/{p}/generate-tasks", "pm1",
              "⑦ 生成任务：4 专业设计（派给经理）+ 采购", ok=(200,),
              json={"professions": ["机械", "电气", "程序", "工艺"], "with_purchase": True})

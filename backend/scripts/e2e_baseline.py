@@ -282,11 +282,10 @@ def a_s1() -> None:
                 json={"equip_name": "贴胶机", "kind": "单机"})
     CTX["eq"] = e["equip_no"]
     api.req("post", f"/projects/{p}/milestones/generate", "pm1")
-    # 长周期件：立项即下单
+    # 长周期件：立项时登记（★ 2026-10-07 起进采购池，S3 由采购下单）
     api.req("post", f"/projects/{p}/purchase-requests", "pm1", (201,), json={
         "item_no": LIB["plc"]["item_no"], "qty": 2, "lead_days": 60, "need_date": d(90),
-        "ordered_at": d(0), "expected_date": d(60), "supplier_name": "华信传动",
-        "unit_price": 18000, "equip_no": CTX["eq"], "is_long_lead": True})
+        "supplier_name": "华信传动", "unit_price": 18000, "equip_no": CTX["eq"]})
     api.req("post", f"/projects/{p}/generate-tasks", "pm1",
             json={"professions": ["机械", "电气", "程序", "工艺"], "with_purchase": True})
     api.req("post", f"/projects/{p}/initiate", "pm1")
@@ -305,7 +304,7 @@ def a_s1() -> None:
     ms = ms if isinstance(ms, list) else ms.get("items", [])
     rec(all(m.get("plan_start") and m.get("plan_end") for m in ms),
         f"标准节点 {len(ms)} 个都带默认起止")
-    note(f"设备 {CTX['eq']}，团队 10 人，节点 {len(ms)}，长周期件 1（PLC×2 已下单）")
+    note(f"设备 {CTX['eq']}，团队 10 人，节点 {len(ms)}，长周期件 1（PLC×2 进池待下单）")
 
 
 def _my_task(equip: str, prof_name: str, who: str) -> int:
@@ -1593,20 +1592,19 @@ def c_money_scrub() -> None:
 
 
 def c_longlead_no_perm() -> None:
-    probe("C5 长周期件登记（= 立即下单 + 发号 + 置在途）的权限")
+    probe("C5 长周期件登记（进采购池的写动作）的权限")
     p = CTX["p"]
     before = q("select count(*) as c from purchase_request")[0]["c"]
     body = {"item_no": LIB["plc"]["item_no"], "qty": 3, "lead_days": 30,
-            "need_date": d(90), "ordered_at": d(0), "supplier_name": "越权探针供应商",
-            "unit_price": 18000, "equip_no": CTX["eq"], "is_long_lead": True}
+            "need_date": d(90), "supplier_name": "越权探针供应商",
+            "unit_price": 18000, "equip_no": CTX["eq"]}
     sc, bd = api.try_("post", f"/projects/{p}/purchase-requests", "site1", json=body)
     after = q("select count(*) as c from purchase_request")[0]["c"]
     rec(sc in (401, 403),
         f"★ 现场账号(site1) 登记长周期件 → HTTP {sc}（应 403，需 purchase:edit）",
         f"返回：{str(bd)[:220]}\n需求行数 {before} → {after}。"
-        "initiation.add_purchase_request 只 Depends(get_current_user)；"
-        "它会 next_number 发一个真采购单号、status 直接置「在途」——"
-        "等于任何登录用户都能凭空下一张采购单")
+        "initiation.add_purchase_request 只写了需求（不再自动下单），但仍必须 purchase:edit / project:edit；"
+        "否则任何登录用户都能凭空往采购池塞需求")
     if after > before:
         row = q("select id, item_no, qty, status, po_no, unit_price from purchase_request "
                 "order by id desc limit 1")[0]

@@ -2,8 +2,6 @@ import { Alert, App, Form, Input, Modal } from 'antd'
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 
-import type { Dayjs } from 'dayjs'
-
 import DesignHeaderCard from '../../components/design/DesignHeaderCard'
 import SectionNav from '../../components/ds/SectionNav'
 import { DESIGN_SECTIONS, defaultSectionKey } from '../../configs/sections'
@@ -19,7 +17,7 @@ import ReviewDetailModal from '../../components/ReviewDetailModal'
 import SubmitReviewModal from '../../components/SubmitReviewModal'
 import ChangeRequestModal from '../../components/ChangeRequestModal'
 
-import { addBom, addDrawing, createProgram, deleteProgram, errMsg, generateEquipmentPurchase, getDesignTree, getMyDesignTasks, listPrograms, listProgramVersions, listStdItems, listVersions, me, newDrawingVersion, newProgramVersion, uploadProgramDraft, updateDrawing, type DesignRoot, type DesignTree, type GeneratePurchaseResult, type MyDesignTask, type ProgramItem, type ProgramVersionRow, type StdItem, type User, type VersionRow } from '../../api/client'
+import { addBom, addDrawing, createProgram, deleteProgram, errMsg, getDesignTree, getMyDesignTasks, listPrograms, listProgramVersions, listStdItems, listVersions, me, newDrawingVersion, newProgramVersion, uploadProgramDraft, updateDrawing, type DesignRoot, type DesignTree, type MyDesignTask, type ProgramItem, type ProgramVersionRow, type StdItem, type User, type VersionRow } from '../../api/client'
 
 interface TreeNode {
   drawing_no: string
@@ -71,9 +69,6 @@ export default function EquipmentDesign({ projectNo: p0, equipNo: e0, embedded }
   const [addForm] = Form.useForm()
   const [matForm] = Form.useForm()
   const [submitForm] = Form.useForm()
-  const [purchaseOpen, setPurchaseOpen] = useState(false)
-  const [purchaseResult, setPurchaseResult] = useState<GeneratePurchaseResult | null>(null)
-  const [purchaseForm] = Form.useForm()
   // 改版原因（Modal.confirm 里的小输入框）
   const reasonRef = { current: '' }
   // PLC 程序版本
@@ -332,37 +327,11 @@ export default function EquipmentDesign({ projectNo: p0, equipNo: e0, embedded }
       })),
   ]
 
-  const submitPurchase = async () => {
-    let v: { need_date?: Dayjs; remark?: string }
-    try {
-      v = await purchaseForm.validateFields()
-    } catch {
-      return
-    }
-    setSaving(true)
-    try {
-      const res = await generateEquipmentPurchase(projectNo, equipNo, {
-        need_date: v.need_date ? v.need_date.format('YYYY-MM-DD') : undefined,
-        remark: v.remark,
-      })
-      setPurchaseResult(res)
-      if (res.created > 0) {
-        message.success(`已生成 ${res.created} 条待采购需求进池（合计 ${res.buy_qty}）`)
-      } else {
-        message.info(res.message ?? '没有新需求')
-      }
-    } catch (e) {
-      message.error(errMsg(e))
-    } finally {
-      setSaving(false)
-    }
-  }
-
   return (
     <>
       {/* 顶部：完整度 + 待办 */}
       {!embedded && (
-      <DesignHeaderCard data={data} equipNo={equipNo} nav={nav} projectNo={projectNo} purchaseForm={purchaseForm} root={root} setPurchaseOpen={setPurchaseOpen} setPurchaseResult={setPurchaseResult} />
+      <DesignHeaderCard data={data} equipNo={equipNo} nav={nav} projectNo={projectNo} root={root} />
       )}
 
       {(data?.issues.unpublished.length ?? 0) > 0 && (
@@ -389,6 +358,18 @@ export default function EquipmentDesign({ projectNo: p0, equipNo: e0, embedded }
       {/* 我的提交（评审单）：一个任务一张单，多轮共用 */}
       {myTasks.length > 0 && (
       <MySubmitsCard myTasks={myTasks} setDetailOpen={setDetailOpen} setDetailTicketId={setDetailTicketId} setReviewOpen={setReviewOpen} setReviewTask={setReviewTask} />
+      )}
+      {/* ★ 提交评审是按「任务的负责人」做的：你在这台设备上没有设计任务时
+          （典型是管理员/其他专业的人来看），就看不到「我的提交」入口，
+          容易以为「东西填完了却不能发布」。说清楚该换谁操作。 */}
+      {!loading && myTasks.length === 0 && (data?.counts.drawings ?? 0) > 0 && (
+        <Alert
+          type="info"
+          showIcon
+          style={{ marginBottom: 16 }}
+          message="你在这台设备上没有设计任务，不能在这里提交评审"
+          description="提交评审是按「任务的负责人」做的 —— 请用这台设备对应专业的负责人账号（机械/电气/程序/工艺经理）登录，把图纸文件传齐后再提交评审、发布（冻结）。发布后 BOM 才计入采购。"
+        />
       )}
 
       {/* 图纸树 */}
@@ -431,7 +412,7 @@ export default function EquipmentDesign({ projectNo: p0, equipNo: e0, embedded }
 
       {/* 新增组件/零件 */}
       {/* 生成采购需求（BOM → 净需求 → 进池） */}
-      <DrawingsModals addForm={addForm} addOpen={addOpen} doAdd={doAdd} doAddMaterial={doAddMaterial} equipNo={equipNo} items={items} load={load} matForm={matForm} matOpen={matOpen} message={message} nav={nav} parentOptions={parentOptions} purchaseForm={purchaseForm} purchaseOpen={purchaseOpen} rows={rows} saving={saving} searchItems={searchItems} selected={selected} setAddOpen={setAddOpen} setMatOpen={setMatOpen} setPurchaseOpen={setPurchaseOpen} setPurchaseResult={setPurchaseResult} setSaving={setSaving} setSubmitOpen={setSubmitOpen} setVerOpen={setVerOpen} submitForm={submitForm} submitOpen={submitOpen} submitPurchase={submitPurchase} verOpen={verOpen} versions={versions} purchaseResult={purchaseResult} />
+      <DrawingsModals addForm={addForm} addOpen={addOpen} doAdd={doAdd} doAddMaterial={doAddMaterial} equipNo={equipNo} items={items} load={load} matForm={matForm} matOpen={matOpen} message={message} parentOptions={parentOptions} rows={rows} saving={saving} searchItems={searchItems} selected={selected} setAddOpen={setAddOpen} setMatOpen={setMatOpen} setSaving={setSaving} setSubmitOpen={setSubmitOpen} setVerOpen={setVerOpen} submitForm={submitForm} submitOpen={submitOpen} verOpen={verOpen} versions={versions} />
       {/* 新建程序 */}
       <ProgramsModals doCreateProgram={doCreateProgram} doUploadProgram={doUploadProgram} equipNo={equipNo} progForm={progForm} progUploadForm={progUploadForm} progCreateOpen={progCreateOpen} progUploadOpen={progUploadOpen} progUploadTarget={progUploadTarget} progVerOpen={progVerOpen} progVerTarget={progVerTarget} progVersions={progVersions} saving={saving} setProgCreateOpen={setProgCreateOpen} setProgUploadOpen={setProgUploadOpen} setProgVerOpen={setProgVerOpen} />
 

@@ -543,21 +543,25 @@ def remove_milestone(
 
 
 # ============================================================================
-# ④ 长周期采购（立项即下单）
+# ④ 长周期采购（登记进采购池，由采购下单）
 # ============================================================================
 
 
 class LongLeadIn(BaseModel):
-    """★ 关键字段必须填：不填就算不出「赶不赶得上」，这个功能就是摆设。"""
+    """长周期件登记：只描述「要什么、要多少、什么时候要、周期多长」，进采购池。
+
+    ★ 2026-10-07 客户口径：长周期件也**走采购流程**（进池 → 采购下单 → 审批 → 在途 →
+      到货验收），不再由系统「立项即下单」。所以这里**不再要求下单日期** ——
+      下单日期 / 预计到货由采购下单时确定。
+    """
 
     item_no: str = Field(..., description="标准库物料编码（从标准库里选）")
     qty: float = Field(..., gt=0, description="数量（必填）")
     unit: str | None = None
-    lead_days: int = Field(..., ge=0, description="采购周期（天，必填）")
+    lead_days: int = Field(..., ge=0, description="采购周期（天，必填）—— 采购池用来提示尽早下单")
     need_date: date = Field(..., description="需要到货日期（必填）")
-    ordered_at: date = Field(..., description="下单日期（必填：长周期件立项即下单）")
-    supplier_name: str | None = None
-    unit_price: float | None = Field(default=None, ge=0, description="单价（选填，填了就能算金额）")
+    supplier_name: str | None = Field(default=None, description="建议供应商（选填，采购下单时最终确定）")
+    unit_price: float | None = Field(default=None, ge=0, description="估价单价（选填，采购下单时确认）")
     equip_no: str | None = None
     remark: str | None = None
 
@@ -622,22 +626,18 @@ def add_purchase_request(
     session: Session = Depends(get_session),
     current: User = Depends(require_any_permission("purchase:edit", "project:edit")),
 ):
-    """登记长周期采购件（从标准库选）。填下单日期 → 已下单，预计到货 = 下单 + 周期。
+    """登记长周期采购件（从标准库选）→ **进采购池**，由采购下单（客户口径 2026-10-07）。
 
-    ★ AZ-01：这是「立即下单 + 发号 + 置在途」的写动作，必须 `purchase:edit`
+    ★ 2026-10-07 修复：以前这里**直接发号并置「在途」**（所谓“立项即下单”），但并没有真正的
+      采购单/供应商/审批 —— 结果 ① 绕过「所有采购都要两级审批」（客户口径 #6/#8），
+      ② 直接出现在仓库「待验收」队列里（仓库按状态「在途」列待验收），看起来像「没走采购
+      就跑到仓库」。现在统一走「采购池 → 采购下单 → 审批 → 在途 → 到货验收」；
+      长周期件用 `is_long_lead` + `lead_days` 标记，采购池里一眼可见、优先下单。
+
+    ★ AZ-01：这是写动作，必须 `purchase:edit` 或 `project:edit`
       （此前只校验登录，现场账号 `site1` 能凭空下一张 ¥54,000 采购单）。
     """
     _get_project(session, project_no)
-    # 合理性校验：下单 + 周期 必须早于「需要到货」，否则这条需求一开始就是不可能完成的
-    ordered_at = body.ordered_at
-    expected = ordered_at + timedelta(days=body.lead_days) if body.lead_days is not None else None
-    if expected and body.need_date and expected > body.need_date:
-        raise HTTPException(
-            status.HTTP_400_BAD_REQUEST,
-            f"这条需求从一开始就赶不上：下单 {ordered_at} + 周期 {body.lead_days} 天 = {expected}，"
-            f"但需要到货是 {body.need_date}。要么提前下单、要么改周期/到货日期。",
-        )
-
     item = session.get(Item, body.item_no)
     if item is None:
         raise HTTPException(
@@ -653,14 +653,11 @@ def add_purchase_request(
         unit=body.unit or item.unit,
         source=SOURCE_LONG_LEAD,
         lead_days=body.lead_days,
-        supplier_name=body.supplier_name,
-        need_date=body.need_date,
-        expected_date=expected,
-        ordered_at=ordered_at,
-        po_no=next_number(session, "PURCHASE_ORDER"),
-        unit_price=body.unit_price,
+        supplier_name=body.supplier_name,  # 建议供应商（采购下单时最终确定）
+        unit_price=body.unit_price,  # 估价（采购下单时确认成交价）
         amount=(float(body.unit_price) * float(body.qty)) if body.unit_price else None,
-        status="在途",  # 立项即下单：下完单就在途（旧「已下单」中间态已废弃）
+        need_date=body.need_date,
+        status="待采购",  # ★ 进采购池：由采购下单，系统不再代替下单
         is_long_lead=True,
         remark=body.remark,
     )
@@ -674,8 +671,7 @@ def add_purchase_request(
         object_ref=project_no,
         summary=f"登记长周期件 {item.display_name}（{body.item_no}）"
         + (f"·周期 {body.lead_days} 天" if body.lead_days else "")
-        + (f"·{'已下单 ' + ordered_at.isoformat() if ordered_at else '待下单'}")
-        + (f"，预计到货 {expected.isoformat()}" if expected else ""),
+        + f"，已进采购池待下单（需要到货 {body.need_date.isoformat()}）",
         ip=client_ip(request),
     )
     session.commit()
@@ -2080,9 +2076,22 @@ def generate_equipment_purchase(
     project = _get_project(session, project_no)
     plan, stats = bom_demand.plan_equipment_purchase(session, project_no, equip_no)
     if stats["need_lines"] == 0:
+        # ★ 区分「没挂 BOM」和「挂了但还是草稿/审核中」—— 后者的错在流程没走完，
+        #   旧文案一律说「BOM 都是空的」，让完整填过的用户以为白填了（客户实测 TX26005）。
+        pending = stats.get("bom_draft", 0) + stats.get("bom_reviewing", 0)
+        if pending:
+            draft = stats.get("bom_draft", 0)
+            reviewing = stats.get("bom_reviewing", 0)
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST,
+                f"这台设备的 BOM 还没发布（冻结）：草稿 {draft} 行、审核中 {reviewing} 行。"
+                "采购只认【已发布】的 BOM —— 请先把图纸文件传齐、提交评审，"
+                "经理/总监通过发布后，再来生成采购需求。",
+            )
         raise HTTPException(
             status.HTTP_400_BAD_REQUEST,
-            "这台设备还没有可采购的 BOM（标准件 / 原材料 BOM 都是空的）",
+            "这台设备还没有 BOM 行（标准件 / 原材料都没挂）—— "
+            "先在「设计 BOM / 材料 BOM」里把要买的件挂上，再走评审发布。",
         )
     if not plan:
         return {

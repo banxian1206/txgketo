@@ -4,7 +4,8 @@
   ① 统一理解   → project_member（团队任命）
   ② 任务分配   → equipment（01A/02A… 各是什么设备，设备号自动发）
   ③ 节点时间段 → milestone（工程设计从几号到几号…）
-  ＋ 长周期采购 → purchase_request(source='长周期')，立项即下单、不走合并
+  ＋ 长周期采购 → purchase_request(source='长周期')，标记 is_long_lead、进采购池由采购下单
+    （2026-10-07 客户口径：不再系统自动下单 —— 采购单/供应商/审批都要真走一遍）
 """
 
 from __future__ import annotations
@@ -163,8 +164,9 @@ REQUEST_SOURCES = (
 class PurchaseRequest(Base, TimestampMixin):
     """采购需求。
 
-    ★ 长周期件（如 ABB 机器人，2 个月周期、不备货）在立项阶段就下单，
-      不走「仓库优先 + 累计合并」那条通道。
+    ★ 长周期件（如 ABB 机器人，2 个月周期、不备货）立项时就登记（`is_long_lead=True`），
+      **进采购池由采购尽快下单**（2026-10-07 客户口径：不再系统自动下单）——
+      仍走「仓库优先 + 累计合并」那条通道，只是带着周期/需要到货日让采购优先看到。
     """
 
     __tablename__ = "purchase_request"

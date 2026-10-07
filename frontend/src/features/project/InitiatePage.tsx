@@ -27,7 +27,7 @@ import { useBack, useGoFrom } from '../../hooks/useFrom'
  *   ① 统一理解 → 项目团队任命
  *   ② 任务分配 → 设备清单（01A/02A… 各是什么设备）
  *   ③ 节点时间段 → 里程碑计划
- *   ＋ 长周期采购 → 立项即下单
+ *   ＋ 长周期采购 → 登记进采购池（由采购下单）
  */
 export default function ProjectInitiate() {
   const { projectNo = '' } = useParams()
@@ -154,8 +154,8 @@ export default function ProjectInitiate() {
         longLeads.length === 0
           ? '未登记长周期件'
           : notOrdered.length === 0
-          ? `长周期件（${longLeads.length} 项，全部已下单）`
-          : `长周期件：${notOrdered.map((r) => r.item_name).join('、')} 还没下单（建议立项前就下单）`,
+          ? `长周期件（${longLeads.length} 项，已下单）`
+          : `长周期件已登记 ${longLeads.length} 项（${notOrdered.length} 项等采购下单）`,
       warnOnly: true,
     },
   ]
@@ -202,10 +202,10 @@ export default function ProjectInitiate() {
           type="warning"
           showIcon
           style={{ marginBottom: 16 }}
-          message={`有 ${notOrdered.length} 项长周期件还没下单`}
+          message={`有 ${notOrdered.length} 项长周期件还在采购池，等采购下单`}
           description={`${notOrdered
             .map((r) => r.item_name)
-            .join('、')} —— 这类件不备货、周期长，立项阶段就该把单下给采购，否则会拖死交期。`}
+            .join('、')} —— 这类件不备货、周期长，登记后已进采购池，请提醒采购尽快下单，否则会拖死交期。`}
         />
       )}
 
@@ -257,7 +257,7 @@ export default function ProjectInitiate() {
             label: '④ 长周期采购',
             children: (
               <>
-      <Card size="small" title="④ 长周期采购（立项即下单）" style={{ marginBottom: 16 }}>
+      <Card size="small" title="④ 长周期采购（登记进采购池，由采购下单）" style={{ marginBottom: 16 }}>
         <LongLeadEditor projectNo={projectNo} onChanged={load} />
       </Card>
               </>

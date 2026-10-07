@@ -2,12 +2,11 @@ import type { FormInstance } from 'antd'
 import { toneOf } from '../../theme/status'
 import { Chip } from '../../components/ds'
 // components/design/DrawingsModals.tsx —— 由 EquipmentDesign 拆出（重构 1.6 · 只拆不改）
-import { Alert, Button, DatePicker, Form, Input, InputNumber, Modal, Select, Space, Table, Tooltip, Typography, Upload } from 'antd'
+import { Button, Form, Input, InputNumber, Modal, Select, Space, Table, Tooltip, Typography, Upload } from 'antd'
 
 
 
-import { errMsg, uploadDrawingDraft, type GeneratePurchaseResult, type StdItem, type VersionRow } from '../../api/client'
-import { useGoFrom } from '../../hooks/useFrom'
+import { errMsg, uploadDrawingDraft, type StdItem, type VersionRow } from '../../api/client'
 import type { TreeNode } from './shared'
 
 export default function DrawingsModals({
@@ -22,25 +21,19 @@ addForm,
   matOpen,
   message,
   parentOptions,
-  purchaseForm,
-  purchaseOpen,
   rows,
   saving,
   searchItems,
   selected,
   setAddOpen,
   setMatOpen,
-  setPurchaseOpen,
-  setPurchaseResult,
   setSaving,
   setSubmitOpen,
   setVerOpen,
   submitForm,
   submitOpen,
-  submitPurchase,
   verOpen,
   versions,
-  purchaseResult
 }: {
 addForm: FormInstance;
   addOpen: boolean;
@@ -52,112 +45,23 @@ addForm: FormInstance;
   matForm: FormInstance;
   matOpen: boolean;
   message: any;
-  nav: any;
   parentOptions: any;
-  purchaseForm: FormInstance;
-  purchaseOpen: boolean;
   rows: TreeNode[];
   saving: boolean;
   searchItems: (...args: any[]) => any;
   selected: TreeNode | null;
   setAddOpen: (...args: any[]) => any;
   setMatOpen: (...args: any[]) => any;
-  setPurchaseOpen: (...args: any[]) => any;
-  setPurchaseResult: (...args: any[]) => any;
   setSaving: (...args: any[]) => any;
   setSubmitOpen: (...args: any[]) => any;
   setVerOpen: (...args: any[]) => any;
   submitForm: FormInstance;
   submitOpen: boolean;
-  submitPurchase: any;
   verOpen: boolean;
   versions: VersionRow[];
-  purchaseResult: GeneratePurchaseResult | null;
 }) {
-  // ★ 来源优先：本组件里往采购台的跳转要带来源（nav 仍由 props 传入，此处只用 go）
-  const go = useGoFrom()
   return (
     <>
-      <Modal
-        className="engineering-modal"
-        title={`生成采购需求（进池） · ${equipNo}`}
-        open={purchaseOpen}
-        width={660}
-        onCancel={() => {
-          setPurchaseOpen(false)
-          setPurchaseResult(null)
-        }}
-        onOk={() => {
-          // ★ 来源优先：设计面 → 采购台也带来源
-          if (purchaseResult) go('/purchase')
-          else void submitPurchase()
-        }}
-        okText={purchaseResult ? '去采购工作台' : '生成进池'}
-        confirmLoading={saving}
-        forceRender
-      >
-        {purchaseResult ? (
-          <>
-            <Alert
-              type={purchaseResult.created > 0 ? 'success' : 'info'}
-              showIcon
-              style={{ marginBottom: 12 }}
-              message={
-                purchaseResult.created > 0
-                  ? `生成 ${purchaseResult.created} 条待采购需求（合计 ${purchaseResult.buy_qty}）`
-                  : (purchaseResult.message ?? '没有新需求')
-              }
-              description={`BOM 需求 ${purchaseResult.need_qty}；库存/在途已覆盖 ${purchaseResult.covered_qty}；需要到货 ${
-                purchaseResult.need_date ?? '待定'
-              }`}
-            />
-            {(purchaseResult.requests?.length ?? 0) > 0 && (
-              <Table
-                scroll={{ x: 620 }}
-                rowKey="id"
-                size="small"
-                pagination={false}
-                dataSource={purchaseResult.requests}
-                columns={[
-                  { title: '物料', dataIndex: 'display_name' },
-                  {
-                    title: '零件',
-                    dataIndex: 'part_no',
-                    width: 210,
-                    render: (v: string | null) => v ?? '—',
-                  },
-                  {
-                    title: '数量',
-                    dataIndex: 'qty',
-                    width: 90,
-                    render: (v: number, r: { unit?: string | null }) => `${v} ${r.unit ?? ''}`,
-                  },
-                ]}
-              />
-            )}
-          </>
-        ) : (
-          <>
-            <Typography.Paragraph type="secondary" style={{ fontSize: 12, marginTop: 0 }}>
-              只展开已冻结（评审发布过）的标准件/原材料 BOM 行；扣掉仓库可用库存和这台设备已经在跑的需求，
-              剩下的按「物料 + 零件」进采购池等合并下单。
-            </Typography.Paragraph>
-            <Form form={purchaseForm} layout="vertical">
-              <Form.Item
-                name="need_date"
-                label="需要到货日期"
-                tooltip="不填就用项目的合同周期结束日"
-              >
-                <DatePicker style={{ width: '100%' }} />
-              </Form.Item>
-              <Form.Item name="remark" label="备注" style={{ marginBottom: 0 }}>
-                <Input placeholder="如：这批和 02A 一起买" />
-              </Form.Item>
-            </Form>
-          </>
-        )}
-      </Modal>
-
       <Modal
         className="engineering-modal"
         title={`新增条目 · 挂在 ${equipNo} 下`}
@@ -187,14 +91,12 @@ addForm: FormInstance;
             name="kind"
             label="类型"
             initialValue="自制件"
-            tooltip="决定这个件走哪条路：自制件排产自己做；外协件发出去加工；外购件买现成的；标准件不出图，直接从标准库选"
+            tooltip="机械只分「外购 / 自制」：外购标品（电机/机器人…）从标准库选标准件、不出图；自制件出图后，是否外协由工艺评审判定"
           >
             <Select
               options={[
-                { value: '自制件', label: '自制件（自己做）' },
-                { value: '外协件', label: '外协件（发出去加工）' },
-                { value: '外购件', label: '外购件（买现成的非标件）' },
-                { value: '标准件', label: '标准件（从标准库选，不出图）' },
+                { value: '自制件', label: '自制件（出图；是否外协由工艺术判定）' },
+                { value: '标准件', label: '标准件（外购标品，从标准库选，不出图）' },
               ]}
             />
           </Form.Item>

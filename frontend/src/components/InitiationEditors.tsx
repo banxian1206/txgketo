@@ -518,7 +518,7 @@ export function MilestoneEditor({ projectNo, users, onChanged }: Props) {
   )
 }
 
-/** ④ 长周期采购：立项即下单（不走仓库优先与合并采购） */
+/** ④ 长周期采购：登记进采购池，由采购优先下单（不再系统自动下单） */
 export function LongLeadEditor({ projectNo, onChanged }: Omit<Props, 'users'>) {
   const { message } = App.useApp()
   const [rows, setRows] = useState<PurchaseRequestItem[]>([])
@@ -550,11 +550,10 @@ export function LongLeadEditor({ projectNo, onChanged }: Omit<Props, 'users'>) {
         lead_days: row.lead_days,
         supplier_name: row.supplier_name,
         need_date: row.need_date ? dayjs(row.need_date) : undefined,
-        ordered_at: row.ordered_at ? dayjs(row.ordered_at) : undefined,
         remark: row.remark,
       })
     } else {
-      setInitial({ ordered_at: dayjs() })
+      setInitial({})
     }
     setOpen(true)
   }
@@ -565,7 +564,6 @@ export function LongLeadEditor({ projectNo, onChanged }: Omit<Props, 'users'>) {
     const body = {
       ...v,
       need_date: v.need_date ? v.need_date.format('YYYY-MM-DD') : null,
-      ordered_at: v.ordered_at ? v.ordered_at.format('YYYY-MM-DD') : null,
     }
     setSaving(true)
     try {
@@ -589,7 +587,7 @@ export function LongLeadEditor({ projectNo, onChanged }: Omit<Props, 'users'>) {
           + 登记长周期件
         </Button>
         <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-          这类件不备货、周期长（如 ABB 机器人 2 个月）—— 立项就下单，不走合并采购
+          这类件不备货、周期长（如 ABB 机器人 2 个月）—— 登记后进采购池，请采购优先下单
         </Typography.Text>
       </Space>
       <Table<PurchaseRequestItem>
@@ -706,7 +704,7 @@ export function LongLeadEditor({ projectNo, onChanged }: Omit<Props, 'users'>) {
             <Form.Item
               name="lead_days"
               label="采购周期（天）"
-              tooltip="预计到货 = 下单日期 + 采购周期"
+              tooltip="采购下单后，预计到货 = 下单日期 + 采购周期"
               style={{ minWidth: 140 }}
               rules={[{ required: true, message: '填周期' }]}
             >
@@ -714,11 +712,8 @@ export function LongLeadEditor({ projectNo, onChanged }: Omit<Props, 'users'>) {
             </Form.Item>
           </Space>
           <Space style={{ display: 'flex' }} size="middle">
-            <Form.Item name="supplier_name" label="供应商" style={{ minWidth: 200 }}>
-              <Input placeholder="如：ABB" />
-            </Form.Item>
-            <Form.Item name="ordered_at" label="下单日期" style={{ minWidth: 170 }} rules={[{ required: true, message: '填下单日' }]}>
-              <DatePicker style={{ width: '100%' }} />
+            <Form.Item name="supplier_name" label="建议供应商" style={{ minWidth: 200 }}>
+              <Input placeholder="选填，如：ABB（采购下单时最终确定）" />
             </Form.Item>
             <Form.Item name="need_date" label="需要到货" style={{ minWidth: 170 }} rules={[{ required: true, message: '填需要到货日' }]}>
               <DatePicker style={{ width: '100%' }} />

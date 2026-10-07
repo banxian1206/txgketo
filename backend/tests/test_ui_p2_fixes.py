@@ -137,7 +137,8 @@ def test_design_parent_options_dont_duplicate_root():
     """
     s = _flatten(FE / "features" / "design" / "Page.tsx")
     seg = s[s.index("const parentOptions"):]
-    seg = seg[: seg.index("const submitPurchase")]
+    # 结束标记用 return（原用 submitPurchase，它随「设计面手动生成采购需求」按钮一起撤了）
+    seg = seg[: seg.index("return (")]
     assert "r.drawing_no === root.drawing_no" in seg or "r.drawing_no === root?.drawing_no" in seg, (
         "parentOptions 必须把总装图从 rows 分支里排掉，否则总装图被列两遍 → duplicate key 告警"
     )

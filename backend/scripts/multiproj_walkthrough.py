@@ -429,10 +429,10 @@ def s1(pj: dict) -> None:
     for key, qty in prof["long_lead"]:
         api.req("post", f"/projects/{p}/purchase-requests", "pm1", (201,), json={
             "item_no": LIB[key]["item_no"], "qty": qty, "lead_days": 60,
-            "need_date": d(prof["delivery_days"] - 30), "ordered_at": d(0),
+            "need_date": d(prof["delivery_days"] - 30),
             "supplier_name": "华信传动",
             "unit_price": price_of(LIB[key]["item_no"]),
-            "equip_no": prof["deep"], "is_long_lead": True,
+            "equip_no": prof["deep"],
         })
     api.req("post", f"/projects/{p}/generate-tasks", "pm1",
             json={"professions": ["机械", "电气", "程序", "工艺"], "with_purchase": True})

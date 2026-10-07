@@ -17,7 +17,7 @@ from dataclasses import dataclass
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.models.engineering import BOM_ROW_FROZEN, BomItem, Drawing
+from app.models.engineering import BOM_ROW_FROZEN, BOM_ROW_REVIEWING, BomItem, Drawing
 from app.models.initiation import (
     SOURCE_CRAFT_RELEASE,
     SOURCE_DESIGN_RELEASE,
@@ -260,14 +260,61 @@ def release_demand(session: Session, release: DesignRelease) -> list[DemandLine]
     return lines
 
 
+def equipment_bom_counts(session: Session, project_no: str, equip_no: str) -> dict[str, int]:
+    """这台设备 BOM / 图纸的状态分布。
+
+    用途：`need_lines == 0` 有两种截然不同的原因 —— ① 真的没挂 BOM；② BOM 挂了但
+    还是**草稿/审核中**（没走评审发布 → 没冻结）。不区分就会说成「BOM 都是空的」，
+    让人以为白填了（客户实测 TX26005 就是这个情况）。
+    """
+    drawings = list(
+        session.scalars(
+            select(Drawing).where(
+                Drawing.project_no == project_no, Drawing.equip_no == equip_no
+            )
+        ).all()
+    )
+    tree_nos = {d.drawing_no for d in drawings}
+    rows = session.scalars(
+        select(BomItem).where(
+            BomItem.project_no == project_no, BomItem.superseded_by_id.is_(None)
+        )
+    ).all()
+    counts = {
+        "bom_draft": 0,
+        "bom_reviewing": 0,
+        "bom_frozen": 0,
+        "drawings": len(drawings),
+        "published_drawings": sum(1 for d in drawings if d.status == "已发布"),
+    }
+    for b in rows:
+        if b.parent_ref not in tree_nos:
+            continue
+        if b.status == BOM_ROW_FROZEN:
+            counts["bom_frozen"] += 1
+        elif b.status == BOM_ROW_REVIEWING:
+            counts["bom_reviewing"] += 1
+        else:
+            counts["bom_draft"] += 1
+    return counts
+
+
 def plan_equipment_purchase(
     session: Session, project_no: str, equip_no: str
 ) -> tuple[list[tuple[DemandLine, float]], dict]:
     """设备面手动补跑：已冻结 BOM 的净需求。"""
     lines = equipment_demand(session, project_no, equip_no)
+    counts = equipment_bom_counts(session, project_no, equip_no)
     if not lines:
-        return [], {"need_lines": 0, "need_qty": 0.0, "buy_lines": 0, "buy_qty": 0.0}
-    return _cover(lines, _total_cover(session, project_no, equip_no))
+        return [], {
+            "need_lines": 0,
+            "need_qty": 0.0,
+            "buy_lines": 0,
+            "buy_qty": 0.0,
+            **counts,
+        }
+    plan, stats = _cover(lines, _total_cover(session, project_no, equip_no))
+    return plan, {**stats, **counts}
 
 
 def plan_release_purchase(
