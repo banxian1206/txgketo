@@ -87,7 +87,10 @@ export default function LifecycleTimeline({ data }: { data: ProjectLifecycle | n
     const today = dayjs().startOf('day')
     const num = (s: string | null | undefined) => (s ? dayjs(s).valueOf() : null)
 
-    const created = num(data.created_at)
+    const created = num(data.created_at) === null ? null : dayjs(data.created_at).startOf('day').valueOf()
+    // ↑ 商机记录是**时间戳**（带时分秒），而这条线其余来源都是「日」粒度 ——
+    //   不归一化的话，同一天建的项目里「商机记录」和「今天」会差出 30 多像素（00:00 vs 14:30），
+    //   看着像两个不同的日子。
     const init = num(data.initiated_at)
     const ddl = num(data.deadline)
     const wS = num(data.warranty.start)
@@ -119,8 +122,19 @@ export default function LifecycleTimeline({ data }: { data: ProjectLifecycle | n
     const starts = placed.map((x) => x.bs)
     const ends = placed.map((x) => x.be)
     const allPts = [...starts, ...ends].filter((v): v is number => v !== null)
-    const min = Math.min(...[created, ...allPts, today.valueOf()].filter((v): v is number => v !== null))
-    const mainEnd = Math.max(ddl ?? min, ...allPts, today.valueOf())
+    let lo = Math.min(...[created, ...allPts, today.valueOf()].filter((v): v is number => v !== null))
+    let hi = Math.max(ddl ?? lo, ...allPts, today.valueOf())
+    // ★ 最小窗口 14 天（2026-10-07 实测 TX26011 抓到）：
+    //   刚建的线索「没成交→没交付截止→没里程碑」时 lo == hi，
+    //   而 L() 除的是 max(1, hi-lo) = 1 毫秒 → **坐标爆炸**（事件标签被挤到最右，条飞出容器）。
+    //   撑成前后各 7 天的窗口，时间线才有意义（今天落在正中）。
+    if (hi - lo < 14 * 86400000) {
+      const mid = (lo + hi) / 2
+      lo = mid - 7 * 86400000
+      hi = mid + 7 * 86400000
+    }
+    const min = lo
+    const mainEnd = hi
     const max = Math.max(wE ?? mainEnd, mainEnd, today.valueOf())
     const CONTENT = 1 - PAD * 2
     const MAIN = CONTENT * (1 - WARRT)
@@ -226,7 +240,7 @@ export default function LifecycleTimeline({ data }: { data: ProjectLifecycle | n
   if (!model) return <div className="ds-life" ref={boxRef} style={{ height: 8 }} />
 
   const {
-    today, min, max, L, clampPct, MAIN, CONTENT, placed, laneCount, evs, evRows, payLabels, payRows, payCls, ticks, lateN, nowN, wS, wE,
+    today, min, max, L, clampPct, MAIN, CONTENT, placed, laneCount, evs, evRows, payLabels, payRows, payCls, ticks, wS, wE,
   } = model
   const inRange = today >= min && today <= max
 
@@ -246,13 +260,7 @@ export default function LifecycleTimeline({ data }: { data: ProjectLifecycle | n
           <span><i className="is-today" />今天</span>
         </span>
       </div>
-      <div className="ds-life-note">
-        里程碑按**时间重叠自动分甬道**（共 {laneCount} 条）；
-        {nowN > 0 ? `${nowN} 个进行中` : '当前没有进行中的节点'}
-        {lateN > 0 ? ` · ${lateN} 个已延期` : ''}。
-      </div>
-
-      {/* ① 事件：商机记录 / 立项 / 交付截止（同日合并）」 */}
+      {/* ① 事件：商机记录 / 立项 / 交付截止（同日合并） */}
       <div className="ds-life-ev" style={{ height: evRows * 24 }}>
         {evs.map((e) => (
           <span

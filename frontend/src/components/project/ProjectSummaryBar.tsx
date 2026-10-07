@@ -139,7 +139,6 @@ export default function ProjectSummaryBar({
       <div className="ds-panel" style={{ marginBottom: 16 }}>
         <div className="ds-panel-h">
           <h3>生命周期</h3>
-          <span className="sub">商机记录 → 立项 → 里程碑（可重叠，按甬道）→ 交付截止 → 质保 → 回款</span>
         </div>
         <LifecycleTimeline data={lifecycle} />
       </div>
