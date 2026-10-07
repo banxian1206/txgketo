@@ -368,17 +368,29 @@ try {
         const life = await vc.page.evaluate(() => {
           const el = document.querySelector('.ds-life')
           if (!el) return null
+          const box = el.getBoundingClientRect()
+          // ★ 回归（2026-10-07 客户实测 TX26005「条超出了整个生命周期的宽度」）：
+          //   范围起点曾经误取里程碑的**结束日**，于是「开始得最早的节点」算成负坐标跑到容器外。
+          //   这里直接量：任何一条都不许越过容器的左右边界。
+          const bars = Array.from(document.querySelectorAll('.ds-life-bar'))
+          const left = bars.map((x) => x.getBoundingClientRect().left - box.left)
+          const right = bars.map((x) => x.getBoundingClientRect().right - box.left)
           return {
-            h: Math.round(el.getBoundingClientRect().height),
-            bars: document.querySelectorAll('.ds-life-bar').length,
+            h: Math.round(box.height),
+            bars: bars.length,
             rows: document.querySelectorAll('.ds-life-lanes .row').length,
             ev: document.querySelectorAll('.ds-life-ev .ev').length,
             pay: document.querySelectorAll('.ds-life-pay .p').length,
+            outL: left.length ? Math.round(Math.min(...left)) : 0,
+            outR: right.length ? Math.round(Math.max(...right) - box.width) : 0,
           }
         })
         check('LIFE-时间线在项目详情长出来', !!life && life.h > 40 && life.rows >= 2,
           life ? `高 ${life.h}px · 节点条 ${life.bars} 个 · 甬道 ${life.rows} 行 · 事件 ${life.ev} 个 · 回款 ${life.pay} 个`
                : '页面上没有 .ds-life —— 时间线没渲染出来（组件报错或没接线）')
+        check('LIFE-时间线条不出容器', !!life && life.outL >= -1 && life.outR <= 1,
+          life ? `最左 ${life.outL}px / 最右超出 ${life.outR}px（应都 ≥/≤ 0）`
+               : '时间线没渲染，量不到')
         // ★ 2026-10-05 迁移（docs/14 P3）：折叠泳道已被**分区条**取代 —— 断言意图不变
         //   （"一屏只呈现一块，不要回到平铺"），选择器从 .ant-collapse-item-active 换到 .ds-sec.on。
         const sec = await vc.page.evaluate(() => {

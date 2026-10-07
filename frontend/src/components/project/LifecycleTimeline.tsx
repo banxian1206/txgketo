@@ -111,10 +111,17 @@ export default function LifecycleTimeline({ data }: { data: ProjectLifecycle | n
     const laneCount = Math.max(1, ...placed.map((x) => x.lane + 1))
 
     // ── 坐标：主体（商机记录 → 交付截止）占 89%，质保固定尾巴 ──
-    const mainEnds = placed.length ? placed.map((x) => x.be) : [today.valueOf()]
-    const min = Math.min(created ?? Infinity, ...mainEnds, today.valueOf())
-    const mainEnd = ddl ?? Math.max(...mainEnds)
-    const max = Math.max(wE ?? mainEnd, today.valueOf())
+    // ⚠ 两个曾经写错的地方（2026-10-07 实测 TX26005 抓到）：
+    //   ① 范围起点必须取**里程碑的开始日**，不是结束日 —— 取错的话，
+    //      开始得最早的节点会算成负坐标，**条跑到容器外面去**（客户反馈「超出整个生命周期宽度」）。
+    //   ② 范围终点还要盖住「最后一个节点结束日」：节点可以晚于交付截止（那正是拖期），
+    //      只按 deadline 取会把它们挤到尾巴区。
+    const starts = placed.map((x) => x.bs)
+    const ends = placed.map((x) => x.be)
+    const allPts = [...starts, ...ends].filter((v): v is number => v !== null)
+    const min = Math.min(...[created, ...allPts, today.valueOf()].filter((v): v is number => v !== null))
+    const mainEnd = Math.max(ddl ?? min, ...allPts, today.valueOf())
+    const max = Math.max(wE ?? mainEnd, mainEnd, today.valueOf())
     const CONTENT = 1 - PAD * 2
     const MAIN = CONTENT * (1 - WARRT)
     const L = (t: number) =>
@@ -122,6 +129,8 @@ export default function LifecycleTimeline({ data }: { data: ProjectLifecycle | n
         ? (PAD + ((t - min) / Math.max(1, mainEnd - min)) * MAIN) * 100
         : (PAD + MAIN + ((t - mainEnd) / Math.max(1, max - mainEnd)) * (CONTENT - MAIN)) * 100
     const toPx = (t: number) => (L(t) / 100) * w
+    // 条形永远画在范围内（超出部分靠 tooltip 给真实日期）——防御性：数据脏了也不溢出
+    const clampPct = (p: number) => Math.max(PAD * 100, Math.min((PAD + CONTENT) * 100, p))
 
     // ── 事件轨：同日合并 → 错排 ──
     const raw: { t: number; name: string; cls: string }[] = []
@@ -195,6 +204,9 @@ export default function LifecycleTimeline({ data }: { data: ProjectLifecycle | n
       mainEnd,
       max,
       L,
+      clampPct,
+      MAIN,
+      CONTENT,
       placed,
       laneCount,
       evs,
@@ -214,7 +226,7 @@ export default function LifecycleTimeline({ data }: { data: ProjectLifecycle | n
   if (!model) return <div className="ds-life" ref={boxRef} style={{ height: 8 }} />
 
   const {
-    today, min, max, L, placed, laneCount, evs, evRows, payLabels, payRows, payCls, ticks, lateN, nowN, wS, wE,
+    today, min, max, L, clampPct, MAIN, CONTENT, placed, laneCount, evs, evRows, payLabels, payRows, payCls, ticks, lateN, nowN, wS, wE,
   } = model
   const inRange = today >= min && today <= max
 
@@ -273,14 +285,16 @@ export default function LifecycleTimeline({ data }: { data: ProjectLifecycle | n
           <div key={i} className={`row${i % 2 ? ' is-alt' : ''}`} style={{ top: i * LANE }} />
         ))}
         {placed.map((x) => {
-          const wPct = Math.max(L(x.be) - L(x.bs), 1.1)
+          const l = clampPct(L(x.bs))
+          const r = clampPct(L(x.be))
+          const wPct = Math.max(r - l, 1.1)
           const wpx = (wPct / 100) * w
           const days = Math.round((x.be - x.bs) / 86400000)
           return (
             <div
               key={x.m.seq}
               className={`ds-life-bar ${STATE_CLS[x.m.state] ?? 'is-idle'}`}
-              style={{ left: `${L(x.bs)}%`, width: `${wPct}%`, top: 3 + x.lane * LANE }}
+              style={{ left: `${l}%`, width: `${wPct}%`, top: 3 + x.lane * LANE }}
               tabIndex={0}
               aria-label={`${x.m.name} ${x.m.state}：计划 ${dayjs(x.bs).format('MM/DD')} 到 ${dayjs(x.be).format('MM/DD')}，${days} 天`}
             >
@@ -306,7 +320,7 @@ export default function LifecycleTimeline({ data }: { data: ProjectLifecycle | n
         {wS !== null && wE !== null && (
           <div
             className="ds-life-bar is-warr"
-            style={{ left: `${(PAD + 1 - (1 - WARRT)) * 100}%`, width: `${(1 - PAD * 2) * WARRT * 100}%`, top: 3 + laneCount * LANE }}
+            style={{ left: `${(PAD + MAIN) * 100}%`, width: `${(CONTENT - MAIN) * 100}%`, top: 3 + laneCount * LANE }}
             tabIndex={0}
             aria-label={`质保期 ${dayjs(wS).format('YY/MM/DD')} 到 ${dayjs(wE).format('YY/MM/DD')}`}
           >
