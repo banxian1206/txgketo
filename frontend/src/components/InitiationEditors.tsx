@@ -74,6 +74,8 @@ export function TeamEditor({ projectNo, users, onChanged }: Props) {
   }
 
   return (
+    <>
+    <Typography.Paragraph type="secondary">选择人员后立即保存；同一个人可在不同项目担任不同角色。</Typography.Paragraph>
     <Table
       rowKey="project_role"
       size="small"
@@ -106,17 +108,9 @@ export function TeamEditor({ projectNo, users, onChanged }: Props) {
             />
           ),
         },
-        {
-          title: '说明',
-          dataIndex: 'remark',
-          render: () => (
-            <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-              同一个人可以在不同项目担任不同角色
-            </Typography.Text>
-          ),
-        },
       ]}
     />
+    </>
   )
 }
 

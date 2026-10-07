@@ -72,7 +72,7 @@ export default function WorkbenchPage({
     defaultTabFor(board, position),
   )
   const def = visible.find((t) => t.key === tab) ?? visible[0]
-  // 体交给 SectionNav 渲染（它统一负责 `.ds-sec-body` 这张纸、空分区文案、切区回顶部）
+  // 体交给 SectionNav 渲染（它统一负责 `.ds-sec-body` 这张纸、空分区文案与稳定的页内切换）
   const sections = visible.map((t) => ({
     key: t.key,
     label: tabLabel(t, counts),

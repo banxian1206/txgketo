@@ -141,7 +141,7 @@ export default function ProjectFormFields({
     <>
       <Group sec="basic" title="① 基本信息">
         <Row gutter={16}>
-          <Col span={10}>
+          <Col xs={24} md={10}>
             <Form.Item
               name="project_name"
               label="项目名称"
@@ -150,7 +150,7 @@ export default function ProjectFormFields({
               <Input placeholder="如：美的 110 寸 TV 总装线" />
             </Form.Item>
           </Col>
-          <Col span={7}>
+          <Col xs={24} md={7}>
             <Form.Item name="deal_mode" label="项目方式">
               <Select
                 allowClear
@@ -162,7 +162,7 @@ export default function ProjectFormFields({
               />
             </Form.Item>
           </Col>
-          <Col span={7}>
+          <Col xs={24} md={7}>
             <Form.Item name="source" label="线索来源">
               <Select
                 allowClear
@@ -171,7 +171,7 @@ export default function ProjectFormFields({
               />
             </Form.Item>
           </Col>
-          <Col span={24}>
+          <Col xs={24} md={24}>
             <Form.Item
               name="project_desc"
               label="项目描述"
@@ -185,7 +185,7 @@ export default function ProjectFormFields({
 
       <Group sec="customer" title="② 客户信息">
         <Row gutter={16}>
-          <Col span={10}>
+          <Col xs={24} md={10}>
             <Form.Item
               name="customer_name"
               label="客户名称"
@@ -216,42 +216,44 @@ export default function ProjectFormFields({
               {(fields, { add, remove }, { errors }) => (
                 <>
                   {fields.map((field) => (
-                    <Row key={field.key} gutter={8} align="middle" style={{ marginTop: 8 }}>
-                      <Col span={3}>
+                    <Row key={field.key} gutter={[8, 12]} align="top" style={{ marginTop: 16 }}>
+                      <Col xs={24} md={3}>
                         <Form.Item
                           name={[field.name, 'name']}
+                          label="姓名"
                           style={{ marginBottom: 0 }}
                           rules={field.name === 0 ? [{ required: true, message: '填姓名' }] : undefined}
                         >
                           <Input placeholder="姓名" />
                         </Form.Item>
                       </Col>
-                      <Col span={3}>
-                        <Form.Item name={[field.name, 'title']} style={{ marginBottom: 0 }}>
+                      <Col xs={24} md={3}>
+                        <Form.Item name={[field.name, 'title']} label="职务" style={{ marginBottom: 0 }}>
                           <Input placeholder="职务" />
                         </Form.Item>
                       </Col>
-                      <Col span={4}>
+                      <Col xs={24} md={4}>
                         <Form.Item
                           name={[field.name, 'phone']}
+                          label="电话"
                           style={{ marginBottom: 0 }}
                           rules={field.name === 0 ? [{ required: true, message: '填电话' }] : undefined}
                         >
                           <Input placeholder="电话" />
                         </Form.Item>
                       </Col>
-                      <Col span={4}>
-                        <Form.Item name={[field.name, 'wechat']} style={{ marginBottom: 0 }}>
+                      <Col xs={24} md={4}>
+                        <Form.Item name={[field.name, 'wechat']} label="微信" style={{ marginBottom: 0 }}>
                           <Input placeholder="微信" />
                         </Form.Item>
                       </Col>
-                      <Col span={5}>
-                        <Form.Item name={[field.name, 'email']} style={{ marginBottom: 0 }}>
+                      <Col xs={24} md={5}>
+                        <Form.Item name={[field.name, 'email']} label="邮箱" style={{ marginBottom: 0 }}>
                           <Input placeholder="邮箱" />
                         </Form.Item>
                       </Col>
-                      <Col span={4}>
-                        <Form.Item name={[field.name, 'role_tag']} style={{ marginBottom: 0 }}>
+                      <Col xs={24} md={4}>
+                        <Form.Item name={[field.name, 'role_tag']} label="角色" style={{ marginBottom: 0 }}>
                           <Select
                             allowClear
                             placeholder="角色"
@@ -263,8 +265,8 @@ export default function ProjectFormFields({
                           />
                         </Form.Item>
                       </Col>
-                      <Col span={1}>
-                        <a onClick={() => remove(field.name)}>删</a>
+                      <Col xs={24} md={1}>
+                        <Button type="link" style={{ padding: 0 }} aria-label={`删除第 ${field.name + 1} 位联系人`} onClick={() => remove(field.name)}>删除</Button>
                       </Col>
                     </Row>
                   ))}
@@ -281,7 +283,7 @@ export default function ProjectFormFields({
 
       <Group sec="require" title="③ 项目要求">
         <Row gutter={16}>
-          <Col span={7}>
+          <Col xs={24} md={7}>
             <Form.Item
               name="site_address"
               label="项目地点（客户工厂）"
@@ -291,22 +293,22 @@ export default function ProjectFormFields({
               <Input placeholder="如：佛山顺德" />
             </Form.Item>
           </Col>
-          <Col span={5}>
+          <Col xs={24} md={5}>
             <Form.Item name="product_type" label="客户产品类型">
               <Input placeholder="如：110 寸 TV" />
             </Form.Item>
           </Col>
-          <Col span={4}>
+          <Col xs={24} md={4}>
             <Form.Item name="required_cycle" label="要求节拍">
               <Input placeholder="如：25 秒/台" />
             </Form.Item>
           </Col>
-          <Col span={4}>
+          <Col xs={24} md={4}>
             <Form.Item name="required_capacity" label="要求产能">
               <Input placeholder="如：150 台/天" />
             </Form.Item>
           </Col>
-          <Col span={4}>
+          <Col xs={24} md={4}>
             <Form.Item
               name="is_retrofit"
               label="旧线改造"
@@ -325,7 +327,7 @@ export default function ProjectFormFields({
         hint="商机截止 ≠ 项目交期：前者是客户要求何时定下来，后者是签约后干多少天"
       >
         <Row gutter={16}>
-          <Col span={6}>
+          <Col xs={24} md={6}>
             <Form.Item
               name="deadline"
               label="商机截止时间"
@@ -335,7 +337,7 @@ export default function ProjectFormFields({
               <DatePicker style={{ width: '100%' }} />
             </Form.Item>
           </Col>
-          <Col span={5}>
+          <Col xs={24} md={5}>
             <Form.Item
               name="delivery_days"
               label="项目交期（天）"
@@ -344,12 +346,12 @@ export default function ProjectFormFields({
               <InputNumber style={{ width: '100%' }} min={1} max={3650} suffix="天" />
             </Form.Item>
           </Col>
-          <Col span={5}>
+          <Col xs={24} md={5}>
             <Form.Item name="expect_sign_date" label="预计签单时间">
               <DatePicker style={{ width: '100%' }} />
             </Form.Item>
           </Col>
-          <Col span={8}>
+          <Col xs={24} md={8}>
             <Form.Item name="est_amount" label="预计金额（元）">
               <InputNumber
                 style={{ width: '100%' }}
@@ -359,7 +361,7 @@ export default function ProjectFormFields({
               />
             </Form.Item>
           </Col>
-          <Col span={6}>
+          <Col xs={24} md={6}>
             <Form.Item
               name="performance_deposit"
               label="履约保证金（元）"
@@ -368,7 +370,7 @@ export default function ProjectFormFields({
               <InputNumber style={{ width: '100%' }} min={0} step={10000} placeholder="选填" />
             </Form.Item>
           </Col>
-          <Col span={6}>
+          <Col xs={24} md={6}>
             <Form.Item
               name="performance_deposit_return_date"
               label="保证金预计退还"
@@ -377,7 +379,7 @@ export default function ProjectFormFields({
               <DatePicker style={{ width: '100%' }} />
             </Form.Item>
           </Col>
-          <Col span={5}>
+          <Col xs={24} md={5}>
             <Form.Item
               name="performance_deposit_returned"
               label="是否已退还"
@@ -398,7 +400,7 @@ export default function ProjectFormFields({
 
       <Group sec="follow" title="⑥ 商务跟进" hint="内部用">
         <Row gutter={16}>
-          <Col span={6}>
+          <Col xs={24} md={6}>
             <Form.Item
               name="sales_id"
               label="销售负责人"
@@ -412,12 +414,12 @@ export default function ProjectFormFields({
               />
             </Form.Item>
           </Col>
-          <Col span={6}>
+          <Col xs={24} md={6}>
             <Form.Item name="competitor" label="竞争对手">
               <Input placeholder="选填" />
             </Form.Item>
           </Col>
-          <Col span={12}>
+          <Col xs={24} md={12}>
             <Form.Item
               name="related_project_no"
               label="关联历史项目"
@@ -435,7 +437,7 @@ export default function ProjectFormFields({
               />
             </Form.Item>
           </Col>
-          <Col span={24}>
+          <Col xs={24} md={24}>
             <Form.Item name="risk_note" label="风险标记">
               <Input placeholder="付款条件差 / 交期极紧 / 客户信誉不明 …" />
             </Form.Item>
@@ -446,37 +448,37 @@ export default function ProjectFormFields({
       {withDeal && (
         <Group title="⑦ 成交信息" hint="签约后填；付款节点与质保金在「成交登记」里维护">
           <Row gutter={16}>
-            <Col span={6}>
+            <Col xs={24} md={6}>
               <Form.Item name="amount" label="合同金额（元）">
                 <InputNumber style={{ width: '100%' }} min={0} step={100000} />
               </Form.Item>
             </Col>
-            <Col span={4}>
+            <Col xs={24} md={4}>
               <Form.Item name="amount_tax_incl" label="金额口径" valuePropName="checked">
                 <Switch checkedChildren="含税" unCheckedChildren="不含税" />
               </Form.Item>
             </Col>
-            <Col span={5}>
+            <Col xs={24} md={5}>
               <Form.Item name="period_start" label="合同签订日">
                 <DatePicker style={{ width: '100%' }} />
               </Form.Item>
             </Col>
-            <Col span={5}>
+            <Col xs={24} md={5}>
               <Form.Item name="period_end" label="合同交期">
                 <DatePicker style={{ width: '100%' }} />
               </Form.Item>
             </Col>
-            <Col span={4}>
+            <Col xs={24} md={4}>
               <Form.Item name="warranty_months" label="质保期（月）">
                 <InputNumber style={{ width: '100%' }} min={0} suffix="月" />
               </Form.Item>
             </Col>
-            <Col span={8}>
+            <Col xs={24} md={8}>
               <Form.Item name="contract_no_customer" label="客户合同号">
                 <Input placeholder="选填" />
               </Form.Item>
             </Col>
-            <Col span={6}>
+            <Col xs={24} md={6}>
               <Form.Item
                 name="tech_agreement_frozen"
                 label="技术协议冻结"

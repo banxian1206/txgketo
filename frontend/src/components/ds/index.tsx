@@ -14,6 +14,7 @@
  */
 import type { CSSProperties, ReactNode } from 'react'
 import { Link } from 'react-router-dom'
+import { Tooltip } from 'antd'
 
 import { FS, T } from '../../theme/tokens'
 
@@ -105,9 +106,9 @@ export function PageHead({
                 ② 实测会污染 e2e 的 getByRole('button', {name:/申请客户验收/}) 查找
                 （帮助文案里恰好含这个词 → 抢先把「?」当成目标按钮，导致 P-13a/b 假红）。 */}
             {help && (
-              <button type="button" className="ds-help" title={help} aria-label="帮助" style={{ marginLeft: 8, verticalAlign: 3 }}>
-                ?
-              </button>
+              <Tooltip title={help} trigger={['hover', 'focus', 'click']}>
+                <button type="button" className="ds-help ds-head-help" aria-label="帮助">?</button>
+              </Tooltip>
             )}
           </h1>
           {sub && <div className="sub">{sub}</div>}
@@ -142,9 +143,9 @@ export function Panel({
           {title && <h3>{title}</h3>}
           {sub && <span className="sub">{sub}</span>}
           {help && (
-            <button type="button" className="ds-help" title={help} aria-label="帮助">
-              ?
-            </button>
+            <Tooltip title={help} trigger={['hover', 'focus', 'click']}>
+              <button type="button" className="ds-help" aria-label="帮助">?</button>
+            </Tooltip>
           )}
           {extra && <div className="act">{extra}</div>}
         </header>

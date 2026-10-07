@@ -73,52 +73,52 @@ export default function DealModals({
         styles={{ body: { maxHeight: '68vh', overflowY: 'auto', paddingRight: 8 } }}
       >
           <Row gutter={12}>
-            <Col span={6}>
+            <Col xs={24} md={6}>
               <Form.Item name="period_start" label="合同签订日" rules={[{ required: true, message: '必填' }]}>
                 <DatePicker style={{ width: '100%' }} />
               </Form.Item>
             </Col>
-            <Col span={6}>
+            <Col xs={24} md={6}>
               <Form.Item name="period_end" label="合同交期" rules={[{ required: true, message: '必填' }]}>
                 <DatePicker style={{ width: '100%' }} />
               </Form.Item>
             </Col>
-            <Col span={6}>
+            <Col xs={24} md={6}>
               <Form.Item name="amount" label="合同金额（元）" rules={[{ required: true, message: '必填' }]}>
                 <InputNumber style={{ width: '100%' }} min={0} step={100000} />
               </Form.Item>
             </Col>
-            <Col span={6}>
+            <Col xs={24} md={6}>
               <Form.Item name="warranty_months" label="质保期（月）" rules={[{ required: true, message: '必填' }]}>
                 <InputNumber style={{ width: '100%' }} min={0} suffix="月" />
               </Form.Item>
             </Col>
-            <Col span={8}>
+            <Col xs={24} md={8}>
               <Form.Item name="contract_no_customer" label="客户合同号">
                 <Input placeholder="选填" />
               </Form.Item>
             </Col>
-            <Col span={8}>
+            <Col xs={24} md={8}>
               <Form.Item name="acceptance_standard" label="验收标准">
                 <Input placeholder="如：节拍 22 秒/台，连续运行 72 小时" />
               </Form.Item>
             </Col>
-            <Col span={8}>
+            <Col xs={24} md={8}>
               <Form.Item name="designated_brand" label="甲方指定品牌 / 供应商">
                 <Input placeholder="如：PLC 指定西门子；机器人指定 ABB" />
               </Form.Item>
             </Col>
-            <Col span={8}>
+            <Col xs={24} md={8}>
               <Form.Item name="delivery_mode" label="交货方式与地点">
                 <Input placeholder="厂内提货 / 送货到厂 / 到场安装" />
               </Form.Item>
             </Col>
-            <Col span={8}>
+            <Col xs={24} md={8}>
               <Form.Item name="site_condition" label="客户现场接收条件">
                 <Input placeholder="水电气 / 地坪 / 通道 / 进场时间窗" />
               </Form.Item>
             </Col>
-            <Col span={8}>
+            <Col xs={24} md={8}>
               <Form.Item name="penalty_note" label="交期与违约条款">
                 <Input placeholder="如：逾期每天按合同额 0.5‰ 计罚" />
               </Form.Item>
@@ -162,24 +162,25 @@ export default function DealModals({
             {(fields, { add, remove }, { errors }) => (
               <>
                 {fields.map((field) => (
-                  <Row key={field.key} gutter={8} align="middle">
-                    <Col span={6}>
+                  <Row key={field.key} gutter={[8, 12]} align="top" className="deal-payment-row">
+                    <Col xs={24} md={6}>
                       <Form.Item
                         name={[field.name, 'node_name']}
+                        label="付款节点"
                         style={{ marginBottom: 0 }}
                         rules={[{ required: true, message: '填节点名' }]}
                       >
                         <Input placeholder="节点名，如 预付款" />
                       </Form.Item>
                     </Col>
-                    <Col span={4}>
-                      <Form.Item name={[field.name, 'percent']}>
+                    <Col xs={24} md={4}>
+                      <Form.Item name={[field.name, 'percent']} label="比例（%）">
                         <InputNumber style={{ width: '100%' }} min={0} max={100} suffix="%" />
                       </Form.Item>
                     </Col>
                     {/* ★ G2：这个款跟哪个业务节点对上（到了就提醒商务部收款）；不选则按节点名自动推断 */}
-                    <Col span={4}>
-                      <Form.Item name={[field.name, 'trigger_node']}>
+                    <Col xs={24} md={4}>
+                      <Form.Item name={[field.name, 'trigger_node']} label="对齐业务节点">
                         <Select
                           allowClear
                           placeholder="对齐节点"
@@ -193,13 +194,13 @@ export default function DealModals({
                         />
                       </Form.Item>
                     </Col>
-                    <Col span={8}>
-                      <Form.Item name={[field.name, 'condition']}>
+                    <Col xs={24} md={8}>
+                      <Form.Item name={[field.name, 'condition']} label="付款条件">
                         <Input placeholder="触发条件" />
                       </Form.Item>
                     </Col>
-                    <Col span={2}>
-                      <a onClick={() => remove(field.name)}>删除</a>
+                    <Col xs={24} md={2}>
+                      <Button type="text" aria-label={`删除第 ${field.name + 1} 个付款节点`} onClick={() => remove(field.name)}>删除</Button>
                     </Col>
                   </Row>
                 ))}
@@ -265,12 +266,12 @@ export default function DealModals({
         }
       >
           <Row gutter={12}>
-            <Col span={12}>
+            <Col xs={24} md={12}>
               <Form.Item name="name" label="姓名" rules={[{ required: true, message: '请输入姓名' }]}>
                 <Input />
               </Form.Item>
             </Col>
-            <Col span={12}>
+            <Col xs={24} md={12}>
               <Form.Item name="role_tag" label="角色">
                 <Select
                   allowClear
@@ -282,22 +283,22 @@ export default function DealModals({
                 />
               </Form.Item>
             </Col>
-            <Col span={12}>
+            <Col xs={24} md={12}>
               <Form.Item name="title" label="职务">
                 <Input />
               </Form.Item>
             </Col>
-            <Col span={12}>
+            <Col xs={24} md={12}>
               <Form.Item name="phone" label="电话">
                 <Input />
               </Form.Item>
             </Col>
-            <Col span={12}>
+            <Col xs={24} md={12}>
               <Form.Item name="wechat" label="微信">
                 <Input />
               </Form.Item>
             </Col>
-            <Col span={12}>
+            <Col xs={24} md={12}>
               <Form.Item name="email" label="邮箱">
                 <Input />
               </Form.Item>

@@ -781,3 +781,26 @@ code,
 .ds-subtabs.ds-grp .ds-grp-t::before {
   content: ""; width: 3px; height: 10px; border-radius: 2px; background: var(--ds-line2); flex: none;
 }
+
+/* 精调第一批：头部不挤压正文；窄屏指标保留原顺序、横向查阅，不挤成竖字。 */
+.ds-head > div:first-child { flex: 1; min-width: 0; }
+.ds-head .act { flex-wrap: wrap; }
+.ds-head-help { margin-left: 8px; vertical-align: 3px; }
+.ds-help:focus-visible, .ds-sec:focus-visible, .ds-metric:focus-visible {
+  outline: 2px solid var(--ds-acc); outline-offset: -2px;
+}
+@media (max-width: 640px) {
+  .ds-head { flex-direction: column; align-items: stretch; gap: 12px; }
+  .ds-head .sub { white-space: normal; overflow-wrap: anywhere; }
+  .ds-head .act { margin-left: 0; }
+  .ds-head .act .ant-btn { min-height: 40px; }
+  .ds-metrics { overflow-x: auto; overscroll-behavior-x: contain; }
+  .ds-metrics .ds-metric { flex: 1 0 132px; min-width: 132px; }
+  .ds-panel-h { flex-wrap: wrap; gap: 8px; }
+  .ds-panel-h h3 { flex: 1; min-width: 0; }
+  .ds-panel-h .sub { flex-basis: 100%; }
+  .ds-subtabs { overflow-x: auto; max-width: 100%; }
+  .ds-subtabs .ant-segmented { flex-shrink: 0; }
+  .ds-subtabs .ant-segmented-item-label { min-height: 40px; display: flex; align-items: center; }
+  .ds-sec { min-height: 40px; }
+}

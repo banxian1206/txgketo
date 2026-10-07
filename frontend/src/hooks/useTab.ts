@@ -27,7 +27,8 @@ export function useTab(
       const base = new URLSearchParams(sp)
       if (key === (fallback ?? first)) base.delete('tab')
       else base.set('tab', key)
-      setSp(base, { replace: true })
+      if (base.toString() === sp.toString()) return
+      setSp(base, { replace: true, preventScrollReset: true })
     },
     [sp, setSp, fallback, first],
   )

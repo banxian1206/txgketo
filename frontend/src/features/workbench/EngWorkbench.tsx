@@ -301,7 +301,7 @@ export default function EngWorkbench() {
 
               <Row gutter={12}>
                 <Col xs={24} lg={12}>
-                  <Panel title="待我终审">
+                  <Panel title="部门待终审">
                     <Table
                       rowKey="id"
                       size="small"
@@ -322,7 +322,7 @@ export default function EngWorkbench() {
                   </Panel>
                 </Col>
                 <Col xs={24} lg={12}>
-                  <Panel title="待我裁决的改版">
+                  <Panel title="部门待裁决改版">
                     <Table
                       rowKey="id"
                       size="small"
@@ -378,11 +378,9 @@ export default function EngWorkbench() {
         sub={
           // ★ 方向 2 ①：原来 sub 写的是 40 字的流程叙述（“设计任务 → 提交评审 → 经理一级审 → …”），
           //   第一屏就是一段要读的话；现在 sub 只报现状 + 异常，全文进 ? 气泡。
-          (board?.summary.pending_reviews ?? 0) > 0 || (board?.summary.pending_changes ?? 0) > 0
-            ? `待审 ${board?.summary.pending_reviews ?? 0} 张${(board?.summary.pending_changes ?? 0) > 0 ? ` · 待裁决改版 ${board?.summary.pending_changes} 张` : ''}`
-            : (board?.summary.blocked ?? 0) > 0
-              ? `没有等你审的单 · ${board?.summary.blocked} 台设备卡住`
-              : `本部门 ${board?.summary.equipments ?? 0} 台设备 · 没有等你审的单`
+          todoTickets.length > 0
+            ? `当前审核队列 ${todoTickets.length} 张待你处理`
+            : `当前没有待你审核的评审单 · 我的任务 ${myTasks.length} 项`
         }
         help="设计任务 → 提交评审 → 经理一级审 → 总监二级审 → 发布（冻结，自动触发采购）；改版走 ECN，不能私下改图。上面的数字可点，点了切到对应队列。"
         actions={
@@ -396,11 +394,11 @@ export default function EngWorkbench() {
           board: board?.summary.blocked ?? 0,
         }}
         metrics={[
-          // ★ 方向 2 ② 主角指认：工程台主角 = **待我审 / 待终审**：审一张单会解开一串任务，而自己的任务是并行的一堆。（ds `MetricItem.lead`）
+          // 本人审核数量与 team 分区的实际队列同源；部门改版量明确标注范围并进入部门分区。
           { key: 'mine', label: '我的任务', value: myTasks.length, unit: '项', tone: myTasks.length ? 'warn' : undefined, dimZero: true, to: '?tab=mine' },
           { key: 'blocked', label: '卡住的任务', value: myTasks.filter((t) => t.blocked).length, unit: '项', tone: 'err', dimZero: true, to: '?tab=mine' },
-          { key: 'review', label: '待我审 / 待终审', value: board?.summary.pending_reviews ?? 0, unit: '张', tone: (board?.summary.pending_reviews ?? 0) > 0 ? 'warn' : undefined, dimZero: true, to: '?tab=team', lead: true },
-          { key: 'change', label: '待我裁决改版', value: board?.summary.pending_changes ?? 0, unit: '张', tone: (board?.summary.pending_changes ?? 0) > 0 ? 'warn' : undefined, dimZero: true, to: '?tab=team' },
+          { key: 'review', label: '待我审核', value: todoTickets.length, unit: '张', tone: todoTickets.length > 0 ? 'warn' : undefined, dimZero: true, to: '?tab=team', lead: true },
+          { key: 'change', label: '部门待裁决改版', value: board?.summary.pending_changes ?? 0, unit: '张', tone: (board?.summary.pending_changes ?? 0) > 0 ? 'warn' : undefined, dimZero: true, to: '?tab=board' },
           { key: 'equip', label: '卡住设备', value: board?.summary.blocked ?? 0, unit: '台', tone: (board?.summary.blocked ?? 0) > 0 ? 'err' : undefined, dimZero: true, to: '?tab=board' },
         ]}
       >

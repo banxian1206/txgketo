@@ -1,4 +1,4 @@
-import { App, Button, Checkbox, Form, Input, Spin, Typography } from 'antd'
+import { Alert, App, Button, Checkbox, Form, Input, Spin, Typography } from 'antd'
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
@@ -18,6 +18,7 @@ import { clearCredential, clearManualLogout, isManualLogout, readCredential, rea
  */
 export default function Login() {
   const [loading, setLoading] = useState(false)
+  const [loginError, setLoginError] = useState<string | null>(null)
   const nav = useNavigate()
   const { message } = App.useApp()
   const { login } = useAuth()
@@ -104,9 +105,11 @@ export default function Login() {
               <p className="login-sub">使用管理员分配的账号访问系统</p>
               <Form
                 form={form}
+                onValuesChange={() => setLoginError(null)}
                 layout="vertical"
                 onFinish={async (v) => {
                   setLoading(true)
+                  setLoginError(null)
                   try {
                     // 记住密码：偏好始终持久化；勾选才留凭据（取消勾选 = 主动清除）
                     saveRememberPref(remember)
@@ -117,14 +120,14 @@ export default function Login() {
                     await login(v.username, v.password)
                     goAfterLogin()
                   } catch (e) {
-                    message.error(errMsg(e))
+                    setLoginError(errMsg(e))
                   } finally {
                     setLoading(false)
                   }
                 }}
               >
                 <Form.Item name="username" label="账号" rules={[{ required: true, message: '请输入账号' }]}>
-                  <Input size="large" placeholder="admin" autoComplete="username" />
+                  <Input size="large" placeholder="请输入账号" autoComplete="username" />
                 </Form.Item>
                 <Form.Item name="password" label="密码" rules={[{ required: true, message: '请输入密码' }]}>
                   <Input.Password size="large" autoComplete="current-password" />
@@ -137,6 +140,7 @@ export default function Login() {
                     记住密码，本机下次自动登录
                   </Checkbox>
                 </div>
+                {loginError && <Alert className="login-error" type="error" showIcon role="alert" message={loginError} />}
                 <Button type="primary" htmlType="submit" size="large" block loading={loading}>
                   登录
                 </Button>
@@ -150,9 +154,9 @@ export default function Login() {
               <Typography.Text type="secondary" style={{ marginTop: 16 }}>
                 正在自动登录…
               </Typography.Text>
-              <a className="login-switch" onClick={switchAccount}>
+              <button type="button" className="login-switch" onClick={switchAccount}>
                 使用其他账号
-              </a>
+              </button>
             </div>
           )}
         </div>

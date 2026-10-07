@@ -1,0 +1,508 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>职责体验样稿 · 同兴高科</title>
+<style>
+:root{--blue:#1f5fd0;--line:#e7ebf0;--muted:#667085;--ink:#202b3c;--paper:#fff;--bg:#f6f8fb}*{box-sizing:border-box}body{margin:0;font:14px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI","Microsoft YaHei",sans-serif;color:var(--ink);background:var(--bg)}button{font:inherit;cursor:pointer}button:focus-visible{outline:3px solid #9dc0ff;outline-offset:3px}.reviewbar{background:#eaf1ff;padding:12px 24px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;border-bottom:1px solid #ccdafa}.reviewbar strong{font-size:13px}.roles{display:flex;gap:6px;flex-wrap:wrap}.roles button{border:1px solid transparent;background:transparent;border-radius:6px;padding:7px 12px;color:#43566d}.roles button[aria-pressed=true]{background:white;border-color:#b5cdf7;color:var(--blue);font-weight:600}.reviewbar small{margin-left:auto;color:#52647e}.layout{display:grid;grid-template-columns:210px 1fr;min-height:calc(100vh - 69px)}aside{border-right:1px solid var(--line);background:white;padding:25px 16px}.brand{font-size:20px;font-weight:750;letter-spacing:-.5px;margin:0 12px}.brand span{color:var(--blue)}.company{font-size:11px;color:var(--muted);margin:0 12px 32px}.identity{padding:12px;background:var(--bg);border-radius:8px;margin-bottom:24px}.identity strong{display:block}.identity small{color:var(--muted)}nav{display:grid;gap:4px}nav button{border:0;background:white;text-align:left;padding:11px 14px;border-radius:6px;color:#506176}nav button[aria-current=page]{color:var(--blue);background:#edf3ff;font-weight:600}.navhelp{font-size:12px;color:var(--muted);padding:16px 12px}main{min-width:0}.topline{height:60px;background:white;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;padding:0 32px;font-size:12px;color:var(--muted)}.topline button{border:0;color:var(--blue);background:none;padding:8px}.content{max-width:1120px;margin:0 auto;padding:28px 32px}.eyebrow{color:var(--muted);font-size:12px;margin:0 0 4px}h1{font-size:26px;line-height:1.4;margin:0 0 8px;letter-spacing:-.4px}h2{font-size:16px;margin:0}h3{font-size:15px;margin:0 0 5px}.intro{color:var(--muted);margin:0 0 22px}.scope{display:flex;gap:10px;flex-wrap:wrap;align-items:center;font-size:12px;border-bottom:1px solid var(--line);padding-bottom:20px;margin-bottom:22px}.scope b{font-weight:500;background:#eaf1ff;padding:3px 8px;border-radius:4px;color:var(--blue)}.columns{display:grid;grid-template-columns:minmax(0,1fr) 280px;gap:24px}.sheet{background:white;border:1px solid var(--line);border-radius:10px;overflow:hidden}.sheethead{padding:17px 20px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between}.sheethead small{color:var(--muted)}.item{padding:20px;border-bottom:1px solid var(--line)}.item:last-child{border:0}.itemtop{display:flex;justify-content:space-between;gap:12px}.tag{font-size:12px;color:#9a5b10;white-space:nowrap}.reference{font-size:12px;color:var(--muted);margin:6px 0}.why{margin:12px 0;color:#526176}.actionline{display:flex;justify-content:space-between;gap:12px;align-items:center}.actionline small{color:var(--muted)}.primary{border:1px solid var(--blue);color:white;background:var(--blue);border-radius:6px;padding:8px 15px}.secondary{border:1px solid var(--line);background:white;border-radius:6px;padding:8px 15px;color:#43536a}.sidebox{background:white;border:1px solid var(--line);border-radius:10px;padding:18px;margin-bottom:16px}.sidebox h2{margin-bottom:12px}.sidebox p{margin:0;color:#667085;font-size:13px}.handoff{margin-top:24px;padding:18px 20px;background:white;border:1px solid var(--line);border-radius:10px}.handoff h2{margin-bottom:13px}.chain{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.chain span{padding:5px 10px;border-radius:5px;color:var(--muted);font-size:12px;background:var(--bg)}.chain span.active{background:#edf3ff;color:var(--blue);font-weight:600}.designnotes{margin-top:20px;padding:18px;border:1px dashed #b8c9e5;border-radius:8px;background:#f0f5ff;color:#425670;font-size:13px}.designnotes[hidden]{display:none}.empty{padding:35px 20px;color:var(--muted)}dialog{border:1px solid var(--line);border-radius:12px;max-width:680px;width:calc(100% - 32px);padding:0;color:var(--ink);box-shadow:0 16px 70px #16305135}dialog::backdrop{background:#14233455}.dialoghead{padding:20px 24px;border-bottom:1px solid var(--line);display:flex;gap:16px;align-items:center;justify-content:space-between}.dialoghead button{padding:6px 12px;background:white;border:1px solid var(--line);border-radius:5px}.dialogbody{padding:24px;max-height:65vh;overflow:auto}.dialogbody p{margin-top:6px;color:#576579}.dialogbody ul{padding-left:20px;color:#576579}.note{font-size:12px;color:var(--muted);border-top:1px solid var(--line);padding-top:12px}
+@media(max-width:1000px){.columns{grid-template-columns:1fr}.rail{display:grid;grid-template-columns:1fr 1fr;gap:16px}.sidebox{margin:0}.layout{grid-template-columns:175px 1fr}.content{padding:24px}.reviewbar small{margin-left:0}}@media(max-width:640px){.layout{display:block}aside{padding:14px 16px;border-right:0;border-bottom:1px solid var(--line)}.brand,.company,.navhelp{display:none}.identity{padding:0;margin:0 0 12px;background:none}.identity small{display:block}nav{display:flex;overflow:auto;gap:6px}nav button{flex:none;padding:8px 12px}.topline{height:auto;min-height:45px;padding:10px 16px;gap:10px}.content{padding:20px 16px}h1{font-size:23px}.reviewbar{padding:12px 16px;gap:8px}.reviewbar small{width:100%}.rail{grid-template-columns:1fr}.itemtop{flex-wrap:wrap}.actionline{align-items:flex-start;flex-direction:column}.primary{min-height:44px}.sheethead{gap:8px;flex-wrap:wrap}.chain{gap:5px}.dialogbody{padding:18px}}
+.chain button[aria-pressed=true]{border-color:var(--blue);background:#edf3ff;color:var(--blue)}
+</style></head><body>
+<header class="reviewbar"><strong>职责体验样稿</strong><div class="roles" aria-label="方案角色对照"></div><small>示意数据 · 不连接业务接口 · 六角色对照 · 仅展开方案内容</small></header>
+<div class="layout"><aside><div class="brand">TX<span>AM</span></div><p class="company">同兴高科 · 项目管理系统</p><div class="identity"></div><nav aria-label="当前职责入口"></nav><div class="navhelp"></div></aside><main><div class="topline"><span id="breadcrumb"></span><button id="notes-toggle" aria-expanded="false">查看设计说明</button></div><div class="content"><p class="eyebrow" id="eyebrow"></p><h1 id="title"></h1><p class="intro" id="intro"></p><div class="scope"></div><div class="columns"><section class="sheet"><div class="sheethead"><h2 id="list-title"></h2><small id="list-note"></small></div><div id="items"></div></section><div class="rail"><section class="sidebox"><h2 id="context-title"></h2><p id="context"></p></section><section class="sidebox"><h2>交接给谁</h2><p id="receiver"></p></section></div></div><section class="handoff"><h2>这一段的责任交接</h2><div class="chain"></div></section><section class="designnotes" hidden></section></div></main></div>
+<dialog aria-labelledby="dialog-title"><div class="dialoghead"><h2 id="dialog-title"></h2><button id="close-dialog">关闭</button></div><div class="dialogbody"></div></dialog>
+<script>
+const profiles={
+  "sales": {
+    "name": "销售执行",
+    "identity": "销售执行 · 商务部",
+    "title": "我的业务跟进",
+    "scope": "本人负责的商机与商务事项",
+    "intro": "先处理客户跟进、成交资料和商务节点。",
+    "contextTitle": "工作依据",
+    "context": "客户要求、联系人、合同周期与技术约定。",
+    "receiver": "成交后由销售经理指定PM；销售继续跟踪客户与商务事项。",
+    "notes": "首页聚焦本人职责；相关项目链接可协作查看，金额按权限。销售/商务实际分岗待核对。",
+    "pages": [
+      {
+        "label": "需要跟进",
+        "items": [
+          {
+            "title": "输送设备项目 · 成交资料交接",
+            "ref": "示例项目 · 本人负责",
+            "state": "已成交 · PM未指定",
+            "why": "客户约定已登记，销售经理尚未指定PM。可继续补充资料，不能显示PM已接手。",
+            "next": "当前接手责任：销售经理",
+            "action": "查看成交交接",
+            "details": [
+              "成交依据：客户联系人、设备需求、技术约定、合同周期与回款节点。",
+              "PM未指定：由销售经理安排；销售执行不代为任命。",
+              "指定PM后仍保留销售跟进责任，项目启动由PM组织。",
+              "资料缺项展示具体内容，不新增交接审批或接单确认。"
+            ]
+          },
+          {
+            "title": "设备改造商机 · 补充技术需求",
+            "ref": "示例商机 · 本人负责",
+            "state": "需跟进",
+            "why": "客户尚未提供完整技术资料，查看已有记录与需要补充的内容。",
+            "next": "当前责任：销售执行",
+            "action": "查看客户依据",
+            "details": [
+              "联系人、需求资料及来源日期。",
+              "未登记约定显示“尚未登记”，不写成已确认。",
+              "进入具体商机补资料，保存结果仍可追溯。"
+            ]
+          }
+        ]
+      },
+      {
+        "label": "我的商机",
+        "items": [
+          {
+            "title": "输送设备项目 · 成交资料交接",
+            "ref": "示例项目 · 本人负责",
+            "state": "已成交 · PM未指定",
+            "why": "客户约定已登记，销售经理尚未指定PM。可继续补充资料，不能显示PM已接手。",
+            "next": "当前接手责任：销售经理",
+            "action": "查看成交交接",
+            "details": [
+              "成交依据：客户联系人、设备需求、技术约定、合同周期与回款节点。",
+              "PM未指定：由销售经理安排；销售执行不代为任命。",
+              "指定PM后仍保留销售跟进责任，项目启动由PM组织。",
+              "资料缺项展示具体内容，不新增交接审批或接单确认。"
+            ]
+          },
+          {
+            "title": "设备改造商机 · 补充技术需求",
+            "ref": "示例商机 · 本人负责",
+            "state": "需跟进",
+            "why": "客户尚未提供完整技术资料，查看已有记录与需要补充的内容。",
+            "next": "当前责任：销售执行",
+            "action": "查看客户依据",
+            "details": [
+              "联系人、需求资料及来源日期。",
+              "未登记约定显示“尚未登记”，不写成已确认。",
+              "进入具体商机补资料，保存结果仍可追溯。"
+            ]
+          }
+        ]
+      },
+      {
+        "label": "回款计划",
+        "items": [
+          {
+            "title": "输送设备项目 · 回款计划",
+            "ref": "示例款项节点 · 日期待定",
+            "state": "日期待定",
+            "why": "已有应收约定，但预计日期尚未登记；不把未回款统一称为到期。",
+            "next": "当前责任：商务跟进",
+            "action": "查看款项依据",
+            "details": [
+              "分别显示约定金额、已收、未收和预计日期。",
+              "计划、日期待定、到期、逾期分别表达。",
+              "这里是款项记录示意，没有收款或转账。"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "salesLead": {
+    "name": "销售经理",
+    "identity": "销售经理 · 商务部",
+    "title": "成交项目的接手安排",
+    "scope": "销售管理范围 · 未指定PM的成交项目",
+    "intro": "先安排没有PM的成交项目，再关注商务协调事项。",
+    "contextTitle": "工作依据",
+    "context": "客户约定、成交项目范围与可任命的PM。",
+    "receiver": "指定到具体PM，PM组织立项。",
+    "notes": "销售经理负责指定PM是用户已确认规则；当前正式入口未实施。管理范围与系统岗位映射需要落地核对。",
+    "pages": [
+      {
+        "label": "待指定PM",
+        "items": [
+          {
+            "title": "输送设备项目 · 指定项目经理",
+            "ref": "示例成交项目 · PM未指定",
+            "state": "轮到销售经理安排",
+            "why": "成交项目缺少项目经理，销售经理负责落实接手人。",
+            "next": "指定后：该PM组织立项",
+            "action": "查看指定PM方案",
+            "details": [
+              "先看成交约定与项目范围，再选择已有PM账号。",
+              "结果明确显示PM姓名和项目，跳转该项目交接记录。",
+              "未指定项留在销售经理队列，指定后退出该队列。",
+              "不新增PM接单确认或审批；任命权限和后端入口尚待实现。",
+              "此处只展开方案，不修改任何账号或业务数据。"
+            ]
+          }
+        ]
+      },
+      {
+        "label": "交接跟踪",
+        "items": [
+          {
+            "title": "输送设备项目 · PM已指定",
+            "ref": "示例项目 · PM：李工（示意）",
+            "state": "跟踪事项",
+            "why": "PM已明确，后续启动进展用于商务协调；这不是待销售经理执行的立项。",
+            "next": "当前执行责任：PM",
+            "action": "查看交接结果",
+            "details": [
+              "显示指定的PM及启动进展，不伪造接单状态。",
+              "销售经理可协作查看项目，立项主动作属于PM。",
+              "部门管理范围须由组织/职责核实，不能只判岗位=经理。"
+            ]
+          }
+        ]
+      },
+      {
+        "label": "商务协调",
+        "items": [
+          {
+            "title": "输送设备项目 · 回款计划",
+            "ref": "示例款项节点 · 日期待定",
+            "state": "日期待定",
+            "why": "已有应收约定，但预计日期尚未登记；不把未回款统一称为到期。",
+            "next": "当前责任：商务跟进",
+            "action": "查看款项依据",
+            "details": [
+              "分别显示约定金额、已收、未收和预计日期。",
+              "计划、日期待定、到期、逾期分别表达。",
+              "这里是款项记录示意，没有收款或转账。"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "pm": {
+    "name": "项目经理",
+    "identity": "PM · 本人负责项目",
+    "title": "项目启动与协调",
+    "scope": "本人负责项目；参与项目另作协作事项",
+    "intro": "明确工作范围与责任，发现需要协调的交接缺口。",
+    "contextTitle": "工作依据",
+    "context": "成交与技术基线、设备范围、团队、节点和有效发布。",
+    "receiver": "设备×专业主任务给专业经理；分批发布交给采购/工艺等下游。",
+    "notes": "本人负责与参与项目分开，保留协作可见。项目阶段、单据进展、异常同时展示。",
+    "pages": [
+      {
+        "label": "需要处理",
+        "items": [
+          {
+            "title": "输送设备项目 · 准备立项",
+            "ref": "示例项目 · 本人负责 / 设备01A",
+            "state": "待立项",
+            "why": "核对设备、项目对接人、节点计划和长周期件，再确认专业任务的去向。",
+            "next": "完成后：各专业经理收到主任务",
+            "action": "查看立项工作页",
+            "details": [
+              "台头：项目约定、本人职责和当前缺项，不堆全链零计数。",
+              "分区：设备范围、项目团队、节点计划、长周期件、任务去向。",
+              "沿用现有必备校验，不要求所有项目角色都任命才可启动。",
+              "项目对接人与专业审核经理分开表示；任务预览显示实际负责人。",
+              "已执行中项目显示启动结果，不继续提供重复立项确认。"
+            ]
+          }
+        ]
+      },
+      {
+        "label": "交接跟踪",
+        "items": [
+          {
+            "title": "01A · 机械设计交接",
+            "ref": "示例设备 · 主任务已到机械经理",
+            "state": "跟踪事项",
+            "why": "主任务已到专业经理，经理可以自己做、转派或拆分。",
+            "next": "下一执行责任：机械经理安排",
+            "action": "查看任务去向",
+            "details": [
+              "没有子任务不等于未分工，不虚构“无人接手”。",
+              "显示实际主任务负责人、子任务与审核状态。",
+              "PM协调节点，不替专业经理编辑或审核图纸。"
+            ]
+          }
+        ]
+      },
+      {
+        "label": "项目依据",
+        "items": [
+          {
+            "title": "输送设备项目 · 准备立项",
+            "ref": "示例项目 · 本人负责 / 设备01A",
+            "state": "待立项",
+            "why": "核对设备、项目对接人、节点计划和长周期件，再确认专业任务的去向。",
+            "next": "完成后：各专业经理收到主任务",
+            "action": "查看立项工作页",
+            "details": [
+              "台头：项目约定、本人职责和当前缺项，不堆全链零计数。",
+              "分区：设备范围、项目团队、节点计划、长周期件、任务去向。",
+              "沿用现有必备校验，不要求所有项目角色都任命才可启动。",
+              "项目对接人与专业审核经理分开表示；任务预览显示实际负责人。",
+              "已执行中项目显示启动结果，不继续提供重复立项确认。"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "lead": {
+    "name": "专业经理",
+    "identity": "机械经理 · 工程部 / 机械组",
+    "title": "机械组工作安排",
+    "scope": "本组工作与轮到本人的本级审核",
+    "intro": "安排主任务，处理本级提交，跟踪本组阻塞。",
+    "contextTitle": "工作依据",
+    "context": "专业主任务、技术基线、本轮提交与审核履历。",
+    "receiver": "工作交给具体执行人；本级通过交工程总监。",
+    "notes": "分工/本人执行/审核是不同责任。子任务数量不能代替分工事实；本组组织范围待统一。",
+    "pages": [
+      {
+        "label": "任务安排",
+        "items": [
+          {
+            "title": "01A · 机械专业主任务",
+            "ref": "示例主任务 · 负责人：机械经理",
+            "state": "尚无子任务",
+            "why": "主任务归你；可以本人承担、转派或拆分，尚无子任务不能直接判为未分工。",
+            "next": "下一执行人：本人或指定组员",
+            "action": "查看任务安排",
+            "details": [
+              "展示设备、专业、技术依据、日期与已有产出。",
+              "本人承担：沿用主任务，不增加强制接单状态。",
+              "转派：改变现有任务负责人；拆分：保留主任务并生成子任务。",
+              "多人按什么对象/工作内容划分尚待确认，暂不固化图纸绑定或提交隔离。",
+              "不得把只有选人写成“已明确全部设计范围”。"
+            ]
+          }
+        ]
+      },
+      {
+        "label": "待我审核",
+        "items": [
+          {
+            "title": "支撑架设计 · 本级审核",
+            "ref": "示例评审单 · 第2轮 / 组员提交",
+            "state": "待我审核",
+            "why": "核对本轮图纸/BOM、上轮意见与修改结果，再给出审核结论。",
+            "next": "通过后：工程总监；退回后：提交人",
+            "action": "查看本轮审核",
+            "details": [
+              "本轮对象、版本、附件、BOM与上轮审核意见。",
+              "通过本级仍未发布，不把待总监审算成待经理审。",
+              "退回写明问题与涉及对象；保留同单同任务的轮次履历。",
+              "经理本人提交由工程总监直审，不给自己生成本级审核。"
+            ]
+          }
+        ]
+      },
+      {
+        "label": "本组跟踪",
+        "items": [
+          {
+            "title": "01A · 机械专业主任务",
+            "ref": "示例主任务 · 负责人：机械经理",
+            "state": "尚无子任务",
+            "why": "主任务归你；可以本人承担、转派或拆分，尚无子任务不能直接判为未分工。",
+            "next": "下一执行人：本人或指定组员",
+            "action": "查看任务安排",
+            "details": [
+              "展示设备、专业、技术依据、日期与已有产出。",
+              "本人承担：沿用主任务，不增加强制接单状态。",
+              "转派：改变现有任务负责人；拆分：保留主任务并生成子任务。",
+              "多人按什么对象/工作内容划分尚待确认，暂不固化图纸绑定或提交隔离。",
+              "不得把只有选人写成“已明确全部设计范围”。"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "designer": {
+    "name": "设计组员",
+    "identity": "机械组员 · 工程部 / 机械组",
+    "title": "我的设计任务",
+    "scope": "指派给本人的任务与提交记录",
+    "intro": "优先处理退回意见，再继续本人设计工作。",
+    "contextTitle": "工作依据",
+    "context": "任务、设备、技术基线、前置与退回意见。",
+    "receiver": "提交给实际审核人；经理通过后工程总监终审。",
+    "notes": "首页不展示审核者语义。多人任务与对象绑定仍待确认，样稿不新增数据硬隔离。",
+    "pages": [
+      {
+        "label": "我的任务",
+        "items": [
+          {
+            "title": "防护罩设计 · 按退回意见修改",
+            "ref": "示例评审单 · 第1轮被退回",
+            "state": "需修改",
+            "why": "示意意见：防护间距需复核。先定位涉及对象，修改后在原单继续提交。",
+            "next": "重提后：重新进入本级审核",
+            "action": "查看退回处理",
+            "details": [
+              "上方常驻：退回人、轮次、时间、意见及涉及对象。",
+              "进入可修改产出，历史意见不覆盖。",
+              "重提进入同任务同评审单下一轮。",
+              "审核中显示进度；只有实际条件允许才给撤回。",
+              "已发布内容另走改版，不覆盖冻结版本。"
+            ]
+          },
+          {
+            "title": "01A · 我的机械设计任务",
+            "ref": "示例子任务 · 本人负责",
+            "state": "进行中",
+            "why": "从具体任务查看设备、时间、技术依据和可编辑产出。",
+            "next": "提交后：机械经理审核",
+            "action": "查看任务工作页",
+            "details": [
+              "工作页保留来源任务与返回入口，刷新不丢任务上下文。",
+              "展示任务负责人、内容说明和计划日期。",
+              "对象与任务范围仍待明确；不假装已建立“仅本子任务对象”过滤。",
+              "提交预览具体对象、版本、附件和接收审核人。",
+              "协作可读不自动等于可以替他人提交；生产规则确认后落实。"
+            ]
+          }
+        ]
+      },
+      {
+        "label": "退回处理",
+        "items": [
+          {
+            "title": "防护罩设计 · 按退回意见修改",
+            "ref": "示例评审单 · 第1轮被退回",
+            "state": "需修改",
+            "why": "示意意见：防护间距需复核。先定位涉及对象，修改后在原单继续提交。",
+            "next": "重提后：重新进入本级审核",
+            "action": "查看退回处理",
+            "details": [
+              "上方常驻：退回人、轮次、时间、意见及涉及对象。",
+              "进入可修改产出，历史意见不覆盖。",
+              "重提进入同任务同评审单下一轮。",
+              "审核中显示进度；只有实际条件允许才给撤回。",
+              "已发布内容另走改版，不覆盖冻结版本。"
+            ]
+          }
+        ]
+      },
+      {
+        "label": "我的提交",
+        "items": [
+          {
+            "title": "支撑架设计 · 提交进展",
+            "ref": "示例评审单 · 第2轮",
+            "state": "待工程总监审",
+            "why": "本级审核已通过，当前等待工程总监；此时尚未发布冻结。",
+            "next": "当前责任：工程总监",
+            "action": "查看提交履历",
+            "details": [
+              "本轮对象与版本、经理意见、实际当前审核人。",
+              "发布后显示有效冻结版本、发布批次与下游结果。",
+              "单批发布不等于整台设备全部设计完成。"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "director": {
+    "name": "工程总监",
+    "identity": "工程总监 · 工程部",
+    "title": "工程审核与协调",
+    "scope": "实际轮到本人的终审与工程部门风险",
+    "intro": "先处理终审，再关注需要工程决策的改版和跨专业问题。",
+    "contextTitle": "工作依据",
+    "context": "本轮提交、有效版本、本级结论与下游影响。",
+    "receiver": "终审通过形成本批有效版本；改版批准后交设计师修订。",
+    "notes": "待我终审与部门进展分开。工程改版路由缺陷已真实复现，需先校正再实施本页。",
+    "pages": [
+      {
+        "label": "待我终审",
+        "items": [
+          {
+            "title": "支撑架设计 · 工程终审",
+            "ref": "示例评审单 · 第2轮 / 本级已通过",
+            "state": "待我终审",
+            "why": "核对本轮依据和本级结论，决定发布或退回。",
+            "next": "通过后：本批发布并触发相应下游",
+            "action": "查看终审依据",
+            "details": [
+              "本轮对象与版本、本级审核意见及历次退回修改。",
+              "通过后形成冻结发布批次，不等于整台设备设计全部完成。",
+              "显示实际新增需求、库存覆盖等下游结果，不能只报“提交成功”。",
+              "机械首次发布可解锁工艺；程序发布不生成采购需求。",
+              "退回到原提交任务，保留同单履历。"
+            ]
+          }
+        ]
+      },
+      {
+        "label": "改版与风险",
+        "items": [
+          {
+            "title": "现场提出的工程改版 · 裁决路由",
+            "ref": "示例改版事项 · 工程对象",
+            "state": "方案待校正",
+            "why": "工程对象应按单据归属交工程裁决；当前现场申请实际路由到申请人部门。",
+            "next": "责任路由修正后：工程总监裁决",
+            "action": "查看改版依据",
+            "details": [
+              "目标冻结版本、问题、建议及采购/领料影响面。",
+              "批准后才下发改版任务，修订仍重新评审发布。",
+              "否决必须写替代方案，不能空关。",
+              "当前路由缺陷尚未修复，此样稿不能当作已进入工程总监真实队列。"
+            ]
+          }
+        ]
+      },
+      {
+        "label": "部门跟踪",
+        "items": [
+          {
+            "title": "01A · 机械设计交接",
+            "ref": "示例设备 · 主任务已到机械经理",
+            "state": "跟踪事项",
+            "why": "主任务已到专业经理，经理可以自己做、转派或拆分。",
+            "next": "下一执行责任：机械经理安排",
+            "action": "查看任务去向",
+            "details": [
+              "没有子任务不等于未分工，不虚构“无人接手”。",
+              "显示实际主任务负责人、子任务与审核状态。",
+              "PM协调节点，不替专业经理编辑或审核图纸。"
+            ]
+          }
+        ]
+      }
+    ]
+  }
+};
+let current='sales', section=0;
+const $=s=>document.querySelector(s);
+function detail(item){
+ $('#dialog-title').textContent=item.title;
+ const body=$('.dialogbody');body.replaceChildren();
+ const p=document.createElement('p');p.textContent=item.why;body.append(p);
+ const h=document.createElement('h3');h.textContent='工作页与交接内容';body.append(h);
+ const ul=document.createElement('ul');item.details.forEach(d=>{const li=document.createElement('li');li.textContent=d;ul.append(li)});body.append(ul);
+ const note=document.createElement('p');note.className='note';note.textContent='方案示意：不连接API，不提交业务操作；待实现与未决规则已在内容中标明。';body.append(note);
+ $('dialog').showModal();
+}
+function render(){
+ const p=profiles[current];
+ $('.roles').innerHTML=Object.entries(profiles).map(([k,v])=>'<button data-role="'+k+'" aria-pressed="'+(k===current)+'">'+v.name+'</button>').join('');
+ $('.identity').innerHTML='<strong>'+p.identity+'</strong><small>当前示意：'+p.name+'的工作范围</small>';
+ $('nav').innerHTML=p.pages.map((page,i)=>'<button data-nav="'+i+'" aria-current="'+(section===i?'page':'false')+'">'+page.label+'</button>').join('');
+ $('.navhelp').textContent='当前为方案对照，角色切换不代表正式系统身份切换。';
+ $('#breadcrumb').textContent=p.pages[section].label;$('#eyebrow').textContent=p.identity;$('#title').textContent=p.title;$('#intro').textContent=p.intro;
+ $('.scope').innerHTML='<b>'+p.name+'</b><span>'+p.scope+'</span>';
+ $('#list-title').textContent=p.pages[section].label;$('#list-note').textContent='示意事项 · 非实时业务数量';
+ $('#context-title').textContent=p.contextTitle;$('#context').textContent=p.context;$('#receiver').textContent=p.receiver;
+ $('.chain').innerHTML=Object.entries(profiles).map(([key,v],i)=>'<button class="secondary" data-flow="'+key+'" aria-pressed="'+(key===current)+'">'+v.name+'</button>'+(i<5?' → ':'')).join('');
+ $('.designnotes').textContent=p.notes;
+ const shown=p.pages[section].items;
+ $('#items').innerHTML=shown.map((it,i)=>'<article class="item"><div class="itemtop"><h3>'+it.title+'</h3><span class="tag">'+it.state+'</span></div><p class="reference">'+it.ref+'</p><p class="why">'+it.why+'</p><div class="actionline"><small>'+it.next+'</small><button class="primary" data-item="'+i+'">'+it.action+'</button></div></article>').join('');
+ document.querySelectorAll('[data-role],[data-flow]').forEach(b=>b.onclick=()=>{current=b.dataset.role||b.dataset.flow;section=0;render()});
+ document.querySelectorAll('[data-nav]').forEach(b=>b.onclick=()=>{section=Number(b.dataset.nav);render()});
+ document.querySelectorAll('[data-item]').forEach(b=>b.onclick=()=>detail(shown[Number(b.dataset.item)]));
+}
+$('#notes-toggle').onclick=()=>{const n=$('.designnotes');n.hidden=!n.hidden;$('#notes-toggle').setAttribute('aria-expanded',String(!n.hidden));$('#notes-toggle').textContent=n.hidden?'查看设计说明':'收起设计说明'};
+$('#close-dialog').onclick=()=>$('dialog').close();render();
+</script></body></html>

@@ -1,0 +1,391 @@
+{
+  "scope": "UX交接核查20261006，专用测试数据，无外部交易",
+  "events": [
+    {
+      "user": "site1",
+      "method": "POST",
+      "path": "/site/issues",
+      "http": 201,
+      "result": {
+        "id": 1,
+        "project_no": "TX26001",
+        "equip_no": "01A",
+        "drawing_no": "TX26001-01A-00-00-00-00",
+        "item_no": null,
+        "part_name": "UX走查输送设备总装图",
+        "title": "UX测试专用：核查现场图纸改版的裁决归属",
+        "desc": "仅角色交接验证，不是真实设计问题，不修改已发布版本",
+        "photos": [],
+        "status": "待处理",
+        "related_change_id": null,
+        "created_by": 24,
+        "closed_at": null
+      }
+    },
+    {
+      "user": "site1",
+      "method": "POST",
+      "path": "/change-requests",
+      "http": 201,
+      "result": {
+        "id": 1,
+        "cr_no": "CR26001",
+        "project_no": "TX26001",
+        "equip_no": "01A",
+        "target_type": "DRAWING",
+        "target_label": "图纸",
+        "target_ref": "TX26001-01A-00-00-00-00",
+        "target_version": "V1",
+        "target_title": "TX26001-01A-00-00-00-00 UX走查输送设备总装图",
+        "profession": "机械",
+        "part_no": "TX26001-01A-00-00-00-00",
+        "reason": "UX测试专用：现场提出工程图纸改版，核对由谁裁决",
+        "proposal": "仅测试申请与否决；保留原V1，禁止实际修改设计",
+        "applicant_id": 24,
+        "applicant_name": "现场负责人",
+        "status": "待裁决",
+        "decided_by_name": null,
+        "decided_at": null,
+        "decision_note": null,
+        "solution": null,
+        "change_task_id": null,
+        "change_task_no": null,
+        "change_task_owner_id": null,
+        "change_task_owner": null,
+        "change_task_status": null,
+        "new_release_id": null,
+        "new_release_no": null,
+        "archived_at": null,
+        "created_at": "2026-10-06T23:56:41.871418+08:00",
+        "updated_at": "2026-10-06T23:56:41.871418+08:00"
+      }
+    },
+    {
+      "user": "site1",
+      "method": "POST",
+      "path": "/site/issues/1/link-change",
+      "http": 200,
+      "result": {
+        "id": 1,
+        "project_no": "TX26001",
+        "equip_no": "01A",
+        "drawing_no": "TX26001-01A-00-00-00-00",
+        "item_no": null,
+        "part_name": "UX走查输送设备总装图",
+        "title": "UX测试专用：核查现场图纸改版的裁决归属",
+        "desc": "仅角色交接验证，不是真实设计问题，不修改已发布版本",
+        "photos": [],
+        "status": "已转变更",
+        "related_change_id": 1,
+        "created_by": 24,
+        "closed_at": null
+      }
+    },
+    {
+      "user": "site1",
+      "method": "POST",
+      "path": "/change-requests",
+      "http": 400,
+      "result": {
+        "detail": "这个版本已经有改版申请在处理中（CR26001 待裁决）"
+      }
+    },
+    {
+      "user": "pm1",
+      "method": "GET",
+      "path": "/change-requests/1/impact",
+      "http": 200,
+      "result": {
+        "purchase_requests": [],
+        "material_issues": [],
+        "has_open_purchase": false,
+        "note": "改版不会自动改已下的采购需求/已领料 —— 请人工判断退货、补买或继续用。"
+      }
+    },
+    {
+      "user": "eng_director",
+      "method": "GET",
+      "path": "/notifications?limit=100",
+      "http": 200,
+      "result": {
+        "unread": 1,
+        "items": [
+          {
+            "id": 20,
+            "type": "review",
+            "title": "经理已通过，等你终审：RV26001",
+            "body": null,
+            "link": "/reviews",
+            "is_read": false,
+            "created_at": "2026-10-06T22:50:41.174035+08:00"
+          }
+        ]
+      }
+    },
+    {
+      "user": "gm",
+      "method": "GET",
+      "path": "/notifications?limit=100",
+      "http": 200,
+      "result": {
+        "unread": 1,
+        "items": [
+          {
+            "id": 54,
+            "type": "change",
+            "title": "有改版申请等你裁决：CR26001",
+            "body": "TX26001-01A-00-00-00-00 UX走查输送设备总装图 —— UX测试专用：现场提出工程图纸改版，核对由谁裁决",
+            "link": "/changes",
+            "is_read": false,
+            "created_at": "2026-10-06T23:56:41.871418+08:00"
+          }
+        ]
+      }
+    },
+    {
+      "user": "eng_director",
+      "method": "POST",
+      "path": "/change-requests/1/decide",
+      "http": 403,
+      "result": {
+        "detail": "只有申请人所在部门的总监能裁决"
+      }
+    },
+    {
+      "user": "gm",
+      "method": "POST",
+      "path": "/change-requests/1/decide",
+      "http": 400,
+      "result": {
+        "detail": "否决必须填写替代方案 / 处理办法，不能空关"
+      }
+    },
+    {
+      "user": "gm",
+      "method": "POST",
+      "path": "/change-requests/1/decide",
+      "http": 200,
+      "result": {
+        "id": 1,
+        "cr_no": "CR26001",
+        "project_no": "TX26001",
+        "equip_no": "01A",
+        "target_type": "DRAWING",
+        "target_label": "图纸",
+        "target_ref": "TX26001-01A-00-00-00-00",
+        "target_version": "V1",
+        "target_title": "TX26001-01A-00-00-00-00 UX走查输送设备总装图",
+        "profession": "机械",
+        "part_no": "TX26001-01A-00-00-00-00",
+        "reason": "UX测试专用：现场提出工程图纸改版，核对由谁裁决",
+        "proposal": "仅测试申请与否决；保留原V1，禁止实际修改设计",
+        "applicant_id": 24,
+        "applicant_name": "现场负责人",
+        "status": "已否决",
+        "decided_by_name": "总经理",
+        "decided_at": "2026-10-06T15:56:43.263997+00:00",
+        "decision_note": "UX测试裁决路由核查，不是真实设计决定",
+        "solution": "测试结束，原图V1不变，无需现场实施改动",
+        "change_task_id": null,
+        "change_task_no": null,
+        "change_task_owner_id": null,
+        "change_task_owner": null,
+        "change_task_status": null,
+        "new_release_id": null,
+        "new_release_no": null,
+        "archived_at": "2026-10-06T15:56:43.263997+00:00",
+        "created_at": "2026-10-06T23:56:41.871418+08:00",
+        "updated_at": "2026-10-06T23:56:43.241748+08:00"
+      }
+    },
+    {
+      "user": "site1",
+      "method": "GET",
+      "path": "/site/issues?project_no=TX26001",
+      "http": 200,
+      "result": [
+        {
+          "id": 1,
+          "project_no": "TX26001",
+          "equip_no": "01A",
+          "drawing_no": "TX26001-01A-00-00-00-00",
+          "item_no": null,
+          "part_name": "UX走查输送设备总装图",
+          "title": "UX测试专用：核查现场图纸改版的裁决归属",
+          "desc": "仅角色交接验证，不是真实设计问题，不修改已发布版本",
+          "photos": [],
+          "status": "已转变更",
+          "related_change_id": 1,
+          "created_by": 24,
+          "closed_at": null
+        }
+      ]
+    },
+    {
+      "user": "site1",
+      "method": "POST",
+      "path": "/site/issues/1/link-change",
+      "http": 200,
+      "result": {
+        "id": 1,
+        "project_no": "TX26001",
+        "equip_no": "01A",
+        "drawing_no": "TX26001-01A-00-00-00-00",
+        "item_no": null,
+        "part_name": "UX走查输送设备总装图",
+        "title": "UX测试专用：核查现场图纸改版的裁决归属",
+        "desc": "仅角色交接验证，不是真实设计问题，不修改已发布版本",
+        "photos": [],
+        "status": "已闭环",
+        "related_change_id": 1,
+        "created_by": 24,
+        "closed_at": "2026-10-06T15:56:43.312465+00:00"
+      }
+    },
+    {
+      "user": "shop1",
+      "method": "GET",
+      "path": "/manufacturing/workbench",
+      "http": 200,
+      "result": {
+        "counts": {
+          "wait": 0,
+          "running": 0,
+          "to_accept": 0,
+          "to_transfer": 0,
+          "rework": 0,
+          "transferred": 0,
+          "overdue": 0,
+          "outsource": 0
+        },
+        "wait": [],
+        "running": [],
+        "to_accept": [],
+        "to_transfer": [],
+        "rework": [],
+        "outsource": []
+      }
+    },
+    {
+      "user": "craft_manager",
+      "method": "GET",
+      "path": "/my-tasks",
+      "http": 200,
+      "result": [
+        {
+          "id": 4,
+          "task_no": "TK26004",
+          "project_no": "TX26001",
+          "equip_no": "01A",
+          "task_type": "设计",
+          "profession": "工艺",
+          "title": "01A UX走查输送设备 · 工艺设计",
+          "content": "看机械零件 → 挂原材料 BOM + 判定自制/外协（机械首次发布后开工）",
+          "owner_id": 9,
+          "owner_name": "工艺经理",
+          "depends_on_id": 1,
+          "parent_task_id": null,
+          "plan_start": "2026-10-06",
+          "plan_end": "2026-10-18",
+          "status": "待开始",
+          "done_at": null,
+          "ref_type": "equipment",
+          "ref_id": 1,
+          "ref_no": "01A",
+          "remark": null,
+          "blocked": false,
+          "blocked_reason": null,
+          "project_name": "UX走查-20261006-整线"
+        }
+      ]
+    }
+  ],
+  "site_issue_id": 1,
+  "change_id": 1,
+  "change_no": "CR26001",
+  "impact": {
+    "purchase_requests": [],
+    "material_issues": [],
+    "has_open_purchase": false,
+    "note": "改版不会自动改已下的采购需求/已领料 —— 请人工判断退货、补买或继续用。"
+  },
+  "director_notifications": {
+    "eng_director": [],
+    "gm": [
+      {
+        "id": 54,
+        "type": "change",
+        "title": "有改版申请等你裁决：CR26001",
+        "body": "TX26001-01A-00-00-00-00 UX走查输送设备总装图 —— UX测试专用：现场提出工程图纸改版，核对由谁裁决",
+        "link": "/changes",
+        "is_read": false,
+        "created_at": "2026-10-06T23:56:41.871418+08:00"
+      }
+    ]
+  },
+  "final_change": {
+    "id": 1,
+    "cr_no": "CR26001",
+    "project_no": "TX26001",
+    "equip_no": "01A",
+    "target_type": "DRAWING",
+    "target_label": "图纸",
+    "target_ref": "TX26001-01A-00-00-00-00",
+    "target_version": "V1",
+    "target_title": "TX26001-01A-00-00-00-00 UX走查输送设备总装图",
+    "profession": "机械",
+    "part_no": "TX26001-01A-00-00-00-00",
+    "reason": "UX测试专用：现场提出工程图纸改版，核对由谁裁决",
+    "proposal": "仅测试申请与否决；保留原V1，禁止实际修改设计",
+    "applicant_id": 24,
+    "applicant_name": "现场负责人",
+    "status": "已否决",
+    "decided_by_name": "总经理",
+    "decided_at": "2026-10-06T15:56:43.263997+00:00",
+    "decision_note": "UX测试裁决路由核查，不是真实设计决定",
+    "solution": "测试结束，原图V1不变，无需现场实施改动",
+    "change_task_id": null,
+    "change_task_no": null,
+    "change_task_owner_id": null,
+    "change_task_owner": null,
+    "change_task_status": null,
+    "new_release_id": null,
+    "new_release_no": null,
+    "archived_at": "2026-10-06T15:56:43.263997+00:00",
+    "created_at": "2026-10-06T23:56:41.871418+08:00",
+    "updated_at": "2026-10-06T23:56:43.241748+08:00"
+  },
+  "issue_after_rejection": [
+    {
+      "id": 1,
+      "project_no": "TX26001",
+      "equip_no": "01A",
+      "drawing_no": "TX26001-01A-00-00-00-00",
+      "item_no": null,
+      "part_name": "UX走查输送设备总装图",
+      "title": "UX测试专用：核查现场图纸改版的裁决归属",
+      "desc": "仅角色交接验证，不是真实设计问题，不修改已发布版本",
+      "photos": [],
+      "status": "已转变更",
+      "related_change_id": 1,
+      "created_by": 24,
+      "closed_at": null
+    }
+  ],
+  "closed_issue": {
+    "id": 1,
+    "project_no": "TX26001",
+    "equip_no": "01A",
+    "drawing_no": "TX26001-01A-00-00-00-00",
+    "item_no": null,
+    "part_name": "UX走查输送设备总装图",
+    "title": "UX测试专用：核查现场图纸改版的裁决归属",
+    "desc": "仅角色交接验证，不是真实设计问题，不修改已发布版本",
+    "photos": [],
+    "status": "已闭环",
+    "related_change_id": 1,
+    "created_by": 24,
+    "closed_at": "2026-10-06T15:56:43.312465+00:00"
+  },
+  "phase": "site_change_routed_gm_rejected_original_v1_preserved_issue_closed"
+}

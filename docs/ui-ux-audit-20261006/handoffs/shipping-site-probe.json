@@ -1,0 +1,1366 @@
+{
+  "scope": "UX交接核查20261006，专用测试数据，无外部交易",
+  "events": [
+    {
+      "user": "assy1",
+      "method": "POST",
+      "path": "/assembly/records/1/finish",
+      "http": 200,
+      "result": {
+        "id": 1,
+        "project_no": "TX26001",
+        "equip_no": "01A",
+        "sub_assembly": "整机装配",
+        "kitting_rate": 0.0,
+        "total_qty": 10.0,
+        "arrived_qty": 0.0,
+        "status": "已装配",
+        "assembled_by": 21,
+        "assembled_at": "2026-10-06T22:52:57.961308+08:00",
+        "photos": [],
+        "unassembled": [
+          {
+            "ref": "JJ-LS-1604",
+            "name": "UX测试螺丝",
+            "qty": 2.0,
+            "unit": "件"
+          }
+        ],
+        "debug_by": null,
+        "debug_at": null,
+        "debug_result": null,
+        "debug_note": null,
+        "debug_photos": [],
+        "remark": "UX测试专用：8件安装，2件随组装体散发，无真实装配"
+      }
+    },
+    {
+      "user": "assy1",
+      "method": "POST",
+      "path": "/assembly/records/1/debug",
+      "http": 200,
+      "result": {
+        "id": 1,
+        "project_no": "TX26001",
+        "equip_no": "01A",
+        "sub_assembly": "整机装配",
+        "kitting_rate": 0.0,
+        "total_qty": 10.0,
+        "arrived_qty": 0.0,
+        "status": "调试完成",
+        "assembled_by": 21,
+        "assembled_at": "2026-10-06T22:52:57.961308+08:00",
+        "photos": [],
+        "unassembled": [
+          {
+            "qty": 2.0,
+            "ref": "JJ-LS-1604",
+            "name": "UX测试螺丝",
+            "unit": "件"
+          }
+        ],
+        "debug_by": 21,
+        "debug_at": "2026-10-06T15:17:08.205115+00:00",
+        "debug_result": "合格",
+        "debug_note": "UX测试专用厂内调试记录，不是真实检验",
+        "debug_photos": [],
+        "remark": "UX测试专用：8件安装，2件随组装体散发，无真实装配"
+      }
+    },
+    {
+      "user": "pm1",
+      "method": "GET",
+      "path": "/shipping/to-ship?project_no=TX26001",
+      "http": 200,
+      "result": [
+        {
+          "equip_no": "01A",
+          "equip_name": "UX走查输送设备",
+          "assembly_status": "调试完成",
+          "kitting_rate": 1.0,
+          "ready": true,
+          "in_open_shipment": false
+        }
+      ]
+    },
+    {
+      "user": "pm1",
+      "method": "POST",
+      "path": "/shipping/instructions",
+      "http": 201,
+      "result": {
+        "id": 1,
+        "shipment_no": "FH26001",
+        "project_no": "TX26001",
+        "status": "已指令",
+        "plan_ship_date": "2026-10-06",
+        "vehicle_status": "待叫车",
+        "vehicle_count": null,
+        "vehicle_fee": null,
+        "vehicle_note": null,
+        "vehicle_by": null,
+        "vehicle_at": null,
+        "vehicle": null,
+        "driver": null,
+        "plate_no": null,
+        "instruct_at": "2026-10-06T15:17:10.132979+00:00",
+        "depart_at": null,
+        "arrive_at": null,
+        "signed_at": null,
+        "photos": [],
+        "remark": "UX测试专用发运批次，无真实运输/运费/对外交易",
+        "lines": [
+          {
+            "id": 1,
+            "equip_no": "01A",
+            "equip_name": "UX走查输送设备",
+            "qty": 1.0,
+            "remark": null
+          }
+        ],
+        "items": [],
+        "receipts": []
+      }
+    },
+    {
+      "user": "buyer1",
+      "method": "GET",
+      "path": "/purchase/to-vehicle",
+      "http": 200,
+      "result": [
+        {
+          "id": 1,
+          "shipment_no": "FH26001",
+          "project_no": "TX26001",
+          "project_name": "UX走查-20261006-整线",
+          "plan_ship_date": "2026-10-06",
+          "status": "已指令",
+          "instruct_at": "2026-10-06T23:17:10.132979+08:00"
+        }
+      ]
+    },
+    {
+      "user": "delivery1",
+      "method": "POST",
+      "path": "/shipping/1/request-vehicle",
+      "http": 403,
+      "result": {
+        "detail": "没有权限：purchase:edit"
+      }
+    },
+    {
+      "user": "delivery1",
+      "method": "POST",
+      "path": "/shipping/1/load",
+      "http": 400,
+      "result": {
+        "detail": "采购还没叫车 —— 先由采购按「计划发货日」把车订好（登记几车 + 本次运费），才能装车"
+      }
+    },
+    {
+      "user": "delivery1",
+      "method": "POST",
+      "path": "/shipping/1/items/generate",
+      "http": 201,
+      "result": {
+        "id": 1,
+        "shipment_no": "FH26001",
+        "project_no": "TX26001",
+        "status": "发货中",
+        "plan_ship_date": "2026-10-06",
+        "vehicle_status": "待叫车",
+        "vehicle_count": null,
+        "vehicle_fee": null,
+        "vehicle_note": null,
+        "vehicle_by": null,
+        "vehicle_at": null,
+        "vehicle": null,
+        "driver": null,
+        "plate_no": null,
+        "instruct_at": "2026-10-06T23:17:10.132979+08:00",
+        "depart_at": null,
+        "arrive_at": null,
+        "signed_at": null,
+        "photos": [],
+        "remark": "UX测试专用发运批次，无真实运输/运费/对外交易",
+        "lines": [
+          {
+            "id": 1,
+            "equip_no": "01A",
+            "equip_name": "UX走查输送设备",
+            "qty": 1.0,
+            "remark": null
+          }
+        ],
+        "items": [
+          {
+            "id": 1,
+            "equip_no": "01A",
+            "ref": "TX26001-01A-00-00-00-00",
+            "parent_ref": null,
+            "name": "UX走查输送设备 组装体",
+            "kind": "组装体",
+            "source": "装配",
+            "qty": 1.0,
+            "unit": "台",
+            "shipped": false,
+            "shipped_at": null,
+            "photos": [],
+            "place_photos": [],
+            "check_result": null,
+            "check_qty": null,
+            "check_note": null,
+            "remark": null
+          },
+          {
+            "id": 2,
+            "equip_no": "01A",
+            "ref": "JJ-LS-1604",
+            "parent_ref": "TX26001-01A-00-00-00-00",
+            "name": "UX测试螺丝",
+            "kind": "零件",
+            "source": "装配未装",
+            "qty": 2.0,
+            "unit": "件",
+            "shipped": false,
+            "shipped_at": null,
+            "photos": [],
+            "place_photos": [],
+            "check_result": null,
+            "check_qty": null,
+            "check_note": null,
+            "remark": null
+          }
+        ],
+        "receipts": []
+      }
+    },
+    {
+      "user": "delivery1",
+      "method": "POST",
+      "path": "/shipping/1/items/manual",
+      "http": 201,
+      "result": {
+        "id": 3
+      }
+    },
+    {
+      "user": "delivery1",
+      "method": "POST",
+      "path": "/shipping/photos",
+      "http": 201,
+      "result": [
+        {
+          "token": "TX26001/shipping/UX-TEST-ONLY/1791299831044160000_UX-TEST-ONLY-photo.png",
+          "filename": "UX-TEST-ONLY-photo.png"
+        }
+      ]
+    },
+    {
+      "user": "delivery1",
+      "method": "POST",
+      "path": "/shipping/items/ship",
+      "http": 200,
+      "result": {
+        "marked": 2
+      }
+    },
+    {
+      "user": "buyer1",
+      "method": "POST",
+      "path": "/shipping/1/request-vehicle",
+      "http": 200,
+      "result": {
+        "id": 1,
+        "shipment_no": "FH26001",
+        "project_no": "TX26001",
+        "status": "发货中",
+        "plan_ship_date": "2026-10-06",
+        "vehicle_status": "已叫车",
+        "vehicle_count": 1,
+        "vehicle_fee": 0.0,
+        "vehicle_note": "UX测试专用车辆登记，无真实叫车或运费",
+        "vehicle_by": 13,
+        "vehicle_at": "2026-10-06T15:17:11.085484+00:00",
+        "vehicle": null,
+        "driver": null,
+        "plate_no": null,
+        "instruct_at": "2026-10-06T23:17:10.132979+08:00",
+        "depart_at": null,
+        "arrive_at": null,
+        "signed_at": null,
+        "photos": [],
+        "remark": "UX测试专用发运批次，无真实运输/运费/对外交易",
+        "lines": [
+          {
+            "id": 1,
+            "equip_no": "01A",
+            "equip_name": "UX走查输送设备",
+            "qty": 1.0,
+            "remark": null
+          }
+        ],
+        "items": [
+          {
+            "id": 1,
+            "equip_no": "01A",
+            "ref": "TX26001-01A-00-00-00-00",
+            "parent_ref": null,
+            "name": "UX走查输送设备 组装体",
+            "kind": "组装体",
+            "source": "装配",
+            "qty": 1.0,
+            "unit": "台",
+            "shipped": true,
+            "shipped_at": "2026-10-06T23:17:11.066144+08:00",
+            "photos": [
+              {
+                "token": "TX26001/shipping/UX-TEST-ONLY/1791299831044160000_UX-TEST-ONLY-photo.png",
+                "filename": "UX-TEST-ONLY-photo.png"
+              }
+            ],
+            "place_photos": [],
+            "check_result": null,
+            "check_qty": null,
+            "check_note": null,
+            "remark": null
+          },
+          {
+            "id": 2,
+            "equip_no": "01A",
+            "ref": "JJ-LS-1604",
+            "parent_ref": "TX26001-01A-00-00-00-00",
+            "name": "UX测试螺丝",
+            "kind": "零件",
+            "source": "装配未装",
+            "qty": 2.0,
+            "unit": "件",
+            "shipped": true,
+            "shipped_at": "2026-10-06T23:17:11.066127+08:00",
+            "photos": [
+              {
+                "token": "TX26001/shipping/UX-TEST-ONLY/1791299831044160000_UX-TEST-ONLY-photo.png",
+                "filename": "UX-TEST-ONLY-photo.png"
+              }
+            ],
+            "place_photos": [],
+            "check_result": null,
+            "check_qty": null,
+            "check_note": null,
+            "remark": null
+          },
+          {
+            "id": 3,
+            "equip_no": "01A",
+            "ref": "补-UX测试工具-本批未发",
+            "parent_ref": null,
+            "name": "UX测试工具-本批未发",
+            "kind": "补充",
+            "source": "补充",
+            "qty": 1.0,
+            "unit": null,
+            "shipped": false,
+            "shipped_at": null,
+            "photos": [],
+            "place_photos": [],
+            "check_result": null,
+            "check_qty": null,
+            "check_note": null,
+            "remark": null
+          }
+        ],
+        "receipts": []
+      }
+    },
+    {
+      "user": "buyer1",
+      "method": "GET",
+      "path": "/purchase/to-vehicle",
+      "http": 200,
+      "result": []
+    },
+    {
+      "user": "delivery1",
+      "method": "POST",
+      "path": "/shipping/1/load",
+      "http": 200,
+      "result": {
+        "id": 1,
+        "shipment_no": "FH26001",
+        "project_no": "TX26001",
+        "status": "已装车",
+        "plan_ship_date": "2026-10-06",
+        "vehicle_status": "已叫车",
+        "vehicle_count": 1,
+        "vehicle_fee": 0.0,
+        "vehicle_note": "UX测试专用车辆登记，无真实叫车或运费",
+        "vehicle_by": 13,
+        "vehicle_at": "2026-10-06T23:17:11.085484+08:00",
+        "vehicle": "UX测试虚拟车辆",
+        "driver": "UX测试",
+        "plate_no": "UX-TEST",
+        "instruct_at": "2026-10-06T23:17:10.132979+08:00",
+        "depart_at": null,
+        "arrive_at": null,
+        "signed_at": null,
+        "photos": [
+          {
+            "token": "TX26001/shipping/UX-TEST-ONLY/1791299831044160000_UX-TEST-ONLY-photo.png",
+            "filename": "UX-TEST-ONLY-photo.png"
+          }
+        ],
+        "remark": "UX测试，无实物运输",
+        "lines": [
+          {
+            "id": 1,
+            "equip_no": "01A",
+            "equip_name": "UX走查输送设备",
+            "qty": 1.0,
+            "remark": null
+          }
+        ],
+        "items": [
+          {
+            "id": 1,
+            "equip_no": "01A",
+            "ref": "TX26001-01A-00-00-00-00",
+            "parent_ref": null,
+            "name": "UX走查输送设备 组装体",
+            "kind": "组装体",
+            "source": "装配",
+            "qty": 1.0,
+            "unit": "台",
+            "shipped": true,
+            "shipped_at": "2026-10-06T23:17:11.066144+08:00",
+            "photos": [
+              {
+                "token": "TX26001/shipping/UX-TEST-ONLY/1791299831044160000_UX-TEST-ONLY-photo.png",
+                "filename": "UX-TEST-ONLY-photo.png"
+              }
+            ],
+            "place_photos": [],
+            "check_result": null,
+            "check_qty": null,
+            "check_note": null,
+            "remark": null
+          },
+          {
+            "id": 2,
+            "equip_no": "01A",
+            "ref": "JJ-LS-1604",
+            "parent_ref": "TX26001-01A-00-00-00-00",
+            "name": "UX测试螺丝",
+            "kind": "零件",
+            "source": "装配未装",
+            "qty": 2.0,
+            "unit": "件",
+            "shipped": true,
+            "shipped_at": "2026-10-06T23:17:11.066127+08:00",
+            "photos": [
+              {
+                "token": "TX26001/shipping/UX-TEST-ONLY/1791299831044160000_UX-TEST-ONLY-photo.png",
+                "filename": "UX-TEST-ONLY-photo.png"
+              }
+            ],
+            "place_photos": [],
+            "check_result": null,
+            "check_qty": null,
+            "check_note": null,
+            "remark": null
+          },
+          {
+            "id": 3,
+            "equip_no": "01A",
+            "ref": "补-UX测试工具-本批未发",
+            "parent_ref": null,
+            "name": "UX测试工具-本批未发",
+            "kind": "补充",
+            "source": "补充",
+            "qty": 1.0,
+            "unit": null,
+            "shipped": false,
+            "shipped_at": null,
+            "photos": [],
+            "place_photos": [],
+            "check_result": null,
+            "check_qty": null,
+            "check_note": null,
+            "remark": null
+          }
+        ],
+        "receipts": []
+      }
+    },
+    {
+      "user": "delivery1",
+      "method": "POST",
+      "path": "/shipping/1/depart",
+      "http": 200,
+      "result": {
+        "id": 1,
+        "shipment_no": "FH26001",
+        "project_no": "TX26001",
+        "status": "在途",
+        "plan_ship_date": "2026-10-06",
+        "vehicle_status": "已叫车",
+        "vehicle_count": 1,
+        "vehicle_fee": 0.0,
+        "vehicle_note": "UX测试专用车辆登记，无真实叫车或运费",
+        "vehicle_by": 13,
+        "vehicle_at": "2026-10-06T23:17:11.085484+08:00",
+        "vehicle": "UX测试虚拟车辆",
+        "driver": "UX测试",
+        "plate_no": "UX-TEST",
+        "instruct_at": "2026-10-06T23:17:10.132979+08:00",
+        "depart_at": "2026-10-06T15:17:11.161821+00:00",
+        "arrive_at": null,
+        "signed_at": null,
+        "photos": [
+          {
+            "token": "TX26001/shipping/UX-TEST-ONLY/1791299831044160000_UX-TEST-ONLY-photo.png",
+            "filename": "UX-TEST-ONLY-photo.png"
+          }
+        ],
+        "remark": "UX测试专用，无真实发运",
+        "lines": [
+          {
+            "id": 1,
+            "equip_no": "01A",
+            "equip_name": "UX走查输送设备",
+            "qty": 1.0,
+            "remark": null
+          }
+        ],
+        "items": [
+          {
+            "id": 1,
+            "equip_no": "01A",
+            "ref": "TX26001-01A-00-00-00-00",
+            "parent_ref": null,
+            "name": "UX走查输送设备 组装体",
+            "kind": "组装体",
+            "source": "装配",
+            "qty": 1.0,
+            "unit": "台",
+            "shipped": true,
+            "shipped_at": "2026-10-06T23:17:11.066144+08:00",
+            "photos": [
+              {
+                "token": "TX26001/shipping/UX-TEST-ONLY/1791299831044160000_UX-TEST-ONLY-photo.png",
+                "filename": "UX-TEST-ONLY-photo.png"
+              }
+            ],
+            "place_photos": [],
+            "check_result": null,
+            "check_qty": null,
+            "check_note": null,
+            "remark": null
+          },
+          {
+            "id": 2,
+            "equip_no": "01A",
+            "ref": "JJ-LS-1604",
+            "parent_ref": "TX26001-01A-00-00-00-00",
+            "name": "UX测试螺丝",
+            "kind": "零件",
+            "source": "装配未装",
+            "qty": 2.0,
+            "unit": "件",
+            "shipped": true,
+            "shipped_at": "2026-10-06T23:17:11.066127+08:00",
+            "photos": [
+              {
+                "token": "TX26001/shipping/UX-TEST-ONLY/1791299831044160000_UX-TEST-ONLY-photo.png",
+                "filename": "UX-TEST-ONLY-photo.png"
+              }
+            ],
+            "place_photos": [],
+            "check_result": null,
+            "check_qty": null,
+            "check_note": null,
+            "remark": null
+          },
+          {
+            "id": 3,
+            "equip_no": "01A",
+            "ref": "补-UX测试工具-本批未发",
+            "parent_ref": null,
+            "name": "UX测试工具-本批未发",
+            "kind": "补充",
+            "source": "补充",
+            "qty": 1.0,
+            "unit": null,
+            "shipped": false,
+            "shipped_at": null,
+            "photos": [],
+            "place_photos": [],
+            "check_result": null,
+            "check_qty": null,
+            "check_note": null,
+            "remark": null
+          }
+        ],
+        "receipts": []
+      }
+    },
+    {
+      "user": "delivery1",
+      "method": "POST",
+      "path": "/shipping/1/items/manual",
+      "http": 400,
+      "result": {
+        "detail": "当前状态「在途」，不能再补清单（已发运的批次清单已锁死）"
+      }
+    },
+    {
+      "user": "site1",
+      "method": "GET",
+      "path": "/site/workbench?project_no=TX26001",
+      "http": 200,
+      "result": {
+        "counts": {
+          "surveyed": 0,
+          "daily_today": 0,
+          "open_issues": 0,
+          "to_dispatch": 0,
+          "debugging": 0
+        },
+        "surveys": [],
+        "dailies": [],
+        "issues": [],
+        "commissions": []
+      }
+    },
+    {
+      "user": "site1",
+      "method": "POST",
+      "path": "/shipping/1/receipt",
+      "http": 400,
+      "result": {
+        "detail": "本批已勾「已发」2 项，必须逐项清点（当前 1 项）"
+      }
+    },
+    {
+      "user": "site1",
+      "method": "POST",
+      "path": "/shipping/1/receipt",
+      "http": 200,
+      "result": {
+        "id": 1,
+        "shipment_no": "FH26001",
+        "project_no": "TX26001",
+        "status": "已签收",
+        "plan_ship_date": "2026-10-06",
+        "vehicle_status": "已叫车",
+        "vehicle_count": 1,
+        "vehicle_fee": 0.0,
+        "vehicle_note": "UX测试专用车辆登记，无真实叫车或运费",
+        "vehicle_by": 13,
+        "vehicle_at": "2026-10-06T23:17:11.085484+08:00",
+        "vehicle": "UX测试虚拟车辆",
+        "driver": "UX测试",
+        "plate_no": "UX-TEST",
+        "instruct_at": "2026-10-06T23:17:10.132979+08:00",
+        "depart_at": "2026-10-06T23:17:11.161821+08:00",
+        "arrive_at": null,
+        "signed_at": "2026-10-06T15:17:11.650844+00:00",
+        "photos": [
+          {
+            "token": "TX26001/shipping/UX-TEST-ONLY/1791299831044160000_UX-TEST-ONLY-photo.png",
+            "filename": "UX-TEST-ONLY-photo.png"
+          }
+        ],
+        "remark": "UX测试专用，无真实发运",
+        "lines": [
+          {
+            "id": 1,
+            "equip_no": "01A",
+            "equip_name": "UX走查输送设备",
+            "qty": 1.0,
+            "remark": null
+          }
+        ],
+        "items": [
+          {
+            "id": 1,
+            "equip_no": "01A",
+            "ref": "TX26001-01A-00-00-00-00",
+            "parent_ref": null,
+            "name": "UX走查输送设备 组装体",
+            "kind": "组装体",
+            "source": "装配",
+            "qty": 1.0,
+            "unit": "台",
+            "shipped": true,
+            "shipped_at": "2026-10-06T23:17:11.066144+08:00",
+            "photos": [
+              {
+                "token": "TX26001/shipping/UX-TEST-ONLY/1791299831044160000_UX-TEST-ONLY-photo.png",
+                "filename": "UX-TEST-ONLY-photo.png"
+              }
+            ],
+            "place_photos": [],
+            "check_result": "到",
+            "check_qty": 1.0,
+            "check_note": null,
+            "remark": null
+          },
+          {
+            "id": 2,
+            "equip_no": "01A",
+            "ref": "JJ-LS-1604",
+            "parent_ref": "TX26001-01A-00-00-00-00",
+            "name": "UX测试螺丝",
+            "kind": "零件",
+            "source": "装配未装",
+            "qty": 2.0,
+            "unit": "件",
+            "shipped": true,
+            "shipped_at": "2026-10-06T23:17:11.066127+08:00",
+            "photos": [
+              {
+                "token": "TX26001/shipping/UX-TEST-ONLY/1791299831044160000_UX-TEST-ONLY-photo.png",
+                "filename": "UX-TEST-ONLY-photo.png"
+              }
+            ],
+            "place_photos": [],
+            "check_result": "缺",
+            "check_qty": 1.0,
+            "check_note": "UX测试：应到2实到1，缺1",
+            "remark": null
+          },
+          {
+            "id": 3,
+            "equip_no": "01A",
+            "ref": "补-UX测试工具-本批未发",
+            "parent_ref": null,
+            "name": "UX测试工具-本批未发",
+            "kind": "补充",
+            "source": "补充",
+            "qty": 1.0,
+            "unit": null,
+            "shipped": false,
+            "shipped_at": null,
+            "photos": [],
+            "place_photos": [],
+            "check_result": null,
+            "check_qty": null,
+            "check_note": null,
+            "remark": null
+          }
+        ],
+        "receipts": [
+          {
+            "id": 1,
+            "result": "缺件",
+            "shortage_detail": [
+              {
+                "qty": 2.0,
+                "item": "JJ-LS-1604",
+                "name": "UX测试螺丝",
+                "reason": "UX测试：应到2实到1，缺1",
+                "result": "缺",
+                "item_id": 2,
+                "equip_no": "01A",
+                "received_qty": 1.0
+              }
+            ],
+            "photos": [
+              {
+                "token": "TX26001/shipping/UX-TEST-ONLY/1791299831044160000_UX-TEST-ONLY-photo.png",
+                "filename": "UX-TEST-ONLY-photo.png"
+              }
+            ],
+            "received_at": "2026-10-06T23:17:11.650760+08:00",
+            "remark": "UX测试缺件分支，无真实签收"
+          }
+        ]
+      }
+    },
+    {
+      "user": "site1",
+      "method": "GET",
+      "path": "/site/workbench?project_no=TX26001",
+      "http": 200,
+      "result": {
+        "counts": {
+          "surveyed": 0,
+          "daily_today": 0,
+          "open_issues": 0,
+          "to_dispatch": 0,
+          "debugging": 0
+        },
+        "surveys": [],
+        "dailies": [],
+        "issues": [],
+        "commissions": []
+      }
+    },
+    {
+      "user": "pm1",
+      "method": "GET",
+      "path": "/shipping/workbench",
+      "http": 200,
+      "result": {
+        "counts": {
+          "instructed": 0,
+          "to_vehicle": 0,
+          "packing": 0,
+          "loaded": 0,
+          "transit": 0,
+          "arrived": 0,
+          "signed": 1,
+          "open": 0
+        },
+        "shipments": [
+          {
+            "id": 1,
+            "shipment_no": "FH26001",
+            "project_no": "TX26001",
+            "status": "已签收",
+            "plan_ship_date": "2026-10-06",
+            "vehicle_status": "已叫车",
+            "vehicle_count": 1,
+            "vehicle_fee": 0.0,
+            "vehicle_note": "UX测试专用车辆登记，无真实叫车或运费",
+            "vehicle_by": 13,
+            "vehicle_at": "2026-10-06T23:17:11.085484+08:00",
+            "vehicle": "UX测试虚拟车辆",
+            "driver": "UX测试",
+            "plate_no": "UX-TEST",
+            "instruct_at": "2026-10-06T23:17:10.132979+08:00",
+            "depart_at": "2026-10-06T23:17:11.161821+08:00",
+            "arrive_at": null,
+            "signed_at": "2026-10-06T23:17:11.650844+08:00",
+            "photos": [
+              {
+                "token": "TX26001/shipping/UX-TEST-ONLY/1791299831044160000_UX-TEST-ONLY-photo.png",
+                "filename": "UX-TEST-ONLY-photo.png"
+              }
+            ],
+            "remark": "UX测试专用，无真实发运",
+            "lines": [
+              {
+                "id": 1,
+                "equip_no": "01A",
+                "equip_name": "UX走查输送设备",
+                "qty": 1.0,
+                "remark": null
+              }
+            ],
+            "items": [
+              {
+                "id": 1,
+                "equip_no": "01A",
+                "ref": "TX26001-01A-00-00-00-00",
+                "parent_ref": null,
+                "name": "UX走查输送设备 组装体",
+                "kind": "组装体",
+                "source": "装配",
+                "qty": 1.0,
+                "unit": "台",
+                "shipped": true,
+                "shipped_at": "2026-10-06T23:17:11.066144+08:00",
+                "photos": [
+                  {
+                    "token": "TX26001/shipping/UX-TEST-ONLY/1791299831044160000_UX-TEST-ONLY-photo.png",
+                    "filename": "UX-TEST-ONLY-photo.png"
+                  }
+                ],
+                "place_photos": [],
+                "check_result": "到",
+                "check_qty": 1.0,
+                "check_note": null,
+                "remark": null
+              },
+              {
+                "id": 2,
+                "equip_no": "01A",
+                "ref": "JJ-LS-1604",
+                "parent_ref": "TX26001-01A-00-00-00-00",
+                "name": "UX测试螺丝",
+                "kind": "零件",
+                "source": "装配未装",
+                "qty": 2.0,
+                "unit": "件",
+                "shipped": true,
+                "shipped_at": "2026-10-06T23:17:11.066127+08:00",
+                "photos": [
+                  {
+                    "token": "TX26001/shipping/UX-TEST-ONLY/1791299831044160000_UX-TEST-ONLY-photo.png",
+                    "filename": "UX-TEST-ONLY-photo.png"
+                  }
+                ],
+                "place_photos": [],
+                "check_result": "缺",
+                "check_qty": 1.0,
+                "check_note": "UX测试：应到2实到1，缺1",
+                "remark": null
+              },
+              {
+                "id": 3,
+                "equip_no": "01A",
+                "ref": "补-UX测试工具-本批未发",
+                "parent_ref": null,
+                "name": "UX测试工具-本批未发",
+                "kind": "补充",
+                "source": "补充",
+                "qty": 1.0,
+                "unit": null,
+                "shipped": false,
+                "shipped_at": null,
+                "photos": [],
+                "place_photos": [],
+                "check_result": null,
+                "check_qty": null,
+                "check_note": null,
+                "remark": null
+              }
+            ],
+            "receipts": [
+              {
+                "id": 1,
+                "result": "缺件",
+                "shortage_detail": [
+                  {
+                    "qty": 2.0,
+                    "item": "JJ-LS-1604",
+                    "name": "UX测试螺丝",
+                    "reason": "UX测试：应到2实到1，缺1",
+                    "result": "缺",
+                    "item_id": 2,
+                    "equip_no": "01A",
+                    "received_qty": 1.0
+                  }
+                ],
+                "photos": [
+                  {
+                    "token": "TX26001/shipping/UX-TEST-ONLY/1791299831044160000_UX-TEST-ONLY-photo.png",
+                    "filename": "UX-TEST-ONLY-photo.png"
+                  }
+                ],
+                "received_at": "2026-10-06T23:17:11.650760+08:00",
+                "remark": "UX测试缺件分支，无真实签收"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "user": "pm1",
+      "method": "GET",
+      "path": "/notifications?limit=100",
+      "http": 200,
+      "result": {
+        "unread": 7,
+        "items": [
+          {
+            "id": 38,
+            "type": "ship",
+            "title": "现场清点缺件：TX26001（FH26001）",
+            "body": "缺/损 1 项；备注：UX测试缺件分支，无真实签收",
+            "link": "/shipping",
+            "is_read": false,
+            "created_at": "2026-10-06T23:17:11.637376+08:00"
+          },
+          {
+            "id": 31,
+            "type": "warehouse",
+            "title": "货已入库：JJ-LS-1604 × 1.000",
+            "body": "TX26001 01A → 深圳仓 A-03-12",
+            "link": "/warehouse",
+            "is_read": false,
+            "created_at": "2026-10-06T22:52:58.065811+08:00"
+          },
+          {
+            "id": 28,
+            "type": "warehouse",
+            "title": "货已入库：JJ-LS-1604 × 3.000",
+            "body": "TX26001 01A → 深圳仓 A-03-12",
+            "link": "/warehouse",
+            "is_read": false,
+            "created_at": "2026-10-06T22:52:54.686986+08:00"
+          },
+          {
+            "id": 26,
+            "type": "warehouse",
+            "title": "货已入库：JJ-LS-1604 × 3.000",
+            "body": "TX26001 01A → 深圳仓 A-03-12",
+            "link": "/warehouse",
+            "is_read": false,
+            "created_at": "2026-10-06T22:52:54.646145+08:00"
+          },
+          {
+            "id": 23,
+            "type": "release",
+            "title": "机械设计已发布（01A）：RL26001",
+            "body": "内容已冻结，后面按这一版干活；工艺可以开工了",
+            "link": "/projects/TX26001/design/01A",
+            "is_read": false,
+            "created_at": "2026-10-06T22:50:42.237891+08:00"
+          },
+          {
+            "id": 13,
+            "type": "warehouse",
+            "title": "货已入库：JJ-LS-1604 × 1.000",
+            "body": "TX26001 01A → 深圳仓 A-03-12",
+            "link": "/warehouse",
+            "is_read": false,
+            "created_at": "2026-10-06T22:42:46.818893+08:00"
+          },
+          {
+            "id": 11,
+            "type": "warehouse",
+            "title": "货已入库：JJ-LS-1604 × 2.000",
+            "body": "TX26001 01A → 深圳仓 A-03-12",
+            "link": "/warehouse",
+            "is_read": false,
+            "created_at": "2026-10-06T22:42:46.754378+08:00"
+          }
+        ]
+      }
+    },
+    {
+      "user": "buyer1",
+      "method": "GET",
+      "path": "/notifications?limit=100",
+      "http": 200,
+      "result": {
+        "unread": 6,
+        "items": [
+          {
+            "id": 30,
+            "type": "purchase",
+            "title": "已入库：JJ-LS-1604 × 1.000 → 深圳仓 A-03-12",
+            "body": "GR26005（TX26001 01A）",
+            "link": "/purchase",
+            "is_read": false,
+            "created_at": "2026-10-06T22:52:58.065811+08:00"
+          },
+          {
+            "id": 27,
+            "type": "purchase",
+            "title": "已入库：JJ-LS-1604 × 3.000 → 深圳仓 A-03-12",
+            "body": "GR26004（TX26001 01A）",
+            "link": "/purchase",
+            "is_read": false,
+            "created_at": "2026-10-06T22:52:54.686986+08:00"
+          },
+          {
+            "id": 25,
+            "type": "purchase",
+            "title": "已入库：JJ-LS-1604 × 3.000 → 深圳仓 A-03-12",
+            "body": "GR26003-A（TX26001 01A）",
+            "link": "/purchase",
+            "is_read": false,
+            "created_at": "2026-10-06T22:52:54.646145+08:00"
+          },
+          {
+            "id": 15,
+            "type": "purchase",
+            "title": "验收不合格：GR26003（JJ-LS-1604 × 1）",
+            "body": "UX交接核查：测试部分不合格1件",
+            "link": "/purchase",
+            "is_read": false,
+            "created_at": "2026-10-06T22:42:47.667319+08:00"
+          },
+          {
+            "id": 12,
+            "type": "purchase",
+            "title": "已入库：JJ-LS-1604 × 1.000 → 深圳仓 A-03-12",
+            "body": "GR26002（TX26001 01A）",
+            "link": "/purchase",
+            "is_read": false,
+            "created_at": "2026-10-06T22:42:46.818893+08:00"
+          },
+          {
+            "id": 10,
+            "type": "purchase",
+            "title": "已入库：JJ-LS-1604 × 2.000 → 深圳仓 A-03-12",
+            "body": "GR26001（TX26001 01A）",
+            "link": "/purchase",
+            "is_read": false,
+            "created_at": "2026-10-06T22:42:46.754378+08:00"
+          }
+        ]
+      }
+    },
+    {
+      "user": "site1",
+      "method": "GET",
+      "path": "/notifications?limit=100",
+      "http": 200,
+      "result": {
+        "unread": 1,
+        "items": [
+          {
+            "id": 34,
+            "type": "ship",
+            "title": "已发运：TX26001（FH26001）共 2 项",
+            "body": "货已发出，请按发运清单逐项清点「到 / 缺 / 损」。",
+            "link": "/m/site",
+            "is_read": false,
+            "created_at": "2026-10-06T23:17:11.151387+08:00"
+          }
+        ]
+      }
+    },
+    {
+      "user": "delivery1",
+      "method": "GET",
+      "path": "/notifications?limit=100",
+      "http": 200,
+      "result": {
+        "unread": 2,
+        "items": [
+          {
+            "id": 33,
+            "type": "task",
+            "title": "车辆已就绪，可以装车：FH26001（1 车）",
+            "body": "计划发货日 2026-10-06；承运/备注：UX测试专用车辆登记，无真实叫车或运费",
+            "link": "/shipping",
+            "is_read": false,
+            "created_at": "2026-10-06T23:17:11.078184+08:00"
+          },
+          {
+            "id": 32,
+            "type": "ship",
+            "title": "新发货指令：TX26001（FH26001）本次发 01A",
+            "body": "请安排打包（视车的大小决定是否拆解）→ 装车 → 发运。",
+            "link": "/shipping",
+            "is_read": false,
+            "created_at": "2026-10-06T23:17:09.346749+08:00"
+          }
+        ]
+      }
+    }
+  ],
+  "assembly_id": 1,
+  "shipment_id": 1,
+  "shipment_no": "FH26001",
+  "generated_items": [
+    {
+      "id": 1,
+      "equip_no": "01A",
+      "ref": "TX26001-01A-00-00-00-00",
+      "parent_ref": null,
+      "name": "UX走查输送设备 组装体",
+      "kind": "组装体",
+      "source": "装配",
+      "qty": 1.0,
+      "unit": "台",
+      "shipped": false,
+      "shipped_at": null,
+      "photos": [],
+      "place_photos": [],
+      "check_result": null,
+      "check_qty": null,
+      "check_note": null,
+      "remark": null
+    },
+    {
+      "id": 2,
+      "equip_no": "01A",
+      "ref": "JJ-LS-1604",
+      "parent_ref": "TX26001-01A-00-00-00-00",
+      "name": "UX测试螺丝",
+      "kind": "零件",
+      "source": "装配未装",
+      "qty": 2.0,
+      "unit": "件",
+      "shipped": false,
+      "shipped_at": null,
+      "photos": [],
+      "place_photos": [],
+      "check_result": null,
+      "check_qty": null,
+      "check_note": null,
+      "remark": null
+    }
+  ],
+  "unshipped_item_id": 3,
+  "photos": [
+    {
+      "token": "TX26001/shipping/UX-TEST-ONLY/1791299831044160000_UX-TEST-ONLY-photo.png",
+      "filename": "UX-TEST-ONLY-photo.png"
+    }
+  ],
+  "final_shipment": {
+    "id": 1,
+    "shipment_no": "FH26001",
+    "project_no": "TX26001",
+    "status": "已签收",
+    "plan_ship_date": "2026-10-06",
+    "vehicle_status": "已叫车",
+    "vehicle_count": 1,
+    "vehicle_fee": 0.0,
+    "vehicle_note": "UX测试专用车辆登记，无真实叫车或运费",
+    "vehicle_by": 13,
+    "vehicle_at": "2026-10-06T23:17:11.085484+08:00",
+    "vehicle": "UX测试虚拟车辆",
+    "driver": "UX测试",
+    "plate_no": "UX-TEST",
+    "instruct_at": "2026-10-06T23:17:10.132979+08:00",
+    "depart_at": "2026-10-06T23:17:11.161821+08:00",
+    "arrive_at": null,
+    "signed_at": "2026-10-06T15:17:11.650844+00:00",
+    "photos": [
+      {
+        "token": "TX26001/shipping/UX-TEST-ONLY/1791299831044160000_UX-TEST-ONLY-photo.png",
+        "filename": "UX-TEST-ONLY-photo.png"
+      }
+    ],
+    "remark": "UX测试专用，无真实发运",
+    "lines": [
+      {
+        "id": 1,
+        "equip_no": "01A",
+        "equip_name": "UX走查输送设备",
+        "qty": 1.0,
+        "remark": null
+      }
+    ],
+    "items": [
+      {
+        "id": 1,
+        "equip_no": "01A",
+        "ref": "TX26001-01A-00-00-00-00",
+        "parent_ref": null,
+        "name": "UX走查输送设备 组装体",
+        "kind": "组装体",
+        "source": "装配",
+        "qty": 1.0,
+        "unit": "台",
+        "shipped": true,
+        "shipped_at": "2026-10-06T23:17:11.066144+08:00",
+        "photos": [
+          {
+            "token": "TX26001/shipping/UX-TEST-ONLY/1791299831044160000_UX-TEST-ONLY-photo.png",
+            "filename": "UX-TEST-ONLY-photo.png"
+          }
+        ],
+        "place_photos": [],
+        "check_result": "到",
+        "check_qty": 1.0,
+        "check_note": null,
+        "remark": null
+      },
+      {
+        "id": 2,
+        "equip_no": "01A",
+        "ref": "JJ-LS-1604",
+        "parent_ref": "TX26001-01A-00-00-00-00",
+        "name": "UX测试螺丝",
+        "kind": "零件",
+        "source": "装配未装",
+        "qty": 2.0,
+        "unit": "件",
+        "shipped": true,
+        "shipped_at": "2026-10-06T23:17:11.066127+08:00",
+        "photos": [
+          {
+            "token": "TX26001/shipping/UX-TEST-ONLY/1791299831044160000_UX-TEST-ONLY-photo.png",
+            "filename": "UX-TEST-ONLY-photo.png"
+          }
+        ],
+        "place_photos": [],
+        "check_result": "缺",
+        "check_qty": 1.0,
+        "check_note": "UX测试：应到2实到1，缺1",
+        "remark": null
+      },
+      {
+        "id": 3,
+        "equip_no": "01A",
+        "ref": "补-UX测试工具-本批未发",
+        "parent_ref": null,
+        "name": "UX测试工具-本批未发",
+        "kind": "补充",
+        "source": "补充",
+        "qty": 1.0,
+        "unit": null,
+        "shipped": false,
+        "shipped_at": null,
+        "photos": [],
+        "place_photos": [],
+        "check_result": null,
+        "check_qty": null,
+        "check_note": null,
+        "remark": null
+      }
+    ],
+    "receipts": [
+      {
+        "id": 1,
+        "result": "缺件",
+        "shortage_detail": [
+          {
+            "qty": 2.0,
+            "item": "JJ-LS-1604",
+            "name": "UX测试螺丝",
+            "reason": "UX测试：应到2实到1，缺1",
+            "result": "缺",
+            "item_id": 2,
+            "equip_no": "01A",
+            "received_qty": 1.0
+          }
+        ],
+        "photos": [
+          {
+            "token": "TX26001/shipping/UX-TEST-ONLY/1791299831044160000_UX-TEST-ONLY-photo.png",
+            "filename": "UX-TEST-ONLY-photo.png"
+          }
+        ],
+        "received_at": "2026-10-06T23:17:11.650760+08:00",
+        "remark": "UX测试缺件分支，无真实签收"
+      }
+    ]
+  },
+  "phase": "signed_with_shortage_1_of_2_unassembled",
+  "shipment_notifications": {
+    "pm1": [
+      {
+        "id": 38,
+        "type": "ship",
+        "title": "现场清点缺件：TX26001（FH26001）",
+        "body": "缺/损 1 项；备注：UX测试缺件分支，无真实签收",
+        "link": "/shipping",
+        "is_read": false,
+        "created_at": "2026-10-06T23:17:11.637376+08:00"
+      }
+    ],
+    "buyer1": [],
+    "site1": [
+      {
+        "id": 34,
+        "type": "ship",
+        "title": "已发运：TX26001（FH26001）共 2 项",
+        "body": "货已发出，请按发运清单逐项清点「到 / 缺 / 损」。",
+        "link": "/m/site",
+        "is_read": false,
+        "created_at": "2026-10-06T23:17:11.151387+08:00"
+      }
+    ],
+    "delivery1": [
+      {
+        "id": 33,
+        "type": "task",
+        "title": "车辆已就绪，可以装车：FH26001（1 车）",
+        "body": "计划发货日 2026-10-06；承运/备注：UX测试专用车辆登记，无真实叫车或运费",
+        "link": "/shipping",
+        "is_read": false,
+        "created_at": "2026-10-06T23:17:11.078184+08:00"
+      },
+      {
+        "id": 32,
+        "type": "ship",
+        "title": "新发货指令：TX26001（FH26001）本次发 01A",
+        "body": "请安排打包（视车的大小决定是否拆解）→ 装车 → 发运。",
+        "link": "/shipping",
+        "is_read": false,
+        "created_at": "2026-10-06T23:17:09.346749+08:00"
+      }
+    ]
+  }
+}

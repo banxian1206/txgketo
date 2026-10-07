@@ -1,0 +1,1559 @@
+{
+  "scope": "UX交接核查20261006，专用测试数据，无外部交易",
+  "events": [
+    {
+      "user": "purchase_manager",
+      "method": "POST",
+      "path": "/library/items",
+      "http": 201,
+      "result": {
+        "item_no": "JJ-LS-1604",
+        "display_name": "螺丝 UX交接核查专用测试 · M8-UX-20261006 · 内六角",
+        "source_type": "标准件",
+        "std_class_code": "LS",
+        "std_class_name": "螺丝",
+        "category_code": "JJ",
+        "spec": {
+          "material": "UX交接核查专用测试",
+          "spec": "M8-UX-20261006",
+          "head": "内六角"
+        },
+        "spec_text": "UX交接核查专用测试 · M8-UX-20261006 · 内六角",
+        "unit": "件",
+        "brand": "UX测试专用",
+        "mfr_model": "UX-HANDOFF-20261006",
+        "is_active": true
+      }
+    },
+    {
+      "user": "buyer1",
+      "method": "POST",
+      "path": "/suppliers",
+      "http": 201,
+      "result": {
+        "id": 812,
+        "code": "S0812",
+        "name": "UX交接核查专用-A-20261006",
+        "short_name": null,
+        "kind": null,
+        "contact_name": null,
+        "phone": null,
+        "email": null,
+        "address": null,
+        "payment_terms": null,
+        "tax_rate": null,
+        "rating": null,
+        "remark": "仅本机走查测试，不是真实供应商，不用于采购付款",
+        "is_active": true
+      }
+    },
+    {
+      "user": "buyer1",
+      "method": "POST",
+      "path": "/suppliers",
+      "http": 201,
+      "result": {
+        "id": 813,
+        "code": "S0813",
+        "name": "UX交接核查专用-B-20261006",
+        "short_name": null,
+        "kind": null,
+        "contact_name": null,
+        "phone": null,
+        "email": null,
+        "address": null,
+        "payment_terms": null,
+        "tax_rate": null,
+        "rating": null,
+        "remark": "仅本机走查测试，不是真实供应商，不用于采购付款",
+        "is_active": true
+      }
+    },
+    {
+      "user": "buyer1",
+      "method": "POST",
+      "path": "/purchase/manual-request",
+      "http": 201,
+      "result": {
+        "id": 1,
+        "item_no": "JJ-LS-1604",
+        "display_name": "螺丝 UX交接核查专用测试 · M8-UX-20261006 · 内六角",
+        "qty": 10.0,
+        "unit": "件",
+        "attribution": "项目",
+        "source": "手工",
+        "status": "待采购"
+      }
+    },
+    {
+      "user": "buyer1",
+      "method": "POST",
+      "path": "/purchase/merge-order",
+      "http": 200,
+      "result": {
+        "po_no": "PO26001",
+        "count": 1,
+        "total": 6.0,
+        "supplier": "UX交接核查专用-A-20261006",
+        "status": "待经理审"
+      }
+    },
+    {
+      "user": "buyer1",
+      "method": "POST",
+      "path": "/purchase/merge-order",
+      "http": 200,
+      "result": {
+        "po_no": "PO26002",
+        "count": 1,
+        "total": 4.0,
+        "supplier": "UX交接核查专用-B-20261006",
+        "status": "待经理审"
+      }
+    },
+    {
+      "user": "buyer1",
+      "method": "POST",
+      "path": "/purchase/orders/PO26001/approve",
+      "http": 403,
+      "result": {
+        "detail": "只有本部门采购经理能审这一级"
+      }
+    },
+    {
+      "user": "purchase_director",
+      "method": "POST",
+      "path": "/purchase/orders/PO26001/approve",
+      "http": 403,
+      "result": {
+        "detail": "只有本部门采购经理能审这一级"
+      }
+    },
+    {
+      "user": "purchase_manager",
+      "method": "POST",
+      "path": "/purchase/orders/PO26001/approve",
+      "http": 200,
+      "result": {
+        "status": "待总监审"
+      }
+    },
+    {
+      "user": "purchase_director",
+      "method": "POST",
+      "path": "/purchase/orders/PO26001/approve",
+      "http": 200,
+      "result": {
+        "status": "已批准"
+      }
+    },
+    {
+      "user": "purchase_manager",
+      "method": "POST",
+      "path": "/purchase/orders/PO26002/approve",
+      "http": 200,
+      "result": {
+        "status": "待总监审"
+      }
+    },
+    {
+      "user": "purchase_director",
+      "method": "POST",
+      "path": "/purchase/orders/PO26002/approve",
+      "http": 200,
+      "result": {
+        "status": "已批准"
+      }
+    },
+    {
+      "user": "wh1",
+      "method": "GET",
+      "path": "/warehouse/workbench",
+      "http": 200,
+      "result": {
+        "incoming": [
+          {
+            "id": 1,
+            "project_no": "TX26001",
+            "attribution": "项目",
+            "project_name": "UX走查-20261006-整线",
+            "equip_no": "01A",
+            "equip_name": "UX走查输送设备",
+            "item_no": "JJ-LS-1604",
+            "display_name": "螺丝 UX交接核查专用测试 · M8-UX-20261006 · 内六角",
+            "spec_text": "UX交接核查专用测试 · M8-UX-20261006 · 内六角",
+            "qty": 10.0,
+            "qty_received": 0.0,
+            "unit": "件",
+            "po_no": "PO26002",
+            "supplier_name": "UX交接核查专用-B-20261006",
+            "lines": [
+              {
+                "po_line_id": 1,
+                "po_no": "PO26001",
+                "supplier_name": "UX交接核查专用-A-20261006",
+                "qty": 6.0,
+                "received_qty": 0.0
+              },
+              {
+                "po_line_id": 2,
+                "po_no": "PO26002",
+                "supplier_name": "UX交接核查专用-B-20261006",
+                "qty": 4.0,
+                "received_qty": 0.0
+              }
+            ],
+            "need_date": "2026-10-20",
+            "expected_date": "2026-10-15",
+            "overdue": false
+          }
+        ],
+        "pending_storage": [],
+        "pending_issues": [],
+        "stock": {
+          "item_kinds": 0,
+          "out_of_stock": 0
+        }
+      }
+    },
+    {
+      "user": "wh1",
+      "method": "POST",
+      "path": "/purchase-requests/1/inspect",
+      "http": 400,
+      "result": {
+        "detail": "这条需求拆给了多家供应商 —— 请指明这批货是哪张采购单的（传 po_line_id）"
+      }
+    },
+    {
+      "user": "wh1",
+      "method": "POST",
+      "path": "/purchase-requests/1/inspect",
+      "http": 200,
+      "result": {
+        "receipt_id": 1,
+        "receipt_no": "GR26001",
+        "receipt_status": "待入库",
+        "request_status": "待入库",
+        "qty_received": 2.0,
+        "qty_rejected": 0.0,
+        "batch_no": "GR26001",
+        "po_line_id": 1,
+        "receipts": [
+          {
+            "receipt_no": "GR26001",
+            "status": "待入库",
+            "qty": 2.0
+          }
+        ]
+      }
+    },
+    {
+      "user": "wh1",
+      "method": "GET",
+      "path": "/warehouse/workbench",
+      "http": 200,
+      "result": {
+        "incoming": [],
+        "pending_storage": [
+          {
+            "id": 1,
+            "receipt_no": "GR26001",
+            "project_no": "TX26001",
+            "attribution": "项目",
+            "project_name": "UX走查-20261006-整线",
+            "request_id": 1,
+            "po_no": "PO26002",
+            "equip_no": "01A",
+            "equip_name": "UX走查输送设备",
+            "supplier_name": "UX交接核查专用-B-20261006",
+            "item_no": "JJ-LS-1604",
+            "display_name": "螺丝 UX交接核查专用测试 · M8-UX-20261006 · 内六角",
+            "spec_text": "UX交接核查专用测试 · M8-UX-20261006 · 内六角",
+            "qty": 2.0,
+            "unit": "件",
+            "receipt_date": "2026-10-06",
+            "inspected_at": "2026-10-06T22:41:25.939025+08:00"
+          }
+        ],
+        "pending_issues": [],
+        "stock": {
+          "item_kinds": 0,
+          "out_of_stock": 0
+        }
+      }
+    },
+    {
+      "user": "wh1",
+      "method": "POST",
+      "path": "/purchase-requests/1/inspect",
+      "http": 200,
+      "result": {
+        "receipt_id": 2,
+        "receipt_no": "GR26002",
+        "receipt_status": "待入库",
+        "request_status": "待入库",
+        "qty_received": 3.0,
+        "qty_rejected": 0.0,
+        "batch_no": "GR26002",
+        "po_line_id": 2,
+        "receipts": [
+          {
+            "receipt_no": "GR26002",
+            "status": "待入库",
+            "qty": 1.0
+          }
+        ]
+      }
+    },
+    {
+      "user": "wh1",
+      "method": "GET",
+      "path": "/warehouse/locations",
+      "http": 200,
+      "result": [
+        {
+          "id": 1,
+          "warehouse": "深圳仓",
+          "code": "A-03-12",
+          "name": "成品区 3 排 12 位",
+          "item_count": 0,
+          "is_active": true
+        },
+        {
+          "id": 2,
+          "warehouse": "深圳仓",
+          "code": "B-01-01",
+          "name": "原材料区 1 排 1 位",
+          "item_count": 0,
+          "is_active": true
+        }
+      ]
+    },
+    {
+      "user": "wh1",
+      "method": "POST",
+      "path": "/goods-receipts/1/store",
+      "http": 200,
+      "result": {
+        "receipt_no": "GR26001",
+        "status": "已入库",
+        "location": "深圳仓 A-03-12",
+        "request_status": "待入库"
+      }
+    },
+    {
+      "user": "wh1",
+      "method": "POST",
+      "path": "/goods-receipts/2/store",
+      "http": 200,
+      "result": {
+        "receipt_no": "GR26002",
+        "status": "已入库",
+        "location": "深圳仓 A-03-12",
+        "request_status": "部分到货"
+      }
+    },
+    {
+      "user": "wh1",
+      "method": "GET",
+      "path": "/warehouse/workbench",
+      "http": 200,
+      "result": {
+        "incoming": [
+          {
+            "id": 1,
+            "project_no": "TX26001",
+            "attribution": "项目",
+            "project_name": "UX走查-20261006-整线",
+            "equip_no": "01A",
+            "equip_name": "UX走查输送设备",
+            "item_no": "JJ-LS-1604",
+            "display_name": "螺丝 UX交接核查专用测试 · M8-UX-20261006 · 内六角",
+            "spec_text": "UX交接核查专用测试 · M8-UX-20261006 · 内六角",
+            "qty": 10.0,
+            "qty_received": 3.0,
+            "unit": "件",
+            "po_no": "PO26002",
+            "supplier_name": "UX交接核查专用-B-20261006",
+            "lines": [
+              {
+                "po_line_id": 1,
+                "po_no": "PO26001",
+                "supplier_name": "UX交接核查专用-A-20261006",
+                "qty": 6.0,
+                "received_qty": 2.0
+              },
+              {
+                "po_line_id": 2,
+                "po_no": "PO26002",
+                "supplier_name": "UX交接核查专用-B-20261006",
+                "qty": 4.0,
+                "received_qty": 1.0
+              }
+            ],
+            "need_date": "2026-10-20",
+            "expected_date": "2026-10-15",
+            "overdue": false
+          }
+        ],
+        "pending_storage": [],
+        "pending_issues": [],
+        "stock": {
+          "item_kinds": 1,
+          "out_of_stock": 0
+        }
+      }
+    },
+    {
+      "user": "wh1",
+      "method": "POST",
+      "path": "/purchase-requests/1/inspect",
+      "http": 400,
+      "result": {
+        "detail": "本批到货 4 超过该采购单行（2）的未到数量 3（订购 4，已到 1）"
+      }
+    },
+    {
+      "user": "wh1",
+      "method": "POST",
+      "path": "/purchase-requests/1/inspect",
+      "http": 200,
+      "result": {
+        "receipt_id": 3,
+        "receipt_no": "GR26003-A",
+        "receipt_status": "待入库",
+        "request_status": "不合格",
+        "qty_received": 6.0,
+        "qty_rejected": 1.0,
+        "batch_no": "GR26003",
+        "po_line_id": 1,
+        "receipts": [
+          {
+            "receipt_no": "GR26003-A",
+            "status": "待入库",
+            "qty": 3.0
+          },
+          {
+            "receipt_no": "GR26003-B",
+            "status": "不合格",
+            "qty": 1.0
+          }
+        ]
+      }
+    },
+    {
+      "user": "wh1",
+      "method": "POST",
+      "path": "/purchase-requests/1/inspect",
+      "http": 200,
+      "result": {
+        "receipt_id": 5,
+        "receipt_no": "GR26004",
+        "receipt_status": "待入库",
+        "request_status": "不合格",
+        "qty_received": 9.0,
+        "qty_rejected": 1.0,
+        "batch_no": "GR26004",
+        "po_line_id": 2,
+        "receipts": [
+          {
+            "receipt_no": "GR26004",
+            "status": "待入库",
+            "qty": 3.0
+          }
+        ]
+      }
+    },
+    {
+      "user": "wh1",
+      "method": "GET",
+      "path": "/warehouse/workbench",
+      "http": 200,
+      "result": {
+        "incoming": [],
+        "pending_storage": [
+          {
+            "id": 3,
+            "receipt_no": "GR26003-A",
+            "project_no": "TX26001",
+            "attribution": "项目",
+            "project_name": "UX走查-20261006-整线",
+            "request_id": 1,
+            "po_no": "PO26002",
+            "equip_no": "01A",
+            "equip_name": "UX走查输送设备",
+            "supplier_name": "UX交接核查专用-B-20261006",
+            "item_no": "JJ-LS-1604",
+            "display_name": "螺丝 UX交接核查专用测试 · M8-UX-20261006 · 内六角",
+            "spec_text": "UX交接核查专用测试 · M8-UX-20261006 · 内六角",
+            "qty": 3.0,
+            "unit": "件",
+            "receipt_date": "2026-10-06",
+            "inspected_at": "2026-10-06T22:42:47.684048+08:00"
+          },
+          {
+            "id": 5,
+            "receipt_no": "GR26004",
+            "project_no": "TX26001",
+            "attribution": "项目",
+            "project_name": "UX走查-20261006-整线",
+            "request_id": 1,
+            "po_no": "PO26002",
+            "equip_no": "01A",
+            "equip_name": "UX走查输送设备",
+            "supplier_name": "UX交接核查专用-B-20261006",
+            "item_no": "JJ-LS-1604",
+            "display_name": "螺丝 UX交接核查专用测试 · M8-UX-20261006 · 内六角",
+            "spec_text": "UX交接核查专用测试 · M8-UX-20261006 · 内六角",
+            "qty": 3.0,
+            "unit": "件",
+            "receipt_date": "2026-10-06",
+            "inspected_at": "2026-10-06T22:42:47.736106+08:00"
+          }
+        ],
+        "pending_issues": [],
+        "stock": {
+          "item_kinds": 1,
+          "out_of_stock": 0
+        }
+      }
+    },
+    {
+      "user": "buyer1",
+      "method": "GET",
+      "path": "/purchase/orders/PO26002",
+      "http": 200,
+      "result": {
+        "order": {
+          "id": 2,
+          "key": "PO26002",
+          "po_no": "PO26002",
+          "supplier_id": 813,
+          "supplier_name": "UX交接核查专用-B-20261006",
+          "ordered_at": "2026-10-06",
+          "expected_date": "2026-10-15",
+          "deliver_to": "公司仓库",
+          "deliver_address": null,
+          "status": "已完成",
+          "po_status": "执行中",
+          "can_approve": false,
+          "pay_status": "未付款",
+          "line_count": 1,
+          "item_kinds": 1,
+          "total_amount": 4.0,
+          "exchanged_qty": 0.0,
+          "returned_qty": 0.0,
+          "projects": [
+            {
+              "project_no": "TX26001",
+              "project_name": "UX走查-20261006-整线"
+            }
+          ],
+          "equipments": [
+            {
+              "project_no": "TX26001",
+              "equip_no": "01A",
+              "equip_name": "UX走查输送设备"
+            }
+          ],
+          "request_ids": [
+            1
+          ]
+        },
+        "lines": [
+          {
+            "id": 2,
+            "po_no": "PO26002",
+            "unit_price": 1.0,
+            "amount": 4.0,
+            "shipped_at": null,
+            "deliver_to": "公司仓库",
+            "deliver_address": null,
+            "arrived_at": "2026-10-06",
+            "qty_received": 4.0,
+            "qty_ordered": 10.0,
+            "qty_rejected": 1.0,
+            "project_no": "TX26001",
+            "equip_no": "01A",
+            "part_no": null,
+            "item_no": "JJ-LS-1604",
+            "item_name": "螺丝 UX交接核查专用测试 · M8-UX-20261006 · 内六角",
+            "model": "UX-HANDOFF-20261006",
+            "brand": "UX测试专用",
+            "spec_text": "UX交接核查专用测试 · M8-UX-20261006 · 内六角",
+            "qty": 4.0,
+            "unit": "件",
+            "source": "手工",
+            "lead_days": null,
+            "supplier_id": 813,
+            "supplier_name": "UX交接核查专用-B-20261006",
+            "need_date": "2026-10-20",
+            "expected_date": "2026-10-15",
+            "ordered_at": "2026-10-06",
+            "status": "已入库",
+            "is_long_lead": false,
+            "origin_request_id": null,
+            "remark": "UX交接核查专用：10件拆6+4，分批到货测试；无外部交易",
+            "po_line_id": 2,
+            "request_id": 1,
+            "tax_incl": true,
+            "project_name": "UX走查-20261006-整线",
+            "equip_name": "UX走查输送设备",
+            "part_title": null,
+            "qty_original": 4.0,
+            "qty_returned": 0.0,
+            "qty_exchanged": 0.0,
+            "receipts": [
+              {
+                "receipt_no": "GR26001",
+                "status": "已入库",
+                "qty": 2.0,
+                "qty_ok": 2.0,
+                "qty_rejected": null,
+                "batch_no": "GR26001",
+                "unit": "件",
+                "receipt_date": "2026-10-06",
+                "deliver_to": "公司仓库",
+                "location": "深圳仓 A-03-12",
+                "inspect_note": null,
+                "inspected_by": "仓管组员",
+                "inspected_at": "2026-10-06T22:41:25.939025+08:00",
+                "stored_by": "仓管组员",
+                "stored_at": "2026-10-06T22:42:46.771499+08:00",
+                "resolve_note": null,
+                "resolved_by": null,
+                "resolved_at": null,
+                "retries": []
+              },
+              {
+                "receipt_no": "GR26002",
+                "status": "已入库",
+                "qty": 1.0,
+                "qty_ok": 1.0,
+                "qty_rejected": null,
+                "batch_no": "GR26002",
+                "unit": "件",
+                "receipt_date": "2026-10-06",
+                "deliver_to": "公司仓库",
+                "location": "深圳仓 A-03-12",
+                "inspect_note": null,
+                "inspected_by": "仓管组员",
+                "inspected_at": "2026-10-06T22:41:26.722944+08:00",
+                "stored_by": "仓管组员",
+                "stored_at": "2026-10-06T22:42:46.830263+08:00",
+                "resolve_note": null,
+                "resolved_by": null,
+                "resolved_at": null,
+                "retries": []
+              },
+              {
+                "receipt_no": "GR26003-A",
+                "status": "待入库",
+                "qty": 3.0,
+                "qty_ok": 3.0,
+                "qty_rejected": null,
+                "batch_no": "GR26003",
+                "unit": "件",
+                "receipt_date": "2026-10-06",
+                "deliver_to": "公司仓库",
+                "location": null,
+                "inspect_note": null,
+                "inspected_by": "仓管组员",
+                "inspected_at": "2026-10-06T22:42:47.684048+08:00",
+                "stored_by": null,
+                "stored_at": null,
+                "resolve_note": null,
+                "resolved_by": null,
+                "resolved_at": null,
+                "retries": []
+              },
+              {
+                "receipt_no": "GR26003-B",
+                "status": "不合格",
+                "qty": 1.0,
+                "qty_ok": null,
+                "qty_rejected": 1.0,
+                "batch_no": "GR26003",
+                "unit": "件",
+                "receipt_date": "2026-10-06",
+                "deliver_to": "公司仓库",
+                "location": null,
+                "inspect_note": "UX交接核查：测试部分不合格1件",
+                "inspected_by": "仓管组员",
+                "inspected_at": "2026-10-06T22:42:47.684105+08:00",
+                "stored_by": null,
+                "stored_at": null,
+                "resolve_note": null,
+                "resolved_by": null,
+                "resolved_at": null,
+                "retries": []
+              },
+              {
+                "receipt_no": "GR26004",
+                "status": "待入库",
+                "qty": 3.0,
+                "qty_ok": 3.0,
+                "qty_rejected": null,
+                "batch_no": "GR26004",
+                "unit": "件",
+                "receipt_date": "2026-10-06",
+                "deliver_to": "公司仓库",
+                "location": null,
+                "inspect_note": null,
+                "inspected_by": "仓管组员",
+                "inspected_at": "2026-10-06T22:42:47.736106+08:00",
+                "stored_by": null,
+                "stored_at": null,
+                "resolve_note": null,
+                "resolved_by": null,
+                "resolved_at": null,
+                "retries": []
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "user": "wh1",
+      "method": "GET",
+      "path": "/mobile/materials/1",
+      "http": 404,
+      "result": {
+        "detail": "Not Found"
+      }
+    },
+    {
+      "user": "wh1",
+      "method": "GET",
+      "path": "/warehouse/workbench",
+      "http": 200,
+      "result": {
+        "incoming": [],
+        "pending_storage": [
+          {
+            "id": 3,
+            "receipt_no": "GR26003-A",
+            "project_no": "TX26001",
+            "attribution": "项目",
+            "project_name": "UX走查-20261006-整线",
+            "request_id": 1,
+            "po_no": "PO26002",
+            "equip_no": "01A",
+            "equip_name": "UX走查输送设备",
+            "supplier_name": "UX交接核查专用-B-20261006",
+            "item_no": "JJ-LS-1604",
+            "display_name": "螺丝 UX交接核查专用测试 · M8-UX-20261006 · 内六角",
+            "spec_text": "UX交接核查专用测试 · M8-UX-20261006 · 内六角",
+            "qty": 3.0,
+            "unit": "件",
+            "receipt_date": "2026-10-06",
+            "inspected_at": "2026-10-06T22:42:47.684048+08:00"
+          },
+          {
+            "id": 5,
+            "receipt_no": "GR26004",
+            "project_no": "TX26001",
+            "attribution": "项目",
+            "project_name": "UX走查-20261006-整线",
+            "request_id": 1,
+            "po_no": "PO26002",
+            "equip_no": "01A",
+            "equip_name": "UX走查输送设备",
+            "supplier_name": "UX交接核查专用-B-20261006",
+            "item_no": "JJ-LS-1604",
+            "display_name": "螺丝 UX交接核查专用测试 · M8-UX-20261006 · 内六角",
+            "spec_text": "UX交接核查专用测试 · M8-UX-20261006 · 内六角",
+            "qty": 3.0,
+            "unit": "件",
+            "receipt_date": "2026-10-06",
+            "inspected_at": "2026-10-06T22:42:47.736106+08:00"
+          }
+        ],
+        "pending_issues": [],
+        "stock": {
+          "item_kinds": 1,
+          "out_of_stock": 0
+        }
+      }
+    },
+    {
+      "user": "buyer1",
+      "method": "GET",
+      "path": "/purchase/orders/PO26002",
+      "http": 200,
+      "result": {
+        "order": {
+          "id": 2,
+          "key": "PO26002",
+          "po_no": "PO26002",
+          "supplier_id": 813,
+          "supplier_name": "UX交接核查专用-B-20261006",
+          "ordered_at": "2026-10-06",
+          "expected_date": "2026-10-15",
+          "deliver_to": "公司仓库",
+          "deliver_address": null,
+          "status": "已完成",
+          "po_status": "执行中",
+          "can_approve": false,
+          "pay_status": "未付款",
+          "line_count": 1,
+          "item_kinds": 1,
+          "total_amount": 4.0,
+          "exchanged_qty": 0.0,
+          "returned_qty": 0.0,
+          "projects": [
+            {
+              "project_no": "TX26001",
+              "project_name": "UX走查-20261006-整线"
+            }
+          ],
+          "equipments": [
+            {
+              "project_no": "TX26001",
+              "equip_no": "01A",
+              "equip_name": "UX走查输送设备"
+            }
+          ],
+          "request_ids": [
+            1
+          ]
+        },
+        "lines": [
+          {
+            "id": 2,
+            "po_no": "PO26002",
+            "unit_price": 1.0,
+            "amount": 4.0,
+            "shipped_at": null,
+            "deliver_to": "公司仓库",
+            "deliver_address": null,
+            "arrived_at": "2026-10-06",
+            "qty_received": 4.0,
+            "qty_ordered": 10.0,
+            "qty_rejected": 1.0,
+            "project_no": "TX26001",
+            "equip_no": "01A",
+            "part_no": null,
+            "item_no": "JJ-LS-1604",
+            "item_name": "螺丝 UX交接核查专用测试 · M8-UX-20261006 · 内六角",
+            "model": "UX-HANDOFF-20261006",
+            "brand": "UX测试专用",
+            "spec_text": "UX交接核查专用测试 · M8-UX-20261006 · 内六角",
+            "qty": 4.0,
+            "unit": "件",
+            "source": "手工",
+            "lead_days": null,
+            "supplier_id": 813,
+            "supplier_name": "UX交接核查专用-B-20261006",
+            "need_date": "2026-10-20",
+            "expected_date": "2026-10-15",
+            "ordered_at": "2026-10-06",
+            "status": "已入库",
+            "is_long_lead": false,
+            "origin_request_id": null,
+            "remark": "UX交接核查专用：10件拆6+4，分批到货测试；无外部交易",
+            "po_line_id": 2,
+            "request_id": 1,
+            "tax_incl": true,
+            "project_name": "UX走查-20261006-整线",
+            "equip_name": "UX走查输送设备",
+            "part_title": null,
+            "qty_original": 4.0,
+            "qty_returned": 0.0,
+            "qty_exchanged": 0.0,
+            "receipts": [
+              {
+                "receipt_no": "GR26001",
+                "status": "已入库",
+                "qty": 2.0,
+                "qty_ok": 2.0,
+                "qty_rejected": null,
+                "batch_no": "GR26001",
+                "unit": "件",
+                "receipt_date": "2026-10-06",
+                "deliver_to": "公司仓库",
+                "location": "深圳仓 A-03-12",
+                "inspect_note": null,
+                "inspected_by": "仓管组员",
+                "inspected_at": "2026-10-06T22:41:25.939025+08:00",
+                "stored_by": "仓管组员",
+                "stored_at": "2026-10-06T22:42:46.771499+08:00",
+                "resolve_note": null,
+                "resolved_by": null,
+                "resolved_at": null,
+                "retries": []
+              },
+              {
+                "receipt_no": "GR26002",
+                "status": "已入库",
+                "qty": 1.0,
+                "qty_ok": 1.0,
+                "qty_rejected": null,
+                "batch_no": "GR26002",
+                "unit": "件",
+                "receipt_date": "2026-10-06",
+                "deliver_to": "公司仓库",
+                "location": "深圳仓 A-03-12",
+                "inspect_note": null,
+                "inspected_by": "仓管组员",
+                "inspected_at": "2026-10-06T22:41:26.722944+08:00",
+                "stored_by": "仓管组员",
+                "stored_at": "2026-10-06T22:42:46.830263+08:00",
+                "resolve_note": null,
+                "resolved_by": null,
+                "resolved_at": null,
+                "retries": []
+              },
+              {
+                "receipt_no": "GR26003-A",
+                "status": "待入库",
+                "qty": 3.0,
+                "qty_ok": 3.0,
+                "qty_rejected": null,
+                "batch_no": "GR26003",
+                "unit": "件",
+                "receipt_date": "2026-10-06",
+                "deliver_to": "公司仓库",
+                "location": null,
+                "inspect_note": null,
+                "inspected_by": "仓管组员",
+                "inspected_at": "2026-10-06T22:42:47.684048+08:00",
+                "stored_by": null,
+                "stored_at": null,
+                "resolve_note": null,
+                "resolved_by": null,
+                "resolved_at": null,
+                "retries": []
+              },
+              {
+                "receipt_no": "GR26003-B",
+                "status": "不合格",
+                "qty": 1.0,
+                "qty_ok": null,
+                "qty_rejected": 1.0,
+                "batch_no": "GR26003",
+                "unit": "件",
+                "receipt_date": "2026-10-06",
+                "deliver_to": "公司仓库",
+                "location": null,
+                "inspect_note": "UX交接核查：测试部分不合格1件",
+                "inspected_by": "仓管组员",
+                "inspected_at": "2026-10-06T22:42:47.684105+08:00",
+                "stored_by": null,
+                "stored_at": null,
+                "resolve_note": null,
+                "resolved_by": null,
+                "resolved_at": null,
+                "retries": []
+              },
+              {
+                "receipt_no": "GR26004",
+                "status": "待入库",
+                "qty": 3.0,
+                "qty_ok": 3.0,
+                "qty_rejected": null,
+                "batch_no": "GR26004",
+                "unit": "件",
+                "receipt_date": "2026-10-06",
+                "deliver_to": "公司仓库",
+                "location": null,
+                "inspect_note": null,
+                "inspected_by": "仓管组员",
+                "inspected_at": "2026-10-06T22:42:47.736106+08:00",
+                "stored_by": null,
+                "stored_at": null,
+                "resolve_note": null,
+                "resolved_by": null,
+                "resolved_at": null,
+                "retries": []
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "user": "wh1",
+      "method": "GET",
+      "path": "/m/materials/1",
+      "http": 200,
+      "result": {
+        "id": 1,
+        "project_no": "TX26001",
+        "project_name": "UX走查-20261006-整线",
+        "equip_no": "01A",
+        "equip_name": "UX走查输送设备",
+        "item_no": "JJ-LS-1604",
+        "display_name": "螺丝 UX交接核查专用测试 · M8-UX-20261006 · 内六角",
+        "spec_text": "UX交接核查专用测试 · M8-UX-20261006 · 内六角",
+        "brand": "UX测试专用",
+        "qty": 10.0,
+        "qty_received": 9.0,
+        "unit": "件",
+        "po_no": "PO26002",
+        "supplier_name": "UX交接核查专用-B-20261006",
+        "lines": [
+          {
+            "po_line_id": 1,
+            "po_no": "PO26001",
+            "supplier_name": "UX交接核查专用-A-20261006",
+            "qty": 6.0,
+            "received_qty": 5.0
+          },
+          {
+            "po_line_id": 2,
+            "po_no": "PO26002",
+            "supplier_name": "UX交接核查专用-B-20261006",
+            "qty": 4.0,
+            "received_qty": 4.0
+          }
+        ],
+        "need_date": "2026-10-20",
+        "expected_date": "2026-10-15",
+        "status": "不合格",
+        "deliver_to": "公司仓库",
+        "part_no": null,
+        "drawing": null,
+        "receipts": [
+          {
+            "id": 1,
+            "receipt_no": "GR26001",
+            "qty": 2.0,
+            "unit": "件",
+            "status": "已入库",
+            "receipt_date": "2026-10-06",
+            "location": "深圳仓 A-03-12",
+            "inspect_note": null,
+            "photos": []
+          },
+          {
+            "id": 2,
+            "receipt_no": "GR26002",
+            "qty": 1.0,
+            "unit": "件",
+            "status": "已入库",
+            "receipt_date": "2026-10-06",
+            "location": "深圳仓 A-03-12",
+            "inspect_note": null,
+            "photos": []
+          },
+          {
+            "id": 3,
+            "receipt_no": "GR26003-A",
+            "qty": 3.0,
+            "unit": "件",
+            "status": "待入库",
+            "receipt_date": "2026-10-06",
+            "location": null,
+            "inspect_note": null,
+            "photos": []
+          },
+          {
+            "id": 4,
+            "receipt_no": "GR26003-B",
+            "qty": 1.0,
+            "unit": "件",
+            "status": "不合格",
+            "receipt_date": "2026-10-06",
+            "location": null,
+            "inspect_note": "UX交接核查：测试部分不合格1件",
+            "photos": []
+          },
+          {
+            "id": 5,
+            "receipt_no": "GR26004",
+            "qty": 3.0,
+            "unit": "件",
+            "status": "待入库",
+            "receipt_date": "2026-10-06",
+            "location": null,
+            "inspect_note": null,
+            "photos": []
+          }
+        ]
+      }
+    },
+    {
+      "user": "wh1",
+      "method": "GET",
+      "path": "/warehouse/stock",
+      "http": 200,
+      "result": [
+        {
+          "id": 1,
+          "item_no": "JJ-LS-1604",
+          "display_name": "螺丝 UX交接核查专用测试 · M8-UX-20261006 · 内六角",
+          "spec_text": "UX交接核查专用测试 · M8-UX-20261006 · 内六角",
+          "unit": "件",
+          "location_id": 1,
+          "location_name": "深圳仓 A-03-12",
+          "qty_on_hand": 3.0,
+          "qty_locked": 0.0,
+          "qty_available": 3.0,
+          "batch_no": null
+        }
+      ]
+    }
+  ],
+  "item_no": "JJ-LS-1604",
+  "supplier_ids": [
+    812,
+    813
+  ],
+  "request_id": 1,
+  "orders": [
+    "PO26001",
+    "PO26002"
+  ],
+  "warehouse_before": {
+    "request_qty": 10.0,
+    "snapshot_po": "PO26002",
+    "snapshot_supplier": "UX交接核查专用-B-20261006",
+    "lines": [
+      {
+        "po_line_id": 1,
+        "po_no": "PO26001",
+        "supplier_name": "UX交接核查专用-A-20261006",
+        "qty": 6.0,
+        "received_qty": 0.0
+      },
+      {
+        "po_line_id": 2,
+        "po_no": "PO26002",
+        "supplier_name": "UX交接核查专用-B-20261006",
+        "qty": 4.0,
+        "received_qty": 0.0
+      }
+    ]
+  },
+  "batch1": {
+    "receipt_id": 1,
+    "receipt_no": "GR26001",
+    "receipt_status": "待入库",
+    "request_status": "待入库",
+    "qty_received": 2.0,
+    "qty_rejected": 0.0,
+    "batch_no": "GR26001",
+    "po_line_id": 1,
+    "receipts": [
+      {
+        "receipt_no": "GR26001",
+        "status": "待入库",
+        "qty": 2.0
+      }
+    ]
+  },
+  "after_batch1": {
+    "still_in_incoming": false,
+    "pending_receipt_ids": [
+      1
+    ]
+  },
+  "batch2": {
+    "receipt_id": 2,
+    "receipt_no": "GR26002",
+    "receipt_status": "待入库",
+    "request_status": "待入库",
+    "qty_received": 3.0,
+    "qty_rejected": 0.0,
+    "batch_no": "GR26002",
+    "po_line_id": 2,
+    "receipts": [
+      {
+        "receipt_no": "GR26002",
+        "status": "待入库",
+        "qty": 1.0
+      }
+    ]
+  },
+  "phase": "received_good9_rejected1_stored3_pending6",
+  "after_store": {
+    "status": "部分到货",
+    "incoming_present": true,
+    "received": 3.0
+  },
+  "batch3_partial_reject": {
+    "receipt_id": 3,
+    "receipt_no": "GR26003-A",
+    "receipt_status": "待入库",
+    "request_status": "不合格",
+    "qty_received": 6.0,
+    "qty_rejected": 1.0,
+    "batch_no": "GR26003",
+    "po_line_id": 1,
+    "receipts": [
+      {
+        "receipt_no": "GR26003-A",
+        "status": "待入库",
+        "qty": 3.0
+      },
+      {
+        "receipt_no": "GR26003-B",
+        "status": "不合格",
+        "qty": 1.0
+      }
+    ]
+  },
+  "batch4": {
+    "receipt_id": 5,
+    "receipt_no": "GR26004",
+    "receipt_status": "待入库",
+    "request_status": "不合格",
+    "qty_received": 9.0,
+    "qty_rejected": 1.0,
+    "batch_no": "GR26004",
+    "po_line_id": 2,
+    "receipts": [
+      {
+        "receipt_no": "GR26004",
+        "status": "待入库",
+        "qty": 3.0
+      }
+    ]
+  },
+  "final_summary": {
+    "incoming_present": false,
+    "pending_storage_for_test": [
+      {
+        "id": 3,
+        "receipt_no": "GR26003-A",
+        "project_no": "TX26001",
+        "attribution": "项目",
+        "project_name": "UX走查-20261006-整线",
+        "request_id": 1,
+        "po_no": "PO26002",
+        "equip_no": "01A",
+        "equip_name": "UX走查输送设备",
+        "supplier_name": "UX交接核查专用-B-20261006",
+        "item_no": "JJ-LS-1604",
+        "display_name": "螺丝 UX交接核查专用测试 · M8-UX-20261006 · 内六角",
+        "spec_text": "UX交接核查专用测试 · M8-UX-20261006 · 内六角",
+        "qty": 3.0,
+        "unit": "件",
+        "receipt_date": "2026-10-06",
+        "inspected_at": "2026-10-06T22:42:47.684048+08:00"
+      },
+      {
+        "id": 5,
+        "receipt_no": "GR26004",
+        "project_no": "TX26001",
+        "attribution": "项目",
+        "project_name": "UX走查-20261006-整线",
+        "request_id": 1,
+        "po_no": "PO26002",
+        "equip_no": "01A",
+        "equip_name": "UX走查输送设备",
+        "supplier_name": "UX交接核查专用-B-20261006",
+        "item_no": "JJ-LS-1604",
+        "display_name": "螺丝 UX交接核查专用测试 · M8-UX-20261006 · 内六角",
+        "spec_text": "UX交接核查专用测试 · M8-UX-20261006 · 内六角",
+        "qty": 3.0,
+        "unit": "件",
+        "receipt_date": "2026-10-06",
+        "inspected_at": "2026-10-06T22:42:47.736106+08:00"
+      }
+    ],
+    "B_order": {
+      "order": {
+        "id": 2,
+        "key": "PO26002",
+        "po_no": "PO26002",
+        "supplier_id": 813,
+        "supplier_name": "UX交接核查专用-B-20261006",
+        "ordered_at": "2026-10-06",
+        "expected_date": "2026-10-15",
+        "deliver_to": "公司仓库",
+        "deliver_address": null,
+        "status": "已完成",
+        "po_status": "执行中",
+        "can_approve": false,
+        "pay_status": "未付款",
+        "line_count": 1,
+        "item_kinds": 1,
+        "total_amount": 4.0,
+        "exchanged_qty": 0.0,
+        "returned_qty": 0.0,
+        "projects": [
+          {
+            "project_no": "TX26001",
+            "project_name": "UX走查-20261006-整线"
+          }
+        ],
+        "equipments": [
+          {
+            "project_no": "TX26001",
+            "equip_no": "01A",
+            "equip_name": "UX走查输送设备"
+          }
+        ],
+        "request_ids": [
+          1
+        ]
+      },
+      "lines": [
+        {
+          "id": 2,
+          "po_no": "PO26002",
+          "unit_price": 1.0,
+          "amount": 4.0,
+          "shipped_at": null,
+          "deliver_to": "公司仓库",
+          "deliver_address": null,
+          "arrived_at": "2026-10-06",
+          "qty_received": 4.0,
+          "qty_ordered": 10.0,
+          "qty_rejected": 1.0,
+          "project_no": "TX26001",
+          "equip_no": "01A",
+          "part_no": null,
+          "item_no": "JJ-LS-1604",
+          "item_name": "螺丝 UX交接核查专用测试 · M8-UX-20261006 · 内六角",
+          "model": "UX-HANDOFF-20261006",
+          "brand": "UX测试专用",
+          "spec_text": "UX交接核查专用测试 · M8-UX-20261006 · 内六角",
+          "qty": 4.0,
+          "unit": "件",
+          "source": "手工",
+          "lead_days": null,
+          "supplier_id": 813,
+          "supplier_name": "UX交接核查专用-B-20261006",
+          "need_date": "2026-10-20",
+          "expected_date": "2026-10-15",
+          "ordered_at": "2026-10-06",
+          "status": "已入库",
+          "is_long_lead": false,
+          "origin_request_id": null,
+          "remark": "UX交接核查专用：10件拆6+4，分批到货测试；无外部交易",
+          "po_line_id": 2,
+          "request_id": 1,
+          "tax_incl": true,
+          "project_name": "UX走查-20261006-整线",
+          "equip_name": "UX走查输送设备",
+          "part_title": null,
+          "qty_original": 4.0,
+          "qty_returned": 0.0,
+          "qty_exchanged": 0.0,
+          "receipts": [
+            {
+              "receipt_no": "GR26001",
+              "status": "已入库",
+              "qty": 2.0,
+              "qty_ok": 2.0,
+              "qty_rejected": null,
+              "batch_no": "GR26001",
+              "unit": "件",
+              "receipt_date": "2026-10-06",
+              "deliver_to": "公司仓库",
+              "location": "深圳仓 A-03-12",
+              "inspect_note": null,
+              "inspected_by": "仓管组员",
+              "inspected_at": "2026-10-06T22:41:25.939025+08:00",
+              "stored_by": "仓管组员",
+              "stored_at": "2026-10-06T22:42:46.771499+08:00",
+              "resolve_note": null,
+              "resolved_by": null,
+              "resolved_at": null,
+              "retries": []
+            },
+            {
+              "receipt_no": "GR26002",
+              "status": "已入库",
+              "qty": 1.0,
+              "qty_ok": 1.0,
+              "qty_rejected": null,
+              "batch_no": "GR26002",
+              "unit": "件",
+              "receipt_date": "2026-10-06",
+              "deliver_to": "公司仓库",
+              "location": "深圳仓 A-03-12",
+              "inspect_note": null,
+              "inspected_by": "仓管组员",
+              "inspected_at": "2026-10-06T22:41:26.722944+08:00",
+              "stored_by": "仓管组员",
+              "stored_at": "2026-10-06T22:42:46.830263+08:00",
+              "resolve_note": null,
+              "resolved_by": null,
+              "resolved_at": null,
+              "retries": []
+            },
+            {
+              "receipt_no": "GR26003-A",
+              "status": "待入库",
+              "qty": 3.0,
+              "qty_ok": 3.0,
+              "qty_rejected": null,
+              "batch_no": "GR26003",
+              "unit": "件",
+              "receipt_date": "2026-10-06",
+              "deliver_to": "公司仓库",
+              "location": null,
+              "inspect_note": null,
+              "inspected_by": "仓管组员",
+              "inspected_at": "2026-10-06T22:42:47.684048+08:00",
+              "stored_by": null,
+              "stored_at": null,
+              "resolve_note": null,
+              "resolved_by": null,
+              "resolved_at": null,
+              "retries": []
+            },
+            {
+              "receipt_no": "GR26003-B",
+              "status": "不合格",
+              "qty": 1.0,
+              "qty_ok": null,
+              "qty_rejected": 1.0,
+              "batch_no": "GR26003",
+              "unit": "件",
+              "receipt_date": "2026-10-06",
+              "deliver_to": "公司仓库",
+              "location": null,
+              "inspect_note": "UX交接核查：测试部分不合格1件",
+              "inspected_by": "仓管组员",
+              "inspected_at": "2026-10-06T22:42:47.684105+08:00",
+              "stored_by": null,
+              "stored_at": null,
+              "resolve_note": null,
+              "resolved_by": null,
+              "resolved_at": null,
+              "retries": []
+            },
+            {
+              "receipt_no": "GR26004",
+              "status": "待入库",
+              "qty": 3.0,
+              "qty_ok": 3.0,
+              "qty_rejected": null,
+              "batch_no": "GR26004",
+              "unit": "件",
+              "receipt_date": "2026-10-06",
+              "deliver_to": "公司仓库",
+              "location": null,
+              "inspect_note": null,
+              "inspected_by": "仓管组员",
+              "inspected_at": "2026-10-06T22:42:47.736106+08:00",
+              "stored_by": null,
+              "stored_at": null,
+              "resolve_note": null,
+              "resolved_by": null,
+              "resolved_at": null,
+              "retries": []
+            }
+          ]
+        }
+      ]
+    },
+    "mobile_material": {
+      "id": 1,
+      "project_no": "TX26001",
+      "project_name": "UX走查-20261006-整线",
+      "equip_no": "01A",
+      "equip_name": "UX走查输送设备",
+      "item_no": "JJ-LS-1604",
+      "display_name": "螺丝 UX交接核查专用测试 · M8-UX-20261006 · 内六角",
+      "spec_text": "UX交接核查专用测试 · M8-UX-20261006 · 内六角",
+      "brand": "UX测试专用",
+      "qty": 10.0,
+      "qty_received": 9.0,
+      "unit": "件",
+      "po_no": "PO26002",
+      "supplier_name": "UX交接核查专用-B-20261006",
+      "lines": [
+        {
+          "po_line_id": 1,
+          "po_no": "PO26001",
+          "supplier_name": "UX交接核查专用-A-20261006",
+          "qty": 6.0,
+          "received_qty": 5.0
+        },
+        {
+          "po_line_id": 2,
+          "po_no": "PO26002",
+          "supplier_name": "UX交接核查专用-B-20261006",
+          "qty": 4.0,
+          "received_qty": 4.0
+        }
+      ],
+      "need_date": "2026-10-20",
+      "expected_date": "2026-10-15",
+      "status": "不合格",
+      "deliver_to": "公司仓库",
+      "part_no": null,
+      "drawing": null,
+      "receipts": [
+        {
+          "id": 1,
+          "receipt_no": "GR26001",
+          "qty": 2.0,
+          "unit": "件",
+          "status": "已入库",
+          "receipt_date": "2026-10-06",
+          "location": "深圳仓 A-03-12",
+          "inspect_note": null,
+          "photos": []
+        },
+        {
+          "id": 2,
+          "receipt_no": "GR26002",
+          "qty": 1.0,
+          "unit": "件",
+          "status": "已入库",
+          "receipt_date": "2026-10-06",
+          "location": "深圳仓 A-03-12",
+          "inspect_note": null,
+          "photos": []
+        },
+        {
+          "id": 3,
+          "receipt_no": "GR26003-A",
+          "qty": 3.0,
+          "unit": "件",
+          "status": "待入库",
+          "receipt_date": "2026-10-06",
+          "location": null,
+          "inspect_note": null,
+          "photos": []
+        },
+        {
+          "id": 4,
+          "receipt_no": "GR26003-B",
+          "qty": 1.0,
+          "unit": "件",
+          "status": "不合格",
+          "receipt_date": "2026-10-06",
+          "location": null,
+          "inspect_note": "UX交接核查：测试部分不合格1件",
+          "photos": []
+        },
+        {
+          "id": 5,
+          "receipt_no": "GR26004",
+          "qty": 3.0,
+          "unit": "件",
+          "status": "待入库",
+          "receipt_date": "2026-10-06",
+          "location": null,
+          "inspect_note": null,
+          "photos": []
+        }
+      ]
+    },
+    "test_stock": [
+      {
+        "id": 1,
+        "item_no": "JJ-LS-1604",
+        "display_name": "螺丝 UX交接核查专用测试 · M8-UX-20261006 · 内六角",
+        "spec_text": "UX交接核查专用测试 · M8-UX-20261006 · 内六角",
+        "unit": "件",
+        "location_id": 1,
+        "location_name": "深圳仓 A-03-12",
+        "qty_on_hand": 3.0,
+        "qty_locked": 0.0,
+        "qty_available": 3.0,
+        "batch_no": null
+      }
+    ]
+  }
+}

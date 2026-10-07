@@ -48,9 +48,9 @@ export default function PmWorkbench() {
       key: 'project',
       width: 220,
       render: (_: unknown, r: PmProjectRow) => (
-        <a onClick={() => go(`/projects/${r.project_no}`)}>
+        <button type="button" className="project-entry" onClick={() => go(`/projects/${r.project_no}`)}>
           {r.project_no} {r.project_name}
-        </a>
+        </button>
       ),
     },
     {
@@ -154,6 +154,7 @@ export default function PmWorkbench() {
                 size="small"
                 dataSource={data?.projects ?? []}
                 columns={columns}
+                scroll={{ x: 880 }}
                 pagination={{ pageSize: 10, showSizeChanger: true }}
                 // ★ 走查 2026-10-05：漏写 emptyText → 空时露 antd 灰插图 + 「暂无数据」
                 //   （护栏 SHELL-台骨架四件套 的「每张表都要说空话」当场抓到的）

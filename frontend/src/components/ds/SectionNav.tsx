@@ -27,7 +27,7 @@ import type { TabGroup } from '../../configs/tabs'
  *   · 分区条**不是**下划线 Tab —— 一屏只允许一条页签条（台类页已占），分区条是更轻的一档
  *   · **不嵌套**：分区内容里不许再出现视图切换
  *   · **空分区保留**：`children` 为空时显示统一的"还没有记录"，不隐藏分区
- *   · 切区**回到内容顶部**（不记住上一区滚动位置，免得"点开了不知道在哪"）
+ *   · 切区只更新内容，不主动滚动整页；导航、标题与外壳位置保持稳定
  */
 export default function SectionNav({
   sections,
@@ -73,25 +73,24 @@ export default function SectionNav({
   /** 只要分区条、不要内容区（表单页：内容由页面自己渲染并保持挂载） */
   barOnly?: boolean
 }) {
-  const bodyRef = useRef<HTMLDivElement>(null)
+  const navRef = useRef<HTMLElement>(null)
   // ★ 2026-10-05：页签条已**全部平铺**（组名不再当可点胶囊，也不再画小标题），
   //   所以 `groups` 只用来决定“要不要渲染这条页签条”，不再用来算当前组。
   const grouped = groups && groups.length > 0
   const active = sections.find((s) => s.key === tab) ?? sections[0]
 
-  // 切区：滚到内容顶部（只动内容区，不动整页）
+  // scrollIntoView 会沿祖先滚动整页，造成台头/导航位移；页内切换不主动滚动。
   const go = useCallback(
     (key: string) => {
       onTab(key)
-      bodyRef.current?.scrollIntoView({ block: 'nearest' })
     },
     [onTab],
   )
 
-  // ←/→ 切区（与 ⌘K 命令栏一致的操作习惯）
+  // 左右键仅在分区按钮获得焦点时切区；输入/选择器及台内Segmented由控件自己处理。
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
+      if (!(e.target instanceof HTMLElement) || !navRef.current?.contains(e.target)) return
       if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return
       const i = sections.findIndex((s) => s.key === active?.key)
       if (i < 0) return
@@ -99,6 +98,17 @@ export default function SectionNav({
       if (next) {
         e.preventDefault()
         go(next.key)
+        const offset = e.key === 'ArrowRight' ? 1 : -1
+        const nav = navRef.current
+        const button = nav.querySelectorAll('button')[i + offset]
+        button?.focus({ preventScroll: true })
+        // 手机长页签条只在条内横移，让焦点可见，不推动整页。
+        if (button) {
+          const item = button.getBoundingClientRect()
+          const bar = nav.getBoundingClientRect()
+          if (item.left < bar.left) nav.scrollLeft -= bar.left - item.left
+          else if (item.right > bar.right) nav.scrollLeft += item.right - bar.right
+        }
       }
     }
     window.addEventListener('keydown', onKey)
@@ -138,7 +148,7 @@ export default function SectionNav({
             options={sections.map((s) => ({ value: s.key, label: labelOf(s), key: s.key }))}
           />
         </div>
-        <div className="ds-sec-body" ref={bodyRef}>
+        <div className="ds-sec-body">
           {renderBody(active, emptyText)}
         </div>
       </>
@@ -160,14 +170,14 @@ export default function SectionNav({
     return (
       <>
         {bar2}
-        <div className="ds-sec-body" ref={bodyRef}>
+        <div className="ds-sec-body">
           {renderBody(active, emptyText)}
         </div>
       </>
     )
   }
   const bar = (
-    <nav className="ds-sec-nav" aria-label="页面分区">
+    <nav ref={navRef} className="ds-sec-nav" aria-label="页面分区">
       {sections.map((s) => {
         const b = badgeText(s.badge)
         return (
@@ -202,7 +212,7 @@ export default function SectionNav({
 
   return (
     <>
-      <nav className="ds-sec-nav" aria-label="页面分区">
+      <nav ref={navRef} className="ds-sec-nav" aria-label="页面分区">
         {sections.map((s) => {
           const b = badgeText(s.badge)
           return (
@@ -219,7 +229,7 @@ export default function SectionNav({
           )
         })}
       </nav>
-      <div className="ds-sec-body" ref={bodyRef}>
+      <div className="ds-sec-body">
         {renderBody(active, emptyText)}
       </div>
     </>

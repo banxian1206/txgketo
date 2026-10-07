@@ -14,6 +14,9 @@ body {
   background: #f5f6f8;
 }
 
+/* 长短页签切换时保留滚动条占位，避免主内容左右移动。 */
+html { scrollbar-gutter: stable; }
+
 /* 项目列表：整行可点击的视觉反馈 */
 .project-row-hover > td {
   background: #eaf3ff !important;
@@ -121,6 +124,40 @@ body {
   padding: 12px 0;
   background: #fff;
   border-top: 1px solid #f0f0f0;
+}
+
+/* 精调第二批：商务入口与商机表单，沿用当前字段和三步结构。 */
+.project-entry, .project-back {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  font: inherit;
+  color: var(--ds-acc);
+  cursor: pointer;
+  text-align: left;
+}
+.project-entry { font-weight: 500; line-height: var(--ds-lh-14); }
+.project-entry:hover, .project-back:hover { text-decoration: underline; text-underline-offset: 4px; }
+.project-entry:focus-visible, .project-back:focus-visible {
+  outline: 2px solid var(--ds-acc);
+  outline-offset: 4px;
+  border-radius: 2px;
+}
+.sales-project-table .ant-table-cell { font-variant-numeric: tabular-nums; }
+.opportunity-create .ant-form-item .ant-form-item-label > label {
+  font-size: 13px;
+  color: var(--ds-ink2);
+}
+.opportunity-create .ant-form-vertical .ant-form-item-label { padding-bottom: 8px; }
+.opportunity-create [data-section] > h5.ant-typography { margin-top: 20px; margin-bottom: 8px; }
+.opportunity-create .form-actions { margin-top: 20px; border-top-color: var(--ds-line); }
+.opportunity-contact-remove { padding-top: calc(var(--ds-lh-14) + 8px); }
+.opportunity-contact-remove .ant-btn { height: 32px; }
+@media (max-width: 767px) {
+  .opportunity-contact-remove { padding-top: 0; }
+  .opportunity-contact-remove .ant-btn { height: 40px; }
+  .opportunity-create .form-actions .ant-btn { min-height: 40px; }
 }
 
 /* 标准库左侧品类导航
@@ -262,6 +299,13 @@ body {
   max-width: 100%;
 }
 
+/* 登录账号、密码和提交同高，密码内部输入不叠加高度。 */
+.login-box .ant-input-lg,
+.login-box .ant-input-affix-wrapper-lg,
+.login-box .ant-btn-lg { height: 48px; }
+.login-box .ant-input-affix-wrapper-lg > .ant-input { height: auto; }
+.login-error { margin-bottom: 16px; }
+
 .login-title {
   margin: 0 0 4px;
   font-size: 24px;
@@ -316,6 +360,11 @@ body {
 }
 
 .login-switch {
+  border: 0;
+  background: none;
+  padding: 8px;
+  font: inherit;
+  cursor: pointer;
   margin-top: 22px;
   font-size: 13px;
   color: rgba(0, 0, 0, 0.45);
@@ -427,3 +476,43 @@ body {
 .hint-inline { font-size: 12px; }
 .alert-mb { margin-bottom: 8px; }
 .center-404 { min-height: 60vh; display: flex; align-items: center; justify-content: center; }
+
+/* S0：分区进度与提交摘要，沿用纸面层级。 */
+.create-step-hint { margin: 12px 0 16px; }
+.create-review { padding: 16px 0; border-top: 1px solid var(--ds-line); }
+.deal-payment-row { padding: 12px 0; border-bottom: 1px solid var(--ds-line); }
+.deal-payment-row .ant-form-item { margin-bottom: 0; }
+@media (max-width: 767px) {
+  .form-actions { flex-wrap: wrap; }
+}
+
+/* S1：立项结论常驻，清单可直接进入对应分区。 */
+.initiate-heading { display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; }
+.initiate-decision { display: flex; flex-direction: column; align-items: flex-end; gap: 12px; max-width: 100%; }
+.initiate-checklist { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--ds-line); }
+.initiate-checklist .ant-btn { height: auto; white-space: normal; text-align: left; }
+@media (max-width: 767px) { .initiate-decision { align-items: flex-start; } }
+
+/* 工作台手机首屏：保留可操作导航，避免顶栏与队列把文字挤成竖列。 */
+.app-header .ds-crumb { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.app-header .app-user { flex-shrink:0; }
+@media (max-width:640px) {
+  .app-header { padding-inline:16px !important; gap:12px; }
+  .app-header .ds-crumb { flex:1; }
+  .app-header .app-search { width:32px; flex-shrink:0; padding:0; justify-content:center; }
+  .app-header .app-search-label, .app-header .ds-kbd, .app-header .app-user-name, .app-header .app-mobile-link { display:none; }
+}
+
+/* 2026-10-07 精调第一批：保留页面内容，改善导航触控和窄屏有效宽度。 */
+.app-content { padding: 24px; min-width: 0; }
+.app-logout { border: 0; background: none; padding: 4px 8px; font: inherit; font-size: 13px; color: var(--ds-ink3); cursor: pointer; }
+.app-logout:hover { color: var(--ds-acc); background: var(--ds-accentSoft); border-radius: 8px; }
+:is(.app-search, .app-logout, .login-switch):focus-visible { outline: 2px solid var(--ds-acc); outline-offset: 2px; border-radius: 8px; }
+.login-page { min-height: 100dvh; }
+@media (max-width: 640px) {
+  .app-content { padding: 16px; }
+  .app-header .app-search { min-height: 40px; }
+  .app-header .app-logout { min-height: 40px; }
+  .app-header .ant-btn { min-width: 40px; min-height: 40px; }
+  .login-pane { min-height: 100dvh; }
+}

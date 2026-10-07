@@ -181,12 +181,12 @@ export default function AppLayout() {
           {/* ★ 命令栏触发：以前这里没有搜索（不假装能用）；现在接的是真接口 /api/v1/search */}
           <button type="button" className="app-search" onClick={() => setCmdkOpen(true)} aria-label="全局检索">
             <SearchOutlined />
-            搜编号 / 图号 / 物料 / 项目
+            <span className="app-search-label">搜编号 / 图号 / 物料 / 项目</span>
             <span className="ds-kbd">⌘K</span>
           </button>
-          <Space size={10} style={{ marginLeft: 'auto' }}>
+          <Space className="app-user" size={10} style={{ marginLeft: 'auto' }}>
             <Tooltip title="手机端（仓库 / 车间 / 现场的主终端）">
-              <Link to="/m" style={{ fontSize: FS.sm, color: PAPER.ink2 }}>
+              <Link className="app-mobile-link" to="/m" style={{ fontSize: FS.sm, color: PAPER.ink2 }}>
                 <MobileOutlined /> 手机端
               </Link>
             </Tooltip>
@@ -198,13 +198,11 @@ export default function AppLayout() {
             <Avatar size={26} style={{ background: T.brand, color: PAPER.surface, fontSize: FS.xs, fontWeight: 600 }}>
               {name.slice(0, 1)}
             </Avatar>
-            <Typography.Text style={{ fontSize: FS.sm }}>{name}</Typography.Text>
-            <a style={{ fontSize: FS.sm, color: PAPER.ink3 }} onClick={logout}>
-              退出
-            </a>
+            <Typography.Text className="app-user-name" style={{ fontSize: FS.sm }}>{name}</Typography.Text>
+            <button type="button" className="app-logout" onClick={logout}>退出</button>
           </Space>
         </Header>
-        <Content style={{ padding: 24 }}>
+        <Content className="app-content">
           <Outlet />
         </Content>
       </Layout>

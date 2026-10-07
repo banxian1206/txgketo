@@ -104,7 +104,7 @@ export default function ProjectSummaryBar({
         crumb={
           <>
             {/* ★ docs/11：从台里点进来必须能回原台（护栏 NAV-返回口是来源台 盯着 —— 文案要以「← 返回」开头） */}
-            <a onClick={() => go(back.hasFrom ? back.to : '/projects')}>{back.label}</a>
+            <button type="button" className="project-back" onClick={() => go(back.hasFrom ? back.to : '/projects')}>{back.label}</button>
             <span style={{ color: 'var(--ds-line2)', margin: '0 8px' }}>/</span>
             <Link to="/projects">项目</Link> / <span className="ds-code cur">{p.project_no}</span>
           </>

@@ -91,14 +91,11 @@ export const INITIATE_SECTIONS: Pick<SectionDef, 'key' | 'label' | 'default'>[] 
   { key: 'tasks', label: '⑤ 任务分派' },
 ]
 
-/** 新建商机（P4 用）—— 就是现在的 ①–⑥ */
+/** 新建商机：先建立责任与客户联系，再明确需求，最后补资料。 */
 export const CREATE_SECTIONS: Pick<SectionDef, 'key' | 'label' | 'default'>[] = [
-  { key: 'basic', label: '① 基本信息', default: true },
-  { key: 'customer', label: '② 客户信息' },
-  { key: 'require', label: '③ 项目要求' },
-  { key: 'time', label: '④ 时间与金额' },
-  { key: 'atts', label: '⑤ 接收资料' },
-  { key: 'follow', label: '⑥ 商务跟进' },
+  { key: 'basic', label: '① 商机与联系', default: true },
+  { key: 'require', label: '② 需求与时间' },
+  { key: 'follow', label: '③ 资料与商务' },
 ]
 
 /** 设计面（P3 用） */

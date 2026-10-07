@@ -20,7 +20,7 @@ import DealModals from '../../components/project/DealModals'
 import { App, Button, Empty, Form, Spin, Typography } from 'antd'
 import dayjs from 'dayjs'
 import { useCallback, useEffect, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useParams } from 'react-router-dom'
 
 import { useGoFrom } from '../../hooks/useFrom'
 
@@ -44,7 +44,6 @@ const DASH = <Typography.Text type="secondary">—</Typography.Text>
 export default function ProjectDetailPage() {
   const { projectNo = '' } = useParams()
   const { message } = App.useApp()
-  const nav = useNavigate()
   const go = useGoFrom()
 
   // 注意：useState 必须在 early-return 之前（否则 loading 分支与渲染分支 hooks 数量不一致）
@@ -188,7 +187,7 @@ export default function ProjectDetailPage() {
   if (!p) return <Empty description="项目不存在" />
 
   const stepIndex = STAGE_ORDER.indexOf(p.stage)
-  const goNext = (to: string) => nav(to)
+  const goNext = (to: string) => go(to)
   // ★ 「下一步」把人带到该去的**分区**（原来是把泳道展开并滚动；分区切换是瞬时的）
   const focusLane = (id: string) => setTab(id)
   const nextAction =

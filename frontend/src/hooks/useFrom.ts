@@ -73,8 +73,9 @@ export function useBack(fallbackTo: string, fallbackLabel = '← 返回列表'):
   }, [from])
   return useMemo(() => {
     if (!from) return { to: fallbackTo, label: fallbackLabel, hasFrom: false }
+    const originPath = from.split('?')[0]
     const hit = benches.find(
-      (w) => from === w.route || (w.route !== '/workbench' && from.startsWith(w.route + '/')),
+      (w) => originPath === w.route || (w.route !== '/workbench' && originPath.startsWith(w.route + '/')),
     )
     const name = hit?.name ?? guessName(from)
     return { to: from, label: name ? `← 返回${name}` : '← 返回上一步', hasFrom: true }
@@ -83,7 +84,12 @@ export function useBack(fallbackTo: string, fallbackLabel = '← 返回列表'):
 
 /** 来源不是台（例如从某个列表页过来）时，至少给个可读的文案 */
 function guessName(from: string): string | null {
-  if (from.startsWith('/projects')) return '项目列表'
+  const path = from.split('?')[0]
+  if (path === '/projects') return '项目列表'
+  if (/^\/projects\/[^/]+\/initiate$/.test(path)) return '立项'
+  if (/^\/projects\/[^/]+\/design\//.test(path)) return '设计面'
+  if (path === '/projects/new') return '新建商机'
+  if (/^\/projects\/[^/]+$/.test(path)) return '项目'
   if (from.startsWith('/library')) return '基础数据'
   if (from.startsWith('/admin')) return '用户与权限'
   return null

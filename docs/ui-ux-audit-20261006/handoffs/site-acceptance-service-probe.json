@@ -1,0 +1,1103 @@
+{
+  "scope": "UX交接核查20261006，专用测试数据，无外部交易",
+  "events": [
+    {
+      "user": "pm1",
+      "method": "POST",
+      "path": "/acceptance/apply",
+      "http": 400,
+      "result": {
+        "detail": "现场调试还没完成（S9）—— 先在现场台「申请调试」走到「调试完成」，再申请客户验收"
+      }
+    },
+    {
+      "user": "site1",
+      "method": "POST",
+      "path": "/site/survey",
+      "http": 201,
+      "result": {
+        "id": 1,
+        "project_no": "TX26001",
+        "surveyed_at": "2026-10-06T15:47:59.684488+00:00",
+        "contact": "UX测试客户",
+        "floor_load": null,
+        "passage": null,
+        "power": "UX测试条件",
+        "air": null,
+        "network": null,
+        "enter_date": "2026-10-06",
+        "photos": [],
+        "remark": "UX测试专用，无实际勘测",
+        "reused": false
+      }
+    },
+    {
+      "user": "site1",
+      "method": "POST",
+      "path": "/site/daily",
+      "http": 400,
+      "result": {
+        "detail": "每日汇报必须拍照留痕"
+      }
+    },
+    {
+      "user": "site1",
+      "method": "POST",
+      "path": "/site/daily",
+      "http": 201,
+      "result": {
+        "id": 1,
+        "project_no": "TX26001",
+        "equip_no": "01A",
+        "report_date": "2026-10-06",
+        "stage": "安装",
+        "done_items": [
+          "UX测试安装记录"
+        ],
+        "people": 1,
+        "photos": [
+          {
+            "token": "TX26001/shipping/UX-TEST-ONLY/1791299831044160000_UX-TEST-ONLY-photo.png",
+            "filename": "UX-TEST-ONLY-photo.png"
+          }
+        ],
+        "videos": [],
+        "problem": null,
+        "reporter_id": 24,
+        "remark": "UX测试专用，无真实安装"
+      }
+    },
+    {
+      "user": "site1",
+      "method": "POST",
+      "path": "/site/commission",
+      "http": 201,
+      "result": {
+        "id": 1,
+        "project_no": "TX26001",
+        "request_by": 24,
+        "request_at": "2026-10-06T15:47:59.742879+00:00",
+        "dispatch_to": "assy1",
+        "plan_date": "2026-10-06",
+        "arrived_at": null,
+        "status": "已申请",
+        "remark": "UX测试专用调试派工，无实际出差",
+        "reused": false
+      }
+    },
+    {
+      "user": "site1",
+      "method": "POST",
+      "path": "/site/commission",
+      "http": 201,
+      "result": {
+        "id": 1,
+        "project_no": "TX26001",
+        "request_by": 24,
+        "request_at": "2026-10-06T23:47:59.742879+08:00",
+        "dispatch_to": "assy1",
+        "plan_date": "2026-10-06",
+        "arrived_at": null,
+        "status": "已申请",
+        "remark": "UX测试专用调试派工，无实际出差",
+        "reused": true
+      }
+    },
+    {
+      "user": "buyer1",
+      "method": "POST",
+      "path": "/site/commission/1/arrive",
+      "http": 403,
+      "result": {
+        "detail": "只有现场/项目经理或本单被派的调试工程师本人能登记到场"
+      }
+    },
+    {
+      "user": "assy1",
+      "method": "POST",
+      "path": "/site/commission/1/arrive",
+      "http": 200,
+      "result": {
+        "id": 1,
+        "project_no": "TX26001",
+        "request_by": 24,
+        "request_at": "2026-10-06T23:47:59.742879+08:00",
+        "dispatch_to": "assy1",
+        "plan_date": "2026-10-06",
+        "arrived_at": "2026-10-06T15:48:00.569265+00:00",
+        "status": "已到现场",
+        "remark": "UX测试专用调试派工，无实际出差"
+      }
+    },
+    {
+      "user": "assy1",
+      "method": "POST",
+      "path": "/site/commission/1/start",
+      "http": 200,
+      "result": {
+        "id": 1,
+        "project_no": "TX26001",
+        "request_by": 24,
+        "request_at": "2026-10-06T23:47:59.742879+08:00",
+        "dispatch_to": "assy1",
+        "plan_date": "2026-10-06",
+        "arrived_at": "2026-10-06T23:48:00.569265+08:00",
+        "status": "已开始调试",
+        "remark": "UX测试专用调试派工，无实际出差"
+      }
+    },
+    {
+      "user": "assy1",
+      "method": "POST",
+      "path": "/site/daily",
+      "http": 403,
+      "result": {
+        "detail": "没有权限：site:edit"
+      }
+    },
+    {
+      "user": "site1",
+      "method": "POST",
+      "path": "/site/daily",
+      "http": 201,
+      "result": {
+        "id": 2,
+        "project_no": "TX26001",
+        "equip_no": "01A",
+        "report_date": "2026-10-06",
+        "stage": "单机调试",
+        "done_items": [
+          "UX测试单机调试记录"
+        ],
+        "people": 1,
+        "photos": [
+          {
+            "token": "TX26001/shipping/UX-TEST-ONLY/1791299831044160000_UX-TEST-ONLY-photo.png",
+            "filename": "UX-TEST-ONLY-photo.png"
+          }
+        ],
+        "videos": [],
+        "problem": null,
+        "reporter_id": 24,
+        "remark": "UX测试专用，无真实安装"
+      }
+    },
+    {
+      "user": "site1",
+      "method": "POST",
+      "path": "/site/daily",
+      "http": 201,
+      "result": {
+        "id": 3,
+        "project_no": "TX26001",
+        "equip_no": "01A",
+        "report_date": "2026-10-06",
+        "stage": "联调",
+        "done_items": [
+          "UX测试联调记录"
+        ],
+        "people": 1,
+        "photos": [
+          {
+            "token": "TX26001/shipping/UX-TEST-ONLY/1791299831044160000_UX-TEST-ONLY-photo.png",
+            "filename": "UX-TEST-ONLY-photo.png"
+          }
+        ],
+        "videos": [],
+        "problem": null,
+        "reporter_id": 24,
+        "remark": "UX测试专用，无真实安装"
+      }
+    },
+    {
+      "user": "assy1",
+      "method": "POST",
+      "path": "/site/commission/1/finish",
+      "http": 200,
+      "result": {
+        "id": 1,
+        "project_no": "TX26001",
+        "request_by": 24,
+        "request_at": "2026-10-06T23:47:59.742879+08:00",
+        "dispatch_to": "assy1",
+        "plan_date": "2026-10-06",
+        "arrived_at": "2026-10-06T23:48:00.569265+08:00",
+        "status": "调试完成",
+        "remark": "UX测试专用调试派工，无实际出差"
+      }
+    },
+    {
+      "user": "pm1",
+      "method": "POST",
+      "path": "/acceptance/apply",
+      "http": 201,
+      "result": {
+        "id": 1,
+        "project_no": "TX26001",
+        "project_name": "UX走查-20261006-整线",
+        "applied_at": "2026-10-06T15:48:00.676254+00:00",
+        "accepted_at": null,
+        "signed_by": null,
+        "result": null,
+        "status": "待验收",
+        "warranty_months": 12,
+        "warranty_start": null,
+        "warranty_end": null,
+        "photos": [],
+        "remark": "UX测试专用客户验收，不是真实客户验收；此前发运缺件仍保留",
+        "documents": [],
+        "doc_count": 0,
+        "signed_count": 0
+      }
+    },
+    {
+      "user": "pm1",
+      "method": "POST",
+      "path": "/acceptance/apply",
+      "http": 400,
+      "result": {
+        "detail": "这个项目已经在申请验收中"
+      }
+    },
+    {
+      "user": "pm1",
+      "method": "POST",
+      "path": "/acceptance/1/documents",
+      "http": 201,
+      "result": [
+        {
+          "id": 1,
+          "acceptance_id": 1,
+          "doc_type": "验收单",
+          "filename": "UX-TEST-ONLY-acceptance.pdf",
+          "is_signed": false,
+          "signed_at": null,
+          "remark": "UX测试资料，非真实客户签字凭证"
+        }
+      ]
+    },
+    {
+      "user": "pm1",
+      "method": "POST",
+      "path": "/acceptance/documents/1/sign",
+      "http": 200,
+      "result": {
+        "id": 1,
+        "acceptance_id": 1,
+        "doc_type": "验收单",
+        "filename": "UX-TEST-ONLY-acceptance.pdf",
+        "is_signed": true,
+        "signed_at": "2026-10-06T15:48:00.760460+00:00",
+        "remark": "UX测试资料，非真实客户签字凭证"
+      }
+    },
+    {
+      "user": "pm1",
+      "method": "POST",
+      "path": "/acceptance/1/confirm",
+      "http": 400,
+      "result": {
+        "detail": "验收通过必须记录客户签字人"
+      }
+    },
+    {
+      "user": "pm1",
+      "method": "POST",
+      "path": "/acceptance/1/confirm",
+      "http": 200,
+      "result": {
+        "id": 1,
+        "project_no": "TX26001",
+        "project_name": "UX走查-20261006-整线",
+        "applied_at": "2026-10-06T23:48:00.676254+08:00",
+        "accepted_at": "2026-10-06T15:48:00.798959+00:00",
+        "signed_by": "UX测试签字人（非真实客户）",
+        "result": "通过",
+        "status": "已通过",
+        "warranty_months": 12,
+        "warranty_start": "2026-10-06",
+        "warranty_end": "2027-10-06",
+        "photos": [],
+        "remark": "UX测试验收通过，无真实客户确认；发运缺件未解决",
+        "documents": [
+          {
+            "id": 1,
+            "acceptance_id": 1,
+            "doc_type": "验收单",
+            "filename": "UX-TEST-ONLY-acceptance.pdf",
+            "is_signed": true,
+            "signed_at": "2026-10-06T23:48:00.760460+08:00",
+            "remark": "UX测试资料，非真实客户签字凭证"
+          }
+        ],
+        "doc_count": 1,
+        "signed_count": 1
+      }
+    },
+    {
+      "user": "pm1",
+      "method": "POST",
+      "path": "/acceptance/1/confirm",
+      "http": 400,
+      "result": {
+        "detail": "这张验收单已经确认过（已通过），不能重复确认"
+      }
+    },
+    {
+      "user": "pm1",
+      "method": "POST",
+      "path": "/acceptance/apply",
+      "http": 400,
+      "result": {
+        "detail": "这个项目已经通过客户验收（质保期已开始）—— 要重新验收请走变更/重开流程；重复申请会覆盖质保起算日"
+      }
+    },
+    {
+      "user": "pm1",
+      "method": "GET",
+      "path": "/projects/TX26001",
+      "http": 200,
+      "result": {
+        "project_no": "TX26001",
+        "project_name": "UX走查-20261006-整线",
+        "customer_id": 1,
+        "customer_name": "UX走查测试客户-20261006",
+        "sales_name": "销售组员",
+        "attachment_count": 0,
+        "attachments_brief": [],
+        "stage": "质保",
+        "project_desc": "UI与UX流程走查专用项目：一台输送设备，用于验证商机、立项与角色交接体验。",
+        "deadline": "2026-10-30",
+        "opportunity_days_left": 24,
+        "delivery_days": 90,
+        "delivery_start": "2026-10-06",
+        "delivery_end": "2027-01-04",
+        "delivery_days_left": 90,
+        "deal_mode": null,
+        "received_docs": null,
+        "source": null,
+        "site_address": "走查专用虚拟工厂",
+        "is_retrofit": false,
+        "product_type": null,
+        "required_cycle": null,
+        "required_capacity": null,
+        "est_amount": null,
+        "expect_sign_date": null,
+        "competitor": null,
+        "related_project_no": null,
+        "risk_note": null,
+        "sales_id": 11,
+        "performance_deposit": null,
+        "performance_deposit_return_date": null,
+        "performance_deposit_returned": false,
+        "amount": 100000.0,
+        "amount_tax_incl": true,
+        "period_start": "2026-10-06",
+        "period_end": "2027-01-06",
+        "contract_no_customer": null,
+        "warranty_months": 12,
+        "warranty_amount": 10000.0,
+        "penalty_note": null,
+        "acceptance_standard": null,
+        "designated_brand": null,
+        "delivery_mode": null,
+        "site_condition": null,
+        "is_batch_delivery": true,
+        "tech_agreement_frozen": false,
+        "close_reason": null,
+        "close_note": null,
+        "warranty_start": "2026-10-06",
+        "warranty_end": "2027-10-06",
+        "archived_at": null,
+        "pm_id": 18,
+        "created_at": "2026-10-06T17:25:43.110162+08:00"
+      }
+    },
+    {
+      "user": "service1",
+      "method": "POST",
+      "path": "/service/orders",
+      "http": 201,
+      "result": {
+        "id": 1,
+        "so_no": "SV26001",
+        "project_no": "TX26001",
+        "project_name": "UX走查-20261006-整线",
+        "equip_no": "01A",
+        "reported_at": "2026-10-06T15:48:01.303510+00:00",
+        "fault": "UX测试专用报修：模拟传感器信号异常，无真实故障",
+        "status": "待受理",
+        "responded_at": null,
+        "dispatched_to": null,
+        "arrived_at": null,
+        "solution": null,
+        "labor_hours": null,
+        "photos": [],
+        "customer_sign": null,
+        "signed_at": null,
+        "closed_at": null,
+        "in_warranty": true,
+        "warranty_end": "2027-10-06",
+        "remark": "仅角色交接验证，无实际维修"
+      }
+    },
+    {
+      "user": "service1",
+      "method": "POST",
+      "path": "/service/orders/1/fix",
+      "http": 400,
+      "result": {
+        "detail": "工单不在「已到场」状态"
+      }
+    },
+    {
+      "user": "service1",
+      "method": "POST",
+      "path": "/service/orders/1/dispatch",
+      "http": 200,
+      "result": {
+        "id": 1,
+        "so_no": "SV26001",
+        "project_no": "TX26001",
+        "project_name": "UX走查-20261006-整线",
+        "equip_no": "01A",
+        "reported_at": "2026-10-06T23:48:01.303510+08:00",
+        "fault": "UX测试专用报修：模拟传感器信号异常，无真实故障",
+        "status": "已派工",
+        "responded_at": "2026-10-06T15:48:01.347894+00:00",
+        "dispatched_to": "service1（UX测试）",
+        "arrived_at": null,
+        "solution": null,
+        "labor_hours": null,
+        "photos": [],
+        "customer_sign": null,
+        "signed_at": null,
+        "closed_at": null,
+        "in_warranty": true,
+        "warranty_end": "2027-10-06",
+        "remark": "仅角色交接验证，无实际维修"
+      }
+    },
+    {
+      "user": "service1",
+      "method": "GET",
+      "path": "/service/workbench?project_no=TX26001",
+      "http": 200,
+      "result": {
+        "counts": {
+          "open": 1,
+          "wait": 0,
+          "in_progress": 1,
+          "to_sign": 0,
+          "closed": 0,
+          "low_parts": 0
+        },
+        "orders": [
+          {
+            "id": 1,
+            "so_no": "SV26001",
+            "project_no": "TX26001",
+            "project_name": "UX走查-20261006-整线",
+            "equip_no": "01A",
+            "reported_at": "2026-10-06T23:48:01.303510+08:00",
+            "fault": "UX测试专用报修：模拟传感器信号异常，无真实故障",
+            "status": "已派工",
+            "responded_at": "2026-10-06T23:48:01.347894+08:00",
+            "dispatched_to": "service1（UX测试）",
+            "arrived_at": null,
+            "solution": null,
+            "labor_hours": null,
+            "photos": [],
+            "customer_sign": null,
+            "signed_at": null,
+            "closed_at": null,
+            "in_warranty": true,
+            "warranty_end": "2027-10-06",
+            "remark": "仅角色交接验证，无实际维修"
+          }
+        ]
+      }
+    },
+    {
+      "user": "service1",
+      "method": "POST",
+      "path": "/service/orders/1/arrive",
+      "http": 200,
+      "result": {
+        "id": 1,
+        "so_no": "SV26001",
+        "project_no": "TX26001",
+        "project_name": "UX走查-20261006-整线",
+        "equip_no": "01A",
+        "reported_at": "2026-10-06T23:48:01.303510+08:00",
+        "fault": "UX测试专用报修：模拟传感器信号异常，无真实故障",
+        "status": "已到场",
+        "responded_at": "2026-10-06T23:48:01.347894+08:00",
+        "dispatched_to": "service1（UX测试）",
+        "arrived_at": "2026-10-06T15:48:01.388486+00:00",
+        "solution": null,
+        "labor_hours": null,
+        "photos": [
+          {
+            "token": "TX26001/shipping/UX-TEST-ONLY/1791299831044160000_UX-TEST-ONLY-photo.png",
+            "filename": "UX-TEST-ONLY-photo.png"
+          }
+        ],
+        "customer_sign": null,
+        "signed_at": null,
+        "closed_at": null,
+        "in_warranty": true,
+        "warranty_end": "2027-10-06",
+        "remark": "仅角色交接验证，无实际维修"
+      }
+    },
+    {
+      "user": "service1",
+      "method": "POST",
+      "path": "/service/orders/1/fix",
+      "http": 200,
+      "result": {
+        "id": 1,
+        "so_no": "SV26001",
+        "project_no": "TX26001",
+        "project_name": "UX走查-20261006-整线",
+        "equip_no": "01A",
+        "reported_at": "2026-10-06T23:48:01.303510+08:00",
+        "fault": "UX测试专用报修：模拟传感器信号异常，无真实故障",
+        "status": "待客户签字",
+        "responded_at": "2026-10-06T23:48:01.347894+08:00",
+        "dispatched_to": "service1（UX测试）",
+        "arrived_at": "2026-10-06T23:48:01.388486+08:00",
+        "solution": "UX测试模拟检查与复位，不是真实维修",
+        "labor_hours": 0.0,
+        "photos": [
+          {
+            "token": "TX26001/shipping/UX-TEST-ONLY/1791299831044160000_UX-TEST-ONLY-photo.png",
+            "filename": "UX-TEST-ONLY-photo.png"
+          },
+          {
+            "token": "TX26001/shipping/UX-TEST-ONLY/1791299831044160000_UX-TEST-ONLY-photo.png",
+            "filename": "UX-TEST-ONLY-photo.png"
+          }
+        ],
+        "customer_sign": null,
+        "signed_at": null,
+        "closed_at": null,
+        "in_warranty": true,
+        "warranty_end": "2027-10-06",
+        "remark": "仅角色交接验证，无实际维修"
+      }
+    },
+    {
+      "user": "service1",
+      "method": "POST",
+      "path": "/service/orders/1/sign",
+      "http": 200,
+      "result": {
+        "id": 1,
+        "so_no": "SV26001",
+        "project_no": "TX26001",
+        "project_name": "UX走查-20261006-整线",
+        "equip_no": "01A",
+        "reported_at": "2026-10-06T23:48:01.303510+08:00",
+        "fault": "UX测试专用报修：模拟传感器信号异常，无真实故障",
+        "status": "已关闭",
+        "responded_at": "2026-10-06T23:48:01.347894+08:00",
+        "dispatched_to": "service1（UX测试）",
+        "arrived_at": "2026-10-06T23:48:01.388486+08:00",
+        "solution": "UX测试模拟检查与复位，不是真实维修",
+        "labor_hours": 0.0,
+        "photos": [
+          {
+            "token": "TX26001/shipping/UX-TEST-ONLY/1791299831044160000_UX-TEST-ONLY-photo.png",
+            "filename": "UX-TEST-ONLY-photo.png"
+          },
+          {
+            "token": "TX26001/shipping/UX-TEST-ONLY/1791299831044160000_UX-TEST-ONLY-photo.png",
+            "filename": "UX-TEST-ONLY-photo.png"
+          }
+        ],
+        "customer_sign": "UX测试签字人（非真实客户）",
+        "signed_at": "2026-10-06T15:48:01.437394+00:00",
+        "closed_at": "2026-10-06T15:48:01.437401+00:00",
+        "in_warranty": true,
+        "warranty_end": "2027-10-06",
+        "remark": "仅角色交接验证，无实际维修"
+      }
+    },
+    {
+      "user": "service1",
+      "method": "POST",
+      "path": "/service/orders/1/sign",
+      "http": 400,
+      "result": {
+        "detail": "工单不在「待客户签字」状态"
+      }
+    },
+    {
+      "user": "service1",
+      "method": "GET",
+      "path": "/service/workbench?project_no=TX26001",
+      "http": 200,
+      "result": {
+        "counts": {
+          "open": 0,
+          "wait": 0,
+          "in_progress": 0,
+          "to_sign": 0,
+          "closed": 1,
+          "low_parts": 0
+        },
+        "orders": [
+          {
+            "id": 1,
+            "so_no": "SV26001",
+            "project_no": "TX26001",
+            "project_name": "UX走查-20261006-整线",
+            "equip_no": "01A",
+            "reported_at": "2026-10-06T23:48:01.303510+08:00",
+            "fault": "UX测试专用报修：模拟传感器信号异常，无真实故障",
+            "status": "已关闭",
+            "responded_at": "2026-10-06T23:48:01.347894+08:00",
+            "dispatched_to": "service1（UX测试）",
+            "arrived_at": "2026-10-06T23:48:01.388486+08:00",
+            "solution": "UX测试模拟检查与复位，不是真实维修",
+            "labor_hours": 0.0,
+            "photos": [
+              {
+                "token": "TX26001/shipping/UX-TEST-ONLY/1791299831044160000_UX-TEST-ONLY-photo.png",
+                "filename": "UX-TEST-ONLY-photo.png"
+              },
+              {
+                "token": "TX26001/shipping/UX-TEST-ONLY/1791299831044160000_UX-TEST-ONLY-photo.png",
+                "filename": "UX-TEST-ONLY-photo.png"
+              }
+            ],
+            "customer_sign": "UX测试签字人（非真实客户）",
+            "signed_at": "2026-10-06T23:48:01.437394+08:00",
+            "closed_at": "2026-10-06T23:48:01.437401+08:00",
+            "in_warranty": true,
+            "warranty_end": "2027-10-06",
+            "remark": "仅角色交接验证，无实际维修"
+          }
+        ]
+      }
+    },
+    {
+      "user": "assy1",
+      "method": "GET",
+      "path": "/notifications?limit=100",
+      "http": 200,
+      "result": {
+        "unread": 1,
+        "items": [
+          {
+            "id": 41,
+            "type": "site",
+            "title": "申请调试：TX26001（必须派人到现场）",
+            "body": "计划 2026-10-06，派 assy1",
+            "link": "/site",
+            "is_read": false,
+            "created_at": "2026-10-06T23:47:59.733894+08:00"
+          }
+        ]
+      }
+    },
+    {
+      "user": "pm1",
+      "method": "GET",
+      "path": "/notifications?limit=100",
+      "http": 200,
+      "result": {
+        "unread": 10,
+        "items": [
+          {
+            "id": 51,
+            "type": "service",
+            "title": "报修已受理：SV26001",
+            "body": "UX测试专用报修：模拟传感器信号异常，无真实故障",
+            "link": "/service",
+            "is_read": false,
+            "created_at": "2026-10-06T23:48:01.287125+08:00"
+          },
+          {
+            "id": 43,
+            "type": "site",
+            "title": "现场申请调试：TX26001",
+            "body": "计划 2026-10-06，派 assy1",
+            "link": "/site",
+            "is_read": false,
+            "created_at": "2026-10-06T23:47:59.733894+08:00"
+          },
+          {
+            "id": 40,
+            "type": "site",
+            "title": "现场勘测完成：TX26001 约定入场 2026-10-06",
+            "body": "现场负责人：UX测试客户",
+            "link": "/site",
+            "is_read": false,
+            "created_at": "2026-10-06T23:47:59.676213+08:00"
+          },
+          {
+            "id": 38,
+            "type": "ship",
+            "title": "现场清点缺件：TX26001（FH26001）",
+            "body": "缺/损 1 项；备注：UX测试缺件分支，无真实签收",
+            "link": "/shipping",
+            "is_read": false,
+            "created_at": "2026-10-06T23:17:11.637376+08:00"
+          },
+          {
+            "id": 31,
+            "type": "warehouse",
+            "title": "货已入库：JJ-LS-1604 × 1.000",
+            "body": "TX26001 01A → 深圳仓 A-03-12",
+            "link": "/warehouse",
+            "is_read": false,
+            "created_at": "2026-10-06T22:52:58.065811+08:00"
+          },
+          {
+            "id": 28,
+            "type": "warehouse",
+            "title": "货已入库：JJ-LS-1604 × 3.000",
+            "body": "TX26001 01A → 深圳仓 A-03-12",
+            "link": "/warehouse",
+            "is_read": false,
+            "created_at": "2026-10-06T22:52:54.686986+08:00"
+          },
+          {
+            "id": 26,
+            "type": "warehouse",
+            "title": "货已入库：JJ-LS-1604 × 3.000",
+            "body": "TX26001 01A → 深圳仓 A-03-12",
+            "link": "/warehouse",
+            "is_read": false,
+            "created_at": "2026-10-06T22:52:54.646145+08:00"
+          },
+          {
+            "id": 23,
+            "type": "release",
+            "title": "机械设计已发布（01A）：RL26001",
+            "body": "内容已冻结，后面按这一版干活；工艺可以开工了",
+            "link": "/projects/TX26001/design/01A",
+            "is_read": false,
+            "created_at": "2026-10-06T22:50:42.237891+08:00"
+          },
+          {
+            "id": 13,
+            "type": "warehouse",
+            "title": "货已入库：JJ-LS-1604 × 1.000",
+            "body": "TX26001 01A → 深圳仓 A-03-12",
+            "link": "/warehouse",
+            "is_read": false,
+            "created_at": "2026-10-06T22:42:46.818893+08:00"
+          },
+          {
+            "id": 11,
+            "type": "warehouse",
+            "title": "货已入库：JJ-LS-1604 × 2.000",
+            "body": "TX26001 01A → 深圳仓 A-03-12",
+            "link": "/warehouse",
+            "is_read": false,
+            "created_at": "2026-10-06T22:42:46.754378+08:00"
+          }
+        ]
+      }
+    },
+    {
+      "user": "sales1",
+      "method": "GET",
+      "path": "/notifications?limit=100",
+      "http": 200,
+      "result": {
+        "unread": 5,
+        "items": [
+          {
+            "id": 49,
+            "type": "task",
+            "title": "该收款了：TX26001 已「质保」（未收 ¥10,000）",
+            "body": "付款节点：质保金。项目 UX走查-20261006-整线已到达「质保」节点，请去收款并登记回款。",
+            "link": "/projects/TX26001",
+            "is_read": false,
+            "created_at": "2026-10-06T23:48:00.788124+08:00"
+          },
+          {
+            "id": 47,
+            "type": "task",
+            "title": "该收款了：TX26001 已「验收」（未收 ¥20,000）",
+            "body": "付款节点：验收款。项目 UX走查-20261006-整线已到达「验收」节点，请去收款并登记回款。",
+            "link": "/projects/TX26001",
+            "is_read": false,
+            "created_at": "2026-10-06T23:48:00.788124+08:00"
+          },
+          {
+            "id": 44,
+            "type": "acceptance",
+            "title": "申请客户验收：TX26001",
+            "body": "请准备验收资料包并联系客户签字确认。",
+            "link": "/acceptance",
+            "is_read": false,
+            "created_at": "2026-10-06T23:48:00.663224+08:00"
+          },
+          {
+            "id": 35,
+            "type": "task",
+            "title": "该收款了：TX26001 已「发货」（未收 ¥40,000）",
+            "body": "付款节点：发货款。项目 UX走查-20261006-整线已到达「发货」节点，请去收款并登记回款。",
+            "link": "/projects/TX26001",
+            "is_read": false,
+            "created_at": "2026-10-06T23:17:11.151387+08:00"
+          },
+          {
+            "id": 5,
+            "type": "task",
+            "title": "该收款了：TX26001 已「立项」（未收 ¥30,000）",
+            "body": "付款节点：预付款。项目 UX走查-20261006-整线已到达「立项」节点，请去收款并登记回款。",
+            "link": "/projects/TX26001",
+            "is_read": false,
+            "created_at": "2026-10-06T17:31:11.161522+08:00"
+          }
+        ]
+      }
+    },
+    {
+      "user": "service1",
+      "method": "GET",
+      "path": "/notifications?limit=100",
+      "http": 200,
+      "result": {
+        "unread": 0,
+        "items": []
+      }
+    }
+  ],
+  "commission_id": 1,
+  "acceptance_id": 1,
+  "documents": [
+    {
+      "id": 1,
+      "acceptance_id": 1,
+      "doc_type": "验收单",
+      "filename": "UX-TEST-ONLY-acceptance.pdf",
+      "is_signed": false,
+      "signed_at": null,
+      "remark": "UX测试资料，非真实客户签字凭证"
+    }
+  ],
+  "final_acceptance": {
+    "id": 1,
+    "project_no": "TX26001",
+    "project_name": "UX走查-20261006-整线",
+    "applied_at": "2026-10-06T23:48:00.676254+08:00",
+    "accepted_at": "2026-10-06T15:48:00.798959+00:00",
+    "signed_by": "UX测试签字人（非真实客户）",
+    "result": "通过",
+    "status": "已通过",
+    "warranty_months": 12,
+    "warranty_start": "2026-10-06",
+    "warranty_end": "2027-10-06",
+    "photos": [],
+    "remark": "UX测试验收通过，无真实客户确认；发运缺件未解决",
+    "documents": [
+      {
+        "id": 1,
+        "acceptance_id": 1,
+        "doc_type": "验收单",
+        "filename": "UX-TEST-ONLY-acceptance.pdf",
+        "is_signed": true,
+        "signed_at": "2026-10-06T23:48:00.760460+08:00",
+        "remark": "UX测试资料，非真实客户签字凭证"
+      }
+    ],
+    "doc_count": 1,
+    "signed_count": 1
+  },
+  "project_after": {
+    "project_no": "TX26001",
+    "project_name": "UX走查-20261006-整线",
+    "customer_id": 1,
+    "customer_name": "UX走查测试客户-20261006",
+    "sales_name": "销售组员",
+    "attachment_count": 0,
+    "attachments_brief": [],
+    "stage": "质保",
+    "project_desc": "UI与UX流程走查专用项目：一台输送设备，用于验证商机、立项与角色交接体验。",
+    "deadline": "2026-10-30",
+    "opportunity_days_left": 24,
+    "delivery_days": 90,
+    "delivery_start": "2026-10-06",
+    "delivery_end": "2027-01-04",
+    "delivery_days_left": 90,
+    "deal_mode": null,
+    "received_docs": null,
+    "source": null,
+    "site_address": "走查专用虚拟工厂",
+    "is_retrofit": false,
+    "product_type": null,
+    "required_cycle": null,
+    "required_capacity": null,
+    "est_amount": null,
+    "expect_sign_date": null,
+    "competitor": null,
+    "related_project_no": null,
+    "risk_note": null,
+    "sales_id": 11,
+    "performance_deposit": null,
+    "performance_deposit_return_date": null,
+    "performance_deposit_returned": false,
+    "amount": 100000.0,
+    "amount_tax_incl": true,
+    "period_start": "2026-10-06",
+    "period_end": "2027-01-06",
+    "contract_no_customer": null,
+    "warranty_months": 12,
+    "warranty_amount": 10000.0,
+    "penalty_note": null,
+    "acceptance_standard": null,
+    "designated_brand": null,
+    "delivery_mode": null,
+    "site_condition": null,
+    "is_batch_delivery": true,
+    "tech_agreement_frozen": false,
+    "close_reason": null,
+    "close_note": null,
+    "warranty_start": "2026-10-06",
+    "warranty_end": "2027-10-06",
+    "archived_at": null,
+    "pm_id": 18,
+    "created_at": "2026-10-06T17:25:43.110162+08:00"
+  },
+  "service_id": 1,
+  "service_no": "SV26001",
+  "final_service": {
+    "id": 1,
+    "so_no": "SV26001",
+    "project_no": "TX26001",
+    "project_name": "UX走查-20261006-整线",
+    "equip_no": "01A",
+    "reported_at": "2026-10-06T23:48:01.303510+08:00",
+    "fault": "UX测试专用报修：模拟传感器信号异常，无真实故障",
+    "status": "已关闭",
+    "responded_at": "2026-10-06T23:48:01.347894+08:00",
+    "dispatched_to": "service1（UX测试）",
+    "arrived_at": "2026-10-06T23:48:01.388486+08:00",
+    "solution": "UX测试模拟检查与复位，不是真实维修",
+    "labor_hours": 0.0,
+    "photos": [
+      {
+        "token": "TX26001/shipping/UX-TEST-ONLY/1791299831044160000_UX-TEST-ONLY-photo.png",
+        "filename": "UX-TEST-ONLY-photo.png"
+      },
+      {
+        "token": "TX26001/shipping/UX-TEST-ONLY/1791299831044160000_UX-TEST-ONLY-photo.png",
+        "filename": "UX-TEST-ONLY-photo.png"
+      }
+    ],
+    "customer_sign": "UX测试签字人（非真实客户）",
+    "signed_at": "2026-10-06T15:48:01.437394+00:00",
+    "closed_at": "2026-10-06T15:48:01.437401+00:00",
+    "in_warranty": true,
+    "warranty_end": "2027-10-06",
+    "remark": "仅角色交接验证，无实际维修"
+  },
+  "handoff_notifications": {
+    "assy1": [
+      {
+        "id": 41,
+        "type": "site",
+        "title": "申请调试：TX26001（必须派人到现场）",
+        "body": "计划 2026-10-06，派 assy1",
+        "link": "/site",
+        "is_read": false,
+        "created_at": "2026-10-06T23:47:59.733894+08:00"
+      }
+    ],
+    "pm1": [
+      {
+        "id": 51,
+        "type": "service",
+        "title": "报修已受理：SV26001",
+        "body": "UX测试专用报修：模拟传感器信号异常，无真实故障",
+        "link": "/service",
+        "is_read": false,
+        "created_at": "2026-10-06T23:48:01.287125+08:00"
+      },
+      {
+        "id": 43,
+        "type": "site",
+        "title": "现场申请调试：TX26001",
+        "body": "计划 2026-10-06，派 assy1",
+        "link": "/site",
+        "is_read": false,
+        "created_at": "2026-10-06T23:47:59.733894+08:00"
+      },
+      {
+        "id": 40,
+        "type": "site",
+        "title": "现场勘测完成：TX26001 约定入场 2026-10-06",
+        "body": "现场负责人：UX测试客户",
+        "link": "/site",
+        "is_read": false,
+        "created_at": "2026-10-06T23:47:59.676213+08:00"
+      },
+      {
+        "id": 38,
+        "type": "ship",
+        "title": "现场清点缺件：TX26001（FH26001）",
+        "body": "缺/损 1 项；备注：UX测试缺件分支，无真实签收",
+        "link": "/shipping",
+        "is_read": false,
+        "created_at": "2026-10-06T23:17:11.637376+08:00"
+      }
+    ],
+    "sales1": [
+      {
+        "id": 49,
+        "type": "task",
+        "title": "该收款了：TX26001 已「质保」（未收 ¥10,000）",
+        "body": "付款节点：质保金。项目 UX走查-20261006-整线已到达「质保」节点，请去收款并登记回款。",
+        "link": "/projects/TX26001",
+        "is_read": false,
+        "created_at": "2026-10-06T23:48:00.788124+08:00"
+      },
+      {
+        "id": 47,
+        "type": "task",
+        "title": "该收款了：TX26001 已「验收」（未收 ¥20,000）",
+        "body": "付款节点：验收款。项目 UX走查-20261006-整线已到达「验收」节点，请去收款并登记回款。",
+        "link": "/projects/TX26001",
+        "is_read": false,
+        "created_at": "2026-10-06T23:48:00.788124+08:00"
+      },
+      {
+        "id": 44,
+        "type": "acceptance",
+        "title": "申请客户验收：TX26001",
+        "body": "请准备验收资料包并联系客户签字确认。",
+        "link": "/acceptance",
+        "is_read": false,
+        "created_at": "2026-10-06T23:48:00.663224+08:00"
+      },
+      {
+        "id": 35,
+        "type": "task",
+        "title": "该收款了：TX26001 已「发货」（未收 ¥40,000）",
+        "body": "付款节点：发货款。项目 UX走查-20261006-整线已到达「发货」节点，请去收款并登记回款。",
+        "link": "/projects/TX26001",
+        "is_read": false,
+        "created_at": "2026-10-06T23:17:11.151387+08:00"
+      },
+      {
+        "id": 5,
+        "type": "task",
+        "title": "该收款了：TX26001 已「立项」（未收 ¥30,000）",
+        "body": "付款节点：预付款。项目 UX走查-20261006-整线已到达「立项」节点，请去收款并登记回款。",
+        "link": "/projects/TX26001",
+        "is_read": false,
+        "created_at": "2026-10-06T17:31:11.161522+08:00"
+      }
+    ],
+    "service1": []
+  },
+  "phase": "commission_done_acceptance_passed_warranty_service_closed"
+}

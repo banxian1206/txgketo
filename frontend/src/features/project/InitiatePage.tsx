@@ -9,9 +9,7 @@ import {
   Button,
   Card,
   Checkbox,
-  Col,
   Empty,
-  Row,
   Space,
   Spin,
   Table,
@@ -85,7 +83,8 @@ export default function ProjectInitiate() {
     void load()
   }, [load])
 
-  const notOrdered = requests.filter((r) => r.is_long_lead && !r.ordered_at)
+  const longLeads = requests.filter((r) => r.is_long_lead)
+  const notOrdered = longLeads.filter((r) => !r.ordered_at)
   const unassigned = tasks.filter((t) => !t.owner_id)
 
   const doGenerateTasks = async () => {
@@ -125,7 +124,7 @@ export default function ProjectInitiate() {
     }
   }
 
-  if (loading) {
+  if (loading && !detail) {
     return (
       <div style={{ textAlign: 'center', padding: 80 }}>
         <Spin />
@@ -135,10 +134,11 @@ export default function ProjectInitiate() {
 
   const p = detail?.project
   const checklist = [
-    { ok: members.length > 0, text: `项目团队（已任命 ${members.length} 个角色）` },
-    { ok: equipment.length > 0, text: `设备清单（已定 ${equipment.length} 台设备）` },
-    { ok: milestones.length > 0, text: `节点计划（已定 ${milestones.length} 个节点）` },
+    { key: 'team', label: '项目团队', ok: members.length > 0, text: `项目团队（已任命 ${members.length} 个角色）` },
+    { key: 'equipment', label: '设备清单', ok: equipment.length > 0, text: `设备清单（已定 ${equipment.length} 台设备）` },
+    { key: 'milestone', label: '节点计划', ok: milestones.length > 0, text: `节点计划（已定 ${milestones.length} 个节点）` },
     {
+      key: 'tasks', label: '任务分派',
       ok: tasks.length > 0 && unassigned.length === 0,
       text:
         tasks.length === 0
@@ -148,10 +148,13 @@ export default function ProjectInitiate() {
             : `任务已分派（${tasks.length} 条到人）`,
     },
     {
+      key: 'longlead', label: '长周期采购',
       ok: notOrdered.length === 0,
       text:
-        notOrdered.length === 0
-          ? `长周期件（${requests.length} 项，全部已下单）`
+        longLeads.length === 0
+          ? '未登记长周期件'
+          : notOrdered.length === 0
+          ? `长周期件（${longLeads.length} 项，全部已下单）`
           : `长周期件：${notOrdered.map((r) => r.item_name).join('、')} 还没下单（建议立项前就下单）`,
       warnOnly: true,
     },
@@ -163,51 +166,34 @@ export default function ProjectInitiate() {
           原来是页首一张 Card，往下滑 2.6 屏才看到 ①…⑤ —— 现在它在最上面、切区不动 */}
       <div className="ds-panel" style={{ marginBottom: 16 }}>
         <div className="ds-panel-b">
-        <Row align="middle">
-          <Col flex="auto">
-            <Space size={8}>
-              <a onClick={() => nav(back.to)}>{back.label}</a>
-              <Typography.Text strong style={{ fontSize: 16 }}>
-                立项 · {projectNo}
+        <div className="initiate-heading">
+          <div>
+            <a onClick={() => nav(back.to)}>{back.label}</a>
+            <Typography.Title level={4} style={{ margin: '8px 0' }}>立项 · {projectNo}</Typography.Title>
+            <Space wrap><Typography.Text>{p?.project_name}</Typography.Text><Chip tone="warn">{p?.stage}</Chip></Space>
+          </div>
+          <div className="initiate-decision">
+            <Typography.Text strong>
+              {checklist.filter((c) => !c.warnOnly && !c.ok).length
+                ? `还需完成 ${checklist.filter((c) => !c.warnOnly && !c.ok).map((c) => c.label).join('、')}`
+                : '团队、设备、节点和任务已具备立项条件'}
+            </Typography.Text>
+            <Button type="primary" loading={submitting}
+              disabled={!members.length || !equipment.length || !milestones.length || !tasks.length || unassigned.length > 0}
+              onClick={() => void submit()}>
+              确认立项（进入执行中）
+            </Button>
+          </div>
+        </div>
+        <div className="initiate-checklist" aria-label="立项准备清单">
+          {checklist.map((c) => (
+            <Button key={c.key} type="text" onClick={() => setTab(c.key)}>
+              <Typography.Text type={c.ok ? 'secondary' : c.warnOnly ? 'warning' : 'danger'}>
+                {c.ok ? '✓' : '○'} {c.text}
               </Typography.Text>
-              <Typography.Text>{p?.project_name}</Typography.Text>
-              <Chip tone="warn">{p?.stage}</Chip>
-            </Space>
-            <div style={{ marginTop: 6 }}>
-              <Typography.Text type="secondary" style={{ fontSize: 13 }}>
-                项目组全体会议要定的三件事：① 统一理解 ② 任务分配（设备）③ 节点时间段；
-                长周期件立项就下单
-              </Typography.Text>
-            </div>
-          </Col>
-          <Col>
-            <Space direction="vertical" align="end" size={4}>
-              {checklist.map((c, i) => (
-                <Typography.Text
-                  key={i}
-                  type={c.ok ? 'success' : c.warnOnly ? 'warning' : 'danger'}
-                  style={{ fontSize: 12 }}
-                >
-                  {c.ok ? '✓' : '○'} {c.text}
-                </Typography.Text>
-              ))}
-              <Button
-                type="primary"
-                loading={submitting}
-                disabled={
-                !members.length ||
-                !equipment.length ||
-                !milestones.length ||
-                !tasks.length ||
-                unassigned.length > 0
-              }
-                onClick={() => void submit()}
-              >
-                确认立项（进入执行中）
-              </Button>
-            </Space>
-          </Col>
-        </Row>
+            </Button>
+          ))}
+        </div>
         </div>
       </div>
 
@@ -310,7 +296,7 @@ export default function ProjectInitiate() {
       >
         <Typography.Paragraph type="secondary" style={{ fontSize: 12 }}>
           每台设备 × 勾选的专业 → 一条设计任务，直接派给对应专业的经理（工程部岗位），经理再拆给组员；
-          工艺挂在机械之后（机械首次发布即可开工）。每个长周期件 → 一条采购任务。生成后各人在「我的任务」里看到自己的活。
+          工艺挂在机械之后（机械首次发布即可开工）。每个长周期件 → 一条采购任务。生成后负责人在对应工作台收到任务。
         </Typography.Paragraph>
         <Table<TaskItem>
           rowKey="id"

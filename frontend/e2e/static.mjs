@@ -1367,5 +1367,34 @@ function topItems(block) {
     bad.length ? bad.slice(0, 4).join(' | ') : '九个台都声明三档：组员/经理/总监各落“轮到我处理”的那一项（页签不增减）')
 }
 
+// UIUX 首轮：连续导航与保存保留已挂载的编辑器。
+{
+  const detail = fs.readFileSync(path.join(SRC, 'features/project/DetailPage.tsx'), 'utf8')
+  const init = fs.readFileSync(path.join(SRC, 'features/project/InitiatePage.tsx'), 'utf8')
+  check('UX-下一步保留来源', /const goNext = \(to: string\) => go\(to\)/.test(detail), '项目下一步使用来源导航')
+  check('UX-立项刷新保留编辑器', /if \(loading && !detail\)/.test(init) && !/if \(loading\)/.test(init), '仅首次加载替换页面')
+}
+
+{
+  const eng = fs.readFileSync(path.join(SRC, 'features/workbench/EngWorkbench.tsx'), 'utf8')
+  check('ROLE-个人审核不冒用部门量', /key: 'review', label: '待我审核', value: todoTickets\.length/.test(eng)
+    && !/待我审 \/ 待终审/.test(eng)
+    && /label: '部门待裁决改版'.*to: '\?tab=board'/.test(eng), '个人审核与实际队列同源，部门改版进入部门分区')
+}
+
+// 新建商机重排后，隐藏区校验必须与真实字段位置一致。
+{
+  const fields = fs.readFileSync(path.join(SRC, 'components/OpportunityCreateFields.tsx'), 'utf8')
+  const mapBlock = fields.match(/OPPORTUNITY_FIELD_SECTION[^=]*=\s*({[^}]+})/)[1]
+  const map = Object.fromEntries([...mapBlock.matchAll(/'([^']+)': '([^']+)'/g)].map(x => [x[1], x[2]]))
+  const actual = {}
+  for (const section of fields.matchAll(/<section data-section="([^"]+)"[\s\S]*?<\/section>/g)) {
+    for (const field of section[0].matchAll(/name="([^"]+)"/g)) actual[field[1]] = section[1]
+  }
+  const bad = [...new Set([...Object.keys(map), ...Object.keys(actual)])].filter(k => map[k] !== actual[k])
+  check('UX-S0错误分区跟随真实字段', bad.length === 0, bad.length ? bad.join(',') : '全部字段含联系人列表与分区映射一致')
+  check('UX-S0选填折叠保留字段', /forceRender: true/.test(fields), '选填折叠始终挂载，跨区不会卸载字段')
+}
+
 const fails = summary('静态回归');
 exitWith(fails);

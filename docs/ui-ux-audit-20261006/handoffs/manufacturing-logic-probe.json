@@ -1,0 +1,62 @@
+{
+  "scope": "内存隔离调用现有制造服务，无数据库、编号生成、业务单据或真实制造；不等同API/页面验收",
+  "checks": [
+    {
+      "check": "未下发不能开工",
+      "passed": true,
+      "reason": "当前状态「待领料」，不能开工"
+    },
+    {
+      "check": "下发无照片拒绝",
+      "passed": true,
+      "reason": "下发要拍照确认（原材料 + 图纸）"
+    },
+    {
+      "check": "下发记住当时图纸V1",
+      "passed": true
+    },
+    {
+      "check": "当前版本变化不覆盖已下发V1",
+      "passed": true
+    },
+    {
+      "check": "下发后可以开工",
+      "passed": true
+    },
+    {
+      "check": "不合格进入返工且保留验收",
+      "passed": true
+    },
+    {
+      "check": "返工不能转运",
+      "passed": true,
+      "reason": "只能验收合格后再转运"
+    },
+    {
+      "check": "返工再下发与合格留两条验收",
+      "passed": true
+    },
+    {
+      "check": "合格转运无照片拒绝",
+      "passed": true,
+      "reason": "转运要拍照（证明确实到位）"
+    },
+    {
+      "check": "合格且有照片转运装配区",
+      "passed": true
+    },
+    {
+      "check": "外协未发出不能回厂",
+      "passed": true,
+      "reason": "当前状态「待发出」，不能登记回厂"
+    },
+    {
+      "check": "外协不合格回外协中",
+      "passed": true
+    },
+    {
+      "check": "外协返修回厂再合格",
+      "passed": true
+    }
+  ]
+}

@@ -407,14 +407,16 @@ try {
       const row = nc.page.locator('.ant-table-row').first()
       let url = '', sideSel = '', tabsAfter = 0, backTxt = '', backUrl = ''
       if (await row.count()) {
-        await row.click()
+        const entry = row.locator('button.project-entry')
+        await entry.focus()
+        await nc.page.keyboard.press('Enter')
         await nc.page.waitForTimeout(1400)
         url = nc.page.url()
         sideSel = (await nc.page.locator('.ant-menu-item-selected').first().innerText().catch(() => '')).replace(/\s+/g, ' ').trim()
         tabsAfter = await nc.page.locator('.domain-tabs a').count()
-        backTxt = await nc.page.locator('a').filter({ hasText: /^←/ }).first().innerText().catch(() => '')
-        const bk = nc.page.locator('a').filter({ hasText: /^← 返回/ }).first()
-        if (await bk.count()) { await bk.click(); await nc.page.waitForTimeout(1200); backUrl = nc.page.url() }
+        const bk = nc.page.getByRole('button', { name: /^← 返回/ }).first()
+        backTxt = await bk.innerText().catch(() => '')
+        if (await bk.count()) { await bk.focus(); await nc.page.keyboard.press('Enter'); await nc.page.waitForTimeout(1200); backUrl = nc.page.url() }
       }
       // （台里没项目行也必须红 —— 不许「没数据就跳过」的休眠护栏）
       check('NAV-drill-in 带来源', url.includes('from='), url ? `点项目行 → ${url.replace(BASE, '')}` : '台里没有可点的项目行')
@@ -450,6 +452,77 @@ try {
     } finally {
       await nc.browser.close()
     }
+  }
+
+  // UIUX：登录失败必须在表单上可见，修改输入后消除旧反馈。
+  {
+    const nc = await newCtx()
+    try {
+      await nc.page.goto(BASE + '/login')
+      await nc.page.locator('input[autocomplete="username"]').fill('pm1')
+      await nc.page.locator('input[autocomplete="current-password"]').fill('incorrect-ux-test')
+      await nc.page.getByRole('button', { name: /登\s*录/ }).click()
+      const feedback = nc.page.getByRole('alert').filter({ hasText: '账号或密码错误' })
+      await feedback.waitFor({ state: 'visible' })
+      check('UX-登录失败就地反馈', await feedback.isVisible(), '错误保留在表单内')
+      await nc.page.locator('input[autocomplete="current-password"]').fill('txgk@123')
+      check('UX-更正输入清除旧错误', await feedback.count() === 0, '输入更正后不保留过时错误')
+    } finally { await nc.browser.close() }
+  }
+
+  // 长/短工作台页签切换不主动滚动页面（只读，矮视口可复现旧scrollIntoView位移）。
+  {
+    const nc = await newCtx()
+    try {
+      await nc.page.setViewportSize({ width: 1366, height: 600 })
+      await login(nc.page, 'pm1', 'txgk@123')
+      await nc.page.goto(BASE + '/workbench/pm', { waitUntil: 'networkidle' })
+      const pos = () => nc.page.evaluate(() => {
+        const nav = document.querySelector('.ds-subtabs').getBoundingClientRect()
+        return { x: nav.x, y: nav.y, scroll: window.scrollY }
+      })
+      const before = await pos()
+      await nc.page.locator('.ds-subtabs').getByText('验收与质保', { exact: true }).click()
+      await nc.page.getByRole('button', { name: '申请客户验收', exact: true }).waitFor()
+      const after = await pos()
+      await nc.page.locator('.ds-subtabs').getByText('看板', { exact: true }).click()
+      const back = await pos()
+      check('UX-页签切换外壳不位移', [after, back].every(p => Math.abs(p.x - before.x) < 1 && Math.abs(p.y - before.y) < 1 && Math.abs(p.scroll - before.scroll) < 1), JSON.stringify({ before, after, back }))
+    } finally { await nc.browser.close() }
+  }
+
+  // S0 分区引导：不写业务数据，验证保值、摘要和隐藏区校验。
+  {
+    const nc = await newCtx()
+    try {
+      await login(nc.page, 'sales1', 'txgk@123')
+      await nc.page.goto(BASE + '/projects/new?from=%2Fworkbench%2Fsales')
+      check('UX-S0标题不重复提交操作', await nc.page.locator('.ant-card-head button').count() === 0 && await nc.page.getByRole('button', { name: '建立商机', exact: true }).count() === 0, '标题无操作，前两步不展示提交')
+      await nc.page.getByRole('button', { name: '① 商机与联系', exact: true }).focus()
+      await nc.page.keyboard.press('ArrowRight')
+      check('UX-分区方向键跟随焦点', new URL(nc.page.url()).searchParams.get('tab') === 'require' && await nc.page.getByRole('button', { name: '② 需求与时间', exact: true }).evaluate(el => el === document.activeElement), '切区后焦点移到对应按钮')
+      await nc.page.keyboard.press('ArrowLeft')
+      await nc.page.getByRole('combobox', { name: '销售负责人' }).click()
+      await nc.page.keyboard.press('ArrowRight')
+      check('UX-分区不抢选择器方向键', !new URL(nc.page.url()).searchParams.has('tab'), '在选择器操作仍停留第一步')
+      await nc.page.keyboard.press('Escape')
+      await nc.page.locator('#project_name').fill('UX草稿护栏')
+      await nc.page.getByRole('button', { name: '下一项：需求与时间', exact: true }).click()
+      await nc.page.locator('#project_desc').fill('仅验证草稿，不提交业务数据')
+      check('UX-S0下一项进URL', new URL(nc.page.url()).searchParams.get('tab') === 'require', '下一项切区不提交')
+      await nc.page.getByRole('button', { name: '③ 资料与商务', exact: true }).click()
+      check('UX-S0摘要保留草稿', await nc.page.getByTestId('create-review').innerText().then((t) => t.includes('UX草稿护栏') && t.includes('未填写')), '摘要区显示已填与缺项')
+      await nc.page.getByRole('button', { name: '更多技术与商务信息（选填）', exact: true }).click()
+      await nc.page.locator('#competitor').fill('选填护栏草稿')
+      await nc.page.getByRole('button', { name: '更多技术与商务信息（选填）', exact: true }).click()
+      await nc.page.getByRole('button', { name: '② 需求与时间', exact: true }).click()
+      await nc.page.getByRole('button', { name: '③ 资料与商务', exact: true }).click()
+      await nc.page.getByRole('button', { name: '更多技术与商务信息（选填）', exact: true }).click()
+      check('UX-S0选填折叠跨区保值', await nc.page.locator('#competitor').inputValue() === '选填护栏草稿', '折叠与切换不卸载已填字段')
+      await nc.page.getByRole('button', { name: '建立商机', exact: true }).last().click()
+      await nc.page.locator('[data-section=basic]').waitFor({ state: 'visible' })
+      check('UX-S0校验跳隐藏区', await nc.page.locator('[data-section=basic]').isVisible(), '必填校验仍跳第一个错误区')
+    } finally { await nc.browser.close() }
   }
 
   // ── B1 三角色开台（拍板④）：发运/现场/售后各见自己的台 + 台Tab直达交付域 ──
@@ -542,43 +615,41 @@ try {
   // —— P-09：空提交必须给出**看得见、能定位**的校验反馈 + 零 pageerror ——
   //   ★ 2026-10-05 迁移（docs/14 P4）：表单页分区后，错误可能落在**被藏起来的步骤**里。
   //     断言意图不变（空提交不能让用户"点了没反应"），拆成两条：
-  //     ① 提交后**当前区**必须有可见的错误行；② 切到「客户信息」能看见列表级联系人错误。
+  //     ① 提交后**当前区**必须有可见的错误行；② 在「商机与联系」能看见列表级联系人错误。
   await page.goto(BASE + '/projects/new', { waitUntil: 'networkidle' });
   await page.waitForTimeout(700);
   errs.length = 0;
+  await openSection(page, '资料与商务');
   await page.getByRole('button', { name: /建\s*立\s*商\s*机/ }).first().click();
   await page.waitForTimeout(900);
   const visibleErrs = await page.locator('.ant-form-item-explain-error:visible').allInnerTexts();
-  await openSection(page, '客户信息');
+  await openSection(page, '商机与联系');
   const t0 = await body(page);
   check('P-09', visibleErrs.length > 0 && t0.includes('至少要有一个客户方联系人') && errs.length === 0,
     `可见错误 ${visibleErrs.length} 条（${visibleErrs.slice(0, 1).join('')}）· 列表级联系人错误=${t0.includes('至少要有一个客户方联系人')}${errs.length ? ' · 有异常: ' + errs[0] : ''}`);
 
-  // —— S0 建商机（写链开始）——
-  // ★ P-09 结束时停在「② 客户信息」（为了看列表级错误）→ 这里先切回①，否则①的字段是隐藏的
-  await openSection(page, '基本信息');
-  await page.getByLabel(/项目名称/).fill(`E2E回归-${new Date().toISOString().slice(5, 16).replace(/[-:]/g, '')}`);
-  await page.getByLabel(/项目描述/).fill('e2e 护栏自动创建（可清理）');
-  await openSection(page, '客户信息');   // ★ 分区化后：客户名称与联系人都「② 客户信息」里
+  // —— S0 建商机（写链开始）：按三步真实字段布局填写 ——
+  await openSection(page, '商机与联系');
+  await page.getByLabel(/商机名称/).fill(`E2E回归-${new Date().toISOString().slice(5, 16).replace(/[-:]/g, '')}`);
   await page.getByLabel(/客户名称/).fill('E2E回归客户');
   await page.getByRole('button', { name: /添\s*加\s*联\s*系\s*人/ }).click();
   await page.getByPlaceholder('姓名').first().fill('回归机器人');
   await page.getByPlaceholder('电话').first().fill('13900000000');
-  await openSection(page, '项目要求');   // ★ 项目地点在③ 项目要求
-  await page.getByLabel(/项目地点/).fill('广东惠州回归路 1 号');
-  await openSection(page, '时间与金额');   // ★ 商机截止在④ 时间与金额
-  const dl = page.locator('.ant-form-item').filter({ hasText: '商机截止时间' }).locator('input');
-  await dl.click(); await page.keyboard.type('2026-12-31'); await page.keyboard.press('Enter');
-  await openSection(page, '商务跟进');   // ★ 销售负责人在⑥ 商务跟进
   await page.getByLabel(/销售负责人/).click(); await page.waitForTimeout(400);
   await page.keyboard.type('销售'); await page.waitForTimeout(500);
   await page.locator('.ant-select-dropdown:visible .ant-select-item').first().click();
+  await openSection(page, '需求与时间');
+  await page.getByLabel(/客户需求/).fill('e2e 护栏自动创建（可清理）');
+  await page.getByLabel(/项目地点/).fill('广东惠州回归路 1 号');
+  const dl = page.locator('.ant-form-item').filter({ hasText: '商机截止时间' }).locator('input');
+  await dl.click(); await page.keyboard.type('2026-12-31'); await page.keyboard.press('Enter');
+  await openSection(page, '资料与商务');
   await page.getByRole('button', { name: /建\s*立\s*商\s*机/ }).first().click();
-  await page.waitForURL(/\/projects$/, { timeout: 15000 }).catch(() => {});
+  await page.waitForURL(/\/projects\/TX\d{5}/, { timeout: 15000 });
   await page.waitForTimeout(1200);
   const t1 = await body(page);
   newNo = (t1.match(/TX\d{5}/g) || []).sort().at(-1);
-  check('S0-建商机', !!newNo && t1.includes('E2E回归'), newNo ? `${newNo} 已建` : '列表未见新项目');
+  check('S0-建商机', !!newNo && t1.includes('E2E回归'), newNo ? `${newNo} 已建` : '新商机详情未见新项目');
   if (!newNo) throw new Error('no project');
 
   // —— 成交登记 ——
@@ -586,6 +657,7 @@ try {
   await page.waitForTimeout(700);
   await page.getByRole('button', { name: /成\s*交\s*登\s*记/ }).first().click();
   await page.waitForSelector('.ant-modal', { timeout: 5000 });
+  check('UX-付款节点固定标签', await page.getByLabel('付款节点', { exact: true }).count() === 4 && await page.getByLabel('比例（%）', { exact: true }).count() === 4, '预填四行均有节点与比例标签');
   const fillDate = async (id, v) => { const i = page.locator('#' + id); await i.click(); await page.keyboard.type(v); await page.keyboard.press('Enter'); };
   await fillDate('period_start', '2026-09-22');
   await fillDate('period_end', '2027-06-30');
@@ -614,6 +686,9 @@ try {
   await page.getByRole('button', { name: /^\s*确\s*定\s*$/ }).last().click();
   await page.waitForTimeout(1400);
   check('S1-立项', (await body(page)).includes('回归升降机'), '设备 01A 已建');
+  await page.getByRole('button', { name: /项目团队（已任命/ }).click();
+  await page.getByRole('button', { name: /设备清单（已定/ }).click();
+  check('UX-S1准备清单直达分区', new URL(page.url()).searchParams.get('tab') === 'equipment' && (await body(page)).includes('回归升降机'), '从团队切回设备，URL与内容一致');
 
   // —— P-03 + P-01：设计面预选 + 第一张图 ——
   await page.goto(`${BASE}/projects/${newNo}/design/01A`, { waitUntil: 'networkidle' });

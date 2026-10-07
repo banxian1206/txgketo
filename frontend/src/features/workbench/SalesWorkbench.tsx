@@ -40,13 +40,20 @@ export default function SalesWorkbench() {
         <Panel title="我的商机 / 项目" sub="点任意一行进项目详情（签约、立项、回款登记都在那里做）">
           <Table
             rowKey="project_no"
+            className="sales-project-table"
             size="small"
+            scroll={{ x: 860 }}
             dataSource={data?.projects ?? []}
             pagination={{ pageSize: 10, showSizeChanger: true }}
             onRow={(r) => ({ onClick: () => go(`/projects/${r.project_no}`), style: { cursor: 'pointer' } })}
             columns={[
-              { title: '项目号', dataIndex: 'project_no', width: 110 },
-              { title: '项目名称', dataIndex: 'project_name' },
+              { title: '项目号', dataIndex: 'project_no', width: 110, render: (v: string) => <Code>{v}</Code> },
+              { title: '项目名称', dataIndex: 'project_name', render: (v: string, r) => (
+                <button type="button" className="project-entry" onClick={(event) => {
+                  event.stopPropagation()
+                  go(`/projects/${r.project_no}`)
+                }}>{v}</button>
+              ) },
               { title: '阶段', dataIndex: 'stage', width: 110, render: (v: string) => <Status tone={toneOf(STAGE_COLOR[v])}>{v}</Status> },
               {
                 title: '商机截止',
