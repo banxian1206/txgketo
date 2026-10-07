@@ -177,12 +177,12 @@ export default function Library() {
   return (
     <div className="library-page">
       {/* 左侧：类别 → 品类（与价格库**共用**同一组件，2026-10-07「两页统一标准」） */}
-      <Col className="library-category" >
+      <div className="library-category">
         {screens.lg ? categoryNav : <Button onClick={() => setCategoryOpen(true)}>选择分类 · {activeClass?.name ?? '全部物料'}</Button>}
-      </Col>
+      </div>
 
       {/* 右侧：该品类下的型号 */}
-      <Col className="library-items" >
+      <div className="library-items">
         <Card
           className="engineering-list"
           size="small"
@@ -193,7 +193,7 @@ export default function Library() {
             <Space wrap>
               {/* ★ 搜索范围显式化（docs/17 第 4 条）：切到「钢材」后搜「电机」没结果时，
                   人要能看出「这是当前品类内没有」，而不是以为全库没有。 */}
-              <Segmented
+              {activeClass ? <Segmented
                 size="small"
                 value={allClasses ? 'all' : 'class'}
                 onChange={(v) =>
@@ -203,7 +203,7 @@ export default function Library() {
                   { value: 'class', label: activeClass ? `${activeClass.name}内` : '当前品类' },
                   { value: 'all', label: '全库' },
                 ]}
-              />
+              /> : <span>搜索全部物料</span>}
               <Input.Search
                 allowClear
                 placeholder={allClasses ? '搜全库' : `在「${activeClass?.name ?? '当前品类'}」内搜`}
@@ -308,7 +308,7 @@ export default function Library() {
           />
 
         </Card>
-      </Col>
+      </div>
 
       {/* 新建物料：按品类规格模板动态生成表单 */}
       <AppModal
