@@ -804,3 +804,75 @@ code,
   .ds-subtabs .ant-segmented-item-label { min-height: 40px; display: flex; align-items: center; }
   .ds-sec { min-height: 40px; }
 }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   ★ 全生命周期时间线（项目详情顶部 · 2026-10-07）
+
+   六个时间源：商机记录 / 立项 / 里程碑时间段 / 交付截止 / 质保 / 回款。
+   里程碑**可重叠**（工程设计、采购、生产并行）→ 按重叠自动分甬道（JS 贪心分槽）。
+
+   标签不重叠靠三件套（都要先知道容器宽度，所以位置由 JS 给 px）：
+     ① 同日合并：同一天发生的事件并成一个标记（同一时刻 = 一件事）
+     ② 贪心错排：仍挨太近的标签挪到下一行
+     ③ 边缘钳制：贴左右边的标签钳进容器内（时间位置仍由虚线精确标出）
+   ══════════════════════════════════════════════════════════════════════════ */
+.ds-life { padding: 12px 16px 8px; }
+.ds-life-hd { display: flex; align-items: baseline; gap: 10px; margin-bottom: 8px; }
+.ds-life-hd .span { font-family: var(--ds-mono); font-size: 12px; line-height: 18px; color: var(--ds-ink3); }
+.ds-life-hd .sp { flex: 1; }
+.ds-life-hd .lg { display: flex; flex-wrap: wrap; gap: 12px; font-size: 12px; line-height: 18px; color: var(--ds-ink2); }
+.ds-life-hd .lg i { display: inline-block; width: 14px; height: 8px; border-radius: 4px; margin-right: 4px; vertical-align: middle; }
+.ds-life-hd .lg i.is-idle { background: var(--ds-surface3); border: 1px dashed var(--ds-line2); }
+.ds-life-hd .lg i.is-done { background: var(--ds-ok); }
+.ds-life-hd .lg i.is-now { background: var(--ds-acc); }
+.ds-life-hd .lg i.is-late { background: var(--ds-err); }
+.ds-life-hd .lg i.is-warr { background: var(--ds-okSoft); border: 1px dashed var(--ds-okLine); }
+.ds-life-hd .lg i.is-today { background: var(--ds-err); width: 3px; border-radius: 2px; }
+.ds-life-note { font-size: 12px; line-height: 18px; color: var(--ds-ink4); margin-bottom: 12px; }
+
+.ds-life-ev, .ds-life-pay { position: relative; }
+.ds-life-ev .ev { position: absolute; font-size: 12px; line-height: 18px; padding: 0 8px; border-radius: 6px; white-space: nowrap;
+  background: var(--ds-surface); border: 1px solid var(--ds-line2); color: var(--ds-ink2); }
+.ds-life-ev .ev.is-start { background: var(--ds-accentSoft); border-color: var(--ds-accentLine); color: var(--ds-acc); font-weight: 600; }
+.ds-life-ev .ev.is-end { background: var(--ds-warnSoft); border-color: var(--ds-warnLine); color: var(--ds-warn); font-weight: 600; }
+.ds-life-pay .pw { position: absolute; display: inline-flex; gap: 4px; }
+.ds-life-pay .p { font-family: var(--ds-mono); font-size: 12px; line-height: 18px; padding: 0 8px; border-radius: 6px; white-space: nowrap;
+  background: var(--ds-surface); border: 1px solid var(--ds-line2); color: var(--ds-ink3); }
+.ds-life-pay .p.is-done { background: var(--ds-okSoft); border-color: var(--ds-okLine); color: var(--ds-ok); }
+.ds-life-pay .p.is-late { background: var(--ds-errSoft); border-color: var(--ds-errLine); color: var(--ds-err); font-weight: 600; }
+.ds-life-pay .p.is-next { background: var(--ds-warnSoft); border-color: var(--ds-warnLine); color: var(--ds-warn); }
+
+.ds-life-lanes { position: relative; margin-top: 18px; }
+.ds-life-lanes .row { position: absolute; left: 0; right: 0; height: 26px; }
+.ds-life-lanes .row.is-alt { background: var(--ds-surface2); }
+.ds-life-bar { position: absolute; height: 20px; border-radius: 6px; display: flex; align-items: center; gap: 4px;
+  padding: 0 8px; font-size: 12px; line-height: 20px; white-space: nowrap; }
+.ds-life-bar .nm { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.ds-life-bar .d { font-family: var(--ds-mono); font-size: 12px; opacity: .8; flex: none; }
+.ds-life-bar.is-idle { background: var(--ds-surface3); color: var(--ds-ink2); border: 1px dashed var(--ds-line2); }
+.ds-life-bar.is-done { background: var(--ds-ok); color: var(--ds-surface); }
+.ds-life-bar.is-now { background: var(--ds-acc); color: var(--ds-surface); box-shadow: 0 0 0 2px var(--ds-surface), 0 0 0 3px var(--ds-accentLine); }
+.ds-life-bar.is-late { background: var(--ds-err); color: var(--ds-surface); }
+.ds-life-bar.is-warr { background: var(--ds-okSoft); border: 1px dashed var(--ds-okLine); color: var(--ds-ok); }
+
+.ds-life .vline { position: absolute; width: 1px; pointer-events: none; }
+.ds-life .vline.is-ev { top: -8px; bottom: -6px; border-left: 1px dashed var(--ds-line2); }
+.ds-life .vline.is-pay { top: 0; bottom: -6px; background: var(--ds-line2); opacity: .75; }
+.ds-life .vline.is-today { top: -18px; bottom: -6px; width: 2px; background: var(--ds-err); border-radius: 1px; box-shadow: 0 0 0 1px var(--ds-surface); }
+.ds-life .todaytag { position: absolute; top: -18px; transform: translateX(-50%); font-size: 12px; line-height: 18px;
+  font-weight: 700; color: var(--ds-err); background: var(--ds-surface); padding: 0 4px; white-space: nowrap; }
+
+.ds-life-axis { position: relative; height: 30px; margin-top: 4px; border-top: 1px solid var(--ds-line); }
+.ds-life-axis .t { position: absolute; top: 6px; transform: translateX(-50%); font-family: var(--ds-mono);
+  font-size: 12px; line-height: 18px; color: var(--ds-ink3); white-space: nowrap; }
+.ds-life-axis .t.is-up { top: -20px; }
+.ds-life-axis .t.is-end { color: var(--ds-ink); font-weight: 700; }
+.ds-life .tip { display: none; position: absolute; top: calc(100% + 6px); left: 0; z-index: 60;
+  background: var(--ds-surface); border: 1px solid var(--ds-line2); border-radius: 8px; box-shadow: var(--ds-shadow);
+  padding: 8px 10px; font-size: 12px; line-height: 18px; color: var(--ds-ink2); white-space: nowrap; pointer-events: none; }
+/* 悬停 / 键盘聚焦都出气泡（不能只认 hover —— 键盘与读屏用户也要能拿到这些日期） */
+.ds-life-bar:hover .tip, .ds-life-bar:focus-visible .tip, .ds-life-ev .ev:hover .tip { display: block; }
+.ds-life-bar:hover { z-index: 61; }
+.ds-life .tip b { color: var(--ds-ink); font-weight: 600; }
+.ds-life .tip .d { color: var(--ds-ink4); font-family: var(--ds-mono); }
+.ds-life .tip .miss { color: var(--ds-ink4); }

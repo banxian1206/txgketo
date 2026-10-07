@@ -128,6 +128,10 @@ class Project(Base, TimestampMixin):
 
     # ---- ③ 结果 ----
     stage: Mapped[str] = mapped_column(String(16), default="线索", server_default="线索")
+    # ★ 时间线（2026-10-07）：**立项时点**。成交有 `period_start`，但立项一直只在
+    #   `audit_log`（action='initiate'）里 —— 画「商机→立项→交付」的全局时间线要捞审计日志
+    #   （会被清理策略影响、也慢）。所以落成字段：`initiate_project()` 里写一次。
+    initiated_at: Mapped[date | None] = mapped_column(Date)
     close_reason: Mapped[str | None] = mapped_column(String(32))
     close_note: Mapped[str | None] = mapped_column(String(255))
     warranty_start: Mapped[date | None] = mapped_column(Date)  # 验收确认日

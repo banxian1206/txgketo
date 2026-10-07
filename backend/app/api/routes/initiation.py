@@ -881,6 +881,9 @@ def initiate_project(
 
     old_stage = project.stage
     project.stage = project_stage.EXECUTING
+    # ★ 时间线（2026-10-07）：立项时点落字段 —— 「商机 → 立项 → 交付」那条全局线的关键点，
+    #   以前只在 audit_log 里。同一天重复立项不可能（上面 assert_transition 挡住），直接覆盖写。
+    project.initiated_at = date.today()
     # ★ G2（09 卷 §3 · 客户口径 2026-09-29）：立项 → **提醒商务部收「预收款」**（只提醒，不卡流程）
     from app.services import payment as payment_svc
     reminded = payment_svc.trigger_for_initiate(session, project_no, actor_id=current.id)

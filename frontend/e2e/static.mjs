@@ -615,6 +615,29 @@ const eachTsx = (dir, fn) => {
     bad.length ? `Progress 缺 aria-label: ${bad.slice(0, 5).join(' | ')}` : '全部 Progress 带 aria-label');
 }
 
+// ★ LIFE-时间线接线与状态口径（2026-10-07 全生命周期时间线）——
+//   两件容易悄悄坏掉的事：
+//     ① 接线断了（组件换了但没人用 / 详情页忘了取数）→ 页面上那条线直接消失，不报错；
+//     ② **状态口径漂了**：前端自己拿计划日期算「延期」，就和后端 `deadline.milestone_state`
+//        各算一套（AGENTS §8.5 那条教训）。所以这里钉住：必须用接口下发的 state，
+//        且前端的状态映射要覆盖后端 4 个取值（后端加一个值 → 这里报红）。
+{
+  const bad = []
+  const comp = fs.readFileSync(path.join(SRC, 'components/project/LifecycleTimeline.tsx'), 'utf8')
+  if (!/\.state\b/.test(comp)) bad.push('LifecycleTimeline 没读接口下发的 state（可能在自己算状态）')
+  for (const v of ['已完成', '延期', '未开始', '进行中']) {
+    if (!comp.includes(`${v}:`)) bad.push(`状态映射漏了后端取值「${v}」`)
+  }
+  const bar = fs.readFileSync(path.join(SRC, 'components/project/ProjectSummaryBar.tsx'), 'utf8')
+  if (!/<LifecycleTimeline\b/.test(bar)) bad.push('ProjectSummaryBar 没有用 LifecycleTimeline（那条线不会出现）')
+  if (!/<LifecycleTimeline data=\{lifecycle\}/.test(bar)) bad.push('ProjectSummaryBar 没把 lifecycle 传给时间线')
+  const dp = fs.readFileSync(path.join(SRC, 'features/project/DetailPage.tsx'), 'utf8')
+  if (!/getProjectLifecycle\(/.test(dp)) bad.push('DetailPage 没取 lifecycle 数据')
+  if (!/lifecycle=\{lifecycle\}/.test(dp)) bad.push('DetailPage 没把 lifecycle 传给结论条')
+  check('LIFE-时间线接线与状态口径', bad.length === 0,
+    bad.length ? bad.join(' | ') : '接线正确 · 状态用后端单一口径（前端只做映射）')
+}
+
 // ══ 双端一致性护栏（本轮起：PC 与移动端不再各改各的）══════════════════
 const FEATS = path.join(SRC, 'features');
 

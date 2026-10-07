@@ -20,10 +20,11 @@ from app.api.schemas import (
 )
 from app.core.config import settings
 from app.core.db import get_session
-from app.models.initiation import ProjectMember
+from app.models.initiation import Milestone, ProjectMember
 from app.models.platform import User
 from app.models.project import Attachment, Contact, Customer, Equipment, PaymentTerm, Project
 from app.services import audit, payment as payment_svc, project_stage
+from app.services.deadline import milestone_state
 from app.services.reviewers import dept_code_of
 from app.services.numbering import ObjectType, next_number, peek_number, year_scope_key
 
@@ -211,6 +212,79 @@ def get_project(
         out.performance_deposit = None
         out.warranty_amount = None
     return out
+
+
+@router.get("/projects/{project_no}/lifecycle")
+def get_project_lifecycle(
+    project_no: str,
+    session: Session = Depends(get_session),
+    current: User = Depends(get_current_user),
+) -> dict:
+    """项目全生命周期时间线 · **只读聚合**（2026-10-07）。
+
+    给项目详情顶部那条「商机记录 → 立项 → 里程碑 → 交付截止 → 质保 → 回款」用。
+    六个时间源全部来自已有的表，**不新增业务表、不写任何业务数据**：
+
+      ① 商机记录 = `project.created_at`
+      ② 立项     = `project.initiated_at`（存量可能为空 → 前端就不画那一段）
+      ③ 里程碑   = `milestone.plan_start/plan_end`（**可重叠** → 前端按重叠分甬道）
+      ④ 交付截止 = `project.delivery_end_date`（应交日的单一口径）
+      ⑤ 质保     = `warranty_start` / `warranty_end`
+      ⑥ 回款     = `payment_term.expect_date`（计划）/ `received_date`（实收）
+
+    ⚠ 里程碑**状态**不在这里算：它与超期扫描必须同源（`services/deadline.py`），
+      在只读接口里把「完成/延期」再算一套，就是又一种“同一个概念两处各算一套”。
+    ⚠ 不回传金额（付款节点只给日期）—— 无需再过金额分档。
+    """
+    project = session.get(Project, project_no)
+    if project is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "项目不存在")
+
+    milestones = session.scalars(
+        select(Milestone).where(Milestone.project_no == project_no).order_by(Milestone.seq, Milestone.id)
+    ).all()
+    terms = session.scalars(
+        select(PaymentTerm)
+        .where(PaymentTerm.project_no == project_no)
+        .order_by(PaymentTerm.seq, PaymentTerm.id)
+    ).all()
+    owner_names = {u.id: u.name for u in session.scalars(select(User)).all()}
+
+    return {
+        "project_no": project.project_no,
+        "project_name": project.project_name,
+        "stage": project.stage,
+        "created_at": project.created_at,  # ① 商机记录
+        "initiated_at": project.initiated_at,  # ② 立项
+        "deal_at": project.period_start,  # 成交（合同签订日）
+        "deadline": project.delivery_end_date,  # ④ 交付截止
+        "warranty": {"start": project.warranty_start, "end": project.warranty_end},  # ⑤
+        "milestones": [  # ③
+            {
+                "seq": m.seq,
+                "name": m.name,
+                "start": m.plan_start,
+                "end": m.plan_end,
+                "actual_start": m.actual_start,
+                "actual_end": m.actual_end,
+                "status": m.status,
+                "state": milestone_state(m),  # ★ 单一口径（services/deadline.py）
+                "owner_name": owner_names.get(m.owner_id) if m.owner_id else None,
+                "remark": m.remark,
+            }
+            for m in milestones
+        ],
+        "payments": [  # ⑥
+            {
+                "seq": t.seq,
+                "name": t.node_name,
+                "plan_date": t.expect_date,
+                "received_date": t.received_date,
+                "received": bool(t.received_amount),
+            }
+            for t in terms
+        ],
+    }
 
 
 # ---------------------------------------------------------------------------

@@ -1,9 +1,11 @@
 import { Button, Dropdown } from 'antd'
 import { Link } from 'react-router-dom'
 import { hasPerm } from '../../api/user'
-import { Chip, Metrics, PageHead, Rail, Status, type MetricItem } from '../ds'
+import type { ProjectLifecycle } from '../../api/client'
+import { Chip, Metrics, PageHead, type MetricItem } from '../ds'
 import { useBack, useGoFrom } from '../../hooks/useFrom'
 import { PROJECT_STAGE as STAGE_COLOR, toneOf } from '../../theme/status'
+import LifecycleTimeline from './LifecycleTimeline'
 
 /**
  * 详情页「结论条」（docs/12 §3.1 ①；方案 A「纸面」2026-10-04 重做）。
@@ -31,16 +33,15 @@ export interface SummaryNumbers {
 export default function ProjectSummaryBar({
   p,
   detail,
-  stepIndex,
-  stageOrder,
+  lifecycle,
   nums,
   next,
   onClose,
 }: {
   p: Record<string, never> | any
   detail: any
-  stepIndex: number
-  stageOrder: string[]
+  /** ★ 全生命周期时间线数据（`GET /projects/{no}/lifecycle` 的只读聚合）；拿不到就不画那条线 */
+  lifecycle: ProjectLifecycle | null
   nums: SummaryNumbers
   /** 下一步动作由页面算好传进来（泳道在页面手里，bar 只管展示与触发） */
   next: { label: string; run: () => void } | null
@@ -87,16 +88,6 @@ export default function ProjectSummaryBar({
   ]
 
   const terminal = p.stage === '已关闭' || p.stage === '已归档'
-  const railSegments = stageOrder.map((s, i) => ({
-    key: s,
-    name: s,
-    value: terminal && i > stepIndex ? '—' : i < stepIndex ? '已完成' : i === stepIndex ? '进行中' : '未开始',
-    state: (i < stepIndex ? 'done' : i === stepIndex ? (p.stage === '已关闭' ? 'block' : 'now') : undefined) as
-      | 'done'
-      | 'now'
-      | 'block'
-      | undefined,
-  }))
 
   return (
     <>
@@ -148,14 +139,9 @@ export default function ProjectSummaryBar({
       <div className="ds-panel" style={{ marginBottom: 16 }}>
         <div className="ds-panel-h">
           <h3>生命周期</h3>
-          <span className="sub">点一段看该阶段的内容</span>
-          <div className="act">
-            <Status tone={toneOf(STAGE_COLOR[p.stage])}>
-              {terminal ? '已结束' : `第 ${stepIndex + 1} / ${stageOrder.length} 段`}
-            </Status>
-          </div>
+          <span className="sub">商机记录 → 立项 → 里程碑（可重叠，按甬道）→ 交付截止 → 质保 → 回款</span>
         </div>
-        <Rail segments={railSegments} />
+        <LifecycleTimeline data={lifecycle} />
       </div>
     </>
   )

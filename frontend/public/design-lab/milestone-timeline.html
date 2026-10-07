@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>样机 v5 · 项目详情 · 全生命周期时间线（甬道）</title>
+<style>
+/* ══════════════════════════════════════════════════════════════
+   样机 v5 —— 用户口径（读 6 个时间源）：
+     ① 商机记录时间（时点）   ② 立项时间（时点）+ 今天（红线）
+     ③ 里程碑时间段（来自立项的节点设置）→ **重叠的走不同甬道**
+     ④ 项目交付截止时间（时点）  ⑤ 质保期（段）  ⑥ 回款时间节点（时点）
+   token 走 §9 纸面 A + §11 刻度
+   ══════════════════════════════════════════════════════════════ */
+:root{
+  --bg:#f6f7f9; --surface:#fff; --surface2:#fbfcfd; --surface3:#f2f4f7;
+  --line:#e7e9ee; --line2:#d8dce3;
+  --ink:#14161a; --ink2:#59616e; --ink3:#6b7383; --ink4:#b8bfc9;
+  --acc:#1f5fd0; --accSoft:#eef4ff; --accLine:#c9dcf8;
+  --ok:#0b7a4d; --okSoft:#e8f7f0; --okLine:#bfe3d1;
+  --warn:#a05c10; --warnSoft:#fdf3e6; --warnLine:#f0dcb8;
+  --err:#b02c2c; --errSoft:#fdecec; --errLine:#f3c9c9;
+  --idle:#98a1ae;
+  --r-lg:12px; --r-md:8px; --r-sm:6px;
+  --shadow:0 1px 2px rgba(16,24,40,.05);
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  --lh-12:18px; --lh-13:20px; --lh-14:22px; --lh-16:24px; --lh-20:26px;
+  --lane:26px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font:400 14px/var(--lh-14) -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;
+     background:var(--bg);color:var(--ink);font-variant-numeric:tabular-nums}
+.app{display:flex;min-height:100vh}
+.side{width:208px;flex:none;background:var(--surface);border-right:1px solid var(--line)}
+.brand{height:56px;display:flex;align-items:center;gap:8px;padding:0 16px;border-bottom:1px solid var(--line)}
+.brand i{width:22px;height:22px;border-radius:6px;background:var(--acc);display:block}
+.brand b{font-size:14px}
+.nav{padding:8px}
+.nav .g{font-size:12px;line-height:var(--lh-12);color:var(--ink4);padding:8px 8px 4px}
+.nav a{display:flex;align-items:center;height:34px;padding:0 10px;border-radius:var(--r-md);font-size:14px;color:var(--ink2);text-decoration:none}
+.nav a.on{background:var(--accSoft);color:var(--acc);font-weight:600}
+.main{flex:1;min-width:0;display:flex;flex-direction:column}
+.top{height:56px;flex:none;background:var(--surface);border-bottom:1px solid var(--line);display:flex;align-items:center;gap:12px;padding:0 20px}
+.top .search{flex:1;max-width:330px;height:32px;border:1px solid var(--line2);border-radius:var(--r-md);display:flex;align-items:center;padding:0 10px;color:var(--ink3);font-size:13px}
+.top .search .kbd{margin-left:auto;font-family:var(--mono);font-size:12px;color:var(--ink4);border:1px solid var(--line);border-radius:var(--r-sm);padding:0 5px}
+.top .sp{flex:1}.top .who{font-size:13px;color:var(--ink2)}
+.top .bell{position:relative;width:32px;height:32px;border:1px solid var(--line2);border-radius:var(--r-md);display:flex;align-items:center;justify-content:center}
+.top .bell b{position:absolute;top:-5px;right:-5px;background:var(--err);color:#fff;font-size:10px;line-height:14px;min-width:14px;text-align:center;border-radius:999px;padding:0 3px}
+.page{padding:14px 20px 40px;min-width:0}
+.crumb{display:flex;align-items:center;gap:6px;font-size:13px;line-height:var(--lh-13);color:var(--ink3);margin-bottom:8px}
+.crumb .code{font-family:var(--mono);color:var(--acc);font-weight:600}
+.hd{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px}
+.hd h1{font-size:20px;line-height:var(--lh-20);font-weight:600;letter-spacing:-.2px;display:flex;align-items:center;gap:8px}
+.hd .facts{display:flex;align-items:center;gap:14px;flex-wrap:wrap;font-size:13px;line-height:var(--lh-13);color:var(--ink3)}
+.hd .facts b{color:var(--ink);font-weight:600}
+.hd .facts .r{color:var(--err)}.hd .facts .w{color:var(--warn)}
+.hd .act{margin-left:auto;display:flex;gap:8px;align-items:center}
+.pill{display:inline-flex;align-items:center;gap:5px;height:24px;padding:0 9px;border-radius:var(--r-sm);font-size:12px;line-height:16px;white-space:nowrap;border:1px solid transparent}
+.pill .dot{width:6px;height:6px;border-radius:50%;flex:none}
+.pill.ok{background:var(--okSoft);color:var(--ok);border-color:var(--okLine)}.pill.ok .dot{background:var(--ok)}
+.pill.run{background:var(--accSoft);color:var(--acc);border-color:var(--accLine)}.pill.run .dot{background:var(--acc)}
+.pill.warn{background:var(--warnSoft);color:var(--warn);border-color:var(--warnLine)}.pill.warn .dot{background:var(--warn)}
+.pill.err{background:var(--errSoft);color:var(--err);border-color:var(--errLine)}.pill.err .dot{background:var(--err)}
+.pill.idle{background:var(--surface3);color:var(--ink2);border-color:var(--line)}.pill.idle .dot{background:var(--idle)}
+.btn{font:inherit;font-size:13px;line-height:18px;height:32px;padding:0 14px;border-radius:var(--r-md);border:1px solid var(--line2);background:var(--surface);color:var(--ink);cursor:pointer}
+.btn.primary{background:var(--acc);border-color:var(--acc);color:#fff;font-weight:500}
+
+/* ══════ 时间线 ══════ */
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);box-shadow:var(--shadow)}
+.tl-wrap{padding:14px 18px 12px}
+.tl-head{display:flex;align-items:baseline;gap:10px;margin-bottom:6px}
+.tl-head h3{font-size:16px;line-height:var(--lh-16);font-weight:600}
+.tl-head .span{font-size:12px;line-height:var(--lh-12);color:var(--ink3);font-family:var(--mono)}
+.tl-head .sp{flex:1}
+.tl-head .legend{display:flex;gap:13px;font-size:12px;line-height:var(--lh-12);color:var(--ink2);flex-wrap:wrap}
+.tl-head .legend i{display:inline-block;width:14px;height:8px;border-radius:3px;vertical-align:middle;margin-right:4px}
+.tl-note{font-size:12px;line-height:var(--lh-12);color:var(--ink4);margin-bottom:12px}
+
+.tl{position:relative}
+/* 事件轨 */
+.tl-events{position:relative;height:28px}
+.tl-ev{position:absolute;font-size:12px;line-height:18px;white-space:nowrap;
+  padding:0 7px;border-radius:var(--r-sm);background:var(--surface);border:1px solid var(--line2);color:var(--ink2);font-weight:600}
+.tl-ev.start{border-color:var(--accLine);background:var(--accSoft);color:var(--acc)}
+.tl-ev.end{border-color:var(--warnLine);background:var(--warnSoft);color:var(--warn)}
+/* 回款轨 */
+.tl-pays{position:relative;height:26px}
+.tl-paywrap{position:absolute;display:inline-flex;gap:4px}
+.tl-pay{font-size:12px;line-height:18px;white-space:nowrap;padding:0 7px;
+  border-radius:var(--r-sm);background:var(--surface);border:1px solid var(--line2);color:var(--ink3);font-family:var(--mono)}
+.tl-pay.done{border-color:var(--okLine);background:var(--okSoft);color:var(--ok)}
+.tl-pay.overdue{border-color:var(--errLine);background:var(--errSoft);color:var(--err);font-weight:600}
+.tl-pay.next{border-color:var(--warnLine);background:var(--warnSoft);color:var(--warn)}
+/* 甬道 */
+.tl-lanes{position:relative}
+.tl-row{position:relative;height:var(--lane)}
+.tl-row:nth-child(even){background:repeating-linear-gradient(90deg,transparent,transparent 0)}
+.tl-row+.tl-row{border-top:1px solid var(--surface3)}
+.tl-bar{position:absolute;top:3px;height:20px;border-radius:5px;display:flex;align-items:center;gap:5px;
+  padding:0 7px;font-size:12px;line-height:20px;color:#fff;overflow:hidden;white-space:nowrap;z-index:12}
+.tl-bar .nm{overflow:hidden;text-overflow:ellipsis}
+.tl-bar .d{font-family:var(--mono);font-size:12px;opacity:.8;flex:none}
+.tl-bar.pending{background:var(--surface3);color:var(--ink2);border:1px dashed var(--line2)}
+.tl-bar.plan{background:var(--surface3);color:var(--ink2);border:1px dashed var(--line2)}
+.tl-bar.done{background:var(--ok)}
+.tl-bar.active{background:var(--acc);box-shadow:0 0 0 2px var(--surface),0 0 0 3px var(--accLine)}
+.tl-bar.overdue{background:var(--err)}
+.tl-bar.warr{background:repeating-linear-gradient(45deg,var(--okSoft),var(--okSoft) 6px,var(--surface) 6px,var(--surface) 12px);
+  border:1px dashed var(--okLine);color:var(--ok)}
+.tl-bar .tip{display:none;position:absolute;top:calc(100% + 5px);left:0;z-index:70;background:var(--surface);border:1px solid var(--line2);
+  border-radius:var(--r-md);box-shadow:0 6px 18px rgba(16,24,40,.14);padding:8px 10px;font-size:12px;line-height:1.65;
+  color:var(--ink2);font-weight:400;white-space:nowrap;pointer-events:none}
+.tl-bar:hover{z-index:71}
+.tl-bar:hover .tip{display:block}
+.tl-bar .tip b{color:var(--ink);font-weight:600}
+.tl-bar .tip .d{color:var(--ink4);opacity:1}
+.tl-bar .tip .miss{color:var(--ink4)}
+/* 竖线 */
+.tl-v{position:absolute;width:1px;pointer-events:none;z-index:20}
+.tl-v.ev{top:-8px;bottom:-6px;border-left:1px dashed var(--line2)}
+.tl-v.pay{top:0;bottom:-6px;background:var(--line2);opacity:.75}
+.tl-v.today{top:-10px;bottom:-6px;width:2px;background:var(--err);border-radius:1px;z-index:40;box-shadow:0 0 0 1px rgba(255,255,255,.75)}
+.tl-nowtag{position:absolute;top:-22px;transform:translateX(-50%);font-size:12px;line-height:16px;font-weight:700;color:var(--err);
+  background:var(--surface);padding:0 4px;white-space:nowrap;z-index:41;pointer-events:none}
+/* 刻度 */
+.tl-axis{position:relative;height:30px;margin-top:2px;border-top:1px solid var(--line)}
+.tl-axis .t{position:absolute;top:6px;transform:translateX(-50%);font-size:12px;line-height:18px;color:var(--ink3);white-space:nowrap;font-family:var(--mono)}
+.tl-axis .t.up{top:-20px}
+.tl-axis .t.now{color:var(--err);font-weight:700}
+.tl-axis .t.end{color:var(--ink);font-weight:700}
+
+.cards{display:grid;grid-template-columns:1.4fr repeat(5,1fr);gap:10px;margin-top:12px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);box-shadow:var(--shadow);padding:10px 12px}
+.card .k{font-size:12px;line-height:var(--lh-12);color:var(--ink3)}
+.card .v{font-family:var(--mono);font-size:20px;line-height:30px;font-weight:600}
+.card .n{font-size:12px;line-height:var(--lh-12);color:var(--ink3)}
+.card.lead{background:linear-gradient(180deg,var(--accSoft),var(--surface));box-shadow:inset 3px 0 0 var(--acc)}
+.card.lead .v{font-size:32px;line-height:36px;color:var(--acc);letter-spacing:-.3px}
+.card.t .v{font-size:16px;line-height:30px;font-family:inherit;font-weight:600}
+.card.is-err .v{color:var(--err)}
+.sec{display:flex;gap:4px;border-bottom:1px solid var(--line);margin:16px 0 12px;overflow-x:auto}
+.sec button{font:inherit;font-size:13px;line-height:20px;padding:8px 12px;border:0;background:none;color:var(--ink2);border-bottom:2px solid transparent;cursor:pointer;white-space:nowrap}
+.sec button.on{color:var(--acc);font-weight:600;border-bottom-color:var(--acc)}
+.block{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);box-shadow:var(--shadow);padding:14px 16px}
+.block h3{font-size:16px;line-height:var(--lh-16);font-weight:600;margin-bottom:10px}
+.row{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--line);font-size:13px;line-height:var(--lh-13)}
+.row:last-child{border-bottom:0}.row .t{flex:1;min-width:0}.row .m{color:var(--ink3);font-size:12px;font-family:var(--mono)}
+.ctl{position:fixed;left:50%;transform:translateX(-50%);bottom:14px;z-index:100;display:flex;align-items:center;gap:10px;background:#14161a;color:#fff;border-radius:999px;padding:6px 8px 6px 14px;font-size:12px;box-shadow:0 8px 26px rgba(0,0,0,.3)}
+.ctl .seg{display:inline-flex;background:rgba(255,255,255,.13);border-radius:999px;padding:2px;gap:2px}
+.ctl .seg button{font:inherit;font-size:12px;line-height:16px;padding:3px 10px;border:0;border-radius:999px;background:transparent;color:rgba(255,255,255,.72);cursor:pointer}
+.ctl .seg button.on{background:#fff;color:#14161a;font-weight:600}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="side">
+    <div class="brand"><i></i><b>TXAM</b></div>
+    <nav class="nav">
+      <div class="g">工作台</div><a>我的任务</a><a>工程部工作台</a><a>采购工作台</a>
+      <div class="g">业务</div><a class="on">项目</a><a>基础数据</a>
+      <div class="g">系统</div><a>用户与权限</a>
+    </nav>
+  </aside>
+  <div class="main">
+    <header class="top">
+      <div class="search">搜编号 / 图号 / 物料 / 项目<span class="kbd">⌘K</span></div>
+      <div class="sp"></div><div class="who">项目经理 · 张涛</div><div class="bell">🔔<b>3</b></div>
+    </header>
+    <div class="page">
+      <div class="crumb">← 返回列表 <span style="color:var(--line2)">/</span> 项目 <span style="color:var(--line2)">/</span> <span class="code" id="pno">—</span></div>
+      <div class="hd">
+        <h1><span id="pname">—</span><span class="pill run" id="stagePill"><i class="dot"></i><span>—</span></span></h1>
+        <div class="facts" id="facts"></div>
+        <div class="act"><button class="btn primary">进入设计</button><button class="btn">更多 ▾</button></div>
+      </div>
+
+      <div class="panel">
+        <div class="tl-wrap">
+          <div class="tl-head">
+            <h3>全生命周期</h3>
+            <span class="span" id="spanTxt">—</span>
+            <span class="sp"></span>
+            <span class="legend">
+              <span><i style="background:var(--surface3);border:1px dashed var(--line2)"></i>未开始</span>
+              <span><i style="background:var(--acc)"></i>进行中</span>
+              <span><i style="background:var(--ok)"></i>已完成</span>
+              <span><i style="background:var(--err)"></i>延期</span>
+              <span><i style="background:var(--err);width:3px;border-radius:2px"></i>今天</span>
+              <span><i style="background:var(--surface);border:1px solid var(--line2)"></i>回款</span>
+            </span>
+          </div>
+          <div class="tl-note" id="note">里程碑按**时间重叠自动分甬道**（工程设计 / 采购 / 生产可以并行）。</div>
+          <div class="tl" id="tl"></div>
+        </div>
+      </div>
+
+      <div class="cards" id="cards"></div>
+      <div class="sec" id="sec"></div>
+      <div class="block" id="block"></div>
+    </div>
+  </div>
+</div>
+
+<div class="ctl">
+  <span>样机 v5</span>
+  <span class="seg" id="segData">
+    <button data-d="live" class="on">有数据（示意）</button>
+    <button data-d="real">真实 TX26001</button>
+  </span>
+</div>
+
+<script>
+/* 六个时间源：①商机记录 ②立项 ③里程碑时间段（可重叠→分甬道） ④交付截止 ⑤质保期 ⑥回款节点 */
+const LIVE={project_no:'TX26009',name:'美的 110 寸 TV 总装线',stage:'执行中',pm:'张涛',
+  amount:1200000, received:360000,
+  created:'2026-08-20',          // ① 商机记录时间
+  initiated:'2026-09-12',        // ② 立项时间
+  deadline:'2027-01-10',         // ④ 项目交付截止时间
+  warranty:{s:'2027-01-10',e:'2028-01-10'},   // ⑤ 质保
+  payments:[                     // ⑥ 成交时设计好的回款节点
+    {name:'预收款',plan:'2026-09-12',act:'2026-09-15'},
+    {name:'发货款',plan:'2026-12-18',act:null},
+    {name:'到货款',plan:'2027-01-02',act:null},
+    {name:'验收款',plan:'2027-01-10',act:null},
+    {name:'质保金',plan:'2027-07-10',act:null},
+  ],
+  milestones:[                   // ③ 立项时定的节点时间段（**故意有重叠**）
+    {name:'工程设计',     s:'2026-09-12',e:'2026-10-20',owner:'李工',   status:'进行中'},
+    {name:'电气设计',     s:'2026-09-20',e:'2026-10-25',owner:'王工',   status:'进行中'},
+    {name:'程序开发',     s:'2026-10-01',e:'2026-10-30',owner:'赵程序', status:'进行中'},
+    {name:'采购到货',     s:'2026-10-10',e:'2026-11-05',owner:'钱采购', status:'未开始'},
+    {name:'制造',         s:'2026-11-01',e:'2026-11-25',owner:'孙班长', status:'未开始'},
+    {name:'装配与厂内调试',s:'2026-11-25',e:'2026-12-10',owner:'周装配', status:'未开始'},
+    {name:'打包发运',     s:'2026-12-10',e:'2026-12-18',owner:null,     status:'未开始'},
+    {name:'现场安装',     s:'2026-12-18',e:'2027-01-02',owner:null,     status:'未开始'},
+    {name:'现场调试',     s:'2027-01-02',e:'2027-01-06',owner:null,     status:'未开始'},
+    {name:'客户验收',     s:'2027-01-06',e:'2027-01-10',owner:null,     status:'未开始'},
+  ]};
+/* 真实 TX26001 —— 商机/立项/成交都在同一天，节点计划在，回款被清空 */
+const REAL={project_no:'TX26001',name:'UX走查-20261006-整线',stage:'质保',pm:'—',
+  created:'2026-10-06',initiated:'2026-10-06',deadline:'2027-01-06',
+  warranty:{s:'2026-10-06',e:'2027-10-06'},payments:[],
+  milestones:[
+    {name:'工程设计',     s:'2026-10-06',e:'2026-10-18',owner:null,status:'未开始'},
+    {name:'采购到货',     s:'2026-10-18',e:'2026-10-29',owner:null,status:'未开始'},
+    {name:'制造',         s:'2026-10-29',e:'2026-11-09',owner:null,status:'未开始'},
+    {name:'装配与厂内调试',s:'2026-11-09',e:'2026-11-21',owner:null,status:'未开始'},
+    {name:'打包发运',     s:'2026-11-21',e:'2026-12-03',owner:null,status:'未开始'},
+    {name:'现场安装',     s:'2026-12-03',e:'2026-12-14',owner:null,status:'未开始'},
+    {name:'现场调试',     s:'2026-12-14',e:'2026-12-25',owner:null,status:'未开始'},
+    {name:'客户验收',     s:'2026-12-25',e:'2027-01-06',owner:null,status:'未开始'},
+  ]};
+
+const SHORT={'工程设计':'设计','电气设计':'电气','程序开发':'程序','采购到货':'采购','制造':'制造',
+  '装配与厂内调试':'装配','打包发运':'发运','现场安装':'安装','现场调试':'调试','客户验收':'验收'};
+const SECTIONS=['概览','基本信息','客户与联系人','时间与金额','成交与付款','范围与资料','执行进度','交付与售后','操作记录'];
+const DAY=864e5, PAD=0.016, LANE=26, WARRT=0.11;
+const TODAY=new Date('2026-10-07T00:00:00');
+const ts=s=>s?new Date(s+'T00:00:00').getTime():null;
+const day0=t=>{const d=new Date(t);d.setHours(0,0,0,0);return d.getTime()};
+const fmt=t=>{const d=new Date(t);return String(d.getFullYear()).slice(2)+'/'+String(d.getMonth()+1).padStart(2,'0')+'/'+String(d.getDate()).padStart(2,'0')};
+const fmtS=t=>{const d=new Date(t);return String(d.getMonth()+1).padStart(2,'0')+'/'+String(d.getDate()).padStart(2,'0')};
+const dd=(a,b)=>Math.round((b-a)/DAY);
+const shortOf=n=>SHORT[n]||n.slice(0,4);
+let DATA=LIVE;
+
+/** 里程碑状态：有实际完成日→已完成；计划结束已过→延期；未到开始→未开始；否则进行中 */
+function stateOf(m,act){
+  if(act&&act.e) return 'done';
+  if(act&&act.s) return 'active';
+  const e=ts(m.e);
+  if(e!==null&&day0(e)<day0(TODAY)) return 'overdue';
+  const s=ts(m.s);
+  if(s!==null&&day0(s)>day0(TODAY)) return 'pending';
+  return 'active';
+}
+
+function paint(){
+  const d=DATA;
+  document.getElementById('pno').textContent=d.project_no;
+  document.getElementById('pname').textContent=d.name;
+  const sp=document.getElementById('stagePill');
+  sp.className='pill '+(d.stage==='质保'?'ok':(d.stage==='执行中'||d.stage==='交付中')?'run':'idle');
+  sp.querySelector('span').textContent=d.stage;
+
+  // ── ③ 里程碑分甬道（贪心：时间重叠的不放同一道）──
+  const ms=d.milestones.map(m=>({...m,bs:ts(m.s),be:ts(m.e),act:(m.act?{s:ts(m.act.s),e:ts(m.act.e)}:null)}))
+    .filter(x=>x.bs!==null||x.be!==null).sort((a,b)=>(a.bs??a.be)-(b.bs??b.be));
+  const lanes=[], placed=[];
+  for(const x of ms){
+    const aS=x.bs??x.be, aE=x.be??x.bs; let ln=0;
+    while((lanes[ln]||[]).some(r=>aS<r.e&&aE>r.s)) ln++;
+    (lanes[ln]||=[]).push({s:aS,e:aE}); placed.push({...x,lane:ln});
+  }
+  const laneCount=Math.max(1,...placed.map(x=>x.lane+1));
+
+  // ── 坐标：主体（商机记录 → 交付截止）占 89%，质保固定 11% 尾巴 ──
+  const created=ts(d.created), init=ts(d.initiated), ddl=ts(d.deadline);
+  const warrS=ts(d.warranty.s), warrE=ts(d.warranty.e);
+  const CONTENT=1-PAD*2, MAIN=CONTENT*(1-WARRT);
+  const min=Math.min(created, ...ms.map(x=>x.bs), TODAY.getTime());
+  const max=Math.max(warrE, TODAY.getTime());
+  const L=t=> t<=ddl ? (PAD+((t-min)/(ddl-min))*MAIN)*100
+                     : (PAD+MAIN+((t-ddl)/(max-ddl))*(CONTENT-MAIN))*100;
+  document.getElementById('spanTxt').textContent=`${fmt(min)} → ${fmt(max)}`;
+  document.getElementById('note').innerHTML=
+    `商机记录 <b>${fmt(created)}</b> · 立项 <b>${fmt(init)}</b> · 交付截止 <b>${fmt(ddl)}</b> · `+
+    `质保 ${fmt(warrS)} → ${fmt(warrE)}。里程碑按时间重叠自动分甬道（共 <b>${laneCount}</b> 条）。`;
+
+  const lateN=placed.filter(x=>stateOf(x,{s:x.act?.s,e:x.act?.e})==='overdue').length;
+  document.getElementById('facts').innerHTML=
+    `<span>里程碑 <b>${placed.length}</b> 个 · <b>${laneCount}</b> 条甬道</span>`+
+    `<span class="${lateN?'r':''}">延期 <b>${lateN}</b> 个</span>`+
+    `<span>交付截止 <b>${fmt(ddl)}</b>（还剩 <b>${dd(TODAY.getTime(),ddl)}</b> 天）</span>`+
+    `<span>PM <b>${d.pm}</b></span>`;
+
+  // ── ⑥ 回款 ──
+  const pays=(d.payments||[]).map(p=>({...p,pt:ts(p.plan),at:ts(p.act)}));
+  const nextPay=pays.find(p=>p.at===null&&p.pt>=TODAY.getTime());
+  const payCls=p=> p.at!==null?'done':(p.pt<TODAY.getTime()?'overdue':(p===nextPay?'next':''));
+
+  // ── 渲染 ──
+  const W=document.getElementById('tl').clientWidth||1180;
+
+  /* ── 标签不重叠的两级处理 ──
+     ① 同一天的事件合并成一个标记（同一时刻发生 = 一件事）
+     ② 仍挨太近的 → 贪心错排到下一行（与甬道同一个算法）
+     ③ 靠近左右边缘的 → 钳制到边界内（否则被切掉） */
+  const estW=str=>{let w=0;for(const ch of str) w+=ch.charCodeAt(0)>255?12:7; return w+18;};
+  function packLabels(items){
+    const rows=[];
+    for(const it of items){
+      const cx=(L(it.t)/100)*W;
+      let left=cx-it.w/2;
+      if(left<0) left=0;
+      if(left+it.w>W) left=W-it.w;
+      it.left=left; it.cx=cx;
+      let r=0;
+      for(;;){ if(rows[r]===undefined||left>=rows[r]+6){ rows[r]=left+it.w; it.row=r; break } r++ }
+    }
+    return Math.max(1, rows.length);
+  }
+  // ① 事件：同日合并
+  const evNames=[{t:created,n:'商机记录',c:'start'},{t:init,n:'立项',c:''},{t:ddl,n:'交付截止',c:'end'}];
+  const evMap=new Map();
+  for(const e of evNames){ if(e.t==null) continue; const k=day0(e.t);
+    if(!evMap.has(k)) evMap.set(k,{t:e.t,names:[],c:e.c});
+    const g=evMap.get(k); g.names.push(e.n); if(e.c) g.c=e.c; }
+  const evs=[...evMap.values()].map(g=>({t:g.t,c:g.c,text:`${g.names.join(' · ')} ${fmtS(g.t)}`}))
+    .map(g=>({...g,w:estW(g.text)}));
+  const evRows=packLabels(evs);
+  // ② 回款：同日合并 + 错排
+  const payMap=new Map();
+  for(const p of pays){ const k=day0(p.pt);
+    if(!payMap.has(k)) payMap.set(k,{t:p.pt,names:[],pays:[]});
+    const g=payMap.get(k); g.names.push(p.name); g.pays.push(p); }
+  const payLabels=[...payMap.values()].map(g=>({t:g.t,pays:g.pays,
+    text:`${g.names.join('·')} ${fmtS(g.t)}`,w:estW(g.names.join('·')+' 00/00')}));
+  const payRows=packLabels(payLabels);
+
+  // ── 刻度（今天只画线上标签，轴上不重复出刻度）──
+  const cand=[{t:min,k:'end'},{t:ddl,k:'end'}];
+  for(const p of pays) if(p.pt>=min) cand.push({t:p.pt,k:'pay'});
+  const byDay=new Map();
+  for(const c of cand.sort((x,y)=>x.t-y.t)){const k0=day0(c.t); if(!byDay.has(k0)) byDay.set(k0,c)}
+  const y0=new Date(min).getFullYear(); let lm=-1e9;
+  const vis=[...byDay.values()].map(c=>{
+    const px=(L(c.t)/100)*W, yy=new Date(c.t).getFullYear();
+    const txt=(yy!==y0?String(yy).slice(2)+'/':'')+fmtS(c.t);
+    if(px-lm>=74){lm=px;return {c,txt,up:false}} return {c,txt,up:true}});
+
+  const tip=(x)=>{const st=stateOf(x,{s:x.act?.s,e:x.act?.e});
+    return `<div><b>${x.name}</b></div>
+      <div>计划 <span class="d">${fmt(x.bs)} → ${fmt(x.be)}</span>（${dd(x.bs,x.be)} 天）</div>
+      ${x.act&&x.act.s?`<div>实际开始 <span class="d">${fmt(x.act.s)}</span></div>`:''}
+      <div>负责人：${x.owner?`<b>${x.owner}</b>`:'<span class="miss">未指派</span>'}</div>
+      <div>状态：<b>${({done:'已完成',active:'进行中',overdue:'延期',pending:'未开始'})[st]}</b></div>`;};
+
+  document.getElementById('tl').innerHTML=`
+    <div class="tl-events" style="height:${evRows*24}px">
+      ${evs.map(e=>`<span class="tl-ev ${e.c}" style="left:${e.left}px;top:${e.row*24}px;transform:none" title="${e.text}">${e.text}</span>`).join('')}
+    </div>
+    <div class="tl-pays" style="height:${payRows*24}px">
+      ${payLabels.map(g=>`<span class="tl-paywrap" style="left:${g.left}px;top:${g.row*24}px" title="${g.text}">${
+        g.pays.map(p=>`<span class="tl-pay ${payCls(p)}">${p.name}</span>`).join('')}</span>`).join('')}
+    </div>
+    <div class="tl-lanes" style="height:${(laneCount+1)*LANE}px">
+      ${Array.from({length:laneCount+1},(_,i)=>`<div class="tl-row" style="top:${i*LANE}px;position:absolute;left:0;right:0"></div>`).join('')}
+      ${placed.map(x=>{
+        const st=stateOf(x,{s:x.act?.s,e:x.act?.e});
+        const w=Math.max(L(x.be)-L(x.bs),1.1), wpx=w/100*W;
+        const nm=wpx>=44?`<span class="nm">${shortOf(x.name)}</span>`:'';
+        const dnum=wpx>=96?`<span class="d">${dd(x.bs,x.be)}天</span>`:'';
+        return `<div class="tl-bar ${st}" style="left:${L(x.bs)}%;width:${w}%;top:${8+x.lane*LANE}px">
+          ${nm}${dnum}<div class="tip">${tip(x)}</div></div>`;
+      }).join('')}
+      <div class="tl-bar warr" style="left:${(PAD+MAIN)*100}%;width:${(CONTENT-MAIN)*100}%;top:${8+laneCount*LANE}px">
+        <span class="nm">质保期</span>
+        <div class="tip"><div><b>质保期</b></div><div class="d">${fmt(warrS)} → ${fmt(warrE)}</div><div>客户验收通过起算</div></div>
+      </div>
+      ${evs.map(e=>`<span class="tl-v ev" style="left:${e.cx}px"></span>`).join('')}
+      ${payLabels.map(g=>g.pays.map(p=>`<span class="tl-v pay" style="left:${L(p.pt)}%"></span>`).join('')).join('')}
+      ${(TODAY>=min)?`<span class="tl-nowtag" style="left:${L(TODAY.getTime())}%">今天</span>
+        <span class="tl-v today" style="left:${L(TODAY.getTime())}%"></span>`:''}
+    </div>
+    <div class="tl-axis">
+      ${vis.map(({c,txt,up})=>`<span class="t ${up?'up':''} ${c.k==='end'?'end':''}" style="left:${L(c.t)}%">${txt}</span>`).join('')}
+    </div>`;
+
+  // ── 卡片 ──
+  const doneN=placed.filter(x=>stateOf(x,{s:x.act?.s,e:x.act?.e})==='done').length;
+  const cards=[
+    {k:'里程碑',v:`${doneN}/${placed.length}`,n:`已完成 / 全部 · ${laneCount} 条甬道`,lead:true},
+    {k:'当前',v:(()=>{const a=placed.filter(x=>stateOf(x,{s:x.act?.s,e:x.act?.e})==='active');return a.length?a.map(x=>shortOf(x.name)).join('/'):'—'})(),n:'并行进行中',t:true},
+    {k:'延期',v:String(lateN),n:lateN?'需处理':'无',cls:lateN?'is-err':''},
+    {k:'回款',v:`${pays.filter(p=>p.at!==null).length}/${pays.length}`,n:'已收 / 全部',t:true},
+    {k:'合同总额',v:d.amount?`¥${(d.amount/10000).toFixed(0)}万`:'—',n:d.amount?`已收 ¥${((d.received||0)/10000).toFixed(0)}万`:'未登记'},
+    {k:'交付截止',v:fmtS(ddl),n:`还剩 ${dd(TODAY.getTime(),ddl)} 天`},
+  ];
+  document.getElementById('cards').innerHTML=cards.map(c=>
+    `<div class="card ${c.lead?'lead':''} ${c.t?'t':''} ${c.cls||''}"><div class="k">${c.k}</div>
+     <div class="v">${c.v}</div><div class="n">${c.n}</div></div>`).join('');
+
+  document.getElementById('sec').innerHTML=SECTIONS.map((s,i)=>`<button class="${i===0?'on':''}">${s}</button>`).join('');
+  document.getElementById('block').innerHTML=`
+    <h3>概览 · 并行段（这是甬道存在的理由）</h3>
+    <div class="row"><span class="pill run"><i class="dot"></i><span>并行 4 件</span></span>
+      <span class="t">设计 / 电气 / 程序 / 采购 同时在跑 —— 单行时间线会盖在一起，所以分甬道</span>
+      <span class="m">09/12 – 11/05</span></div>
+    <div class="row"><span class="pill ok"><i class="dot"></i><span>已收</span></span>
+      <span class="t">预收款 ¥36万 —— 立项后 3 天到账</span><span class="m">09/15</span></div>
+    <div class="row"><span class="pill warn"><i class="dot"></i><span>下一个</span></span>
+      <span class="t">发货款 —— 发运后提醒商务催收</span><span class="m">12/18</span></div>`;
+}
+document.getElementById('segData').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;
+  [...e.currentTarget.children].forEach(x=>x.classList.toggle('on',x===b));
+  DATA=b.dataset.d==='real'?REAL:LIVE; paint()});
+paint(); window.addEventListener('resize',paint);
+</script>
+</body>
+</html>

@@ -245,6 +245,55 @@ export async function getProjectDetail(projectNo: string) {
   return data
 }
 
+/* ═══════════════════════════════════════════════════════════════════════
+ * 项目全生命周期时间线（2026-10-07）—— 项目详情顶部那条
+ *
+ * 六个时间源全部来自已有表，**只读**（后端 `GET /projects/{no}/lifecycle`）：
+ *   ① created_at（商机记录） ② initiated_at（立项）
+ *   ③ milestones（节点时间段，**可重叠** → 前端按重叠分甬道）
+ *   ④ deadline（交付截止 = 应交日单一口径）
+ *   ⑤ warranty（质保） ⑥ payments（成交时设计好的回款节点）
+ * ═════════════════════════════════════════════════════════════════════ */
+export interface LifecycleMilestone {
+  seq: number
+  name: string
+  start: string | null
+  end: string | null
+  actual_start: string | null
+  actual_end: string | null
+  status: string
+  /** ★ 节点状态（单一口径，后端 `services/deadline.py::milestone_state`）：已完成/延期/未开始/进行中 */
+  state: string
+  owner_name: string | null
+  remark: string | null
+}
+
+export interface LifecyclePayment {
+  seq: number
+  name: string
+  plan_date: string | null
+  received_date: string | null
+  received: boolean
+}
+
+export interface ProjectLifecycle {
+  project_no: string
+  project_name: string
+  stage: string
+  created_at: string | null
+  initiated_at: string | null
+  deal_at: string | null
+  deadline: string | null
+  warranty: { start: string | null; end: string | null }
+  milestones: LifecycleMilestone[]
+  payments: LifecyclePayment[]
+}
+
+export async function getProjectLifecycle(projectNo: string) {
+  const { data } = await api.get<ProjectLifecycle>(`/projects/${projectNo}/lifecycle`)
+  return data
+}
+
 export async function listAuditLogs(params: { object_type?: string; object_ref?: string }) {
   const { data } = await api.get<AuditLog[]>('/audit-logs', { params })
   return data

@@ -8,6 +8,7 @@
 | **任务超期** | `plan_end < 今天` 且任务未完成 | 负责人本人 + 本专业经理 |
 | **项目交期临期/超期** | `delivery_end ≤ 今天+7` 且阶段在执行中/交付中 | 项目经理 + 销售负责人 |
 | **采购到货超期** | `expected_date > need_date`（到货晚于需求）且还在跑 | 采购（PURCHASE 角色） |
+| **里程碑节点状态** | 见 `milestone_state()`（不单独提醒；供时间线等展示共用） | — |
 
 实现方式 —— **惰性扫描**（与 G1 项目自动归档同一套路）：
 本系统**不用 Redis / 消息队列 / 调度器**（技术栈铁律），所以不做后台定时任务，
@@ -22,7 +23,7 @@ from datetime import UTC, date, datetime, timedelta
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models.initiation import PurchaseRequest
+from app.models.initiation import Milestone, PurchaseRequest
 from app.models.project import Project
 from app.models.task import Task
 from app.services import notify
@@ -34,6 +35,32 @@ NEAR_DAYS = 7
 _ACTIVE_STAGES = ("执行中", "交付中")
 # 采购还在跑的（末态不用再催）
 _OPEN_REQ = ("待采购", "在途", "待入库", "部分到货", "现场待验收", "不合格")
+
+# 里程碑节点状态（4 个值，作为**契约**：前端不再自己算一套）
+MS_DONE, MS_LATE, MS_IDLE, MS_NOW = "已完成", "延期", "未开始", "进行中"
+
+
+def milestone_state(m: Milestone, today: date | None = None) -> str:
+    """节点状态的**单一口径**（2026-10-07）。
+
+    为什么要集中：项目详情顶部的全生命周期时间线要看「哪些节点拖了」，
+    而车间台 / 超期扫描各自也有一套“算不算超期”的判断 —— 再各算一套就是
+    AGENTS §8.5 那条“同一个概念在多处各算一套”（六通道六种答案的翻版）。
+
+    判据（顺序敏感）：
+      ① 有实际完成日 或 状态已是「已完成」 → 已完成
+      ② 计划结束日 < 今天、且没完成   → 延期
+      ③ 计划开始日 > 今天             → 未开始
+      ④ 其余                           → 进行中
+    """
+    day = today or date.today()
+    if m.actual_end is not None or m.status == MS_DONE:
+        return MS_DONE
+    if m.plan_end is not None and m.plan_end < day:
+        return MS_LATE
+    if m.plan_start is not None and m.plan_start > day:
+        return MS_IDLE
+    return MS_NOW
 
 
 # 提醒键统一由 notify.daily_key 提供（收款提醒也用同一套去重口径）

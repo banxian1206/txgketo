@@ -363,6 +363,22 @@ try {
         check('VIS-详情首屏给结论', fold.stage && fold.nums && (fold.nextBtn || terminal),
           `首屏: 阶段=${fold.stageText ?? fold.stage} 下一步=${fold.nextBtn}${terminal ? '(终态豁免)' : ''} 关键数字=${fold.nums} · 页高 ${fold.h}px`)
         check('VIS-详情页≤3屏', fold.h <= 2700, `页高 ${fold.h}px（改造前 7411px）`)
+        // ★ 2026-10-07 全生命周期时间线：静态护栏只能证明"接线在"，证明不了"真长出来了"
+        //   （组件里一个 ResizeObserver/宽度为 0 就会让它安静地不渲染）。
+        const life = await vc.page.evaluate(() => {
+          const el = document.querySelector('.ds-life')
+          if (!el) return null
+          return {
+            h: Math.round(el.getBoundingClientRect().height),
+            bars: document.querySelectorAll('.ds-life-bar').length,
+            rows: document.querySelectorAll('.ds-life-lanes .row').length,
+            ev: document.querySelectorAll('.ds-life-ev .ev').length,
+            pay: document.querySelectorAll('.ds-life-pay .p').length,
+          }
+        })
+        check('LIFE-时间线在项目详情长出来', !!life && life.h > 40 && life.rows >= 2,
+          life ? `高 ${life.h}px · 节点条 ${life.bars} 个 · 甬道 ${life.rows} 行 · 事件 ${life.ev} 个 · 回款 ${life.pay} 个`
+               : '页面上没有 .ds-life —— 时间线没渲染出来（组件报错或没接线）')
         // ★ 2026-10-05 迁移（docs/14 P3）：折叠泳道已被**分区条**取代 —— 断言意图不变
         //   （"一屏只呈现一块，不要回到平铺"），选择器从 .ant-collapse-item-active 换到 .ds-sec.on。
         const sec = await vc.page.evaluate(() => {

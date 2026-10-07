@@ -28,13 +28,11 @@ import { listShipments } from '../../api/shipping'
 import { listAcceptances } from '../../api/acceptance'
 import { serviceWorkbench } from '../../api/service'
 import AttachmentPreviewModal, { type PreviewState } from '../../components/AttachmentPreviewModal'
-import { closeProject, createContact, errMsg, getDesignOverview, getProjectDetail, listAuditLogs, listUsers, previewAttachment, registerDeal, updateContact, updateProject, uploadAttachment, type Attachment, type AuditLog, type ContactIn, type ProjectContact, type DesignOverviewRow, type ProjectDetail as Detail, type ProjectUpdate, kittingOverview, registerPayment, type KittingOverviewRow } from '../../api/client'
+import { closeProject, createContact, errMsg, getDesignOverview, getProjectDetail, getProjectLifecycle, listAuditLogs, listUsers, previewAttachment, registerDeal, updateContact, updateProject, uploadAttachment, type Attachment, type AuditLog, type ContactIn, type ProjectContact, type DesignOverviewRow, type ProjectDetail as Detail, type ProjectLifecycle, type ProjectUpdate, kittingOverview, registerPayment, type KittingOverviewRow } from '../../api/client'
 
 const ATT_CATEGORIES = ['客户资料', '方案', '报价', '合同', '技术协议', '其他']
 const CLOSE_REASONS = ['价格', '交期', '技术不满足', '客户取消', '对手中标', '其他']
 const SOURCES = ['老客户复购', '客户询价', '展会', '转介绍', '招标平台', '销售拜访', '其他']
-
-const STAGE_ORDER = ['线索', '成交待立项', '执行中', '交付中', '质保', '已归档', '已关闭']
 
 
 // 立项后才有的区块（成交前不显示，锚点条也不显示）
@@ -62,6 +60,8 @@ export default function ProjectDetailPage() {
   const [svcRows, setSvcRows] = useState<any[]>([])
   const [design, setDesign] = useState<DesignOverviewRow[]>([])
   const [kitting, setKitting] = useState<KittingOverviewRow[]>([])
+  // ★ 全生命周期时间线（2026-10-07）：商机记录/立项/里程碑/交付截止/质保/回款 的只读聚合
+  const [lifecycle, setLifecycle] = useState<ProjectLifecycle | null>(null)
 
   // 成交登记 / 关闭订单 / 联系人
   const [dealOpen, setDealOpen] = useState(false)
@@ -100,6 +100,11 @@ export default function ProjectDetailPage() {
       setDesign(await getDesignOverview(projectNo))
     } catch {
       setDesign([])
+    }
+    try {
+      setLifecycle(await getProjectLifecycle(projectNo))
+    } catch {
+      setLifecycle(null)  // 拿不到就不画那条线，不影响详情页其余部分
     }
     // ★ 齐套率需要 mfg:view —— 没权限的角色（销售/采购…）不要发这个请求，
     //   否则每次进项目详情都在控制台留两条 403 红字（2026-09-30 P2-6）。
@@ -186,7 +191,6 @@ export default function ProjectDetailPage() {
   }
   if (!p) return <Empty description="项目不存在" />
 
-  const stepIndex = STAGE_ORDER.indexOf(p.stage)
   const goNext = (to: string) => go(to)
   // ★ 「下一步」把人带到该去的**分区**（原来是把泳道展开并滚动；分区切换是瞬时的）
   const focusLane = (id: string) => setTab(id)
@@ -379,8 +383,7 @@ export default function ProjectDetailPage() {
       <ProjectSummaryBar
         p={p}
         detail={detail}
-        stepIndex={stepIndex}
-        stageOrder={STAGE_ORDER}
+        lifecycle={lifecycle}
         next={nextAction}
         nums={{
           // ★ 设备台数用后端计数（齐套数据按 mfg:view 收口，拿它当台数会让销售/商务看到「设备 0」）
