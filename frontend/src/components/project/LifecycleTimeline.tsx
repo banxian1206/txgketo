@@ -26,10 +26,11 @@ const WARRT = 0.11 // 质保尾段占内容区比例
 /** 中文按 12px、西文数字按 7px 估标签宽度（只为「放不放得下」判断，不求精确） */
 function estW(str: string): number {
   let n = 0
-  for (const ch of str) n += ch.charCodeAt(0) > 255 ? 12 : 7
-  return n + 16
+  for (const ch of str) n += ch.charCodeAt(0) > 255 ? 12.6 : 7.4
+  return n + 18
 }
 
+type Align = 'center' | 'left' | 'right'
 interface Packable {
   t: number
   text: string
@@ -37,6 +38,15 @@ interface Packable {
   left?: number
   cx?: number
   row?: number
+  align?: Align
+}
+
+/** 标签定位：居中的用 `left: cx + translateX(-50%)`（**按浏览器量的真实宽度**居中，
+ *  估算宽度只用于分道判断 —— 用估算居中会让标签中心偏 ~10px，客户实测看得出来）。 */
+export function labelStyle(it: Packable): { left: number | string; transform?: string } {
+  if (it.align === 'left') return { left: 0 }
+  if (it.align === 'right') return { left: '100%', transform: 'translateX(-100%)' }
+  return { left: it.cx ?? 0, transform: 'translateX(-50%)' }
 }
 
 /** 标签贪心错排 + 边缘钳制（就地写回 left/cx/row，返回行数） */
@@ -45,10 +55,17 @@ function packLabels(items: Packable[], toPx: (t: number) => number, total: numbe
   for (const it of items) {
     const cx = toPx(it.t)
     let left = cx - it.w / 2
-    if (left < 0) left = 0
-    if (left + it.w > total) left = Math.max(0, total - it.w)
+    let align: Align = 'center'
+    if (left < 0) {
+      left = 0
+      align = 'left'
+    } else if (left + it.w > total) {
+      left = Math.max(0, total - it.w)
+      align = 'right'
+    }
     it.left = left
     it.cx = cx
+    it.align = align
     let r = 0
     for (;;) {
       if (rows[r] === undefined || left >= rows[r] + 6) {
@@ -122,17 +139,21 @@ export default function LifecycleTimeline({ data }: { data: ProjectLifecycle | n
     const starts = placed.map((x) => x.bs)
     const ends = placed.map((x) => x.be)
     const allPts = [...starts, ...ends].filter((v): v is number => v !== null)
+    const payPts = data.payments
+      .flatMap((p) => [num(p.plan_date), num(p.received_date)])
+      .filter((v): v is number => v !== null)
+    // ★ 真实锚点（**不含**下面的最小窗口补白）——标题上印的必须是这些，不能印补白。
+    //   2026-10-07 客户实测：「我今天创建的商机，为什么起始点是 9/30？」
+    const realPts = [created, init, ddl, wS, wE, ...allPts, ...payPts].filter((v): v is number => v !== null)
+    const realLo = realPts.length ? Math.min(...realPts) : today.valueOf()
+    const realHi = realPts.length ? Math.max(...realPts) : today.valueOf()
+    // 同一个日期内（没有任何真实跨度）→ 不画尺子，收成一行事实
+    const hasSpan = realHi - realLo >= 86400000
     let lo = Math.min(...[created, ...allPts, today.valueOf()].filter((v): v is number => v !== null))
     let hi = Math.max(ddl ?? lo, ...allPts, today.valueOf())
-    // ★ 最小窗口 14 天（2026-10-07 实测 TX26011 抓到）：
-    //   刚建的线索「没成交→没交付截止→没里程碑」时 lo == hi，
-    //   而 L() 除的是 max(1, hi-lo) = 1 毫秒 → **坐标爆炸**（事件标签被挤到最右，条飞出容器）。
-    //   撑成前后各 7 天的窗口，时间线才有意义（今天落在正中）。
-    if (hi - lo < 14 * 86400000) {
-      const mid = (lo + hi) / 2
-      lo = mid - 7 * 86400000
-      hi = mid + 7 * 86400000
-    }
+    // ⚠ 这里**不做**「最小 14 天窗口」补白（曾经做过，被客户当场问住：
+    //   「我今天建的商机，为什么起始点是 9/30？」—— 补白被当成真实日期印在标题上 = 编数据）。
+    //   零跨度的情形由 `hasSpan` 拦下、收成一行事实；有真实跨度（≥1 天）时除法本来就安全。
     const min = lo
     const mainEnd = hi
     const max = Math.max(wE ?? mainEnd, mainEnd, today.valueOf())
@@ -231,6 +252,9 @@ export default function LifecycleTimeline({ data }: { data: ProjectLifecycle | n
       ticks,
       lateN,
       nowN,
+      realLo,
+      realHi,
+      hasSpan,
       wS,
       wE,
     }
@@ -241,14 +265,29 @@ export default function LifecycleTimeline({ data }: { data: ProjectLifecycle | n
 
   const {
     today, min, max, L, clampPct, MAIN, CONTENT, placed, laneCount, evs, evRows, payLabels, payRows, payCls, ticks, wS, wE,
+    realLo, realHi, hasSpan,
   } = model
+  // ★ 没有任何真实跨度（刚建的商机：只有「商机记录」这一天）→ 不画尺子。
+  //   画一条全是补白的空轨道，等于拿编出来的日期骗人（客户实测原话见上）。
+  if (!hasSpan) {
+    return (
+      <div className="ds-life" ref={boxRef}>
+        <div className="ds-life-mini">
+          <span>商机记录 <b>{dayjs(realLo).format('YY/MM/DD')}</b></span>
+          {data.initiated_at && <span>立项 <b>{dayjs(data.initiated_at).format('YY/MM/DD')}</b></span>}
+          <span className="miss">还没有节点计划</span>
+        </div>
+      </div>
+    )
+  }
+
   const inRange = today >= min && today <= max
 
   return (
     <div className="ds-life" ref={boxRef}>
       <div className="ds-life-hd">
         <span className="span">
-          {dayjs(min).format('YY/MM/DD')} → {dayjs(max).format('YY/MM/DD')}
+          {dayjs(realLo).format('YY/MM/DD')} → {dayjs(realHi).format('YY/MM/DD')}
         </span>
         <span className="sp" />
         <span className="lg">
@@ -266,7 +305,7 @@ export default function LifecycleTimeline({ data }: { data: ProjectLifecycle | n
           <span
             key={e.text}
             className={`ev ${(e as Packable & { cls: string }).cls}`}
-            style={{ left: e.left, top: (e.row ?? 0) * 24 }}
+            style={{ ...labelStyle(e), top: (e.row ?? 0) * 24 }}
             title={e.text}
           >
             {e.text}
@@ -277,7 +316,7 @@ export default function LifecycleTimeline({ data }: { data: ProjectLifecycle | n
       {/* ⑥ 回款节点（同日合并） */}
       <div className="ds-life-pay" style={{ height: payRows * 24 }}>
         {payLabels.map((g) => (
-          <span key={g.text} className="pw" style={{ left: g.left, top: (g.row ?? 0) * 24 }} title={g.text}>
+          <span key={g.text} className="pw" style={{ ...labelStyle(g), top: (g.row ?? 0) * 24 }} title={g.text}>
             {g.items.map((p) => (
               <span key={p.seq} className={`p ${payCls(p)}`}>
                 {p.name}

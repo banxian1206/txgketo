@@ -833,6 +833,11 @@ code,
 .ds-life-hd .lg i.is-warr { background: var(--ds-okSoft); border: 1px dashed var(--ds-okLine); }
 .ds-life-hd .lg i.is-today { background: var(--ds-err); width: 3px; border-radius: 2px; }
 .ds-life-note { font-size: 12px; line-height: 18px; color: var(--ds-ink4); margin-bottom: 12px; }
+/* 零跨度（刚建的商机，只有「商机记录」这一天）：不画尺子，收成一行事实 */
+.ds-life-mini { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 4px 0 8px;
+  font-size: 12px; line-height: 18px; color: var(--ds-ink3); }
+.ds-life-mini b { font-family: var(--ds-mono); font-weight: 600; color: var(--ds-ink2); }
+.ds-life-mini .miss { color: var(--ds-ink4); }
 
 .ds-life-ev, .ds-life-pay { position: relative; }
 .ds-life-ev .ev { position: absolute; font-size: 12px; line-height: 18px; padding: 0 8px; border-radius: 6px; white-space: nowrap;
