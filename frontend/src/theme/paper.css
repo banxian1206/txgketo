@@ -885,3 +885,38 @@ code,
 .ds-life .tip b { color: var(--ds-ink); font-weight: 600; }
 .ds-life .tip .d { color: var(--ds-ink4); font-family: var(--ds-mono); }
 .ds-life .tip .miss { color: var(--ds-ink4); }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   ★ 标准库/价格库共用的品类导航（2026-10-07「两个页统一标准」）
+
+   起因：139 个品类平铺 + 表格不显示规格 → 标准库页高 4587px、同名物料分不清。
+   实测「钢材」2517 条里：品名只有 139 种（重复严重）、规格有 2315 种（唯一能区分的）、
+   品牌 99.7% 是空的 —— 结论是**表格显示错了列**，而导航缺折叠与搜索。
+   ══════════════════════════════════════════════════════════════════════════ */
+.std-nav-all { display: block; width: 100%; text-align: left; font: inherit; font-size: 13px; line-height: 20px;
+  padding: 4px 8px; margin-top: 8px; border: 0; border-radius: 6px; background: none; color: var(--ds-ink2); cursor: pointer; }
+.std-nav-all.on { background: var(--ds-accentSoft); color: var(--ds-acc); font-weight: 600; }
+.std-nav-cat { display: flex; align-items: center; gap: 4px; margin-top: 8px; }
+.std-nav-fold { width: 16px; flex: none; border: 0; background: none; color: var(--ds-ink4); cursor: pointer;
+  font-size: 12px; line-height: 20px; padding: 0; }
+.std-nav-catname { flex: 1; min-width: 0; text-align: left; font: inherit; font-size: 12px; line-height: 18px;
+  color: var(--ds-ink3); border: 0; background: none; cursor: pointer; padding: 4px; border-radius: 6px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.std-nav-catname:hover { color: var(--ds-ink); }
+.std-nav-catname.on { color: var(--ds-acc); font-weight: 600; }
+.std-nav-n { flex: none; font-family: var(--ds-mono); font-size: 12px; line-height: 18px; color: var(--ds-ink4); }
+.std-nav-item { display: flex; align-items: center; gap: 6px; width: 100%; text-align: left; font: inherit;
+  font-size: 13px; line-height: 20px; padding: 4px 8px 4px 20px; border: 0; border-radius: 6px; background: none;
+  color: var(--ds-ink2); cursor: pointer; }
+.std-nav-item:hover { background: var(--ds-surface3); }
+.std-nav-item.on { background: var(--ds-accentSoft); color: var(--ds-acc); font-weight: 600; }
+.std-nav-item .nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.std-nav-item .n { flex: none; font-family: var(--ds-mono); font-size: 12px; line-height: 18px; color: var(--ds-ink4);
+  display: inline-flex; align-items: center; gap: 4px; }
+/* 有历史价的数用主色：它是「这个品类能不能比价」的决策信息，不是装饰 */
+.std-nav-item .n em { font-style: normal; color: var(--ds-acc); }
+
+/* 标准库台账：规格是唯一能区分同名的字段，给它一整列（现在是 2315 种不同规格） */
+.ds-code-wrap { font-family: var(--ds-mono); font-size: 13px; white-space: nowrap; }
+.std-spec { color: var(--ds-ink2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block; }
+.std-spec.miss { color: var(--ds-ink4); }

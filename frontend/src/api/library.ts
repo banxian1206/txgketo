@@ -16,6 +16,9 @@ export interface StdClassInfo {
   name: string
   spec_template?: SpecFieldDef[] | null
   item_count?: number
+  /** ★ 有历史价的条数（2026-10-07）：与价格库同一口径（`services/pricing`）——
+   *  「看得到才能选得对」：选料时先知道这个品类里有多少料是能比价的。 */
+  priced_count?: number
   category_code?: string
   category_name?: string
 }
@@ -48,6 +51,49 @@ export async function listLibraryCategories() {
 
 export async function getLibraryClass(code: string) {
   const { data } = await api.get<StdClassInfo>(`/library/classes/${code}`)
+  return data
+}
+
+export interface StdItemPrice {
+  /** 历史成交条数（0 = 没历史价） */
+  quote_count?: number
+  /** 几家供过 */
+  supplier_count?: number
+  last_price?: number | null
+  /** ≥2 家 → 可比价；≥3 家 → 可放心推荐（阈值见后端 pricing） */
+  comparable?: boolean
+  recommendable?: boolean
+}
+
+/** 标准库物料 + 价格可用性（`GET /library/items/page`） */
+export interface StdItemPaged extends StdItem, StdItemPrice {}
+
+export interface StdItemPage {
+  total: number
+  offset: number
+  limit: number
+  items: StdItemPaged[]
+}
+
+/**
+ * 标准库物料 · **真服务端分页**（2026-10-07「两页统一标准」）。
+ *
+ * 与 `listStdItems` 的分工：那个是**选料候选搜索**（只取前 30~50 条，返回数组）；
+ * 这个是**台账**（返回 `{total, items}`，带每行的价格可用性）。
+ * 两者共存 —— 改老接口的返回形状会让所有选料弹窗静默失败。
+ */
+export async function listStdItemsPaged(params: {
+  class_code?: string
+  category_code?: string
+  q?: string
+  /** true = 跨全库搜（否则搜当前品类） */
+  all_classes?: boolean
+  /** 只看有历史价的 */
+  only_priced?: boolean
+  limit?: number
+  offset?: number
+}) {
+  const { data } = await api.get<StdItemPage>('/library/items/page', { params })
   return data
 }
 

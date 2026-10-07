@@ -18,8 +18,9 @@ from app.models.library import (
     validate_spec,
 )
 from app.models.platform import User
-from app.services import audit
+from app.services import audit, pricing
 from app.services.numbering import next_number
+from app.models.purchasing import SupplierQuote
 
 router = APIRouter(prefix="/library", tags=["标准库"])
 
@@ -55,6 +56,15 @@ def list_categories(session: Session = Depends(get_session), _: User = Depends(g
             .group_by(Item.std_class_code)
         ).all()
     )
+    # ★ 每个品类还要知道「有几条有历史价」—— 「看得到才能选得对」（2026-10-07）。
+    #   与价格库同一口径：都数 supplier_quote 里出现过的物料。
+    priced = dict(
+        session.execute(
+            select(Item.std_class_code, func.count(func.distinct(Item.item_no)))
+            .where(Item.source_type == SOURCE_STANDARD, Item.item_no.in_(select(SupplierQuote.item_no)))
+            .group_by(Item.std_class_code)
+        ).all()
+    )
     return [
         {
             "code": c.code,
@@ -69,6 +79,7 @@ def list_categories(session: Session = Depends(get_session), _: User = Depends(g
                     "category_code": k.category_code,
                     "spec_template": k.spec_template,
                     "item_count": counts.get(k.code, 0),
+                    "priced_count": priced.get(k.code, 0),
                 }
                 for k in classes
                 if k.category_code == c.code
@@ -132,6 +143,71 @@ def list_items(
         )
         for i in rows
     ]
+
+
+@router.get("/items/page")
+def list_items_paged(
+    class_code: str | None = None,
+    category_code: str | None = None,
+    q: str | None = Query(default=None, description="按编码/品名/规格/品牌/型号模糊搜索"),
+    all_classes: bool = Query(default=False, description="true=跨全库搜（否则在当前品类内）"),
+    only_priced: bool = Query(default=False, description="只看有历史价的"),
+    limit: int = Query(default=20, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
+    session: Session = Depends(get_session),
+    _: User = Depends(get_current_user),
+):
+    """标准库物料 · **真服务端分页**（2026-10-07 客户要求「两页统一标准」）。
+
+    为什么要新开一个而不是改 `/items`：那个接口是**选料候选搜索**（多个弹窗在用，
+    只取前 30~50 条），动它的返回形状（`list` → `{total, items}`）会让所有调用方
+    静默失败。所以老接口原样保留，分页台账走这里（docs/17「避免直接改变其他调用方
+    的响应协议」）。
+
+    ★ 每行带**价格可用性**（最近价 / 有没有历史价 / 能不能比价）——
+      数据来自 `services/pricing.price_index()`，**与价格库同一口径**。
+      客户原话：「看得到才能选得对」。（实测钢材 2517 条里 1192 条有价。）
+    """
+    base = select(Item).where(Item.source_type == SOURCE_STANDARD, Item.is_active.is_(True))
+    if not all_classes:
+        if class_code:
+            base = base.where(Item.std_class_code == class_code)
+        elif category_code:
+            base = base.where(Item.std_class_code.in_(select(StdClass.code).where(StdClass.category_code == category_code)))
+    if q:
+        like = f"%{q}%"
+        base = base.where(
+            or_(
+                Item.item_no.ilike(like),
+                Item.display_name.ilike(like),
+                Item.spec_text.ilike(like),
+                Item.brand.ilike(like),
+                Item.mfr_model.ilike(like),
+            )
+        )
+    if only_priced:
+        base = base.where(Item.item_no.in_(select(SupplierQuote.item_no)))
+
+    total = int(session.execute(select(func.count()).select_from(base.subquery())).scalar_one())
+    rows = session.scalars(base.order_by(Item.item_no).limit(limit).offset(offset)).all()
+    classes = {k.code: k for k in session.scalars(select(StdClass)).all()}
+    idx = pricing.price_index(session, [i.item_no for i in rows])
+    return {
+        "total": total,
+        "offset": offset,
+        "limit": limit,
+        "items": [
+            {
+                **_item_dict(
+                    i,
+                    classes[i.std_class_code].name if i.std_class_code in classes else None,
+                    classes[i.std_class_code].category_code if i.std_class_code in classes else None,
+                ),
+                **idx.get(i.item_no, {}),
+            }
+            for i in rows
+        ],
+    }
 
 
 @router.get("/items/{item_no}")

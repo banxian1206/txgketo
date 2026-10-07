@@ -1,23 +1,29 @@
 import { useUrlState } from '../../hooks/useUrlState'
-import { App, Button, Card, Col, Empty, Form, Input, InputNumber, Row, Select, Space, Table, Typography } from 'antd'
+import { App, Button, Card, Col, Empty, Form, Input, InputNumber, Row, Segmented, Select, Space, Table, Tooltip, Typography } from 'antd'
 import { useCallback, useEffect, useState } from 'react'
 
-import { createStdItem, errMsg, getStdItem, listLibraryCategories, listStdItems, updateStdItem, type SpecFieldDef, type StdCategoryInfo, type StdClassInfo, type StdItem } from '../../api/client'
+import { createStdItem, errMsg, getStdItem, listLibraryCategories, listStdItemsPaged, updateStdItem, type SpecFieldDef, type StdCategoryInfo, type StdClassInfo, type StdItem, type StdItemPaged } from '../../api/client'
 import AppModal from '../../components/AppModal'
-import { PAPER } from '../../theme/tokens'
+import StdCategoryNav from '../../components/library/StdCategoryNav'
 
 /**
  * 标准库（01 卷 §5）：三层 → 类别 → 品类 → 型号
  * 编码不含规格，但规格必须完整（按品类规格模板逐字段校验）
  */
+const PAGE = 20
+
 export default function Library() {
   const { message } = App.useApp()
   const [cats, setCats] = useState<StdCategoryInfo[]>([])
   const [activeClass, setActiveClass] = useState<StdClassInfo | null>(null)
-  const [items, setItems] = useState<StdItem[]>([])
+  const [items, setItems] = useState<StdItemPaged[]>([])
   // ★ P3：搜索词进 URL（/library?q=方通 可分享、刷新不丢）
-  const [libState, setLibState] = useUrlState({ q: undefined })
+  // ★ 2026-10-07「两页统一标准」：搜索词、分页、搜索范围全进 URL（可分享/刷新不丢）
+  const [libState, setLibState] = useUrlState({ q: undefined, page: undefined, scope: undefined })
   const q = libState.q ?? ''
+  const page = Number(libState.page ?? 1) || 1
+  const allClasses = libState.scope === 'all'
+  const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(false)
   const [open, setOpen] = useState(false)
   const [initial, setInitial] = useState<Record<string, unknown>>({})
@@ -43,26 +49,33 @@ export default function Library() {
   const loadItems = useCallback(async () => {
     setLoading(true)
     try {
-      setItems(
-        await listStdItems({
-          class_code: activeClass?.code,
-          q: q || undefined,
-        }),
-      )
+      const d = await listStdItemsPaged({
+        // ★ 搜索范围显式化：默认搜「当前品类」，勾了「全库」才跨品类
+        class_code: allClasses ? undefined : (activeClass?.code ?? undefined),
+        q: q || undefined,
+        all_classes: allClasses || undefined,
+        limit: PAGE,
+        offset: (page - 1) * PAGE,
+      })
+      setItems(d.items)
+      setTotal(d.total)
     } catch (e) {
       message.error(errMsg(e))
     } finally {
       setLoading(false)
     }
-  }, [activeClass, q, message])
+  }, [activeClass, q, page, allClasses, message])
 
   useEffect(() => {
     void loadCats()
   }, [loadCats])
 
   useEffect(() => {
+    // ⚠ cats 还没到就先别查：否则会先发两次「全部物料」（默认品类未定的空态），
+    //   实测 3 次请求里 2 次是白跑的。
+    if (!cats.length) return
     void loadItems()
-  }, [loadItems])
+  }, [cats.length, loadItems])
 
   const openCreate = () => {
     setEditing(null)
@@ -152,32 +165,18 @@ export default function Library() {
 
   return (
     <Row gutter={16}>
-      {/* 左侧：类别 → 品类 */}
-      <Col flex="210px">
-        <Card size="small" title="类别 / 品类" styles={{ body: { padding: 8 } }}>
-          {cats.map((c) => (
-            <div key={c.code} style={{ marginBottom: 8 }}>
-              <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-                {c.code} {c.name}
-              </Typography.Text>
-              <div style={{ marginTop: 2 }}>
-                {c.classes.map((k) => (
-                  <a
-                    key={k.code}
-                    className={`lib-class${activeClass?.code === k.code ? ' active' : ''}`}
-                    onClick={() => setActiveClass(k)}
-                  >
-                    {k.name}
-                    {/* ★ 2026-10-06 无障碍体检：这个数是**有意义的数据**（用来判断哪个品类有料），
-                        原来用 T.textDisabled 标它 —— 语义错（把数据标成「禁用」）+ 对比度仅 1.84:1。
-                        改用 PAPER.ink3（「辅助说明」角色）。 */}
-                    <span style={{ color: PAPER.ink3, marginLeft: 6 }}>{k.item_count ?? 0}</span>
-                  </a>
-                ))}
-              </div>
-            </div>
-          ))}
-        </Card>
+      {/* 左侧：类别 → 品类（与价格库**共用**同一组件，2026-10-07「两页统一标准」） */}
+      <Col flex="232px">
+        <StdCategoryNav
+          cats={cats}
+          classCode={activeClass?.code}
+          onPick={(_c, k) => {
+            if (k) {
+              const hit = cats.flatMap((x) => x.classes).find((x) => x.code === k)
+              if (hit) setActiveClass(hit)
+            } else setActiveClass(null)
+          }}
+        />
       </Col>
 
       {/* 右侧：该品类下的型号 */}
@@ -191,11 +190,24 @@ export default function Library() {
           }
           extra={
             <Space>
+              {/* ★ 搜索范围显式化（docs/17 第 4 条）：切到「钢材」后搜「电机」没结果时，
+                  人要能看出「这是当前品类内没有」，而不是以为全库没有。 */}
+              <Segmented
+                size="small"
+                value={allClasses ? 'all' : 'class'}
+                onChange={(v) =>
+                  setLibState({ scope: v === 'all' ? 'all' : undefined, page: undefined })
+                }
+                options={[
+                  { value: 'class', label: activeClass ? `${activeClass.name}内` : '当前品类' },
+                  { value: 'all', label: '全库' },
+                ]}
+              />
               <Input.Search
                 allowClear
-                placeholder="搜编码 / 品名 / 规格 / 品牌"
-                style={{ width: 240 }}
-                onSearch={(v: string) => setLibState({ q: v || undefined })}
+                placeholder={allClasses ? '搜全库' : `在「${activeClass?.name ?? '当前品类'}」内搜`}
+                style={{ width: 220 }}
+                onSearch={(v: string) => setLibState({ q: v || undefined, page: undefined })}
                 defaultValue={q}
               />
               <Button type="primary" disabled={!activeClass} onClick={openCreate}>
@@ -209,8 +221,28 @@ export default function Library() {
             size="small"
             loading={loading}
             dataSource={items}
-            pagination={{ pageSize: 10, showSizeChanger: true }}
-            locale={{ emptyText: <Empty description="这个品类下还没有物料" /> }}
+            // ★ 真服务端分页（2026-10-07）：以前后端最多返回 200、前端切 10 条/页 →
+            //   钢材 2517 条「翻不到底」（只有 5 页的假象）。现在 total 来自后端。
+            pagination={{
+              current: page,
+              pageSize: PAGE,
+              total,
+              showSizeChanger: false,
+              onChange: (p: number) => setLibState({ page: p === 1 ? undefined : String(p) }),
+            }}
+            locale={{
+              emptyText: (
+                <Empty
+                  description={
+                    q
+                      ? allClasses
+                        ? `全库没有匹配「${q}」的物料`
+                        : `「${activeClass?.name ?? '当前品类'}」内没有匹配「${q}」的物料 —— 试试右上角切「全库」`
+                      : '这个品类下还没有物料'
+                  }
+                />
+              ),
+            }}
             columns={[
               {
                 title: '编码',
@@ -219,16 +251,51 @@ export default function Library() {
                 render: (v: string) => <Typography.Text strong>{v}</Typography.Text>,
               },
               {
-                title: '品名（自动生成）',
-                dataIndex: 'display_name',
-                render: (v: string) => <span className="row-title">{v}</span>,
+                // ★ 2026-10-07「两页统一标准」：**品名与规格同格**（品名在上、规格在下）。
+                //   理由不是省列，是**规格才是区分同名的字段** —— 实测钢材 2517 条：
+                //   品名只有 139 种（25 个「45#链轮」）、规格有 2315 种。
+                //   以前只显示品名，同名的一整页长得一模一样，只能逐个点开。
+                title: '品名 · 规格',
+                key: 'name',
+                render: (_: unknown, r: StdItem) => {
+                  const spec = r.spec_text || r.mfr_model
+                  return (
+                    <>
+                      <span className="row-title">{r.display_name}</span>
+                      {spec ? (
+                        <Tooltip title={spec}>
+                          <span className="std-spec">{spec}</span>
+                        </Tooltip>
+                      ) : (
+                        <span className="std-spec miss">未填规格</span>
+                      )}
+                    </>
+                  )
+                },
               },
-              { title: '单位', dataIndex: 'unit', width: 70 },
+              { title: '单位', dataIndex: 'unit', width: 60 },
               {
+                // ★ 品牌为空就**不画这一格**（实测 2517 条里 2509 条为空 = 99.7%），
+                //   以前它占着 100px 什么都不说。
                 title: '品牌',
                 dataIndex: 'brand',
-                width: 100,
-                render: (v: string | null) => v || '—',
+                width: 96,
+                render: (v: string | null) => (v ? v : <span style={{ color: 'var(--ds-ink4)' }}>—</span>),
+              },
+              {
+                // ★ 价格可用性进列表（与价格库同一口径）：选料时当场知道能不能自动推荐供应商
+                title: '价格',
+                key: 'price',
+                width: 120,
+                render: (_: unknown, r: StdItemPaged) =>
+                  (r.quote_count ?? 0) > 0 ? (
+                    <span title={`${r.quote_count} 条历史价 · ${r.supplier_count} 家供过`}>
+                      ¥{r.last_price ?? '—'}
+                      {r.recommendable ? ' ·可推荐' : r.comparable ? ' ·可比价' : ' ·仅一家'}
+                    </span>
+                  ) : (
+                    <span style={{ color: 'var(--ds-ink4)' }}>无历史价</span>
+                  ),
               },
               {
                 title: '操作',
@@ -238,9 +305,7 @@ export default function Library() {
               },
             ]}
           />
-          <Typography.Paragraph type="secondary" style={{ fontSize: 12, marginTop: 12 }}>
-            编码不含规格，但规格必须写全 —— 采购就是照规格买。同品类同规格同品牌不允许重复建码。
-          </Typography.Paragraph>
+
         </Card>
       </Col>
 

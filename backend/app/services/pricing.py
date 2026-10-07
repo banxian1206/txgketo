@@ -15,6 +15,7 @@
 from __future__ import annotations
 
 from datetime import date
+from typing import Sequence
 
 from sqlalchemy import Select, and_, func, select
 from sqlalchemy.orm import Session
@@ -263,6 +264,52 @@ def items_ledger(
             }
         )
     return {"total": total, "items": items, "offset": offset, "limit": limit}
+
+
+def price_index(session: Session, item_nos: Sequence[str]) -> dict[str, dict]:
+    """一批物料的「价格可用性」摘要 —— **标准库列表与价格库共用的同一口径**。
+
+    2026-10-07：客户要求「两个页统一标准」，于是把「这个料有没有历史价、能不能比价」
+    抽到这里。否则标准库列表写一套、价格库写一套，两个页就可能对着同一个料说不同的话
+    （AGENTS §8.5：同一个概念不许各算一套）。
+
+    返回 item_no → {quote_count, supplier_count, last_price, comparable, recommendable}。
+    没记录的物料**也会在结果里**（quote_count=0）—— 列表要把它标成「无历史价」。
+    """
+    out: dict[str, dict] = {
+        n: {"quote_count": 0, "supplier_count": 0, "last_price": None, "comparable": False, "recommendable": False}
+        for n in item_nos
+    }
+    ids = list(item_nos)
+    for i in range(0, len(ids), 500):  # IN 列表分块（PG 参数个数有限）
+        chunk = ids[i : i + 500]
+        agg = session.execute(
+            select(
+                SupplierQuote.item_no,
+                func.count(SupplierQuote.id),
+                func.count(func.distinct(SupplierQuote.supplier_id)),
+            )
+            .where(SupplierQuote.item_no.in_(chunk))
+            .group_by(SupplierQuote.item_no)
+        ).all()
+        latest = dict(
+            session.execute(
+                select(SupplierQuote.item_no, SupplierQuote.price)
+                .where(SupplierQuote.item_no.in_(chunk))
+                .order_by(SupplierQuote.item_no, SupplierQuote.quote_date.desc(), SupplierQuote.id.desc())
+                .distinct(SupplierQuote.item_no)  # PG DISTINCT ON
+            ).all()
+        )
+        for item_no, n, sup_n in agg:
+            last = latest.get(item_no)
+            out[item_no] = {
+                "quote_count": int(n),
+                "supplier_count": int(sup_n),
+                "last_price": float(last) if last is not None else None,
+                "comparable": int(sup_n) >= MIN_COMPARABLE,
+                "recommendable": int(sup_n) >= MIN_RECOMMENDABLE,
+            }
+    return out
 
 
 def quotes_by_item(session: Session, item_no: str) -> dict:

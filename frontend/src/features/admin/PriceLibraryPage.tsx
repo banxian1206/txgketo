@@ -18,6 +18,7 @@ import {
 } from '../../api/client'
 import { hasPerm } from '../../api/user'
 import { Code, Empty, Metrics, PageHead, Panel, Status, type MetricItem } from '../../components/ds'
+import StdCategoryNav from '../../components/library/StdCategoryNav'
 import { useGoFrom } from '../../hooks/useFrom'
 
 /**
@@ -214,53 +215,9 @@ export default function PriceLibraryPage() {
       <Metrics items={metrics} />
 
       <Space align="start" size={12} style={{ display: 'flex', marginBottom: 12 }}>
-        {/* 品类树（与标准库同一套：ERP 导进来的 19 类别 / 139 品类） */}
-        <div className="ds-panel" style={{ width: 240, flex: 'none', maxHeight: 560, overflowY: 'auto' }}>
-          <div style={{ padding: '10px 12px' }}>
-            <div style={{ fontSize: 13, color: 'var(--ds-ink3)', marginBottom: 6 }}>品类</div>
-            {cats.map((c) => (
-              <div key={c.code}>
-                <div
-                  style={{
-                    padding: '4px 8px',
-                    borderRadius: 6,
-                    cursor: 'pointer',
-                    fontWeight: catCode === c.code && !classCode ? 600 : 400,
-                    color: catCode === c.code && !classCode ? 'var(--ds-acc)' : 'var(--ds-ink2)',
-                  }}
-                  onClick={() => {
-                    setCatCode(catCode === c.code ? undefined : c.code)
-                    setClassCode(undefined)
-                    setPage(1)
-                  }}
-                >
-                  {c.name}
-                </div>
-                {c.classes?.map((k) => (
-                  <div
-                    key={k.code}
-                    style={{
-                      padding: '3px 8px 3px 20px',
-                      borderRadius: 6,
-                      cursor: 'pointer',
-                      fontSize: 13,
-                      fontWeight: classCode === k.code ? 600 : 400,
-                      color: classCode === k.code ? 'var(--ds-acc)' : 'var(--ds-ink2)',
-                    }}
-                    onClick={() => {
-                      setClassCode(classCode === k.code ? undefined : k.code)
-                      setCatCode(undefined)
-                      setPage(1)
-                    }}
-                  >
-                    {k.name}
-                  </div>
-                ))}
-              </div>
-            ))}
-            {!cats.length && <Empty text="没有品类数据" />}
-          </div>
-        </div>
+        {/* ★ 2026-10-07「两页统一标准」：左栏换成与标准库**共用**的 StdCategoryNav
+            —— 以前这里又手写了一棵 139 品类的树，跟标准库那棵长得一样却各改各的。 */}
+        <StdCategoryNav cats={cats} classCode={classCode} categoryCode={catCode} onPick={(c, k) => { setClassCode(c); setCatCode(k); setPage(1) }} />
 
         <div style={{ flex: 1, minWidth: 0 }}>
           {canImport && (
@@ -346,11 +303,20 @@ export default function PriceLibraryPage() {
                     </a>
                   ),
                 },
+                // ★ 与标准库同一套列（2026-10-07「两页统一标准」）：品名单独一列、
+                //   **规格单独一列** —— 规格才是区分同名的字段（钢材 2517 条里品名只有 139 种）。
+                { title: '品名', dataIndex: 'display_name', width: 200, ellipsis: true },
                 {
-                  title: '品名 / 规格',
-                  key: 'name',
-                  ellipsis: true,
-                  render: (_, r) => r.display_name + (r.spec_text ? ` · ${r.spec_text}` : ''),
+                  title: '规格 · 型号',
+                  key: 'spec',
+                  render: (_, r) =>
+                    r.spec_text ? (
+                      <Tooltip title={r.spec_text}>
+                        <span className="std-spec">{r.spec_text}</span>
+                      </Tooltip>
+                    ) : (
+                      <span className="std-spec miss">未填规格</span>
+                    ),
                 },
                 { title: '成交笔数', dataIndex: 'quote_count', width: 90 },
                 {
