@@ -154,3 +154,49 @@ def test_mobile_accept_no_tiny_qty_floor():
     assert "Math.max(0.001" not in s, "剩余为 0 时不许用 0.001 兜底预填"
     assert "已经全部到货" in s, "全部到货要有明确文案"
     assert "fullyReceived" in s, "提交按钮要能按「已全部到货」置灰"
+
+
+# ── 2026-10-07（采购下单实测）：条件规则为假时给 [{}] → 报「不是一个有效的undefined」──
+def _empty_rule_expr(expr: str) -> bool:
+    """`rules={...}` 表达式里有没有「空规则对象」：`[cond ? {...} : {}]` / `cond ? [...] : {}` / `[{}]`。
+    空对象会被 antd 当成类型校验，而 DatePicker 的值是 dayjs 对象 → 报
+    `<label>不是一个有效的undefined`。"""
+    import re
+
+    return bool(
+        re.search(r":\s*\{\s*\}", expr)
+        or re.search(r"\[\s*\{\s*\}\s*\]", expr)
+        or expr.strip() == "{}"
+    )
+
+
+def test_conditional_form_rules_must_be_array_not_empty_object():
+    """条件为假时必须给 `[]`，不能给 `[{}]` / `: {}`（MergeOrderModal 预计到货日期实测）。"""
+    bad: list[str] = []
+    for p in FE.rglob("*.tsx"):
+        s = _read(p)
+        idx = 0
+        while True:
+            i = s.find("rules={", idx)
+            if i < 0:
+                break
+            # 取 `rules={` 后面那对**配对**的花括号表达式（不是贪婪截到底）
+            start = i + len("rules=")
+            depth = 0
+            j = start
+            while j < len(s):
+                if s[j] == "{":
+                    depth += 1
+                elif s[j] == "}":
+                    depth -= 1
+                    if depth == 0:
+                        break
+                j += 1
+            if _empty_rule_expr(s[start : j + 1]):
+                line_no = s.count("\n", 0, i) + 1
+                bad.append(f"{p.relative_to(FE)}:{line_no}")
+            idx = j + 1
+    assert not bad, (
+        "条件表单规则为空时应给 []，不能给 [{}]/: {}（空规则 → 类型校验 → 「不是一个有效的undefined」）："
+        + "、".join(bad)
+    )

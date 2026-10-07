@@ -163,6 +163,12 @@ deploy/          docker-compose.dev.yml
 
 ## 8. 当前进度（交接记录）
 
+### 8.2 行（2026-10-07）｜★ 采购下单「预计到货日期」报「不是一个有效的undefined」
+
+**现象**：采购合并下单弹窗里，条件规则为假时（每条需求都有采购周期、不用手填预计到货）点在「预计到货日期」就报 `预计到货日期不是一个有效的undefined`。
+**根因**：`MergeOrderModal` 的 `rules={[noLead ? {required:true,…} : {}]}` —— 条件为假时数组里留了个**空规则对象 `{}`**；antd/async-validator 把空规则当成「类型校验」，而 DatePicker 的值是 `dayjs` 对象 → 报本地化 `types` 文案（`${type}` 为 undefined）。
+**修**：条件为假给 `[]`，不给 `[{}]`。护栏 `test_ui_p2_fixes::test_conditional_form_rules_must_be_array_not_empty_object`（扫描全部 tsx 的 `rules={...}` 配对表达式，命中 `: {}`/`[{}]` 即红；已用**提交版源文件**验证能红、修后绿）。`pytest 303` · `e2e:static 66` · `tsc 0` · `build OK`。
+
 ### 8.2 行（2026-10-07）｜★ 机械只定外购/自制，外协由工艺判；设计面撤掉手动「生成采购需求」
 
 **客户口径**：机械负责 BOM 结构 + 那个件是**外购还是自制**（外购标品如电机/机器人）；**自制里真正做还是外协，由工艺判**；**外协 = 直接购买这个定制件**。

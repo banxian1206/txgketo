@@ -591,14 +591,18 @@ export default function MergeOrderModal({
             label="预计到货日期"
             style={{ minWidth: 190 }}
             tooltip={noLead ? `${noLead} 条需求没填采购周期，推不出来 —— 这一格必填` : '不填则按各条需求自己的采购周期自动推算'}
-            rules={[
+            // ★ 条件为假时必须给 []：给 [{}] 时空规则会被 antd 当成「类型校验」，
+            //   日期值是 dayjs 对象 → 报「预计到货日期不是一个有效的undefined」（客户实测）
+            rules={
               noLead
-                ? {
-                    required: true,
-                    message: `${noLead} 条需求无采购周期，必须填预计到货日期（催货/超期预警以它为凭）`,
-                  }
-                : {},
-            ]}
+                ? [
+                    {
+                      required: true,
+                      message: `${noLead} 条需求无采购周期，必须填预计到货日期（催货/超期预警以它为凭）`,
+                    },
+                  ]
+                : []
+            }
           >
             <DatePicker style={{ width: '100%' }} />
           </Form.Item>
