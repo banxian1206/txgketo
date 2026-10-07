@@ -66,6 +66,10 @@ export default function EquipmentDesign({ projectNo: p0, equipNo: e0, embedded }
   const [detailOpen, setDetailOpen] = useState(false)
   const [versions, setVersions] = useState<VersionRow[]>([])
   const [items, setItems] = useState<StdItem[]>([])
+  // 材料 BOM 的候选：与设计 BOM **分开**（职责不同，见 searchMaterials）
+  const [matItems, setMatItems] = useState<StdItem[]>([])
+  // ★ 兜底：真需要跨职责选时勾上（客户同意「允许 + 提示」，不硬拦）
+  const [showAll, setShowAll] = useState(false)
   const [addForm] = Form.useForm()
   const [matForm] = Form.useForm()
   const [submitForm] = Form.useForm()
@@ -116,11 +120,27 @@ export default function EquipmentDesign({ projectNo: p0, equipNo: e0, embedded }
     void load()
   }, [load])
 
-  const searchItems = async (q?: string) => {
+  /**
+   * ★ 2026-10-07 客户口径：**挂料按职责收口**
+   *   「作为机械设计师，他不会去选择原材料，只会选择那些商选件（比如马达、电机）。
+   *     原材料是属于工艺去选择的。」
+   *   所以两个选择器**各查各的**（以前共用一个 items 列表 —— 一个列表没法服务两种职责）：
+   *     · 设计 BOM 挂标准件 → pick_for=design（设计 + 皆可）
+   *     · 材料 BOM 挂原材料 → pick_for=process（工艺 + 皆可）
+   *   `all=true` 是「显示全部物料」兜底（跨职责），列表里会标出「通常由X选」。
+   */
+  const searchItems = async (q?: string, all = false) => {
     try {
-      setItems(await listStdItems({ q, limit: 50 }))
+      setItems(await listStdItems({ q, limit: 50, ...(all ? {} : { pick_for: 'design' as const }) }))
     } catch {
       setItems([])
+    }
+  }
+  const searchMaterials = async (q?: string, all = false) => {
+    try {
+      setMatItems(await listStdItems({ q, limit: 50, ...(all ? {} : { pick_for: 'process' as const }) }))
+    } catch {
+      setMatItems([])
     }
   }
 
@@ -412,7 +432,7 @@ export default function EquipmentDesign({ projectNo: p0, equipNo: e0, embedded }
 
       {/* 新增组件/零件 */}
       {/* 生成采购需求（BOM → 净需求 → 进池） */}
-      <DrawingsModals addForm={addForm} addOpen={addOpen} doAdd={doAdd} doAddMaterial={doAddMaterial} equipNo={equipNo} items={items} load={load} matForm={matForm} matOpen={matOpen} message={message} parentOptions={parentOptions} rows={rows} saving={saving} searchItems={searchItems} selected={selected} setAddOpen={setAddOpen} setMatOpen={setMatOpen} setSaving={setSaving} setSubmitOpen={setSubmitOpen} setVerOpen={setVerOpen} submitForm={submitForm} submitOpen={submitOpen} verOpen={verOpen} versions={versions} />
+      <DrawingsModals addForm={addForm} addOpen={addOpen} doAdd={doAdd} doAddMaterial={doAddMaterial} equipNo={equipNo} items={items} matItems={matItems} searchMaterials={searchMaterials} showAll={showAll} setShowAll={setShowAll} load={load} matForm={matForm} matOpen={matOpen} message={message} parentOptions={parentOptions} rows={rows} saving={saving} searchItems={searchItems} selected={selected} setAddOpen={setAddOpen} setMatOpen={setMatOpen} setSaving={setSaving} setSubmitOpen={setSubmitOpen} setVerOpen={setVerOpen} submitForm={submitForm} submitOpen={submitOpen} verOpen={verOpen} versions={versions} />
       {/* 新建程序 */}
       <ProgramsModals doCreateProgram={doCreateProgram} doUploadProgram={doUploadProgram} equipNo={equipNo} progForm={progForm} progUploadForm={progUploadForm} progCreateOpen={progCreateOpen} progUploadOpen={progUploadOpen} progUploadTarget={progUploadTarget} progVerOpen={progVerOpen} progVerTarget={progVerTarget} progVersions={progVersions} saving={saving} setProgCreateOpen={setProgCreateOpen} setProgUploadOpen={setProgUploadOpen} setProgVerOpen={setProgVerOpen} />
 

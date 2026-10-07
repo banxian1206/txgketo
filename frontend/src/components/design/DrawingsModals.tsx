@@ -16,6 +16,10 @@ addForm,
   doAddMaterial,
   equipNo,
   items,
+  matItems,
+  searchMaterials,
+  showAll,
+  setShowAll,
   load,
   matForm,
   matOpen,
@@ -41,6 +45,12 @@ addForm: FormInstance;
   doAddMaterial: (...args: any[]) => any;
   equipNo: string;
   items: StdItem[];
+  /** 材料 BOM 的候选（工艺职责，与设计 BOM 分开取） */
+  matItems: StdItem[];
+  searchMaterials: (q?: string) => void;
+  /** 「显示全部物料」兜底（跨职责） */
+  showAll: boolean;
+  setShowAll: (v: boolean) => void;
   load: (...args: any[]) => any;
   matForm: FormInstance;
   matOpen: boolean;
@@ -115,17 +125,32 @@ addForm: FormInstance;
                     </Typography.Text>
                   }
                 >
-                  <Select
-                    showSearch
-                    optionFilterProp="label"
-                    aria-label="搜索物料/标准件"
-                    placeholder="输入编码 / 品名 / 规格 / 品牌搜索"
-                    onSearch={(q) => void searchItems(q)}
-                    options={items.map((i) => ({
-                      value: i.item_no,
-                      label: `${i.item_no} ${i.display_name}`,
-                    }))}
-                  />
+                  <>
+                    {/* ★ 2026-10-07：设计 BOM 只列**设计职责**的商选件（设计 + 皆可），
+                        原材料归工艺、耗材只给采购（客户口径）。 */}
+                    <Select
+                      showSearch
+                      optionFilterProp="label"
+                      aria-label="搜索物料/标准件"
+                      placeholder="输入编码 / 品名 / 规格 / 品牌搜索"
+                      onSearch={(q) => void searchItems(q, showAll)}
+                      onOpenChange={(o) => { if (o && !items.length) void searchItems(undefined, showAll) }}
+                      notFoundContent={items.length ? undefined : '按「设计 / 皆可」筛选，正在加载…'}
+                      options={items.map((i) => ({
+                        value: i.item_no,
+                        label: `${i.item_no} ${i.display_name}`,
+                      }))}
+                    />
+                    {/* 兜底：真需要跨职责选（比如设计直接指定型材）—— 允许，但明说 */}
+                    <label className="std-pick-all">
+                      <input
+                        type="checkbox"
+                        checked={showAll}
+                        onChange={(e) => { setShowAll(e.target.checked); void searchItems(undefined, e.target.checked) }}
+                      />
+                      显示全部物料（含工艺 / 采购职责的）
+                    </label>
+                  </>
                 </Form.Item>
               ) : (
                 <Form.Item name="title" label="名称" rules={[{ required: true, message: '请填名称' }]}>
@@ -227,8 +252,14 @@ addForm: FormInstance;
               <Select
                 showSearch
                 optionFilterProp="label"
+                aria-label="原材料"
                 placeholder="输入编码 / 品名 / 规格 搜索"
-                options={items.map((i) => ({ value: i.item_no, label: `${i.item_no} ${i.display_name}` }))}
+                // ★ 2026-10-07：材料 BOM 只列**工艺职责**的料（原材料 + 皆可），
+                //   机械件（马达/导轨/螺丝…）不该出现在这里（客户口径见 Page.tsx::searchMaterials）。
+                onSearch={(q) => void searchMaterials(q)}
+                onOpenChange={(o) => { if (o && !matItems.length) void searchMaterials() }}
+                notFoundContent={matItems.length ? undefined : '按「原材料 / 皆可」筛选，正在加载…'}
+                options={matItems.map((i) => ({ value: i.item_no, label: `${i.item_no} ${i.display_name}` }))}
               />
             </Form.Item>
             <Form.Item name="qty" label="用量" initialValue={1} rules={[{ required: true }]}>

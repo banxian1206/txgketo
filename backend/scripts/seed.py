@@ -14,7 +14,13 @@ from sqlalchemy import func, select  # noqa: E402
 
 from app.core.db import SessionLocal  # noqa: E402
 from app.core.security import hash_password  # noqa: E402
-from app.models.library import Item, StdCategory, StdClass  # noqa: E402
+from app.models.library import (  # noqa: E402
+    CATEGORY_SELECT_BY,
+    SELECT_ANY,
+    Item,
+    StdCategory,
+    StdClass,
+)
 from app.models.library_seed import (  # noqa: E402
     CATEGORIES,
     CHANGE_REQUEST_RULE,
@@ -180,6 +186,14 @@ def main() -> None:
                 continue
             if not session.get(StdCategory, c["code"]):
                 session.add(StdCategory(**c))
+        session.flush()
+        # ★ 2026-10-07：品类「谁能选」每次 seed 重应用（唯一来源 CATEGORY_SELECT_BY）——
+        #   否则 e2e:clean + seed 之后分类就丢了，变成"谁都能选到一切"。
+        #   注意要覆盖**全部**类别（含 ERP 导入进来的 12 个，它们不在 CATEGORIES 里）。
+        for row in session.scalars(select(StdCategory)).all():
+            want = CATEGORY_SELECT_BY.get(row.code, SELECT_ANY)
+            if row.select_by != want:
+                row.select_by = want
         session.flush()
         for k in CLASSES:
             if k["code"] in RETIRED_STD_CLASSES:

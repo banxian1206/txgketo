@@ -27,6 +27,44 @@ SOURCE_STANDARD = "标准件"
 SOURCE_TYPES = (SOURCE_SELF_MADE, SOURCE_CUSTOM, SOURCE_OUTSOURCE, SOURCE_STANDARD)
 
 
+# ★ 品类「谁能选」（2026-10-07 客户口径）：挂料选择器按职责过滤，不再"谁都能选到一切"。
+#   机械只选商选件（马达/导轨…）、原材料归工艺、耗材只给采购 —— 详见迁移 e5f6a7b8c9d0。
+SELECT_DESIGN = "设计"
+SELECT_PROCESS = "工艺"
+SELECT_PURCHASE = "采购"
+SELECT_ANY = "皆可"
+CATEGORY_SELECT_BY = (SELECT_DESIGN, SELECT_PROCESS, SELECT_PURCHASE, SELECT_ANY)
+
+# 19 个类别的归属（**唯一来源**：迁移 e5f6a7b8c9d0 与 `scripts/seed.py` 都用它重应用，
+# 所以 `e2e:clean` + `seed` 之后分类不会丢）。客户口径见 docs/26。
+CATEGORY_SELECT_BY: dict[str, str] = {
+    # 原材料 → 工艺（客户：「原材料是属于工艺去选择的」）
+    "YL": SELECT_PROCESS,
+    # 耗材 → 只给采购（客户：「第一个仓库耗材，这里只给采购」）
+    # 其他外购 → 也只给采购（客户：「第二个先不管吧，隐藏吧」—— 从设计/工艺的选择器隐藏）
+    "HC": SELECT_PURCHASE,
+    "QT": SELECT_PURCHASE,
+    # 定不了的 → 都能看到（客户：「这几个没办法定的，就都能看得到吧」）
+    "ZJ": SELECT_ANY,
+    "BCP": SELECT_ANY,
+    "GLF": SELECT_ANY,
+    # 其余 13 个 → 设计（机械/电气的商选件）
+    "DQ": SELECT_DESIGN,
+    "QD": SELECT_DESIGN,
+    "JJ": SELECT_DESIGN,
+    "ZC": SELECT_DESIGN,
+    "CD": SELECT_DESIGN,
+    "DGL": SELECT_DESIGN,
+    "DL": SELECT_DESIGN,
+    "MJ": SELECT_DESIGN,
+    "TCL": SELECT_DESIGN,
+    "TYLJ": SELECT_DESIGN,
+    "WJ": SELECT_DESIGN,
+    "YQYB": SELECT_DESIGN,
+    "BZH": SELECT_DESIGN,
+}
+
+
 class StdCategory(Base, TimestampMixin):
     """类别：管理口径（原材料 / 外购标准件 / 电气件…）。"""
 
@@ -35,6 +73,9 @@ class StdCategory(Base, TimestampMixin):
     code: Mapped[str] = mapped_column(String(8), primary_key=True)
     name: Mapped[str] = mapped_column(String(32))
     seq: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    # 谁能在这个品类的料上挂进 BOM / 下单：见上面的 CATEGORY_SELECT_BY。
+    # ★ 默认「皆可」而不是「设计」：新导入的品类宁可谁都能看到，也不能静默藏起来。
+    select_by: Mapped[str] = mapped_column(String(8), default=SELECT_ANY, server_default=SELECT_ANY)
 
 
 class StdClass(Base, TimestampMixin):

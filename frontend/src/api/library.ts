@@ -26,6 +26,9 @@ export interface StdClassInfo {
 export interface StdCategoryInfo {
   code: string
   name: string
+  /** ★ 这个类别归谁选（2026-10-07 客户口径）：设计 / 工艺 / 采购 / 皆可。
+   *  `采购` 的语义是「对设计/工艺隐藏」，不是「只有采购看得到」。 */
+  select_by?: string
   classes: StdClassInfo[]
 }
 
@@ -90,6 +93,8 @@ export async function listStdItemsPaged(params: {
   all_classes?: boolean
   /** 只看有历史价的 */
   only_priced?: boolean
+  /** ★ 挂料按职责收口：design=设计+皆可 / process=工艺+皆可 / 不传=全量（采购） */
+  pick_for?: 'design' | 'process' | 'purchase'
   limit?: number
   offset?: number
 }) {
@@ -101,6 +106,8 @@ export async function listStdItems(params: {
   class_code?: string
   category_code?: string
   q?: string
+  /** ★ 挂料按职责收口：design=设计+皆可 / process=工艺+皆可 / 不传=全量（采购） */
+  pick_for?: 'design' | 'process' | 'purchase'
   limit?: number
 }) {
   const { data } = await api.get<StdItem[]>('/library/items', { params })

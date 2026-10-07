@@ -10,6 +10,10 @@ from sqlalchemy.orm import Session
 from app.api.deps import client_ip, get_current_user, require_permission
 from app.core.db import get_session
 from app.models.library import (
+    SELECT_ANY,
+    SELECT_DESIGN,
+    SELECT_PROCESS,
+    SELECT_PURCHASE,
     SOURCE_STANDARD,
     Item,
     StdCategory,
@@ -69,6 +73,8 @@ def list_categories(session: Session = Depends(get_session), _: User = Depends(g
         {
             "code": c.code,
             "name": c.name,
+            # ★ 这个类别归谁选（design/process/purchase/any 的中文值，2026-10-07）
+            "select_by": c.select_by,
             "classes": [
                 {
                     "code": k.code,
@@ -107,16 +113,42 @@ def get_class(class_code: str, session: Session = Depends(get_session), _: User 
 # ---------------------------------------------------------------- 物料（型号）
 
 
+# ★ 挂料选择器按职责收口（2026-10-07 客户口径，见 models/library.py::CATEGORY_SELECT_BY）
+#
+#   design   → 只看「设计 + 皆可」  （机械/电气/程序：商选件）
+#   process  → 只看「工艺 + 皆可」  （工艺员：原材料）
+#   purchase → **不过滤**（采购什么都能买，包括原材料与耗材 —— 客户：
+#              「我在这个标准里面去买的时候，照样能买」）
+#
+# ⚠ `采购` 这个取值的语义是「**对设计/工艺隐藏**」，不是「只有采购才看得到」——
+#   所以 purchase 与不传一样是全量，别把它也写成 in_([采购, 皆可])。
+_PICK_ALLOWED: dict[str, tuple[str, ...]] = {
+    "design": (SELECT_DESIGN, SELECT_ANY),
+    "process": (SELECT_PROCESS, SELECT_ANY),
+}
+
+
+def _apply_pick_for(stmt, pick_for: str | None):
+    """按职责过滤挂料候选。未知/未传 → 不过滤（宁可多给，不可静默少给）。"""
+    allowed = _PICK_ALLOWED.get((pick_for or "").strip().lower())
+    if not allowed:
+        return stmt
+    cats = select(StdCategory.code).where(StdCategory.select_by.in_(allowed))
+    return stmt.where(Item.std_class_code.in_(select(StdClass.code).where(StdClass.category_code.in_(cats))))
+
+
 @router.get("/items")
 def list_items(
     class_code: str | None = None,
     category_code: str | None = None,
     q: str | None = Query(default=None, description="按编码/品名/规格/品牌/型号模糊搜索"),
+    pick_for: str | None = Query(default=None, description="按职责收口：design/process（purchase 与不传=全量）"),
     limit: int = 50,
     session: Session = Depends(get_session),
     _: User = Depends(get_current_user),
 ):
     stmt = select(Item).where(Item.source_type == SOURCE_STANDARD, Item.is_active.is_(True))
+    stmt = _apply_pick_for(stmt, pick_for)
     if class_code:
         stmt = stmt.where(Item.std_class_code == class_code)
     if category_code:
@@ -152,6 +184,7 @@ def list_items_paged(
     q: str | None = Query(default=None, description="按编码/品名/规格/品牌/型号模糊搜索"),
     all_classes: bool = Query(default=False, description="true=跨全库搜（否则在当前品类内）"),
     only_priced: bool = Query(default=False, description="只看有历史价的"),
+    pick_for: str | None = Query(default=None, description="按职责收口：design/process（purchase 与不传=全量）"),
     limit: int = Query(default=20, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
     session: Session = Depends(get_session),
@@ -169,6 +202,7 @@ def list_items_paged(
       客户原话：「看得到才能选得对」。（实测钢材 2517 条里 1192 条有价。）
     """
     base = select(Item).where(Item.source_type == SOURCE_STANDARD, Item.is_active.is_(True))
+    base = _apply_pick_for(base, pick_for)
     if not all_classes:
         if class_code:
             base = base.where(Item.std_class_code == class_code)

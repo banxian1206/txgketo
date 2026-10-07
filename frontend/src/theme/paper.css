@@ -920,3 +920,6 @@ code,
 .ds-code-wrap { font-family: var(--ds-mono); font-size: 13px; white-space: nowrap; }
 .std-spec { color: var(--ds-ink2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block; }
 .std-spec.miss { color: var(--ds-ink4); }
+/* 「显示全部物料」兜底（跨职责选）—— 挂在选择器下方，勾了才跨职责 */
+.std-pick-all { display: flex; align-items: center; gap: 6px; margin-top: 6px;
+  font-size: 12px; line-height: 18px; color: var(--ds-ink3); cursor: pointer; }
