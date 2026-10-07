@@ -10,7 +10,7 @@ import { TASK_TABS, TASK_GROUPS } from '../../configs/tabs'
 import { useTab } from '../../hooks/useTab'
 import WorkbenchTabs from '../../components/ds/WorkbenchTabs'
 import { useGoFrom } from '../../hooks/useFrom'
-import { Status, Chip, Empty } from '../../components/ds'
+import { Status, Chip, Empty, Code } from '../../components/ds'
 /** 我的任务（工作台）：我的任务 / 我组任务（经理，05 卷 §2.2） */
 export default function MyTasks() {
   const { message } = App.useApp()
@@ -115,7 +115,7 @@ export default function MyTasks() {
       title: '任务号',
       dataIndex: 'task_no',
       width: 100,
-      render: (v: string) => <Typography.Text strong>{v}</Typography.Text>,
+      render: (v: string) => <Code>{v}</Code>,
     },
     {
       title: '类型',
@@ -158,9 +158,9 @@ export default function MyTasks() {
       dataIndex: 'project_no',
       width: 180,
       render: (v: string, r) => (
-        <a onClick={() => go(`/projects/${v}`)}>
+        <button type="button" className="project-entry" onClick={() => go(`/projects/${v}`)}>
           {v} {r.project_name ?? ''}
-        </a>
+        </button>
       ),
     },
     {
@@ -223,16 +223,16 @@ export default function MyTasks() {
                 </Typography.Text>
               </Tooltip>
             ) : canActOn(r) ? (
-              <a onClick={() => void setStatus(r.id, '进行中')}>开始</a>
+              <button type="button" className="project-entry" onClick={() => void setStatus(r.id, '进行中')}>开始</button>
             ) : null)}
           {r.task_type !== '采购' && r.status !== '已完成' && canActOn(r) && (
-            <a onClick={() => void setStatus(r.id, '已完成')}>完成</a>
+            <button type="button" className="project-entry" onClick={() => void setStatus(r.id, '已完成')}>完成</button>
           )}
           {isLead &&
             r.task_type === '设计' &&
             !r.parent_task_id &&
             r.status !== '已完成' &&
-            r.owner_id === profile?.id && <a onClick={() => void openSplit(r)}>拆分派工</a>}
+            r.owner_id === profile?.id && <button type="button" className="project-entry" onClick={() => void openSplit(r)}>拆分派工</button>}
           {r.status === '已完成' && (
             <Typography.Text type="secondary" style={{ fontSize: 12 }}>
               {r.done_at ? r.done_at.slice(5, 16).replace('T', ' ') : ''}
@@ -244,16 +244,17 @@ export default function MyTasks() {
   ]
   return (
     <Card
+      className="engineering-list task-list"
       title={
         <>
           我的任务{' '}
-          <Tooltip title="任务在「立项」时生成：每台设备 × 专业 → 设计任务，直接派给各专业经理，经理再拆给组员；工艺挂在机械之后，机械首次发布即可开工。">
-            <span className="ds-help">?</span>
+          <Tooltip trigger={['hover', 'focus', 'click']} title="任务在「立项」时生成：每台设备 × 专业 → 设计任务，直接派给各专业经理，经理再拆给组员；工艺挂在机械之后，机械首次发布即可开工。">
+            <button type="button" className="ds-help" aria-label="任务帮助">?</button>
           </Tooltip>
         </>
       }
       extra={
-        <Space>
+        <Space wrap>
           {isLead && (
             <Segmented
               value={scope}
@@ -286,6 +287,7 @@ export default function MyTasks() {
       <Table<TaskItem>
         rowKey="id"
         size="middle"
+        scroll={{ x: scope === 'team' ? 1200 : 1100 }}
         loading={loading}
         dataSource={filtered}
         pagination={{ pageSize: 10, showSizeChanger: true }}

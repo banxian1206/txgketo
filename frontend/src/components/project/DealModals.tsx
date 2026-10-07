@@ -57,6 +57,7 @@ export default function DealModals({
     <>
       <AppModal
         title={`成交登记 · ${projectNo}`}
+        className="deal-modal"
         open={dealOpen}
         width={900}
         onClose={() => setDealOpen(false)}
@@ -70,7 +71,6 @@ export default function DealModals({
             登记后阶段变为「成交待立项」；所有字段都会记入操作记录（旧值 → 新值）
           </Typography.Paragraph>
         }
-        styles={{ body: { maxHeight: '68vh', overflowY: 'auto', paddingRight: 8 } }}
       >
           <Row gutter={12}>
             <Col xs={24} md={6}>
@@ -127,7 +127,7 @@ export default function DealModals({
           <Divider orientation="left" plain>
             付款方式（比例合计应为 100%）
           </Divider>
-          <Typography.Paragraph style={{ marginTop: -8 }}>
+          <Typography.Paragraph className="deal-percent-total" role="status" aria-live="polite" aria-atomic="true">
             <Typography.Text type={pctOff ? 'danger' : 'secondary'} style={{ fontSize: 12 }}>
               当前比例合计：{pctList.length ? `${pctSum}%` : '—'}
               {pctOff ? '（不是 100%，改完再提交）' : pctList.length ? ' ✓' : ''}
@@ -199,7 +199,7 @@ export default function DealModals({
                         <Input placeholder="触发条件" />
                       </Form.Item>
                     </Col>
-                    <Col xs={24} md={2}>
+                    <Col xs={24} md={2} className="deal-payment-remove">
                       <Button type="text" aria-label={`删除第 ${field.name + 1} 个付款节点`} onClick={() => remove(field.name)}>删除</Button>
                     </Col>
                   </Row>

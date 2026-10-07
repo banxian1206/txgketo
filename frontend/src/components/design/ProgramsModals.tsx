@@ -44,6 +44,7 @@ doCreateProgram: (...args: any[]) => any;
   return (
     <>
       <Modal
+        className="engineering-modal"
         title={`新建程序 · ${equipNo}`}
         open={progCreateOpen}
         onCancel={() => setProgCreateOpen(false)}
@@ -64,6 +65,7 @@ doCreateProgram: (...args: any[]) => any;
 
       {/* 上传程序草稿 */}
       <Modal
+        className="engineering-modal"
         title={`上传程序草稿 · ${progUploadTarget?.name ?? ''}`}
         open={progUploadOpen}
         onCancel={() => setProgUploadOpen(false)}
@@ -91,6 +93,7 @@ doCreateProgram: (...args: any[]) => any;
 
       {/* 程序版本历史 */}
       <Modal
+        className="engineering-modal"
         title={`程序版本 · ${progVerTarget?.name ?? ''}`}
         open={progVerOpen}
         width={760}
@@ -98,6 +101,7 @@ doCreateProgram: (...args: any[]) => any;
         onCancel={() => setProgVerOpen(false)}
       >
         <Table<ProgramVersionRow>
+          scroll={{ x: 720 }}
           rowKey="id"
           size="small"
           pagination={false}

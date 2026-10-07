@@ -22,9 +22,10 @@ myTasks: MyDesignTask[];
 }) {
   return (
     <>
-        <Card size="small" title="我的提交（评审单）" style={{ marginBottom: 16 }}>
+        <Card className="engineering-list" size="small" title="我的提交（评审单）" style={{ marginBottom: 16 }}>
           <Table<MyDesignTask>
-            rowKey="task_id"
+            scroll={{ x: 700 }}
+              rowKey="task_id"
             size="small"
             pagination={false}
             dataSource={myTasks}

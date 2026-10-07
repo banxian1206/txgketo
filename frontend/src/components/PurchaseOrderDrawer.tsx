@@ -217,8 +217,9 @@ export default function PurchaseOrderDrawer({
 
   return (
     <Drawer
+      rootClassName="purchase-order-drawer"
       title={
-        <Space>
+        <Space wrap>
           <span>采购单 {o?.po_no ?? '（未编号）'}</span>
           {o && <Chip tone={toneOf(ORDER_STATUS_COLOR[o.status])}>{o.status}</Chip>}
         </Space>
@@ -227,7 +228,7 @@ export default function PurchaseOrderDrawer({
       open={open}
       onClose={onClose}
       extra={
-        <Space>
+        <Space wrap>
           {o && ['待经理审', '待总监审'].includes(o.po_status ?? '') && (
             <Button type="primary" onClick={() => setApproveOpen(true)}>
               审批
@@ -282,7 +283,7 @@ export default function PurchaseOrderDrawer({
         <Empty description={loading ? '加载中…' : '没有数据'} />
       ) : (
         <>
-          <Descriptions size="small" column={2} style={{ marginBottom: 16 }}>
+          <Descriptions size="small" column={{ xs: 1, sm: 2 }} style={{ marginBottom: 16 }}>
             <Descriptions.Item label="供应商">{o.supplier_name ?? '—'}</Descriptions.Item>
             <Descriptions.Item label="合计金额">
               {o.total_amount > 0 ? `¥${o.total_amount.toLocaleString()}` : '—'}
@@ -339,6 +340,7 @@ export default function PurchaseOrderDrawer({
             expandable={{
               expandedRowRender: (l) => (
                 <Table<PurchaseOrderLine['receipts'][number]>
+                  scroll={{ x: 680 }}
                   rowKey="receipt_no"
                   size="small"
                   pagination={false}
@@ -598,6 +600,7 @@ export default function PurchaseOrderDrawer({
 
       {/* 更改供应商（还没到的行） */}
       <Modal
+        className="engineering-modal"
         title={`更改供应商 · ${o?.po_no ?? ''}`}
         open={supplierOpen}
         width={760}
@@ -627,6 +630,7 @@ export default function PurchaseOrderDrawer({
           </Form.Item>
           {changeable.length > 0 && (
             <Table<PurchaseOrderLine>
+              scroll={{ x: 720 }}
               rowKey="id"
               size="small"
               pagination={false}
@@ -679,6 +683,7 @@ export default function PurchaseOrderDrawer({
 
       {/* 取消未到的部分 */}
       <Modal
+        className="engineering-modal"
         title={`取消未到的部分 · ${o?.po_no ?? ''}`}
         open={cancelOpen}
         width={520}

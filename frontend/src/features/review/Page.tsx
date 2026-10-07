@@ -1,5 +1,5 @@
-import { App, Button, Card, Table, Tooltip, Typography } from 'antd'
-import { Status, Empty } from '../../components/ds'
+import { App, Button, Card, Table, Tooltip } from 'antd'
+import { Status, Empty, Code } from '../../components/ds'
 import type { ColumnsType } from 'antd/es/table'
 import { useCallback, useEffect, useState } from 'react'
 
@@ -54,7 +54,7 @@ export default function Reviews() {
       title: '评审单',
       dataIndex: 'ticket_no',
       width: 100,
-      render: (v: string) => <Typography.Text strong>{v}</Typography.Text>,
+      render: (v: string) => <Code>{v}</Code>,
     },
     {
       title: '任务',
@@ -107,18 +107,19 @@ export default function Reviews() {
       key: 'action',
       width: 100,
       render: (_: unknown, r: ReviewTicketBrief) => (
-        <a onClick={() => openDetail(r.id)}>{r.status.includes('待') && isReviewer ? '去审核' : '查看'}</a>
+        <button type="button" className="project-entry" onClick={() => openDetail(r.id)}>{r.status.includes('待') && isReviewer ? '去审核' : '查看'}</button>
       ),
     },
   ]
 
   return (
     <Card
+      className="engineering-list review-list"
       title={
         <>
           设计评审{' '}
-          <Tooltip title="审核链：组员提交 → 本部门经理（一级）→ 总监（二级）→ 发布（= 冻结）。发布后这一轮内容成为冻结版本，采购按发布批次触发。">
-            <span className="ds-help">?</span>
+          <Tooltip trigger={['hover', 'focus', 'click']} title="审核链：组员提交 → 本部门经理（一级）→ 总监（二级）→ 发布（= 冻结）。发布后这一轮内容成为冻结版本，采购按发布批次触发。">
+            <button type="button" className="ds-help" aria-label="评审帮助">?</button>
           </Tooltip>
         </>
       }
@@ -137,6 +138,7 @@ export default function Reviews() {
       <Table<ReviewTicketBrief>
         rowKey="id"
         size="middle"
+        scroll={{ x: 1070 }}
         loading={loading}
         dataSource={rows}
         columns={columns}

@@ -86,12 +86,12 @@ export default function Changes() {
       title: '操作',
       key: 'action',
       width: 90,
-      render: (_: unknown, r) => <a onClick={() => { setCrId(r.id); setOpen(true) }}>查看/处理</a>,
+      render: (_: unknown, r) => <button type="button" className="project-entry" onClick={() => { setCrId(r.id); setOpen(true) }}>查看/处理</button>,
     },
   ]
 
   return (
-    <Card title="改版申请（ECN）" extra={<Button onClick={() => void load()}>刷新</Button>}>
+    <Card className="engineering-list" title="改版申请（ECN）" extra={<Button onClick={() => void load()}>刷新</Button>}>
       <WorkbenchTabs
         groups={CHANGE_GROUPS}
         tab={scope}
@@ -104,6 +104,7 @@ export default function Changes() {
         ].filter((x) => visKeys.includes(x.key))}
       />
       <Table<ChangeRequestRow>
+        scroll={{ x: 1100 }}
         rowKey="id"
         size="middle"
         loading={loading}

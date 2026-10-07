@@ -77,6 +77,7 @@ export default function PoApproveModal({
   const o = detail?.order
   return (
     <Modal
+      className="engineering-modal"
       title={`审批采购单 ${o?.po_no ?? ''}${o?.supplier_name ? ` · ${o.supplier_name}` : ''}`}
       open={open}
       width={1000}

@@ -93,9 +93,10 @@ export default function ChangeDetailModal({ crId, open, onClose, onChanged }: Pr
 
   return (
     <Drawer
+      rootClassName="review-detail-drawer"
       title={
         cr ? (
-          <Space>
+          <Space wrap>
             <span>改版申请 {cr.cr_no}</span>
             <Status tone={toneOf(STATUS_COLOR[cr.status])}>{cr.status}</Status>
           </Space>
@@ -107,7 +108,7 @@ export default function ChangeDetailModal({ crId, open, onClose, onChanged }: Pr
       width={720}
       onClose={onClose}
       footer={
-        <Space>
+        <Space wrap>
           {canRevise && <Button onClick={() => setReviseOpen(true)}>修订 BOM 行</Button>}
           {canDecide && (
             <>
@@ -143,7 +144,7 @@ export default function ChangeDetailModal({ crId, open, onClose, onChanged }: Pr
     >
       {cr && (
         <>
-          <Descriptions size="small" column={2} style={{ marginBottom: 8 }}>
+          <Descriptions size="small" column={{ xs: 1, sm: 2 }} style={{ marginBottom: 8 }}>
             <Descriptions.Item label="对象">
               {cr.target_title}（{cr.target_label} {cr.target_version}）
             </Descriptions.Item>
@@ -185,6 +186,7 @@ export default function ChangeDetailModal({ crId, open, onClose, onChanged }: Pr
                   <Input.TextArea
                     rows={2}
                     style={{ marginBottom: 8 }}
+                    aria-label="裁决意见（可留空）"
                     placeholder="裁决意见（可留空）"
                     value={note}
                     onChange={(e) => setNote(e.target.value)}
@@ -192,6 +194,7 @@ export default function ChangeDetailModal({ crId, open, onClose, onChanged }: Pr
                   <Input.TextArea
                     rows={2}
                     style={{ marginBottom: 8 }}
+                    aria-label="否决时的替代方案 / 处理办法（否决必填）"
                     placeholder="否决时的替代方案 / 处理办法（否决必填）"
                     value={solution}
                     onChange={(e) => setSolution(e.target.value)}
@@ -219,6 +222,7 @@ export default function ChangeDetailModal({ crId, open, onClose, onChanged }: Pr
           </Divider>
           <Alert type={impact?.has_open_purchase ? 'warning' : 'info'} showIcon message={impact?.note ?? ''} style={{ marginBottom: 8 }} />
           <Table
+            scroll={{ x: 760 }}
             rowKey="id"
             size="small"
             pagination={false}
@@ -240,6 +244,7 @@ export default function ChangeDetailModal({ crId, open, onClose, onChanged }: Pr
           />
           {(impact?.material_issues.length ?? 0) > 0 && (
             <Table
+            scroll={{ x: 760 }}
               style={{ marginTop: 8 }}
               rowKey="issue_no"
               size="small"

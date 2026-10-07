@@ -85,9 +85,10 @@ export default function ReviewDetailModal({ ticketId, open, onClose, onChanged }
 
   return (
     <Drawer
+      rootClassName="review-detail-drawer"
       title={
         detail ? (
-          <Space>
+          <Space wrap>
             <span>评审单 {detail.ticket_no}</span>
             <Status tone={toneOf(STATUS_COLOR[detail.status])}>{detail.status}</Status>
           </Space>
@@ -99,7 +100,7 @@ export default function ReviewDetailModal({ ticketId, open, onClose, onChanged }
       width={720}
       onClose={onClose}
       footer={
-        <Space>
+        <Space wrap>
           {canWithdraw && (
             <Popconfirm title="撤回这一轮提交？内容会解锁回草稿" onConfirm={() => void doWithdraw()}>
               <Button loading={busy}>撤回</Button>
@@ -121,7 +122,7 @@ export default function ReviewDetailModal({ ticketId, open, onClose, onChanged }
     >
       {detail && (
         <>
-          <Descriptions size="small" column={2} style={{ marginBottom: 8 }}>
+          <Descriptions size="small" column={{ xs: 1, sm: 2 }} style={{ marginBottom: 8 }}>
             <Descriptions.Item label="任务">
               {detail.task_no} {detail.task_title}
             </Descriptions.Item>
@@ -136,6 +137,7 @@ export default function ReviewDetailModal({ ticketId, open, onClose, onChanged }
               rows={2}
               style={{ marginBottom: 10 }}
               placeholder="审核意见（退回必填）"
+              aria-label="审核意见（退回必填）"
               value={note}
               onChange={(e) => setNote(e.target.value)}
             />

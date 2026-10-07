@@ -79,6 +79,7 @@ addForm: FormInstance;
   return (
     <>
       <Modal
+        className="engineering-modal"
         title={`生成采购需求（进池） · ${equipNo}`}
         open={purchaseOpen}
         width={660}
@@ -112,6 +113,7 @@ addForm: FormInstance;
             />
             {(purchaseResult.requests?.length ?? 0) > 0 && (
               <Table
+                scroll={{ x: 620 }}
                 rowKey="id"
                 size="small"
                 pagination={false}
@@ -157,6 +159,7 @@ addForm: FormInstance;
       </Modal>
 
       <Modal
+        className="engineering-modal"
         title={`新增条目 · 挂在 ${equipNo} 下`}
         open={addOpen}
         width={600}
@@ -206,7 +209,7 @@ addForm: FormInstance;
                   extra={
                     <Typography.Text type="secondary" style={{ fontSize: 12 }}>
                       库里没有？
-                      <a onClick={() => window.open('/library', '_blank')}> 去标准库新建 </a>
+                      <a href="/library" target="_blank" rel="noopener noreferrer"> 去标准库新建 </a>
                     </Typography.Text>
                   }
                 >
@@ -230,7 +233,7 @@ addForm: FormInstance;
             }
           </Form.Item>
 
-          <Space style={{ display: 'flex' }} size="middle">
+          <Space wrap style={{ display: 'flex' }} size="middle">
             <Form.Item name="qty" label="数量" initialValue={1} style={{ minWidth: 120 }}>
               <InputNumber style={{ width: '100%' }} min={0.01} />
             </Form.Item>
@@ -247,6 +250,7 @@ addForm: FormInstance;
 
       {/* 上传图纸草稿（审核走评审单） */}
       <Modal
+        className="engineering-modal"
         title={`上传图纸草稿 · ${selected?.drawing_no ?? ''}`}
         open={submitOpen}
         width={560}
@@ -285,6 +289,7 @@ addForm: FormInstance;
 
       {/* 挂标准件 / 挂原材料 */}
       <Modal
+        className="engineering-modal"
           title="挂原材料（材料 BOM · 工艺部）"
           open={matOpen}
           width={620}
@@ -296,7 +301,7 @@ addForm: FormInstance;
         >
           <Typography.Paragraph type="secondary" style={{ fontSize: 12 }}>
             都从标准库里选，选不到就去
-            <a onClick={() => window.open('/library', '_blank')}> 标准库新建 </a>
+            <a href="/library" target="_blank" rel="noopener noreferrer"> 标准库新建 </a>
           </Typography.Paragraph>
           <Form form={matForm} layout="vertical" preserve={false}>
             <Form.Item
@@ -332,6 +337,7 @@ addForm: FormInstance;
 
       {/* 版本历史 */}
       <Modal
+        className="engineering-modal"
         title={`版本历史 · ${selected?.drawing_no ?? ''}`}
         open={verOpen}
         width={760}
@@ -339,6 +345,7 @@ addForm: FormInstance;
         onCancel={() => setVerOpen(false)}
       >
         <Table<VersionRow>
+          scroll={{ x: 720 }}
           rowKey="version"
           size="small"
           pagination={false}

@@ -107,6 +107,7 @@ export default function SubmitReviewModal({ task, open, onClose, onDone }: Props
 
   return (
     <Modal
+        className="engineering-modal"
       title={`提交评审 · ${task?.task_no ?? ''} ${task?.profession ?? ''}`}
       open={open}
       width={700}

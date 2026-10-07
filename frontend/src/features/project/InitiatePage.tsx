@@ -161,14 +161,14 @@ export default function ProjectInitiate() {
   ]
 
   return (
-    <>
+    <div className="ds-page initiate-page">
       {/* ── 常驻区（切分区不动）：能不能立项的结论 + 确认按钮 ──────────────
           原来是页首一张 Card，往下滑 2.6 屏才看到 ①…⑤ —— 现在它在最上面、切区不动 */}
       <div className="ds-panel" style={{ marginBottom: 16 }}>
         <div className="ds-panel-b">
         <div className="initiate-heading">
           <div>
-            <a onClick={() => nav(back.to)}>{back.label}</a>
+            <button type="button" className="project-back" onClick={() => nav(back.to)}>{back.label}</button>
             <Typography.Title level={4} style={{ margin: '8px 0' }}>立项 · {projectNo}</Typography.Title>
             <Space wrap><Typography.Text>{p?.project_name}</Typography.Text><Chip tone="warn">{p?.stage}</Chip></Space>
           </div>
@@ -273,7 +273,7 @@ export default function ProjectInitiate() {
         size="small"
         title="⑤ 任务分派（立项后任务开始并行）"
         extra={
-          <Space>
+          <Space wrap className="initiate-task-options">
             <Checkbox.Group
               value={professions}
               onChange={(v) => setProfessions(v as string[])}
@@ -302,6 +302,7 @@ export default function ProjectInitiate() {
           rowKey="id"
           size="small"
           pagination={false}
+          scroll={{ x: 680 }}
           dataSource={tasks}
           locale={{ emptyText: <Empty description="还没生成任务" /> }}
           columns={[
@@ -344,6 +345,6 @@ export default function ProjectInitiate() {
         ]}
       />
 
-    </>
+    </div>
   )
 }

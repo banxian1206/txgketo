@@ -2,7 +2,7 @@ import { App, Button, Card, Col, Row, Space, Spin, Table, Typography } from 'ant
 import type { ColumnsType } from 'antd/es/table'
 import { useCallback, useEffect, useState, type ReactNode } from 'react'
 
-import { Empty as DsEmpty, Metrics, Panel, Status } from '../../components/ds'
+import { Empty as DsEmpty, Code, Metrics, Panel, Status } from '../../components/ds'
 
 import {
   engBoard,
@@ -76,22 +76,22 @@ export default function EngWorkbench() {
   //   用岗位裁是"看得见的活别人点不到"的老病（M-04）。
 
   const taskColumns: ColumnsType<TaskItem> = [
-    { title: '任务号', dataIndex: 'task_no', width: 100 },
+    { title: '任务号', dataIndex: 'task_no', width: 100, render: (v: string) => <Code>{v}</Code> },
     {
       title: '专业',
       dataIndex: 'profession',
       width: 70,
       render: (v: string | null) => v ?? '—',
     },
-    { title: '任务', dataIndex: 'title' },
+    { title: '任务', dataIndex: 'title', render: (v: string) => <button type="button" className="project-entry" onClick={(event) => { event.stopPropagation(); go('/workbench/tasks') }}>{v}</button> },
     {
       title: '设备',
       key: 'equip',
       width: 150,
       render: (_: unknown, r) => (
-        <a onClick={() => r.equip_no && go(`/projects/${r.project_no}/design/${r.equip_no}`)}>
+        <button type="button" className="project-entry" disabled={!r.equip_no} onClick={(event) => { event.stopPropagation(); if (r.equip_no) go(`/projects/${r.project_no}/design/${r.equip_no}`) }}>
           {r.project_no} {r.equip_no ?? ''}
-        </a>
+        </button>
       ),
     },
     {
@@ -131,7 +131,7 @@ export default function EngWorkbench() {
       title: '操作',
       key: 'action',
       width: 90,
-      render: () => <a onClick={() => go('/workbench/reviews')}>去处理</a>,
+      render: () => <button type="button" className="project-entry" onClick={(event) => { event.stopPropagation(); go('/workbench/reviews') }}>去处理</button>,
     },
   ]
 
@@ -141,9 +141,9 @@ export default function EngWorkbench() {
       key: 'equip',
       width: 200,
       render: (_: unknown, r) => (
-        <a onClick={() => go(`/projects/${r.project_no}/design/${r.equip_no}`)}>
+        <button type="button" className="project-entry" onClick={() => go(`/projects/${r.project_no}/design/${r.equip_no}`)}>
           {r.project_no} {r.equip_no} {r.equip_name}
-        </a>
+        </button>
       ),
     },
     ...PROFS.map((prof) => ({
@@ -186,6 +186,7 @@ export default function EngWorkbench() {
       <>
         <Card size="small" title="我的任务" style={{ marginBottom: 12 }}>
           <Table
+            scroll={{ x: 900 }}
             rowKey="id"
             size="small"
             dataSource={myTasks}
@@ -201,6 +202,7 @@ export default function EngWorkbench() {
           <Col xs={24} lg={12}>
             <Card size="small" title="我提交的评审单">
               <Table
+                scroll={{ x: 680 }}
                 rowKey="id"
                 size="small"
                 dataSource={mineTickets}
@@ -216,6 +218,7 @@ export default function EngWorkbench() {
           <Col xs={24} lg={12}>
             <Card size="small" title="待我改版">
               <Table
+                scroll={{ x: 400 }}
                 rowKey="id"
                 size="small"
                 dataSource={myChanges}
@@ -237,6 +240,7 @@ export default function EngWorkbench() {
             <>
               <Card size="small" title="待我审核" style={{ marginBottom: 12 }}>
                 <Table
+                  scroll={{ x: 680 }}
                   rowKey="id"
                   size="small"
                   dataSource={todoTickets}
@@ -247,6 +251,7 @@ export default function EngWorkbench() {
               </Card>
               <Card size="small" title="组员任务进度">
                 <Table
+                  scroll={{ x: 900 }}
                   rowKey="id"
                   size="small"
                   dataSource={teamTasks}
@@ -290,6 +295,7 @@ export default function EngWorkbench() {
 
               <Panel title="设备设计进度（机械 / 电气 / 程序 / 工艺）">
                 <Table
+                  scroll={{ x: 900 }}
                   rowKey={(r) => `${r.project_no}-${r.equip_no}`}
                   size="small"
                   dataSource={board?.equipments ?? []}
@@ -303,6 +309,7 @@ export default function EngWorkbench() {
                 <Col xs={24} lg={12}>
                   <Panel title="部门待终审">
                     <Table
+                      scroll={{ x: 560 }}
                       rowKey="id"
                       size="small"
                       dataSource={board?.pending_reviews ?? []}
@@ -324,6 +331,7 @@ export default function EngWorkbench() {
                 <Col xs={24} lg={12}>
                   <Panel title="部门待裁决改版">
                     <Table
+                      scroll={{ x: 560 }}
                       rowKey="id"
                       size="small"
                       dataSource={board?.pending_changes ?? []}
@@ -346,6 +354,7 @@ export default function EngWorkbench() {
 
               <Panel title="超期任务">
                 <Table
+                  scroll={{ x: 840 }}
                   rowKey="id"
                   size="small"
                   dataSource={board?.overdue_tasks ?? []}

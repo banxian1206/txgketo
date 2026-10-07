@@ -101,6 +101,7 @@ export default function DrawingsCard({
           />
         )}
         <Table<TreeNode>
+          scroll={{ x: 1100 }}
           rowKey="drawing_no"
           size="small"
           loading={loading}
@@ -230,7 +231,7 @@ export default function DrawingsCard({
                   >
                     加子件
                   </a>
-                  <a onClick={() => void openVersions(r.drawing_no)}>版本</a>
+                  <button type="button" className="project-entry" onClick={() => void openVersions(r.drawing_no)}>版本</button>
                   <AuthedFileLink path={drawingFileUrl(r.drawing_no)}>看图纸</AuthedFileLink>
                   {r.status === '草稿' && (
                     <a
@@ -264,7 +265,7 @@ export default function DrawingsCard({
                   )}
                   {CHANGE_ACTION_AVAILABLE(r.change_request) &&
                     r.change_request?.change_task_owner_id === profile?.id && (
-                      <a onClick={() => doNewDrawingVersion(r.drawing_no)}>改版出新版</a>
+                      <button type="button" className="project-entry" onClick={() => doNewDrawingVersion(r.drawing_no)}>改版出新版</button>
                     )}
                   {r.level > 0 && r.status !== '已发布' && (
                     <Popconfirm

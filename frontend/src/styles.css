@@ -17,6 +17,23 @@ body {
 /* 长短页签切换时保留滚动条占位，避免主内容左右移动。 */
 html { scrollbar-gutter: stable; }
 
+/* 工程任务/评审保持字段与流程，窄屏页头换行、宽表内部滚动。 */
+.engineering-list .ant-card-head-title { white-space: normal; min-width: 0; }
+.engineering-list .ds-help { margin-left: 8px; }
+.project-entry:disabled { color: var(--ds-ink3); cursor: default; text-decoration: none; }
+.review-detail-drawer .ant-drawer-content-wrapper { max-width: 100vw; }
+.review-detail-drawer .ant-descriptions-item-content { overflow-wrap: anywhere; }
+@media (max-width: 767px) {
+  .engineering-list .ant-card-head-wrapper { flex-direction: column; align-items: flex-start; gap: 12px; }
+  .engineering-list .ant-card-head-title { width: 100%; }
+  .engineering-list .ant-card-extra { margin-inline-start: 0; max-width: 100%; }
+  .engineering-list .ant-btn, .engineering-list .project-entry { min-height: 40px; }
+  .engineering-list .ant-card-head { padding: 16px; }
+  .engineering-list .ant-card-body { padding: 16px; }
+  .review-detail-drawer .ant-drawer-header, .review-detail-drawer .ant-drawer-body, .review-detail-drawer .ant-drawer-footer { padding: 16px; }
+  .review-detail-drawer .ant-drawer-footer .ant-btn { min-height: 40px; }
+}
+
 /* 项目列表：整行可点击的视觉反馈 */
 .project-row-hover > td {
   background: #eaf3ff !important;
@@ -482,8 +499,23 @@ html { scrollbar-gutter: stable; }
 .create-review { padding: 16px 0; border-top: 1px solid var(--ds-line); }
 .deal-payment-row { padding: 12px 0; border-bottom: 1px solid var(--ds-line); }
 .deal-payment-row .ant-form-item { margin-bottom: 0; }
+.deal-modal .ant-modal-body {
+  max-height: 68vh;
+  max-height: 68dvh;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+  padding-right: 8px;
+}
+.deal-modal .ant-form-item .ant-form-item-label > label { font-size: 13px; color: var(--ds-ink2); }
+.deal-modal .ant-form-vertical .ant-form-item-label { padding-bottom: 8px; }
+.deal-modal .deal-percent-total { margin: 0 0 12px; }
+.deal-payment-remove { padding-top: calc(var(--ds-lh-14) + 8px); }
 @media (max-width: 767px) {
   .form-actions { flex-wrap: wrap; }
+  .deal-modal { top: 16px; }
+  .deal-modal .ant-modal-body { max-height: calc(100dvh - 180px); }
+  .deal-payment-remove { padding-top: 0; }
+  .deal-modal .ant-btn { min-height: 40px; }
 }
 
 /* S1：立项结论常驻，清单可直接进入对应分区。 */
@@ -491,6 +523,18 @@ html { scrollbar-gutter: stable; }
 .initiate-decision { display: flex; flex-direction: column; align-items: flex-end; gap: 12px; max-width: 100%; }
 .initiate-checklist { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--ds-line); }
 .initiate-checklist .ant-btn { height: auto; white-space: normal; text-align: left; }
+.initiate-page .ant-card-head-title { min-width: 0; white-space: normal; }
+.initiate-task-options { max-width: 100%; }
+.initiate-task-options .ant-checkbox-group { display: flex; flex-wrap: wrap; gap: 8px 12px; }
+.initiate-task-options .ant-checkbox-wrapper { margin-inline-start: 0; }
+@media (max-width: 767px) {
+  .initiate-page .ant-card-head-wrapper { flex-direction: column; align-items: flex-start; gap: 12px; }
+  .initiate-page .ant-card-extra { margin-inline-start: 0; max-width: 100%; }
+  .initiate-page .ant-btn { min-height: 40px; }
+  .initiate-task-options { display: flex; }
+  .initiate-task-options > .ant-space-item:first-child { flex: 1 0 100%; }
+  .initiate-task-options .ant-checkbox-wrapper { white-space: normal; }
+}
 @media (max-width: 767px) { .initiate-decision { align-items: flex-start; } }
 
 /* 工作台手机首屏：保留可操作导航，避免顶栏与队列把文字挤成竖列。 */
@@ -515,4 +559,37 @@ html { scrollbar-gutter: stable; }
   .app-header .app-logout { min-height: 40px; }
   .app-header .ant-btn { min-width: 40px; min-height: 40px; }
   .login-pane { min-height: 100dvh; }
+}
+
+/* 工程设计头部：摘要与操作各自换行，保留业务内容。 */
+.design-header-summary { min-width: 0; }
+.design-header-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+@media (max-width: 767px) {
+  .design-header-summary, .design-header-actions { flex: 0 0 100% !important; max-width: 100%; }
+  .design-header .ant-card-body { padding: 16px; }
+  .design-header-actions .ant-btn { min-height: 40px; }
+}
+
+/* 工程编辑与版本弹窗：正文滚动，标题/操作保留在弹窗内。 */
+.engineering-modal .ant-modal-title { padding-inline-end: 24px; overflow-wrap: anywhere; }
+.engineering-modal .ant-modal-body { max-height: 68dvh; overflow-y: auto; overscroll-behavior: contain; }
+.engineering-modal .ant-form-item-label > label { font-size: 13px; height: auto; }
+.engineering-modal .ant-checkbox-wrapper { align-items: flex-start; overflow-wrap: anywhere; }
+@media (max-width: 767px) {
+  .engineering-modal { top: 16px; padding-bottom: 16px; }
+  .engineering-modal .ant-modal-content { padding: 16px; }
+  .engineering-modal .ant-modal-body { max-height: calc(100dvh - 180px); }
+  .engineering-modal .ant-btn { min-height: 40px; }
+  .engineering-modal .ant-modal-footer { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 8px; }
+  .engineering-modal .ant-modal-footer .ant-btn + .ant-btn { margin-inline-start: 0; }
+}
+
+/* 采购单动作较多：手机台头纵向排布，避免标题被操作挤出屏幕。 */
+.purchase-order-drawer .ant-drawer-content-wrapper { max-width: 100vw; }
+.purchase-order-drawer .ant-descriptions-item-content { overflow-wrap: anywhere; }
+@media (max-width: 767px) {
+  .purchase-order-drawer .ant-drawer-header { padding: 16px; flex-direction: column; align-items: stretch; gap: 12px; }
+  .purchase-order-drawer .ant-drawer-extra { margin-inline-start: 0; }
+  .purchase-order-drawer .ant-drawer-body { padding: 16px; }
+  .purchase-order-drawer .ant-drawer-extra .ant-btn { min-height: 40px; }
 }

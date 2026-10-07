@@ -32,6 +32,7 @@ data: DesignTree | null;
             }
           >
             <Table<BomLine>
+              scroll={{ x: 850 }}
               rowKey="id"
               size="small"
               pagination={false}

@@ -22,8 +22,9 @@ data: DesignTree | null;
 }) {
   return (
     <>
-          <Card size="small" title={`设计 BOM · 标准件（${data?.counts.std_items ?? 0}）`}>
+          <Card className="engineering-list" size="small" title={`设计 BOM · 标准件（${data?.counts.std_items ?? 0}）`}>
             <Table<BomLine>
+              scroll={{ x: 900 }}
               rowKey="id"
               size="small"
               pagination={false}

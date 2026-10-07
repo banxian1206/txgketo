@@ -252,9 +252,9 @@ export default function PurchaseWorkbench() {
                     render: (v: string | null, r) =>
                       v ? (
                         <>
-                          <a onClick={() => go(`/projects/${v}`)}>
+                          <button type="button" className="project-entry" onClick={() => go(`/projects/${v}`)}>
                             {v} {r.project_name ?? ''}
-                          </a>
+                          </button>
                           <div style={{ fontSize: 12, color: T.textSecondary }}>
                             {r.equip_no ?? '未分到设备'}
                           </div>
@@ -540,6 +540,7 @@ export default function PurchaseWorkbench() {
     ),
     arrivals: (
       <Table<PurchaseOrderSummary>
+        scroll={{ x: 1080 }}
         rowKey="key"
         dataSource={arrivals}
         pagination={{ pageSize: 10, showSizeChanger: true }}
@@ -551,7 +552,7 @@ export default function PurchaseWorkbench() {
             title: '采购单',
             dataIndex: 'po_no',
             width: 110,
-            render: (v: string | null, r) => (v ? <a onClick={() => openOrder(r.key)}>{v}</a> : '—'),
+            render: (v: string | null, r) => (v ? <button type="button" className="project-entry" onClick={() => openOrder(r.key)}>{v}</button> : '—'),
           },
           { title: '物料 / 行数', width: 120, render: (_v, r) => `${r.item_kinds} 种 · ${r.line_count} 行` },
           { title: '归属项目', render: (_v, r) => r.projects.map((x) => x.project_no).join(' / ') || '辅料 / 其他' },
@@ -667,7 +668,7 @@ export default function PurchaseWorkbench() {
                 <>
                   <Typography.Text strong>{v}</Typography.Text>
                   <div style={{ fontSize: 12 }}>
-                    {r.po_no ? <a onClick={() => openOrder(r.po_no as string)}>{r.po_no}</a> : <Muted>未编号</Muted>}
+                    {r.po_no ? <button type="button" className="project-entry" onClick={() => openOrder(r.po_no as string)}>{r.po_no}</button> : <Muted>未编号</Muted>}
                   </div>
                 </>
               ),
@@ -806,7 +807,7 @@ export default function PurchaseWorkbench() {
                 <>
                   <Typography.Text strong>{v}</Typography.Text>
                   <div style={{ fontSize: 12 }}>
-                    {r.po_no ? <a onClick={() => openOrder(r.po_no as string)}>{r.po_no}</a> : <Muted>未编号</Muted>}
+                    {r.po_no ? <button type="button" className="project-entry" onClick={() => openOrder(r.po_no as string)}>{r.po_no}</button> : <Muted>未编号</Muted>}
                   </div>
                 </>
               ),

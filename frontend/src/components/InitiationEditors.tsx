@@ -78,6 +78,7 @@ export function TeamEditor({ projectNo, users, onChanged }: Props) {
     <Typography.Paragraph type="secondary">选择人员后立即保存；同一个人可在不同项目担任不同角色。</Typography.Paragraph>
     <Table
       rowKey="project_role"
+      scroll={{ x: 360 }}
       size="small"
       pagination={false}
       dataSource={PROJECT_ROLES.map((r) => {
@@ -183,6 +184,7 @@ export function EquipmentEditor({ projectNo, onChanged }: Omit<Props, 'users'>) 
       </Space>
       <Table<EquipmentItem>
         rowKey="id"
+        scroll={{ x: 680 }}
         size="small"
         pagination={false}
         dataSource={rows}
@@ -390,6 +392,7 @@ export function MilestoneEditor({ projectNo, users, onChanged }: Props) {
       </Space>
       <Table<MilestoneItem>
       rowKey="id"
+      scroll={{ x: 800 }}
       size="small"
       pagination={false}
       dataSource={rows}
@@ -591,6 +594,7 @@ export function LongLeadEditor({ projectNo, onChanged }: Omit<Props, 'users'>) {
       </Space>
       <Table<PurchaseRequestItem>
         rowKey="id"
+        scroll={{ x: 1040 }}
         size="small"
         pagination={false}
         dataSource={rows}

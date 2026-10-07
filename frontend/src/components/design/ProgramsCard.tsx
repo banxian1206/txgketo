@@ -50,6 +50,7 @@ export default function ProgramsCard({
         }
       >
         <Table<ProgramItem>
+          scroll={{ x: 850 }}
           rowKey="id"
           size="small"
           pagination={false}
@@ -91,7 +92,7 @@ export default function ProgramsCard({
                       上传程序
                     </a>
                   )}
-                  <a onClick={() => void openProgramVersions(p)}>版本</a>
+                  <button type="button" className="project-entry" onClick={() => void openProgramVersions(p)}>版本</button>
                   {p.current_filename && (
                     <AuthedFileLink path={programFileUrl(p.id)}>下载程序</AuthedFileLink>
                   )}
@@ -117,7 +118,7 @@ export default function ProgramsCard({
                   )}
                   {CHANGE_ACTION_AVAILABLE(p.change_request) &&
                     p.change_request?.change_task_owner_id === profile?.id && (
-                      <a onClick={() => doNewProgramVersion(p)}>改版出新版</a>
+                      <button type="button" className="project-entry" onClick={() => doNewProgramVersion(p)}>改版出新版</button>
                     )}
                   {p.status === '草稿' && (
                     <Popconfirm title={`删除程序 ${p.name}？`} onConfirm={() => void removeProgram(p)}>

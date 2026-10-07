@@ -33,11 +33,11 @@ data: DesignTree | null;
   const back = useBack(`/projects/${projectNo}`, '← 返回项目')
   return (
     <>
-        <Card style={{ marginBottom: 16 }}>
-          <Row align="middle">
-            <Col flex="auto">
+        <Card className="design-header" style={{ marginBottom: 16 }}>
+          <Row align="middle" gutter={[16, 12]}>
+            <Col className="design-header-summary" flex="auto">
               <Space size={8} wrap>
-                <a onClick={() => nav(back.to)}>{back.label}</a>
+                <button type="button" className="project-entry" onClick={() => nav(back.to)}>{back.label}</button>
                 <Typography.Text strong style={{ fontSize: 16 }}>
                   {equipNo} 设计工作面
                 </Typography.Text>
@@ -56,7 +56,7 @@ data: DesignTree | null;
                 </Typography.Text>
               </Space>
             </Col>
-            <Col>
+            <Col className="design-header-actions">
               {/* ★ R2：设备档案 = 这台设备的一生（只读汇总 + 跳各台干活）；
                   设计面只负责"设计"这一环，别互相抄 */}
               <Link to={`/equipment/${projectNo}/${equipNo}`} style={{ marginRight: 8 }}>

@@ -45,6 +45,7 @@ export default function MarkPaidModal({
 
   return (
     <Modal
+      className="engineering-modal"
       title={`标记已付款 · ${poNo ?? ''}`}
       open={open}
       onCancel={onClose}

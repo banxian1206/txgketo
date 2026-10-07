@@ -470,6 +470,20 @@ try {
     } finally { await nc.browser.close() }
   }
 
+  // 工程任务行里的设备入口不能被整行「去任务页」的click覆盖；键盘也能直达设计。
+  {
+    const nc = await newCtx()
+    try {
+      await login(nc.page, 'mech_manager', 'txgk@123')
+      await nc.page.goto(BASE + '/workbench/eng?tab=mine', { waitUntil: 'networkidle' })
+      const entry = nc.page.getByRole('button', { name: /^TX\d{5}\s+\d{2}[A-Z]$/ }).first()
+      await entry.focus()
+      await nc.page.keyboard.press('Enter')
+      await nc.page.waitForURL(/\/projects\/TX\d{5}\/design\//)
+      check('UX-工程设备入口不被行点击覆盖', /\/design\//.test(nc.page.url()) && new URL(nc.page.url()).searchParams.get('from') === '/workbench/eng?tab=mine', nc.page.url().replace(BASE, ''))
+    } finally { await nc.browser.close() }
+  }
+
   // 长/短工作台页签切换不主动滚动页面（只读，矮视口可复现旧scrollIntoView位移）。
   {
     const nc = await newCtx()

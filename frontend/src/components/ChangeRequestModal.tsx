@@ -53,6 +53,7 @@ export default function ChangeRequestModal({
 
   return (
     <Modal
+        className="engineering-modal"
       title="提改版申请"
       open={open}
       width={560}
