@@ -18,7 +18,7 @@ from app.api.deps import (
     scrub_money,
 )
 from app.core.db import get_session
-from app.services import excel_import
+from app.services import excel_import, pricing
 from app.models.initiation import GoodsReceipt, PurchaseRequest
 from app.models.purchase_order import PurchaseOrder, PurchaseOrderLine
 from app.models.library import SOURCE_STANDARD, Item, StdCategory, StdClass
@@ -415,9 +415,13 @@ async def import_purchase_history(
     request: Request,
     file: UploadFile = File(..., description="历史采购台账：xlsx / csv"),
     session: Session = Depends(get_session),
-    current: User = Depends(require_permission("purchase:edit")),
+    current: User = Depends(require_permission("price:import")),
 ):
     """★ Excel/CSV **历史采购导入**（AGENTS §8.3 第 1 条，客户已确认要做）→ 写价格库。
+
+    🔒 2026-10-07：**权限从 `purchase:edit` 提为 `price:import`**（只给采购经理）。
+       原因：价格库是**公司级主数据**，而 `purchase:edit`（采购员）也能改它 —— 导错一条
+       就会影响后面所有项目的比价。查看仍用 `purchase:price`（见价格库台账页）。
 
     表头（顺序不限，中英文都行）：**物料 / 供应商 / 单价 / 数量 / 日期**（含税可选）。
     · 物料、供应商不在库里 → **自动建**（历史台账里常有我们还没有的），并在返回里列出来给你核对
@@ -451,6 +455,75 @@ async def import_purchase_history(
     return ImportHistoryOut(
         **result, warnings=warnings[:50], warning_count=len(warnings)
     )
+
+
+# ═══════════════════════════════════════════════════════════════════
+# ★ 价格库台账（2026-10-07 客户口径：入口搬到「基础数据」，既可导入也可看导入了什么）
+#
+#   「数据管理」看这里：导入 / 浏览 / 数据健康度（docs/25）
+#   「干活」在采购台的价格参考页签：下单时查这个料多少钱、推荐哪家
+#
+# ⚠ 口径单一来源：`services/pricing.py`（可比价阈值与推荐服务共用，
+#   不许在这里另写一套聚合 —— AGENTS §8.5「同一个概念多处各算一套」）。
+# ⚠ 金额分档（铁律 N23）：全部要 `purchase:price`，无权限 → 403（不是显示 0）。
+# ═══════════════════════════════════════════════════════════════════
+
+
+@router.get("/purchase/quotes/stats")
+def price_library_stats(
+    q: str | None = None,
+    class_code: str | None = None,
+    category_code: str | None = None,
+    session: Session = Depends(get_session),
+    current: User = Depends(require_permission("purchase:price")),
+):
+    """价格库健康度（台账首屏那排数 + 待办清单）。"""
+    return pricing.stats(session, q=q, class_code=class_code, category_code=category_code)
+
+
+@router.get("/purchase/quotes/items")
+def price_library_items(
+    q: str | None = None,
+    class_code: str | None = None,
+    category_code: str | None = None,
+    supplier_id: int | None = None,
+    date_from: date | None = None,
+    date_to: date | None = None,
+    source: str | None = None,
+    only_single: bool = Query(default=False, description="只看只有一家的料（选不了价）"),
+    only_never: bool = Query(default=False, description="只看从未有价的料"),
+    limit: int = Query(default=20, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
+    session: Session = Depends(get_session),
+    current: User = Depends(require_permission("purchase:price")),
+):
+    """价格库台账：**一行一个物料**（12,431 个物料逐条报价翻不动，按物料聚合）。"""
+    return pricing.items_ledger(
+        session,
+        q=q,
+        class_code=class_code,
+        category_code=category_code,
+        supplier_id=supplier_id,
+        date_from=date_from,
+        date_to=date_to,
+        source=source,
+        only_single=only_single,
+        only_never=only_never,
+        limit=limit,
+        offset=offset,
+    )
+
+
+@router.get("/purchase/quotes/by-item/{item_no}")
+def price_library_by_item(
+    item_no: str,
+    session: Session = Depends(get_session),
+    current: User = Depends(require_permission("purchase:price")),
+):
+    """单个物料的全部报价（台账里点开）。"""
+    if session.get(Item, item_no) is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "物料不存在")
+    return pricing.quotes_by_item(session, item_no)
 
 
 @router.get("/purchase/price-reference/{item_no}")

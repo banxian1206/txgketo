@@ -24,6 +24,9 @@ export interface TabItem {
 
 export const BASE_TABS: TabItem[] = [
   { path: '/library', label: '标准库', anyOf: ['std:view', 'std:edit'] },
+  // ★ 价格库（2026-10-07 客户口径：从采购台「价格参考」搬过来，只管**数据管理**）。
+  //   查看要 purchase:price（金额分档铁律 N23）—— 没有它的人看不到这一页签。
+  { path: '/library/prices', label: '价格库', anyOf: ['purchase:price'] },
   { path: '/numbering', label: '编号规则' }, // 只读页，人人可看自己公司怎么编号
 ]
 

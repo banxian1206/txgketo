@@ -503,6 +503,108 @@ export async function priceReference(itemNo: string) {
   return data
 }
 
+/* ═══════════════════════════════════════════════════════════════════
+ * ★ 价格库台账（2026-10-07 客户口径：入口搬到「基础数据」）
+ *
+ *   这里是**数据管理**视角：导入 / 浏览 / 数据健康度（docs/25）。
+ *   「干活时查这个料多少钱、推荐哪家」仍在采购台的价格参考页签（priceReference/recommend）。
+ *
+ * ⚠ 比价阈值不在前端写死 —— 接口带 `thresholds` 回来（与后端推荐服务同一套）。
+ * ═══════════════════════════════════════════════════════════════════ */
+
+export interface PriceLibraryStats {
+  quote_count: number
+  item_count: number
+  supplier_count: number
+  date_from?: string | null
+  date_to?: string | null
+  /** 有 ≥ comparable 家的料 → 能比价 */
+  comparable_items: number
+  /** 有 ≥ recommendable 家的料 → 可放心推荐 */
+  recommendable_items: number
+  /** 只有一家的料 → 选不了价（首屏的待办） */
+  single_supplier_items: number
+  /** 标准库里有、价格库一条没有的料（另一条待办） */
+  never_priced_items: number
+  /** 有价的物料数（台账默认列的就是这批） */
+  priced_item_count: number
+  no_spec_item_count: number
+  thresholds: { comparable: number; recommendable: number }
+}
+
+export interface PriceLibraryItem {
+  item_no: string
+  display_name: string
+  spec_text?: string | null
+  unit?: string | null
+  std_class_code?: string | null
+  quote_count: number
+  supplier_count: number
+  avg_price?: number | null
+  last_price?: number | null
+  last_date?: string | null
+  comparable: boolean
+  recommendable: boolean
+}
+
+export interface PriceLibraryItems {
+  total: number
+  items: PriceLibraryItem[]
+  offset: number
+  limit: number
+}
+
+export interface PriceLibraryQuote {
+  id: number
+  supplier_id: number
+  supplier_name: string
+  price: number
+  tax_incl: boolean
+  qty?: number | null
+  unit?: string | null
+  price_type: string
+  quote_date: string
+  source?: string | null
+  remark?: string | null
+}
+
+export interface PriceLibraryByItem {
+  item_no: string
+  display_name: string
+  spec_text?: string | null
+  unit?: string | null
+  quotes: PriceLibraryQuote[]
+}
+
+export interface PriceLibraryQuery {
+  q?: string
+  class_code?: string
+  category_code?: string
+  supplier_id?: number
+  date_from?: string
+  date_to?: string
+  source?: string
+  only_single?: boolean
+  only_never?: boolean
+  limit?: number
+  offset?: number
+}
+
+export async function priceLibraryStats(params: PriceLibraryQuery = {}) {
+  const { data } = await api.get<PriceLibraryStats>('/purchase/quotes/stats', { params })
+  return data
+}
+
+export async function priceLibraryItems(params: PriceLibraryQuery = {}) {
+  const { data } = await api.get<PriceLibraryItems>('/purchase/quotes/items', { params })
+  return data
+}
+
+export async function priceLibraryByItem(itemNo: string) {
+  const { data } = await api.get<PriceLibraryByItem>(`/purchase/quotes/by-item/${itemNo}`)
+  return data
+}
+
 // ============================== 物料搜索 / 库位 / 其他入库 =============================
 
 export interface LocationRow {

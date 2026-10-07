@@ -20,6 +20,8 @@ const ProjectCreate = lazy(() => import('./features/project/CreatePage'))
 const ProjectDetailPage = lazy(() => import('./features/project/DetailPage'))
 const ProjectInitiate = lazy(() => import('./features/project/InitiatePage'))
 const Library = lazy(() => import('./features/admin/LibraryPage'))
+// ★ 价格库（2026-10-07）：从采购台「价格参考」搬过来的**数据管理**页（docs/25）
+const PriceLibrary = lazy(() => import('./features/admin/PriceLibraryPage'))
 const EquipmentDesign = lazy(() => import('./features/design/Page'))
 const ItemDossier = lazy(() => import('./features/dossier/ItemPage'))
 const EquipmentDossier = lazy(() => import('./features/dossier/EquipmentPage'))
@@ -177,6 +179,7 @@ export default function App() {
         </Route>
         <Route element={<DomainShell tabs={BASE_TABS} />}>
           <Route path="library" element={<RequirePerm anyOf={['std:view', 'std:edit']}><Library /></RequirePerm>} />
+          <Route path="library/prices" element={<RequirePerm anyOf={['purchase:price']}><PriceLibrary /></RequirePerm>} />
           <Route path="numbering" element={<NumberRules />} />
         </Route>
         {redirectRoutes()}

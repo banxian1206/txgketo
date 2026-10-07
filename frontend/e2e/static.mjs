@@ -638,6 +638,29 @@ const eachTsx = (dir, fn) => {
     bad.length ? bad.join(' | ') : '接线正确 · 状态用后端单一口径（前端只做映射）')
 }
 
+// ★ PRICE-价格库搬家（2026-10-07 客户口径：入口从采购台搬到基础数据）——
+//   三个容易悄悄坏掉的点：
+//     ① 基础数据域必须有「价格库」这一项，且按 purchase:price 过滤（金额分档铁律 N23）
+//     ② **导入卡不许再出现在采购台**（职责错位：查价是干活，导入是管数据）
+//     ③ 采购台要留着「去价格库」的入口（下单时查价是高频动作，不该把人赶出去）
+{
+  const bad = []
+  const dom = fs.readFileSync(path.join(SRC, 'configs/domain.tsx'), 'utf8')
+  if (!/path: '\/library\/prices'/.test(dom)) bad.push('基础数据域没有「价格库」这一项')
+  const priceTab = dom.match(/path: '\/library\/prices'[^\n]*/)?.[0] ?? ''
+  if (!/purchase:price/.test(priceTab)) bad.push('价格库页签没按 purchase:price 过滤')
+
+  const panel = fs.readFileSync(path.join(SRC, 'components/PriceReferencePanel.tsx'), 'utf8')
+  if (/importPurchaseHistory|历史采购导入/.test(panel)) bad.push('采购台的「价格参考」里还有导入卡（该搬去基础数据）')
+  if (!/library\/prices/.test(panel)) bad.push('采购台没有「去价格库」的入口')
+
+  const page = fs.readFileSync(path.join(SRC, 'features/admin/PriceLibraryPage.tsx'), 'utf8')
+  if (!/importPurchaseHistory/.test(page)) bad.push('价格库页没有导入入口')
+  if (!/priceLibraryStats/.test(page)) bad.push('价格库页没有健康度（首屏那排数）')
+  check('PRICE-价格库搬进基础数据', bad.length === 0,
+    bad.length ? bad.join(' | ') : '入口在基础数据 · 导入已搬走 · 采购台留去路 · 比价阈值读接口')
+}
+
 // ══ 双端一致性护栏（本轮起：PC 与移动端不再各改各的）══════════════════
 const FEATS = path.join(SRC, 'features');
 

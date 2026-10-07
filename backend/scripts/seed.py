@@ -85,6 +85,9 @@ PERMISSIONS: list[tuple[str, str, str]] = [
     ("purchase:view", "查看采购", "采购"),
     ("purchase:edit", "采购下单", "采购"),
     ("purchase:price", "查看采购价格", "采购"),
+    # ★ 2026-10-07：价格库搬进「基础数据」后，**导入**单独拆一个码。
+    #   以前导入挂在 purchase:edit（采购员也能改公司级价格库），导错一条会影响后面所有项目的比价。
+    ("price:import", "导入历史价格库", "采购"),
     ("purchase:payment", "标记付款/上传付款凭证", "采购"),
     ("warehouse:view", "查看库存", "仓库"),
     ("warehouse:edit", "到货验收/入库/领料", "仓库"),
@@ -109,7 +112,7 @@ ROLES: list[tuple[str, str, list[str]]] = [
     ("CRAFT", "工艺", ["project:view", "design:edit", "std:view", "std:edit"]),
     ("PM", "项目经理", ["project:view", "project:edit", "project:amount", "contract:view", "design:edit", "purchase:view", "mfg:view", "ship:edit", "site:edit", "acceptance:edit"]),
     ("PURCHASE", "采购", ["project:view", "purchase:view", "purchase:edit", "purchase:price", "purchase:payment", "std:view", "warehouse:view"]),
-    ("PURCHASE_LEAD", "采购经理", ["project:view", "purchase:view", "purchase:edit", "purchase:price", "purchase:payment", "std:view", "std:edit", "warehouse:view", "cost:view"]),
+    ("PURCHASE_LEAD", "采购经理", ["project:view", "purchase:view", "purchase:edit", "purchase:price", "purchase:payment", "std:view", "std:edit", "warehouse:view", "cost:view", "price:import"]),
     ("WAREHOUSE", "仓库", ["project:view", "warehouse:view", "warehouse:edit", "purchase:view", "std:view"]),
     ("MFG", "制造执行", ["project:view", "mfg:view", "mfg:edit", "warehouse:edit"]),
     ("ASSY", "装配", ["project:view", "mfg:view", "mfg:edit"]),
