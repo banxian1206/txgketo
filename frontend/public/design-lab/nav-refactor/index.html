@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>导航重构样机 · 无侧栏 + 头像系统设置</title>
+<style>
+:root{
+  --bg:#f6f7f9; --surface:#fff; --surface2:#fbfcfd; --surface3:#f2f4f7;
+  --line:#e7e9ee; --line2:#d8dce3;
+  --ink:#14161a; --ink2:#59616e; --ink3:#8b93a1; --ink4:#b8bfc9;
+  --accent:#1f5fd0; --accent2:#134aa8; --accentSoft:#eef4ff; --accentLine:#c9dcf8;
+  --ok:#0f9d63; --okSoft:#e8f7f0; --warn:#c4761a; --warnSoft:#fdf3e6;
+  --err:#d23b3b; --errSoft:#fdecec; --run:#2f7de1; --runSoft:#eaf2fd; --idle:#98a1ae;
+  --r:12px; --r2:8px; --r3:6px; --pill:999px;
+  --s1:4px; --s2:8px; --s3:12px; --s4:16px; --s5:24px; --s6:32px;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  --sh:0 1px 2px rgba(16,24,40,.05);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font:400 13px/1.55 -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;
+  background:var(--bg);color:var(--ink);-webkit-font-smoothing:antialiased}
+.mono{font-family:var(--mono);font-size:12.5px}
+.app{min-height:100vh;display:flex;flex-direction:column}
+
+/* ══ 顶栏（就是这次的主角）══ */
+.top{height:56px;background:var(--surface);border-bottom:1px solid var(--line);display:flex;align-items:center;
+  gap:var(--s4);padding:0 var(--s5);position:sticky;top:0;z-index:30}
+.brand{display:flex;align-items:center;gap:9px;flex:none;padding-right:var(--s4);border-right:1px solid var(--line)}
+.brand .mark{width:26px;height:26px;border-radius:7px;background:linear-gradient(140deg,#1f5fd0,#0f2b52);color:#fff;
+  display:grid;place-items:center;font:700 10px/1 var(--mono);letter-spacing:.3px}
+.brand b{font-size:14px;font-weight:600;letter-spacing:-.2px}
+.search{flex:1;max-width:440px;display:flex;align-items:center;gap:var(--s2);height:34px;padding:0 var(--s3);
+  border:1px solid var(--line2);border-radius:var(--r2);background:var(--surface2);color:var(--ink3);cursor:text}
+.search:hover{border-color:var(--accentLine);background:#fff}
+.search svg{width:14px;height:14px}
+.kbd{font:500 10.5px/16px var(--mono);border:1px solid var(--line2);border-bottom-width:2px;border-radius:5px;
+  padding:0 5px;color:var(--ink3);background:#fff;margin-left:auto}
+.top .sp{margin-left:auto;display:flex;align-items:center;gap:6px}
+.iconbtn{width:32px;height:32px;border-radius:var(--r2);display:grid;place-items:center;color:var(--ink2);
+  position:relative;cursor:pointer;border:0;background:none}
+.iconbtn:hover{background:var(--surface3)}
+.iconbtn svg{width:17px;height:17px}
+.dot{position:absolute;top:6px;right:7px;width:7px;height:7px;border-radius:50%;background:var(--err);border:1.5px solid #fff}
+.me{display:flex;align-items:center;gap:9px;padding:4px 8px 4px 4px;border-radius:var(--pill);cursor:pointer;border:0;background:none}
+.me:hover{background:var(--surface3)}
+.avatar{width:28px;height:28px;border-radius:50%;background:var(--accent);color:#fff;display:grid;place-items:center;
+  font-size:12px;font-weight:600;flex:none}
+.me .nm{font-size:13px;color:var(--ink)}
+.me .caret{width:12px;height:12px;color:var(--ink3)}
+
+/* 头像下拉 */
+.menu{position:absolute;top:50px;right:20px;width:264px;background:var(--surface);border:1px solid var(--line);
+  border-radius:var(--r);box-shadow:0 12px 32px rgba(16,24,40,.14);padding:6px;display:none;z-index:40}
+.menu.open{display:block}
+.menu .who{padding:10px var(--s3) 10px;border-bottom:1px solid var(--line);margin-bottom:6px}
+.menu .who b{font-size:13.5px;display:block}
+.menu .who span{font-size:11.5px;color:var(--ink3)}
+.menu h5{font-size:11px;color:var(--ink4);font-weight:500;letter-spacing:.6px;padding:8px var(--s3) 4px}
+.menu button{width:100%;display:flex;align-items:center;gap:10px;padding:8px var(--s3);border:0;background:none;
+  border-radius:var(--r2);font-size:13px;color:var(--ink);cursor:pointer;text-align:left}
+.menu button:hover{background:var(--surface3)}
+.menu button svg{width:15px;height:15px;color:var(--ink2)}
+.menu button .n{margin-left:auto;font:500 11px/16px var(--mono);background:var(--surface3);color:var(--ink2);border-radius:var(--pill);padding:0 6px}
+.menu .sep{height:1px;background:var(--line);margin:6px 0}
+
+/* ══ 主体 ══ */
+.body{flex:1;min-width:0}
+.wrap{padding:var(--s5);max-width:1360px;width:100%;margin:0 auto}
+
+/* 台条（工作台切换，超管看得到全部）*/
+.wbtabs{display:flex;gap:4px;overflow-x:auto;padding:6px;background:var(--surface);border:1px solid var(--line);
+  border-radius:var(--r);margin-bottom:var(--s4)}
+.wbtabs a{display:flex;align-items:center;gap:6px;padding:6px 11px;border-radius:var(--r2);font-size:12.5px;
+  color:var(--ink2);text-decoration:none;white-space:nowrap;cursor:pointer}
+.wbtabs a:hover{background:var(--surface3)}
+.wbtabs a.on{background:var(--accentSoft);color:var(--accent);font-weight:600}
+.wbtabs .n{font:500 10.5px/16px var(--mono);background:var(--surface3);color:var(--ink2);border-radius:var(--pill);padding:0 6px}
+.wbtabs a.on .n{background:#fff;color:var(--accent)}
+
+.head{display:flex;align-items:flex-end;gap:var(--s4);margin-bottom:var(--s4)}
+.head h1{font-size:21px;font-weight:600;letter-spacing:-.3px}
+.head p{font-size:12.5px;color:var(--ink3);margin-top:2px}
+.head .sp{margin-left:auto;display:flex;gap:8px;align-items:center}
+.help{width:17px;height:17px;border-radius:50%;border:1px solid var(--line2);color:var(--ink3);font-size:10px;
+  display:grid;place-items:center;cursor:help}
+.help:hover{border-color:var(--accent);color:var(--accent)}
+
+.metrics{display:flex;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);
+  box-shadow:var(--sh);margin-bottom:var(--s4);overflow:hidden}
+.metrics .m{padding:13px var(--s4);border-right:1px solid var(--line);flex:1}
+.metrics .m:last-child{border-right:0}
+.metrics .m .l{font-size:11.5px;color:var(--ink3)}
+.metrics .m .v{font:600 20px/1.2 var(--mono);letter-spacing:-.4px;margin-top:2px}
+.metrics .m.lead .v{color:var(--accent);font-size:26px}
+.metrics .m.err .v{color:var(--err)} .metrics .m small{font-size:11.5px;font-weight:400;color:var(--ink3);font-family:inherit}
+
+.flow{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:var(--s3)}
+.flow a{padding:5px 12px;border-radius:var(--pill);border:1px solid var(--line2);background:var(--surface);
+  font-size:12.5px;color:var(--ink2);cursor:pointer;text-decoration:none}
+.flow a.on{background:#fff;border-color:var(--accentLine);color:var(--accent);font-weight:600;box-shadow:var(--sh)}
+.flow a .n{font:500 10.5px/16px var(--mono);color:var(--ink3);margin-left:5px}
+.flow a.on .n{color:var(--accent)}
+
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--sh);overflow:hidden}
+.grp{display:flex;align-items:center;gap:8px;padding:11px var(--s4);border-bottom:1px solid var(--line);
+  font-size:11.5px;color:var(--ink3);font-weight:500;background:var(--surface2)}
+.grp .bar{width:3px;height:12px;border-radius:2px;background:var(--err)}
+.grp.g-warn .bar{background:var(--warn)}
+.row{display:grid;grid-template-columns:3px 1fr 150px 120px 118px;align-items:center;gap:var(--s4);
+  padding:12px var(--s4);border-bottom:1px solid var(--line)}
+.row:last-child{border-bottom:0}
+.row:hover{background:var(--surface2)}
+.row .tone{width:3px;height:30px;border-radius:2px;background:var(--err)}
+.row.warn .tone{background:var(--warn)} .row.run .tone{background:var(--run)} .row.ok .tone{background:var(--ok)}
+.row .ttl{font-size:13px;font-weight:500}
+.row .meta{font-size:11.5px;color:var(--ink3);margin-top:3px}
+.row .who{font-size:12px;color:var(--ink2)}
+.row .due{font-size:12px;color:var(--ink2)}
+.row .due.e{color:var(--err);font-weight:500}
+.chip{display:inline-flex;align-items:center;height:20px;padding:0 7px;border-radius:5px;border:1px solid var(--line2);
+  background:var(--surface2);font-size:11.5px;color:var(--ink2)}
+.chip.acc{border-color:var(--accentLine);background:var(--accentSoft);color:var(--accent)}
+.chip.warn{border-color:#f0d9b8;background:var(--warnSoft);color:var(--warn)}
+.chip.err{border-color:#f3c9c9;background:var(--errSoft);color:var(--err)}
+.btn{height:30px;padding:0 14px;border-radius:var(--r2);border:1px solid var(--line2);background:var(--surface);
+  font-size:13px;font-weight:500;display:inline-flex;align-items:center;gap:6px;cursor:pointer;color:var(--ink)}
+.btn.pri{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn.sm{height:26px;padding:0 10px;font-size:12px}
+
+/* ══ 系统设置：左子菜单（复用「用户与权限」那套）══ */
+.setwrap{display:grid;grid-template-columns:224px 1fr;gap:var(--s5);padding:var(--s5);max-width:1240px;margin:0 auto;width:100%}
+.setnav{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--sh);padding:8px;align-self:start;position:sticky;top:72px}
+.setnav .lbl{font-size:11px;color:var(--ink4);letter-spacing:.6px;padding:8px 10px 4px;font-weight:500}
+.setnav button{width:100%;text-align:left;border:0;background:none;border-radius:var(--r2);padding:9px 10px;cursor:pointer;display:block}
+.setnav button:hover{background:var(--surface3)}
+.setnav button.on{background:var(--accentSoft)}
+.setnav button strong{display:block;font-size:13px;font-weight:500;color:var(--ink)}
+.setnav button.on strong{color:var(--accent)}
+.setnav button span{display:block;font-size:11px;color:var(--ink3);margin-top:1px}
+.setbody{min-width:0}
+.setbody .sh{margin-bottom:var(--s4)}
+.setbody .sh h2{font-size:19px;font-weight:600;letter-spacing:-.3px}
+.setbody .sh p{font-size:12.5px;color:var(--ink3);margin-top:2px}
+table.t{width:100%;border-collapse:collapse;font-size:12.5px}
+table.t th{text-align:left;font-weight:500;color:var(--ink3);font-size:11.5px;padding:10px var(--s3);
+  border-bottom:1px solid var(--line);background:var(--surface2)}
+table.t td{padding:11px var(--s3);border-bottom:1px solid var(--line)}
+table.t tr:hover td{background:var(--surface2)}
+table.t td b{font-weight:500}
+
+/* ══ 超管：所有工作台总览 ══ */
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:var(--s4)}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--sh);
+  padding:var(--s4);cursor:pointer}
+.card:hover{border-color:var(--accentLine)}
+.card .ct{display:flex;align-items:center;gap:9px;margin-bottom:10px}
+.card .ic{width:30px;height:30px;border-radius:8px;background:var(--accentSoft);color:var(--accent);display:grid;place-items:center}
+.card .ic svg{width:16px;height:16px}
+.card b{font-size:14px;font-weight:600}
+.card .desc{font-size:11.5px;color:var(--ink3);min-height:32px;line-height:1.5}
+.card .nums{display:flex;gap:14px;margin-top:10px;padding-top:10px;border-top:1px solid var(--line)}
+.card .nums span{font-size:11.5px;color:var(--ink3)}
+.card .nums b{font:600 15px/1 var(--mono);display:block;color:var(--ink);margin-bottom:2px}
+
+/* ══ 对比旧版（浮动）══ */
+.cmp{position:fixed;left:20px;bottom:20px;z-index:50;display:flex;align-items:center;gap:8px;
+  background:var(--ink);color:#fff;border-radius:var(--pill);padding:8px 14px;font-size:12.5px;box-shadow:0 8px 20px rgba(0,0,0,.2);cursor:pointer}
+.oldside{display:none}
+body.showold .app{display:grid;grid-template-columns:236px 1fr}
+body.showold .oldside{display:flex;flex-direction:column;background:var(--surface);border-right:1px solid var(--line);
+  height:100vh;position:sticky;top:0}
+body.showold .top{display:none}
+.oldnav{padding:8px}
+.oldnav h4{font-size:11px;color:var(--ink4);font-weight:500;letter-spacing:.6px;padding:14px 10px 6px}
+.oldnav a{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:var(--r2);color:var(--ink2);
+  text-decoration:none;font-size:13px}
+.oldnav a.on{background:var(--accentSoft);color:var(--accent);font-weight:500}
+.oldbrand{padding:16px;font-weight:600;font-size:14px}
+.view{display:none}
+.view.on{display:block}
+.muted{color:var(--ink3)}
+</style>
+</head>
+<body>
+<div class="app">
+  <!-- 旧版侧栏（只在“对比旧版”时出现） -->
+  <aside class="oldside">
+    <div class="oldbrand">同兴高科 TXGK</div>
+    <nav class="oldnav">
+      <h4>工作台</h4><a class="on">工作台</a>
+      <h4>业务</h4><a>项目</a><a>基础数据</a>
+      <h4>系统管理</h4><a>用户与权限</a>
+    </nav>
+  </aside>
+
+  <!-- ══ 顶栏 ══ -->
+  <header class="top">
+    <div class="brand"><span class="mark">TX</span><b>同兴高科</b></div>
+    <div class="search">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3-3"/></svg>
+      <span>搜编号 / 图号 / 物料 / 项目</span>
+      <span class="kbd">⌘K</span>
+    </div>
+    <div class="sp">
+      <button class="iconbtn" title="站内消息">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>
+        <span class="dot"></span>
+      </button>
+      <button class="me" onclick="toggleMenu(event)">
+        <span class="avatar">系</span><span class="nm">系统管理员</span>
+        <svg class="caret" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <!-- 头像下拉 -->
+  <div class="menu" id="menu">
+    <div class="who"><b>系统管理员</b><span>admin · 全站管理员</span></div>
+    <button onclick="go('settings','users')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a7.6 7.6 0 0 0 .1-1 7.6 7.6 0 0 0-.1-1l2-1.6-2-3.4-2.4 1a7.5 7.5 0 0 0-1.7-1l-.4-2.6h-3.8l-.4 2.6a7.5 7.5 0 0 0-1.7 1l-2.4-1-2 3.4L4.5 13a7.6 7.6 0 0 0 0 2l-2 1.6 2 3.4 2.4-1a7.5 7.5 0 0 0 1.7 1l.4 2.6h3.8l.4-2.6a7.5 7.5 0 0 0 1.7-1l2.4 1 2-3.4z"/></svg>
+      系统设置
+    </button>
+    <button onclick="go('allwb')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
+      所有工作台<span class="n">10</span>
+    </button>
+    <div class="sep"></div>
+    <button onclick="alert('（样机）手机端入口')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="6" y="2" width="12" height="20" rx="2.5"/><path d="M11 18h2"/></svg>
+      手机端入口
+    </button>
+    <button onclick="alert('（样机）退出')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/></svg>
+      退出登录
+    </button>
+  </div>
+
+  <div class="body">
+    <!-- ════════ 视图 1：工作台（无侧栏，顶栏 + 台条）════════ -->
+    <div class="view on" id="v-workbench">
+      <div class="wrap">
+        <!-- 台条：超管看得到全部台 -->
+        <div class="wbtabs">
+          <a>经营驾驶舱</a><a>商务部工作台</a><a>项目经理台</a><a>工程部工作台</a>
+          <a class="on">采购工作台</a><a>仓库工作台<span class="n">9</span></a><a>车间工作台<span class="n">4</span></a>
+          <a>发运工作台</a><a>现场工作台</a><a>售后工作台</a>
+        </div>
+
+        <div class="head">
+          <div>
+            <h1>采购工作台</h1>
+            <p>先查仓库 → 缺的进池 → 攒一攒合并下单</p>
+          </div>
+          <div class="sp">
+            <span class="help" title="先查仓库 → 缺的进采购池 → 攒一攒合并下单；手工申请免审核直入池">?</span>
+            <button class="btn pri">手工采购申请</button>
+          </div>
+        </div>
+
+        <div class="metrics">
+          <div class="m lead"><div class="l">待我审批</div><div class="v">3 <small>单</small></div></div>
+          <div class="m"><div class="l">待叫车</div><div class="v">1 <small>单</small></div></div>
+          <div class="m"><div class="l">采购池</div><div class="v">6 <small>条</small></div></div>
+          <div class="m err"><div class="l">到货超期</div><div class="v">2 <small>单</small></div></div>
+          <div class="m"><div class="l">验收不合格</div><div class="v">1 <small>单</small></div></div>
+        </div>
+
+        <div class="flow">
+          <a class="on">待我审批<span class="n">3</span></a>
+          <a>待叫车<span class="n">1</span></a>
+          <a>采购池</a><a>采购单</a><a>到货跟踪</a><a>退换记录</a><a>供应商</a>
+        </div>
+
+        <div class="panel">
+          <div class="grp"><span class="bar"></span>等我审批 · 通过后供应商即接单</div>
+          <div class="row">
+            <span class="tone"></span>
+            <div><div class="ttl">PO26011 · 温州希顺电气科技有限公司</div>
+              <div class="meta mono">TX26005 · 01A · T-2型链条耐磨条 × 12 · ¥14,400</div></div>
+            <div class="who">提交：buyer1</div>
+            <div class="due e">今天 11:53</div>
+            <div><button class="btn sm pri">审批</button></div>
+          </div>
+          <div class="row warn">
+            <span class="tone"></span>
+            <div><div class="ttl">PO26010 · 广东奕丞防爆电气有限公司</div>
+              <div class="meta mono">TX26005 · 45#链轮 × 1 · ¥9</div></div>
+            <div class="who">提交：buyer1</div>
+            <div class="due">昨天 10:05</div>
+            <div><button class="btn sm pri">审批</button></div>
+          </div>
+          <div class="row run">
+            <span class="tone"></span>
+            <div><div class="ttl">PO26005 · 温州希顺电气科技有限公司</div>
+              <div class="meta mono">TX26005 · 45#链轮 × 1 · ¥9</div></div>
+            <div class="who">提交：buyer1</div>
+            <div class="due">10-07 09:41</div>
+            <div><button class="btn sm pri">审批</button></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ════════ 视图 2：系统设置（左子菜单）════════ -->
+    <div class="view" id="v-settings">
+      <div class="setwrap">
+        <nav class="setnav">
+          <div class="lbl">账号与系统</div>
+          <button class="on" id="s-users" onclick="setTab('users')"><strong>用户</strong><span>维护账号、部门与角色</span></button>
+          <button id="s-org" onclick="setTab('org')"><strong>组织架构</strong><span>管理部门与下属小组</span></button>
+          <button id="s-roles" onclick="setTab('roles')"><strong>角色说明</strong><span>查看职责与权限范围</span></button>
+          <button id="s-integration" onclick="setTab('integration')"><strong>外部集成</strong><span>配置识别服务与连接</span></button>
+          <button id="s-logs" onclick="setTab('logs')"><strong>操作日志</strong><span>追溯系统操作记录</span></button>
+          <div class="lbl">基础数据</div>
+          <button id="s-std" onclick="setTab('std')"><strong>标准库</strong><span>分类查找与维护物料</span></button>
+          <button id="s-prices" onclick="setTab('prices')"><strong>价格库</strong><span>查看历史采购价与供应商</span></button>
+          <button id="s-numbering" onclick="setTab('numbering')"><strong>编号规则</strong><span>查看编号规则与编码结构</span></button>
+        </nav>
+        <section class="setbody">
+          <div class="sh"><h2 id="sh-title">用户</h2><p id="sh-note">维护账号、部门与角色</p></div>
+          <div class="panel">
+            <table class="t">
+              <thead><tr><th style="width:120px">姓名</th><th style="width:130px">账号</th><th>部门 / 岗位</th><th style="width:180px">角色</th><th style="width:80px">状态</th></tr></thead>
+              <tbody>
+                <tr><td><b>林工</b></td><td class="mono">mech_manager</td><td>工程部 · 机械组 / 经理</td><td>设计</td><td><span class="chip">在职</span></td></tr>
+                <tr><td><b>陈工</b></td><td class="mono">craft_manager</td><td>工程部 · 工艺组 / 经理</td><td>工艺</td><td><span class="chip">在职</span></td></tr>
+                <tr><td><b>周采购</b></td><td class="mono">purchase_manager</td><td>采购部 / 经理</td><td>采购</td><td><span class="chip">在职</span></td></tr>
+                <tr><td><b>王仓管</b></td><td class="mono">wh1</td><td>仓库 / 组员</td><td>仓库</td><td><span class="chip">在职</span></td></tr>
+                <tr><td><b>李师傅</b></td><td class="mono">shop1</td><td>车间 / 组员</td><td>制造</td><td><span class="chip warn">停用</span></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </div>
+    </div>
+
+    <!-- ════════ 视图 3：超管 · 所有工作台总览 ════════ -->
+    <div class="view" id="v-allwb">
+      <div class="wrap">
+        <div class="head">
+          <div><h1>所有工作台</h1><p>管理员全局视角 · 10 个台，点进任意台干活；每页顶部台条也能切</p></div>
+        </div>
+        <div class="grid">
+          <div class="card" onclick="go('workbench')">
+            <div class="ct"><span class="ic">📊</span><b>经营驾驶舱</b></div>
+            <div class="desc">在手订单 / 交付风险 / 卡点榜 / 售后与质保，一屏看完</div>
+            <div class="nums"><span><b>12</b>在手订单</span><span><b>2</b>交付风险</span></div>
+          </div>
+          <div class="card" onclick="go('workbench')">
+            <div class="ct"><span class="ic">💼</span><b>商务部工作台</b></div>
+            <div class="desc">我的商机 / 待立项 / 待回款节点</div>
+            <div class="nums"><span><b>5</b>我的商机</span><span><b>3</b>待回款</span></div>
+          </div>
+          <div class="card" onclick="go('workbench')">
+            <div class="ct"><span class="ic">🧭</span><b>项目经理台</b></div>
+            <div class="desc">项目全链进度 / 风险 / 验收与质保</div>
+            <div class="nums"><span><b>4</b>我负责</span><span><b>1</b>缺料</span></div>
+          </div>
+          <div class="card" onclick="go('workbench')">
+            <div class="ct"><span class="ic">📐</span><b>工程部工作台</b></div>
+            <div class="desc">我的任务 / 我组 / 部门看板</div>
+            <div class="nums"><span><b>6</b>待我审</span><span><b>2</b>待裁决</span></div>
+          </div>
+          <div class="card" onclick="go('workbench')">
+            <div class="ct"><span class="ic">🛒</span><b>采购工作台</b></div>
+            <div class="desc">采购池 / 采购单 / 到货跟踪 / 供应商</div>
+            <div class="nums"><span><b>3</b>待我审批</span><span><b>6</b>采购池</span></div>
+          </div>
+          <div class="card" onclick="go('workbench')">
+            <div class="ct"><span class="ic">📦</span><b>仓库工作台</b></div>
+            <div class="desc">待验收 / 待入库 / 待领料 / 库存</div>
+            <div class="nums"><span><b>9</b>待办</span><span><b>2</b>缺货</span></div>
+          </div>
+          <div class="card" onclick="go('workbench')">
+            <div class="ct"><span class="ic">🔧</span><b>车间工作台</b></div>
+            <div class="desc">待下发 / 在制 / 待转运 / 外协</div>
+            <div class="nums"><span><b>4</b>待下发</span><span><b>1</b>超期</span></div>
+          </div>
+          <div class="card" onclick="go('workbench')">
+            <div class="ct"><span class="ic">🚚</span><b>发运工作台</b></div>
+            <div class="desc">待装车 / 待发运 / 发运批次</div>
+            <div class="nums"><span><b>2</b>待装车</span><span><b>1</b>在途</span></div>
+          </div>
+          <div class="card" onclick="go('workbench')">
+            <div class="ct"><span class="ic">🏗️</span><b>现场工作台</b></div>
+            <div class="desc">来货清点 / 勘测 / 日报 / 现场问题</div>
+            <div class="nums"><span><b>1</b>来货清点</span><span><b>0</b>问题</span></div>
+          </div>
+          <div class="card" onclick="go('workbench')">
+            <div class="ct"><span class="ic">🛠️</span><b>售后工作台</b></div>
+            <div class="desc">服务工单 / 备件台账</div>
+            <div class="nums"><span><b>2</b>待受理</span><span><b>1</b>在保</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="cmp" onclick="document.body.classList.toggle('showold')">
+  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M8 21H5a2 2 0 0 1-2-2v-3M16 21h3a2 2 0 0 0 2-2v-3"/></svg>
+  点这里对比「旧版（有左侧栏）」
+</div>
+
+<script>
+function toggleMenu(e){ e.stopPropagation(); document.getElementById('menu').classList.toggle('open'); }
+document.addEventListener('click', ()=>document.getElementById('menu').classList.remove('open'));
+function show(id){
+  document.querySelectorAll('.view').forEach(v=>v.classList.remove('on'));
+  document.getElementById(id).classList.add('on');
+  window.scrollTo(0,0);
+}
+function go(view, tab){ document.getElementById('menu').classList.remove('open'); if(view==='workbench') return show('v-workbench'); if(view==='allwb') return show('v-allwb'); show('v-settings'); if(tab) setTab(tab); }
+const TABTXT={users:['用户','维护账号、部门与角色'],org:['组织架构','管理部门与下属小组'],roles:['角色说明','查看职责与权限范围'],integration:['外部集成','配置识别服务与连接'],logs:['操作日志','追溯系统操作记录'],std:['标准库','分类查找与维护物料'],prices:['价格库','查看历史采购价与供应商'],numbering:['编号规则','查看编号规则与编码结构']};
+function setTab(k){
+  document.querySelectorAll('.setnav button').forEach(b=>b.classList.remove('on'));
+  const el=document.getElementById('s-'+k); if(el) el.classList.add('on');
+  document.getElementById('sh-title').textContent=TABTXT[k][0];
+  document.getElementById('sh-note').textContent=TABTXT[k][1];
+}
+</script>
+</body>
+</html>

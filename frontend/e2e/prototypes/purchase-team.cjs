@@ -1,0 +1,28 @@
+const fs=require('fs'),vm=require('vm'),assert=require('node:assert/strict');
+const element=()=>({innerHTML:'',textContent:'',hidden:false,parentElement:{querySelector(){return element()}},dataset:{},classList:{toggle(){}},appendChild(){},querySelector(){return element()}});
+const nodes={};const get=s=>nodes[s]??=element();const events={};
+const ctx=vm.createContext({console,document:{createElement:element,head:element(),querySelector:get,querySelectorAll(){return[]},addEventListener(n,f){(events[n]??=[]).push(f)}},$:get,roleDemo:element(),demo:{role:'采购员',orderState:'草稿',view:'待采购'},md:{todoId:'reject'},tab:'todo',safe:s=>s,cash:n=>'¥'+n,render(){},todoDetail:t=>t.title,todo(){},taskPaper:()=>'',poolPaper:()=>'',chasePaper:()=>'',returnPaper:()=>'',flowNav(){},toast(){},linesForPO:()=>[{name:'test',qty:1,unit:'台',price:10,prev:9,sources:[]}],poRows:()=>[['PO26013','铝业','铝型材',9888,ctx.demo.orderState==='草稿'?'待经理审':ctx.demo.orderState,'10月15日'],['PO26012','机电','电机',31500,'待总监审','—'],['PO26009','电气','变频器',24600,'部分到货','10月9日']],poDetailMD:()=>'',projects:()=>`我参与的项目 · 4`,prs:[['TX26007'],['TX26005'],['TX26008'],['TX26001']],todosMD:[{id:'reject',title:'异常'},{id:'chase',title:'催货'},{id:'price',title:'退回'},{id:'order',title:'需求'}],mdShell:(...args)=>args.join(''),mdHead:(...args)=>args.join(''),mdMeta:()=>'',mdItem:(...args)=>args.join('')});
+vm.runInContext(fs.readFileSync('frontend/public/design-lab/proposals/purchase-team.js','utf8'),ctx);
+const run=s=>vm.runInContext(s,ctx);
+assert.equal(run('visibleMembers().length'),1);assert.equal(run('scopedTodos().length'),4);assert.equal(run('pendingApprovals().length'),0);
+run("demo.role='采购经理';render()");assert.equal(run('visibleMembers().length'),3);assert.equal(run('scopedTodos().length'),9);assert.equal(run('pendingApprovals().length'),1);
+assert(run('flowNav()').includes('待审批'));assert(run('projects()').includes('团队项目 · 5'));
+run("teamScope.member='小陈';render()");assert.equal(run('teamScope.member'),'小陈');assert.equal(run('scopedTodos().length'),2);assert.equal(run('poRows().length'),1);assert(run('projects()').includes('团队项目 · 1'));
+run("demo.role='采购总监';teamScope.member='全部';render()");assert.equal(run('visibleMembers().length'),6);assert.equal(run('scopedTodos().length'),13);assert.equal(run('pendingApprovals().length'),2);assert(run('projects()').includes('团队项目 · 8'));
+run("teamScope.member='小林';render()");assert.equal(run('scopedTodos().length'),1);assert.equal(run('poRows().length'),1);assert(run('projects()').includes('团队项目 · 1'));
+run("demo.role='采购经理';teamScope.member='全部';teamScope.approval='PO26013';tab='tasks';demo.view='待审批';render()");
+get('#team-approval-reason').value='';for(const f of events.click)f({target:{closest:s=>s==='button'?{dataset:{teamDecision:'reject'}}:null}});assert.equal(ctx.demo.orderState,'草稿');assert.equal(get('#team-approval-error').textContent,'请填写退回原因');
+for(const f of events.click)f({target:{closest:s=>s==='button'?{dataset:{teamDecision:'approve'}}:null}});assert.equal(ctx.demo.orderState,'待总监审');assert.equal(run('pendingApprovals().length'),0);
+run("demo.role='采购总监';teamScope.approval='PO26013';render()");assert.equal(run('pendingApprovals().length'),3);
+for(const f of events.click)f({target:{closest:s=>s==='button'?{dataset:{teamDecision:'approve'}}:null}});assert.equal(ctx.demo.orderState,'在途');
+run("demo.role='采购员';render()");assert(!run('flowNav()').includes('待审批'));assert.equal(ctx.demo.view,'待审批');
+console.log('PASS: personal / manager / director scopes, member persistence, projects, orders, approval stage, required rejection reason, two-step approval, staff reset. DOM stub only; not visual browser QA.');
+vm.runInContext(fs.readFileSync('frontend/public/design-lab/proposals/purchase-stages.js','utf8'),ctx);
+run("demo.role='采购员';teamScope.member='全部';demo.view='待审批'");
+assert.equal(run('currentStage()'),'待审批');assert.equal(run("stageCount('待审批')"),0); // Previously approved above; no pending personal order.
+assert.equal(run("stageCount('已验收')"),1);assert.equal(run("stageCount('已入库')"),1);
+assert.equal(run("stageCount('已叫车 · 待装车')"),1);assert.equal(run("stageCount('已装车 · 运输中')"),0);
+run("demo.role='采购经理';teamScope.member='全部'");assert.equal(run("stageCount('已装车 · 运输中')"),1);
+run("teamScope.member='小陈'");assert.equal(run("stageCount('已验收')"),0);assert.equal(run("stageCount('已装车 · 运输中')"),1);
+run("teamScope.member='小周';demo.called=true");assert.equal(run("stageCount('待叫车')"),0);assert.equal(run("stageCount('已叫车 · 待装车')"),1);
+console.log('PASS: two flow groups, scoped receipt/transport states, independent accepted/stored counts, booked-car transition.');

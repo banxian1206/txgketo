@@ -1,0 +1,34 @@
+/* Canonical workbench prototype tokens. See docs/29-UI页面统一标准.md. */
+:root {
+  --ui-font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  --ui-font-body: 14px;
+  --ui-font-table: 13px;
+  --ui-font-secondary: 12px;
+  --ui-font-caption: 11px;
+  --ui-font-detail-title: 18px;
+  --ui-font-greeting: 23px;
+  --ui-line-height: 1.55;
+  --ui-primary: #1f5fd0;
+  --ui-page: #f4f7fc;
+  --ui-surface: #ffffff;
+  --ui-text: #1b2941;
+  --ui-text-secondary: #718099;
+  --ui-selected: #edf3ff;
+  --ui-hover: #f5f8fd;
+  --workbench-gap: 16px;
+  --workbench-radius: 13px;
+  --workbench-border: #e1e8f3;
+  --workbench-control-height: 36px;
+  --summary-rail-width: 300px;
+  --summary-rail-gap: 16px;
+  --status-danger: #c43b43;
+  --status-danger-bg: #fff0f1;
+  --status-warning: #9b610c;
+  --status-warning-bg: #fff5e5;
+  --status-success: #237a46;
+  --status-success-bg: #edf8f0;
+  --status-info: #1f5fd0;
+  --status-info-bg: #edf3ff;
+  --status-neutral: #68788f;
+  --status-neutral-bg: #f1f4f8;
+}

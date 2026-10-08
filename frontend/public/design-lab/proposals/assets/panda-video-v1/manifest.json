@@ -1,0 +1,13 @@
+{
+  "fps": 24,
+  "count": 141,
+  "width": 256,
+  "height": 276,
+  "columns": 8,
+  "perSheet": 48,
+  "sheets": [
+    "atlas-0.webp",
+    "atlas-1.webp",
+    "atlas-2.webp"
+  ]
+}

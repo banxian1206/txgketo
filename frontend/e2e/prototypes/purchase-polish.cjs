@@ -1,0 +1,6 @@
+const fs=require('fs'),vm=require('vm'),assert=require('assert');
+const source=fs.readFileSync('frontend/public/design-lab/proposals/purchase-polish.js','utf8');
+const buttons={};for(const id of ['todo','tasks','projects','issues'])buttons[id]={dataset:{tab:id},innerHTML:'',setAttribute(k,v){this[k]=v},removeAttribute(k){delete this[k]}};
+const ctx={stages:{materials:['待采购','待审批','待验收']},stageCount:s=>({'待采购':1,'待审批':2,'待验收':3}[s]),issueSubmitter:()=> '小李',issueRecords:[{owner:'小李',recipient:'小李'},{owner:'王师傅',recipient:'小李'},{owner:'小周',recipient:'陈经理'}],tab:'issues',render(){},document:{head:{appendChild(){}},createElement:()=>({}),querySelector:s=>buttons[s.match(/data-tab="(.*?)"/)[1]],querySelectorAll:()=>Object.values(buttons)}};
+vm.createContext(ctx);vm.runInContext(source,ctx);assert.equal(vm.runInContext('purchaseTaskCount()',ctx),6);assert.equal(vm.runInContext('purchaseIssueCount()',ctx),2);assert(buttons.tasks.innerHTML.includes('6'));assert(buttons.issues.innerHTML.includes('2'));assert.equal(buttons.issues['aria-current'],'page');assert.equal(buttons.tasks['aria-current'],undefined);
+console.log('PASS: task categories summed, issue records scoped and deduplicated, badge rendering and active navigation semantics.');
